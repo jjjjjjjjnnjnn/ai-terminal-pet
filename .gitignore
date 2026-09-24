@@ -1,0 +1,26 @@
+# Build outputs (rebuilt via install.ps1, never committed)
+*.exe
+*.disabled
+bin/
+
+# Runtime / logs (machine-local state)
+error.log
+hang.log
+*.tmp
+
+# Editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# Backups
+*.bak
+*.bak-*
+
+# Node artifacts (reporters use stdlib only, no node_modules needed)
+node_modules/
+package-lock.json
+
+# Local harness output
+harness-out.json
