@@ -22,6 +22,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 const (
@@ -161,6 +163,11 @@ func SaveState(path string, value State) error {
 	return WriteFileAtomic(path, append(data, '\n'))
 }
 
+// TempPrefix marks the temporary files WriteFileAtomic creates. It is
+// deliberately distinctive so a sweep can recognise them without touching
+// anything a user put in the directory.
+const TempPrefix = ".pet-"
+
 // WriteFileAtomic writes data to path via a temporary file in the same
 // directory followed by a rename. Same-directory is required: rename is only
 // atomic within a volume.
@@ -169,7 +176,7 @@ func WriteFileAtomic(path string, data []byte) error {
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(directory, ".pet-*.tmp")
+	temporary, err := os.CreateTemp(directory, TempPrefix+"*.tmp")
 	if err != nil {
 		return err
 	}
@@ -189,4 +196,40 @@ func WriteFileAtomic(path string, data []byte) error {
 		return err
 	}
 	return nil
+}
+
+// SweepTemporaryFiles removes atomic-write temporaries left in directory by an
+// interrupted save and returns how many it deleted.
+//
+// WriteFileAtomic cleans up after itself on every error path, but a hard kill
+// (taskkill /F, power loss) between CreateTemp and Rename cannot: the process
+// simply stops existing. Nothing else revisits this directory, so without a
+// sweep those orphans accumulate one per interrupted save.
+//
+// Only files older than minAge are considered, so a sweep can never race a
+// save that another process still has in flight.
+func SweepTemporaryFiles(directory string, minAge time.Duration) int {
+	if directory == "" {
+		return 0
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return 0
+	}
+	cutoff := time.Now().Add(-minAge)
+	removed := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, TempPrefix) || !strings.HasSuffix(name, ".tmp") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || info.ModTime().After(cutoff) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(directory, name)); err == nil {
+			removed++
+		}
+	}
+	return removed
 }

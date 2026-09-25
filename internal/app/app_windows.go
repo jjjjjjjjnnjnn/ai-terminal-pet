@@ -41,6 +41,10 @@ func Run() error {
 	}
 	platform.HideConsole()
 	directory := filepath.Join(localAppData, "AI-Terminal-Pet")
+	// Reclaim atomic-write temporaries orphaned by a hard kill. Only files
+	// older than an hour are touched, so a save still in flight in another
+	// process is never disturbed.
+	config.SweepTemporaryFiles(directory, time.Hour)
 	runtimeDirectory := filepath.Join(directory, "runtime")
 	scanner := store.SnapshotScanner{
 		Directory: runtimeDirectory,

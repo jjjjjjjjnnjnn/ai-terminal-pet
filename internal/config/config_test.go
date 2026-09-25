@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDecodeConfigFallsBackToDefaults(t *testing.T) {
@@ -112,5 +114,44 @@ func TestSaveLeavesNoTemporaryFiles(t *testing.T) {
 		if entry.Name() != StateFileName {
 			t.Fatalf("unexpected leftover file %q", entry.Name())
 		}
+	}
+}
+
+func TestSweepTemporaryFiles(t *testing.T) {
+	directory := t.TempDir()
+	stale := filepath.Join(directory, TempPrefix+"111.tmp")
+	fresh := filepath.Join(directory, TempPrefix+"222.tmp")
+	keepConfig := filepath.Join(directory, FileName)
+	for _, path := range []string{stale, fresh, keepConfig} {
+		if err := os.WriteFile(path, []byte("{}"), 0600); err != nil {
+			t.Fatalf("seed %s: %v", path, err)
+		}
+	}
+	// Age one of them past the cutoff.
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatalf("age stale temp: %v", err)
+	}
+
+	if removed := SweepTemporaryFiles(directory, time.Hour); removed != 1 {
+		t.Fatalf("expected exactly the stale temp removed, got %d", removed)
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("stale temp must be gone")
+	}
+	// A save in flight must never be swept, and real files are not ours to touch.
+	for _, path := range []string{fresh, keepConfig} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("%s must survive: %v", path, err)
+		}
+	}
+}
+
+func TestSweepTemporaryFilesMissingDirectory(t *testing.T) {
+	if removed := SweepTemporaryFiles(filepath.Join(t.TempDir(), "nope"), time.Hour); removed != 0 {
+		t.Fatalf("missing directory must be a no-op, got %d", removed)
+	}
+	if removed := SweepTemporaryFiles("", time.Hour); removed != 0 {
+		t.Fatalf("empty directory must be a no-op, got %d", removed)
 	}
 }
