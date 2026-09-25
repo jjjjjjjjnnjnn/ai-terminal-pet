@@ -24,6 +24,11 @@ const (
 	menuShow       = 1001
 	menuHide       = 1002
 	menuExit       = 1003
+
+	// windowClassName is also the rendezvous used by ActivateExisting, so
+	// the short-lived second process can find the live overlay.
+	windowClassName = "AITerminalPetWindow"
+	windowTitle     = "AI Terminal Pet"
 )
 
 var activeWindow atomic.Pointer[App]
@@ -43,22 +48,30 @@ type messageEnvelope struct {
 }
 
 type App struct {
-	values          *store.Store
-	handle          atomic.Uintptr
-	dpi             uint32
-	zoom            float64
-	expanded        bool
-	hidden          bool
-	pressed         bool
-	x               int32
-	y               int32
-	width           int
-	height          int
-	sessions        []session.Session
-	state           session.State
-	revision        uint64
-	hit             []byte
-	drag            dragState
+	values   *store.Store
+	handle   atomic.Uintptr
+	dpi      uint32
+	zoom     float64
+	expanded bool
+	hidden   bool
+	pressed  bool
+	x        int32
+	y        int32
+	width    int
+	height   int
+	sessions []session.Session
+	state    session.State
+	revision uint64
+	hit      []byte
+	// surface is the reused DIB canvas. Recreating it every frame meant a
+	// CreateDIBSection/SelectObject/DeleteObject round trip at up to 20 FPS
+	// (the alert-state animation timer), which is pure GDI churn on a
+	// layered window. UI thread only.
+	surface *canvas
+	drag    dragState
+	// lastAvailable is the grace anchor for the idle self-destruct: with no
+	// sessions the overlay removes itself, so the reporters' on-demand
+	// launch path stays the only thing that keeps a process alive.
 	lastAvailable   time.Time
 	taskbarMessage  uint32
 	trayIcon        win.HICON
@@ -70,10 +83,38 @@ type App struct {
 	// goroutine stacks when this goes stale while a window exists.
 	lastDispatchNs atomic.Int64
 	lastHangDumpNs atomic.Int64
+	// lastMessage is the most recent window message id, recorded so a hang
+	// dump can name the message the UI thread was last asked to handle.
+	lastMessage atomic.Uint32
 }
 
 func New(values *store.Store) *App {
 	return &App{values: values, dpi: 96, zoom: 1, state: session.StateIdle, revision: ^uint64(0), lastAvailable: time.Now()}
+}
+
+// ActivateExisting asks an already-running instance to reveal itself and
+// reports whether one was found.
+//
+// The overlay is single-instance and on demand: reporters launch it, and it
+// removes itself once no session is left. A user who double-clicks the
+// executable while an instance is alive used to hit the single-instance
+// mutex and exit silently, which is indistinguishable from "the program is
+// broken" - the reported "open anomaly". The second process now pokes the
+// live window with wmActivate instead, running the same show path a tray
+// click would.
+//
+// PostMessage is asynchronous and safe across threads, so this can never
+// block the short-lived second process; a missing window is a plain false.
+func ActivateExisting() bool {
+	name, err := syscall.UTF16FromString(windowClassName)
+	if err != nil {
+		return false
+	}
+	handle := win.FindWindow(&name[0], nil)
+	if handle == 0 {
+		return false
+	}
+	return win.PostMessage(handle, wmActivate, 0, 0) != 0
 }
 
 func (a *App) Refresh() {
@@ -110,12 +151,26 @@ func (a *App) Close() {
 }
 
 func (a *App) Run() error {
+	// Win32 demands that window creation, the first ShowWindow/SetWindowPos
+	// and the message pump all happen on ONE OS thread. Go's scheduler is
+	// free to migrate an unlocked goroutine to a different M between any two
+	// calls, and window messages are delivered to the queue of the thread
+	// that created the window. When that migration happened here, the
+	// creating thread ended up with a queue nobody pumped, so the very first
+	// SetWindowPos(HWND_TOPMOST) blocked forever inside a cross-thread
+	// SendMessage: WS_VISIBLE never got set, no message was ever dispatched,
+	// and the process became a ghost window that Windows reported as hung.
+	// That single omission produced every reported symptom - invisible
+	// overlay, click "crash", dead timers, no drag - and is verified by
+	// instrumenting Run() with and without this pin.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	enableDPIAwareness()
-	className, err := syscall.UTF16FromString("AITerminalPetWindow")
+	className, err := syscall.UTF16FromString(windowClassName)
 	if err != nil {
 		return err
 	}
-	windowName, err := syscall.UTF16FromString("AI Terminal Pet")
+	windowName, err := syscall.UTF16FromString(windowTitle)
 	if err != nil {
 		return err
 	}
@@ -182,6 +237,7 @@ func (a *App) Run() error {
 func procedure(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {
 	window := activeWindow.Load()
 	if window != nil {
+		window.lastMessage.Store(message)
 		window.lastDispatchNs.Store(time.Now().UnixNano())
 		return window.handleMessage(hwnd, message, wParam, lParam)
 	}
@@ -192,11 +248,19 @@ func procedure(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {
 // stops dispatching for longer than stallThreshold while the window
 // exists. Idle blocking inside GetMessage does NOT trigger this because
 // GetMessage itself returns (timers fire at 50ms) and every dispatch
-// refreshes lastDispatchNs. Dumps are rate-limited to one per minute.
+// refreshes lastDispatchNs.
+//
+// Dumps are bounded on purpose. The previous unbounded, 60s-throttled
+// version appended 370 KB of identical stacks over a single 80-minute
+// outage without ever naming the culprit, which made the log useless for
+// diagnosis. A stall that repeats after maxDumps is the same stall; the
+// first dump already carries the stack that matters.
 func (a *App) watchHang(stop <-chan struct{}) {
 	const stallThreshold = 6 * time.Second
-	const dumpCooldown = 60 * time.Second
-	const maxHangLog = 512 << 10
+	const dumpCooldown = 2 * time.Minute
+	const maxDumps = 3
+	const maxHangLog = 256 << 10
+	dumps := 0
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -204,7 +268,7 @@ func (a *App) watchHang(stop <-chan struct{}) {
 		case <-stop:
 			return
 		case now := <-ticker.C:
-			if a.handle.Load() == 0 {
+			if dumps >= maxDumps || a.handle.Load() == 0 {
 				continue
 			}
 			last := a.lastDispatchNs.Load()
@@ -215,12 +279,13 @@ func (a *App) watchHang(stop <-chan struct{}) {
 				continue
 			}
 			a.lastHangDumpNs.Store(now.UnixNano())
-			writeHangLog(now, maxHangLog)
+			dumps++
+			writeHangLog(now, maxHangLog, a.lastMessage.Load(), dumps, maxDumps)
 		}
 	}
 }
 
-func writeHangLog(now time.Time, maxBytes int64) {
+func writeHangLog(now time.Time, maxBytes int64, lastMessage uint32, dump, maxDumps int) {
 	root := os.Getenv("LOCALAPPDATA")
 	if root == "" {
 		return
@@ -238,8 +303,56 @@ func writeHangLog(now time.Time, maxBytes int64) {
 		return
 	}
 	defer file.Close()
-	fmt.Fprintf(file, "=== hang suspected at %s goroutines=%d ===\n", now.Format(time.RFC3339), runtime.NumGoroutine())
+	fmt.Fprintf(file, "=== stall %d/%d at %s lastMessage=%s goroutines=%d ===\n",
+		dump, maxDumps, now.Format(time.RFC3339), messageName(lastMessage), runtime.NumGoroutine())
 	_ = pprof.Lookup("goroutine").WriteTo(file, 2)
+}
+
+// messageName labels the handful of window messages the UI thread handles
+// so a stall dump is readable without a message-number table at hand.
+func messageName(message uint32) string {
+	switch message {
+	case wmDestroy:
+		return "WM_DESTROY"
+	case wmClose:
+		return "WM_CLOSE"
+	case wmEraseBackground:
+		return "WM_ERASEBKGND"
+	case wmNCHitTest:
+		return "WM_NCHITTEST"
+	case wmContextMenu:
+		return "WM_CONTEXTMENU"
+	case wmKeyDown:
+		return "WM_KEYDOWN"
+	case wmTimer:
+		return "WM_TIMER"
+	case wmLButtonDown:
+		return "WM_LBUTTONDOWN"
+	case wmLButtonUp:
+		return "WM_LBUTTONUP"
+	case wmLButtonDblClk:
+		return "WM_LBUTTONDBLCLK"
+	case wmMouseMove:
+		return "WM_MOUSEMOVE"
+	case wmMouseWheel:
+		return "WM_MOUSEWHEEL"
+	case wmRButtonUp:
+		return "WM_RBUTTONUP"
+	case wmRefresh:
+		return "WM_APP+1(refresh)"
+	case wmTray:
+		return "WM_APP+2(tray)"
+	case wmActivate:
+		return "WM_APP+3(activate)"
+	case wmDPIChanged:
+		return "WM_DPICHANGED"
+	case wmCaptureChanged:
+		return "WM_CAPTURECHANGED"
+	case wmCancelMode:
+		return "WM_CANCELMODE"
+	default:
+		return fmt.Sprintf("%#x", message)
+	}
 }
 
 func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {
@@ -309,6 +422,7 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		return 0
 	case wmDestroy:
 		a.removeTray()
+		a.releaseSurface()
 		a.handle.Store(0)
 		win.PostQuitMessage(0)
 		return 0
@@ -421,26 +535,50 @@ func (a *App) moveDrag() {
 	win.SetWindowPos(a.window(), win.HWND_TOPMOST, a.x, a.y, 0, 0, win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
 }
 
+// releaseAction is what a finished drag should trigger.
+type releaseAction int
+
+const (
+	releaseNothing releaseAction = iota
+	releaseToggle
+)
+
+// decideRelease maps a completed drag to the action it triggers. It is pure
+// so the invariant "a drag that moved must never also toggle the panel" is
+// locked down by a test.
+//
+// The old code read a.drag.moved AFTER calling ReleaseCapture. ReleaseCapture
+// dispatches WM_CAPTURECHANGED synchronously to this same window, and that
+// handler clears a.drag, so moved was always observed as false: every drag
+// additionally toggled the panel between compact and expanded, which is what
+// "cannot drag the pet" looked like from the outside.
+func decideRelease(active, moved, expanded bool, x, y, width int) releaseAction {
+	if !active || moved {
+		return releaseNothing
+	}
+	if !expanded {
+		return releaseToggle
+	}
+	if closeButtonHit(x, y, width) {
+		return releaseToggle
+	}
+	return releaseNothing
+}
+
 func (a *App) endDrag(lParam uintptr) {
 	if !a.drag.active {
 		a.pressed = false
 		return
 	}
-	win.ReleaseCapture()
-	wasMoved := a.drag.moved
+	x := int(int16(uint16(lParam)))
+	y := int(int16(uint16(lParam >> 16)))
+	// Decide before touching capture: see decideRelease.
+	action := decideRelease(a.drag.active, a.drag.moved, a.expanded, x, y, a.width)
 	a.drag = dragState{}
 	a.pressed = false
+	win.ReleaseCapture()
 	a.postRefresh()
-	if wasMoved {
-		return
-	}
-	x := int32(int16(uint16(lParam)))
-	y := int32(int16(uint16(lParam >> 16)))
-	if !a.expanded {
-		a.toggleExpanded()
-		return
-	}
-	if a.closeButtonContains(x, y) {
+	if action == releaseToggle {
 		a.toggleExpanded()
 	}
 }
@@ -580,11 +718,19 @@ func (a *App) notifyIcon() win.NOTIFYICONDATA {
 
 func (a *App) present() error {
 	width, height := a.logicalWidth(), a.logicalHeight()
-	target, err := newCanvas(width, height)
-	if err != nil {
-		return err
+	if a.surface != nil && (a.surface.width != width || a.surface.height != height) {
+		a.surface.close()
+		a.surface = nil
 	}
-	defer target.close()
+	if a.surface == nil {
+		target, err := newCanvas(width, height)
+		if err != nil {
+			return err
+		}
+		a.surface = target
+	}
+	target := a.surface
+	target.clear()
 	drawVerticalPanel(target, a.sessions, time.Now(), a.expanded, a.pressed)
 	screenDC := win.GetDC(0)
 	if screenDC == 0 {
@@ -598,8 +744,18 @@ func (a *App) present() error {
 	}
 	a.width = width
 	a.height = height
-	a.hit = target.hitMap()
+	if len(a.hit) != width*height {
+		a.hit = make([]byte, width*height)
+	}
+	target.hitMapInto(a.hit)
 	return nil
+}
+
+func (a *App) releaseSurface() {
+	if a.surface != nil {
+		a.surface.close()
+		a.surface = nil
+	}
 }
 
 func (a *App) load() {
@@ -724,14 +880,6 @@ func (a *App) windowDpi() uint32 {
 		return 96
 	}
 	return dpi
-}
-
-func (a *App) closeButtonContains(x, y int32) bool {
-	unit := float64(a.width) / 200
-	size := int32(20*unit + 0.5)
-	left := int32(a.width) - size - int32(12*unit+0.5)
-	top := int32(9*unit + 0.5)
-	return x >= left && x <= left+size && y >= top && y <= top+size
 }
 
 func (a *App) window() win.HWND {

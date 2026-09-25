@@ -11,6 +11,28 @@ import (
 
 const dtCenter = 0x0001
 
+// expandedCloseButtonRect is the single source of truth for the expanded
+// panel's close button geometry. Both the rasterizer and the hit test go
+// through it so a drawn button can never disagree with its click target -
+// the two used to duplicate the same arithmetic in two files.
+func expandedCloseButtonRect(width int) (left, top, size int) {
+	unit := float64(width) / 200
+	scale := func(base int) int {
+		return maxInt(int(float64(base)*unit+0.5), 1)
+	}
+	size = scale(20)
+	left = width - size - scale(12)
+	top = scale(9)
+	return left, top, size
+}
+
+// closeButtonHit reports whether a client-space point lands on the expanded
+// panel's close button. Kept pure so the geometry is unit-testable.
+func closeButtonHit(x, y, width int) bool {
+	left, top, size := expandedCloseButtonRect(width)
+	return x >= left && x < left+size && y >= top && y < top+size
+}
+
 func drawVerticalPanel(target *canvas, items []session.Session, now time.Time, expanded, pressed bool) {
 	width := target.width
 	height := target.height
@@ -93,9 +115,7 @@ func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time
 	target.fillRounded(pillX, pillY, pillWidth, value(19), 9, pill)
 	accent.A = 255
 	target.text(pillX, pillY, pillWidth, value(19), stateLabel(state), value(10), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	closeSize := value(20)
-	closeX := width - closeSize - value(12)
-	closeY := value(9)
+	closeX, closeY, closeSize := expandedCloseButtonRect(width)
 	target.fillEllipse(closeX, closeY, closeSize, closeSize, raised)
 	target.line(closeX+value(5), closeY+value(5), closeX+closeSize-value(5), closeY+closeSize-value(5), 1, colorSecondary)
 	target.line(closeX+closeSize-value(5), closeY+value(5), closeX+value(5), closeY+closeSize-value(5), 1, colorSecondary)

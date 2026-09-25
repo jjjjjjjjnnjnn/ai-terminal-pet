@@ -4,6 +4,8 @@
 
 ## 1. 当前状态（一句话）
 
+> **本节已过期，最新状态见 §13（2026-09-25 根因修复）。** 下面保留作历史记录。
+
 **项目全局停用中**：浮窗进程不存在；安装目录可执行文件已改名为 `AI-Terminal-Pet.exe.disabled`；
 OpenCode / Antigravity / Claude 三处上报入口已全部摘除并校验通过；源码保留、可随时重新启用。
 
@@ -135,3 +137,30 @@ Get-ChildItem "$env:LOCALAPPDATA\AI-Terminal-Pet\runtime" -ErrorAction SilentlyC
   无第三方代码复制、无密钥、无二进制进仓（`*.exe` 全忽略）；新增 `LICENSE`/`README.md`/`.gitignore`。
 - 回滚：删三处新增条目（或 bak 覆盖恢复）→ `Stop-Process AI-Terminal-Pet` →
   安装目录 exe 改名 `.disabled` → 清 `runtime/` → 回到 §1 停用态。
+
+## 13. 浮窗全线故障根因修复 2026-09-25（本节为最新状态）
+
+**根因（一个）**：`internal/ui/app_windows.go` 的 `Run()` 没有 `runtime.LockOSThread()`。
+Go 调度器把主 goroutine 迁到别的 OS 线程后，窗口消息仍投递到「创建窗口的那个线程」的队列，
+而该队列无人泵消息；于是首个跨线程 `SetWindowPos(HWND_TOPMOST)` 在同步 `SendMessage` 里
+永久阻塞 → `WS_VISIBLE` 从未置位、消息全不分发、定时器全死。
+
+**这一个遗漏解释并已修复**：显示不出来 / 点击崩溃（幽灵窗口 + AppHang）/ 打开异常 /
+无法拖拽 / 定时器失效 / 空闲自毁不生效。**§16 的「系统级 win32k/DWM 楔子」结论作废**
+（当时观察到的跨进程 show 卡死、新生窗口同样中招，都是同一 bug 的不同侧面）。
+
+**第二个 bug**：`endDrag` 在 `ReleaseCapture()` **之后**读 `a.drag.moved`，
+而 `ReleaseCapture` 会同步派发 `WM_CAPTURECHANGED` 把 `a.drag` 清空 → 每次拖动都额外
+触发一次展开/收起。已改为先判定后释放，并抽成有单测的 `decideRelease`。
+
+**附带改进**：第二实例不再静默退出而是激活已存在浮窗（`ui.ActivateExisting`）；
+DIB 画布与命中缓冲复用（去掉每帧 GDI 分配）；watchdog 限 3 次转储 + 记录最后消息名；
+展开态关闭按钮绘制与命中几何同源；新增 2 个单测。
+
+**装机**：hash `9C70D60B…`（前值 `71078FA7…`），`install.ps1` 安装 + SHA256 校验通过。
+
+**终端接入**：按用户决策移除 Antigravity 的 `BeforeTool`/`AfterAgent` node 钩子
+（每次工具调用约 1 s 进程创建税），仅保留 `statusLine`；备份
+`~/.gemini/antigravity-cli/settings.json.bak-20260925-pet-hooks`。
+
+**完整取证 / 验证矩阵见 `BASELINE-20260925.md`。** 遗留：`-race`/govulncheck/gosec 仍缺工具链。

@@ -77,12 +77,15 @@ func newCanvas(width, height int) (*canvas, error) {
 }
 
 func (c *canvas) close() {
-	if c == nil {
+	if c == nil || c.dc == 0 {
 		return
 	}
 	win.SelectObject(c.dc, c.old)
 	win.DeleteObject(win.HGDIOBJ(c.bitmap))
 	win.DeleteDC(c.dc)
+	c.dc = 0
+	c.bitmap = 0
+	c.pixels = nil
 }
 
 func (c *canvas) clear() {
@@ -370,12 +373,17 @@ func (c *canvas) alphaAt(x, y int) uint8 {
 	return c.pixels[y*c.stride+x*4+3]
 }
 
-func (c *canvas) hitMap() []byte {
-	result := make([]byte, c.width*c.height)
+// hitMapInto writes the alpha channel into a caller-owned buffer so the
+// 20 FPS alert animation does not allocate a fresh width*height slice on
+// every frame. The buffer must be at least width*height bytes.
+func (c *canvas) hitMapInto(result []byte) {
+	if len(result) < c.width*c.height {
+		return
+	}
+	result = result[:c.width*c.height]
 	for index := 0; index < len(result); index++ {
 		result[index] = c.pixels[index*4+3]
 	}
-	return result
 }
 
 func pointInside(x, y float64, points []canvasPoint) bool {

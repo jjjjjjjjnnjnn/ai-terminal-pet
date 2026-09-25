@@ -24,3 +24,6 @@ package-lock.json
 
 # Local harness output
 harness-out.json
+
+# Agent working memory (machine-local, not project source)
+.workbuddy-ai/

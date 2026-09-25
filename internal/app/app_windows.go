@@ -18,10 +18,12 @@ import (
 func Run() error {
 	// Single-instance gate doubles as pipe-preemption mitigation: only the
 	// mutex holder proceeds to pipeserver.New/ListenPipe (see PipePathForUser).
-	// A second instance exits silently with nil so double-click/launch storms
-	// never surface an error dialog.
+	// A second instance does not just exit silently - it pokes the live
+	// overlay so a user double-clicking the executable sees it appear
+	// instead of nothing happening.
 	instance, err := platform.AcquireInstance(`Local\AI-Terminal-Pet-v1-SingleInstance`)
 	if errors.Is(err, platform.ErrAlreadyRunning) {
+		ui.ActivateExisting()
 		return nil
 	}
 	if err != nil {
