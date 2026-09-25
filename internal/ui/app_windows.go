@@ -21,15 +21,64 @@ const (
 	timerIdle      = 1
 	timerClock     = 2
 	timerAnimation = 3
-	menuShow       = 1001
-	menuHide       = 1002
-	menuExit       = 1003
 
-	// windowClassName is also the rendezvous used by ActivateExisting, so
-	// the short-lived second process can find the live overlay.
+	menuShow          = 1001
+	menuHide          = 1002
+	menuExit          = 1003
+	menuNotifications = 1004
+	menuTopmost       = 1005
+	menuReset         = 1006
+
+	// animationInterval drives the alert pulse. It is only installed while
+	// the overlay is actually animating (pressed, waiting or error); the
+	// rest of the time the timer is killed so an idle pet costs no CPU.
+	animationInterval = 50
+
+	// windowClassName is also the rendezvous used by Control, so a
+	// short-lived second process can find the live overlay.
 	windowClassName = "AITerminalPetWindow"
 	windowTitle     = "AI Terminal Pet"
+
+	// trayTipMax is NOTIFYICONDATA.SzTip's capacity including the NUL.
+	trayTipMax = 128
+	// trayInfoMax is SzInfo/SzInfoTitle's capacity including the NUL.
+	trayInfoMax  = 256
+	trayTitleMax = 64
 )
+
+// Placement is the window geometry remembered between launches. The ui
+// package deliberately does not import internal/config: the app layer owns the
+// file paths and hands the UI a plain struct plus a persist callback.
+type Placement struct {
+	Placed   bool
+	X        int32
+	Y        int32
+	Zoom     float64
+	Expanded bool
+}
+
+// Settings is the subset of user preferences the tray menu can flip.
+type Settings struct {
+	Notifications bool
+	AlwaysOnTop   bool
+}
+
+// Options is everything the UI needs from outside. All callbacks are invoked
+// on the UI thread and may be nil.
+type Options struct {
+	// Opacity is the layered window constant alpha, 1..255.
+	Opacity uint8
+	// Settings is the initial state of the tray switches.
+	Settings Settings
+	// Initial is the remembered geometry, or the zero value when the window
+	// has never been placed.
+	Initial Placement
+	// OnPlacementChanged fires after the user moves, zooms or expands the
+	// overlay so the app layer can persist it.
+	OnPlacementChanged func(Placement)
+	// OnSettingsChanged fires when a tray switch is flipped.
+	OnSettingsChanged func(Settings)
+}
 
 var activeWindow atomic.Pointer[App]
 
@@ -50,6 +99,7 @@ type messageEnvelope struct {
 type App struct {
 	values   *store.Store
 	handle   atomic.Uintptr
+	options  Options
 	dpi      uint32
 	zoom     float64
 	expanded bool
@@ -69,6 +119,13 @@ type App struct {
 	// layered window. UI thread only.
 	surface *canvas
 	drag    dragState
+	// animating tracks whether the pulse timer is currently installed, so
+	// syncAnimation only calls SetTimer/KillTimer on a real transition.
+	animating bool
+	// alertKey is the "session+state" of the last balloon shown. Balloons
+	// fire on transitions only, otherwise a session parked in
+	// waiting_permission would re-notify on every repaint.
+	alertKey string
 	// lastAvailable is the grace anchor for the idle self-destruct: with no
 	// sessions the overlay removes itself, so the reporters' on-demand
 	// launch path stays the only thing that keeps a process alive.
@@ -88,24 +145,47 @@ type App struct {
 	lastMessage atomic.Uint32
 }
 
-func New(values *store.Store) *App {
-	return &App{values: values, dpi: 96, zoom: 1, state: session.StateIdle, revision: ^uint64(0), lastAvailable: time.Now()}
+func New(values *store.Store, options Options) *App {
+	if options.Opacity == 0 {
+		options.Opacity = 235
+	}
+	zoom := options.Initial.Zoom
+	if math.IsNaN(zoom) || zoom < 0.65 || zoom > 1.6 {
+		zoom = 1
+	}
+	return &App{
+		values:        values,
+		options:       options,
+		dpi:           96,
+		zoom:          zoom,
+		expanded:      options.Initial.Expanded,
+		state:         session.StateIdle,
+		revision:      ^uint64(0),
+		lastAvailable: time.Now(),
+	}
 }
 
-// ActivateExisting asks an already-running instance to reveal itself and
-// reports whether one was found.
-//
-// The overlay is single-instance and on demand: reporters launch it, and it
-// removes itself once no session is left. A user who double-clicks the
-// executable while an instance is alive used to hit the single-instance
-// mutex and exit silently, which is indistinguishable from "the program is
-// broken" - the reported "open anomaly". The second process now pokes the
-// live window with wmActivate instead, running the same show path a tray
-// click would.
-//
-// PostMessage is asynchronous and safe across threads, so this can never
-// block the short-lived second process; a missing window is a plain false.
-func ActivateExisting() bool {
+// ControlAction identifies a command one process can send to the live
+// overlay. The second process is short lived: it finds the window by class
+// name and posts the message, then exits. PostMessage is asynchronous and
+// safe across threads, so a missing or busy window can never block it.
+type ControlAction int
+
+const (
+	// ControlActivate reveals the overlay (same path as a tray click).
+	ControlActivate ControlAction = iota
+	// ControlToggle flips compact/expanded.
+	ControlToggle
+	// ControlQuit asks the overlay to close and exit.
+	ControlQuit
+	// ControlReset drops the remembered geometry and re-anchors.
+	ControlReset
+)
+
+// Control sends action to an already-running instance and reports whether one
+// was found. A missing window is a plain false, never an error: callers use it
+// to decide whether to fall back to starting a fresh instance.
+func Control(action ControlAction) bool {
 	name, err := syscall.UTF16FromString(windowClassName)
 	if err != nil {
 		return false
@@ -114,7 +194,20 @@ func ActivateExisting() bool {
 	if handle == 0 {
 		return false
 	}
-	return win.PostMessage(handle, wmActivate, 0, 0) != 0
+	var message uint32
+	switch action {
+	case ControlActivate:
+		message = wmActivate
+	case ControlToggle:
+		message = wmToggle
+	case ControlQuit:
+		message = wmClose
+	case ControlReset:
+		message = wmReset
+	default:
+		return false
+	}
+	return win.PostMessage(handle, message, 0, 0) != 0
 }
 
 func (a *App) Refresh() {
@@ -190,8 +283,12 @@ func (a *App) Run() error {
 		return fmt.Errorf("register class: %w", syscall.GetLastError())
 	}
 	defer unregisterClass(&className[0], instance)
+	style := uint32(win.WS_EX_TOOLWINDOW | win.WS_EX_LAYERED)
+	if a.options.Settings.AlwaysOnTop {
+		style |= uint32(win.WS_EX_TOPMOST)
+	}
 	created := win.CreateWindowEx(
-		uint32(win.WS_EX_TOPMOST|win.WS_EX_TOOLWINDOW|win.WS_EX_LAYERED),
+		style,
 		&className[0], &windowName[0], uint32(win.WS_POPUP),
 		0, 0, int32(a.logicalWidth()), int32(a.logicalHeight()),
 		0, 0, instance, nil,
@@ -207,7 +304,7 @@ func (a *App) Run() error {
 	a.taskbarMessage = win.RegisterWindowMessage(&taskbarName[0])
 	a.addTray()
 	a.load()
-	a.positionForWorkArea()
+	a.restoreOrAnchor()
 	if err := a.present(); err != nil {
 		return fmt.Errorf("present: %w", err)
 	}
@@ -215,7 +312,7 @@ func (a *App) Run() error {
 	a.setTopmost()
 	win.SetTimer(created, timerIdle, 500, 0)
 	win.SetTimer(created, timerClock, 2000, 0)
-	win.SetTimer(created, timerAnimation, 50, 0)
+	a.syncAnimation()
 	a.lastDispatchNs.Store(time.Now().UnixNano())
 	watchStop := make(chan struct{})
 	defer close(watchStop)
@@ -344,6 +441,10 @@ func messageName(message uint32) string {
 		return "WM_APP+2(tray)"
 	case wmActivate:
 		return "WM_APP+3(activate)"
+	case wmToggle:
+		return "WM_APP+4(toggle)"
+	case wmReset:
+		return "WM_APP+5(reset)"
 	case wmDPIChanged:
 		return "WM_DPICHANGED"
 	case wmCaptureChanged:
@@ -365,12 +466,20 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		if len(a.sessions) > 0 {
 			a.lastAvailable = time.Now()
 		}
+		a.syncAnimation()
 		if !a.hidden {
 			_ = a.present()
 		}
 		return 0
 	case wmActivate:
 		a.activatePending.Store(false)
+		a.showFromTray()
+		return 0
+	case wmToggle:
+		a.toggleExpanded()
+		return 0
+	case wmReset:
+		a.resetPlacement()
 		a.showFromTray()
 		return 0
 	case wmTray:
@@ -413,14 +522,19 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 	case wmCaptureChanged, wmCancelMode:
 		a.drag = dragState{}
 		a.pressed = false
+		a.syncAnimation()
 		if !a.hidden {
 			a.postRefresh()
 		}
 		return 0
 	case wmClose:
+		a.persistPlacement()
 		win.DestroyWindow(hwnd)
 		return 0
 	case wmDestroy:
+		// The overlay also removes itself on idle, so this is the only
+		// chance to remember where the user left it.
+		a.persistPlacement()
 		a.removeTray()
 		a.releaseSurface()
 		a.handle.Store(0)
@@ -447,11 +561,16 @@ func (a *App) handleTimer(hwnd win.HWND, timer uintptr) uintptr {
 			a.load()
 			a.postRefresh()
 		}
+		a.syncAnimation()
 	case timerAnimation:
 		if a.hidden {
 			return 0
 		}
 		a.load()
+		// The state can go quiet without a wmRefresh (a session simply
+		// expires), so re-check here and stop the pulse when nothing is
+		// pulsing any more.
+		a.syncAnimation()
 		if a.pressed || a.state == session.StateWaitingPermission || a.state == session.StateError {
 			a.postRefresh()
 		}
@@ -466,7 +585,7 @@ func (a *App) handleTrayMessage(message uint32, lParam uintptr) {
 	}
 	event := uint32(uint16(lParam))
 	switch event {
-	case wmLButtonUp, wmLButtonDblClk:
+	case wmLButtonUp, wmLButtonDblClk, ninBalloonUserClick:
 		a.showFromTray()
 	case wmRButtonUp, wmContextMenu:
 		a.showContextMenu(true)
@@ -515,6 +634,7 @@ func (a *App) beginDrag(lParam uintptr) {
 		return
 	}
 	a.pressed = true
+	a.syncAnimation()
 	a.postRefresh()
 	a.drag = dragState{active: true, startX: cursor.X, startY: cursor.Y, windowX: bounds.Left, windowY: bounds.Top}
 	win.SetCapture(a.window())
@@ -532,7 +652,17 @@ func (a *App) moveDrag() {
 	}
 	a.x = a.drag.windowX + dx
 	a.y = a.drag.windowY + dy
-	win.SetWindowPos(a.window(), win.HWND_TOPMOST, a.x, a.y, 0, 0, win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
+	win.SetWindowPos(a.window(), a.zOrder(), a.x, a.y, 0, 0, win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
+}
+
+// zOrder maps the AlwaysOnTop preference onto the SetWindowPos insert-after
+// handle, so a user who turns the tray switch off gets a normal window that
+// other apps can cover.
+func (a *App) zOrder() win.HWND {
+	if a.options.Settings.AlwaysOnTop {
+		return win.HWND_TOPMOST
+	}
+	return win.HWND_NOTOPMOST
 }
 
 // releaseAction is what a finished drag should trigger.
@@ -574,10 +704,14 @@ func (a *App) endDrag(lParam uintptr) {
 	y := int(int16(uint16(lParam >> 16)))
 	// Decide before touching capture: see decideRelease.
 	action := decideRelease(a.drag.active, a.drag.moved, a.expanded, x, y, a.width)
+	moved := a.drag.moved
 	a.drag = dragState{}
 	a.pressed = false
 	win.ReleaseCapture()
 	a.postRefresh()
+	if moved {
+		a.persistPlacement()
+	}
 	if action == releaseToggle {
 		a.toggleExpanded()
 	}
@@ -598,6 +732,7 @@ func (a *App) zoomBy(delta float64) {
 	a.clampToMonitor()
 	a.setTopmost()
 	a.postRefresh()
+	a.persistPlacement()
 }
 
 func (a *App) toggleExpanded() {
@@ -613,6 +748,57 @@ func (a *App) toggleExpanded() {
 	a.clampToMonitor()
 	a.setTopmost()
 	a.postRefresh()
+	a.persistPlacement()
+}
+
+// placement snapshots the geometry worth remembering across launches.
+func (a *App) placement() Placement {
+	return Placement{Placed: true, X: a.x, Y: a.y, Zoom: a.zoom, Expanded: a.expanded}
+}
+
+// persistPlacement hands the current geometry to the app layer. It is called
+// only on settled transitions (drag release, zoom step, expand toggle) and
+// once at shutdown, never per mouse-move, so a drag writes one file.
+func (a *App) persistPlacement() {
+	if a.options.OnPlacementChanged == nil || a.handle.Load() == 0 {
+		return
+	}
+	a.options.OnPlacementChanged(a.placement())
+}
+
+// restoreOrAnchor puts the window back where the user last left it, or falls
+// back to the right-edge anchor on a first run. The restored position is still
+// clamped to the monitor, so a saved coordinate from a disconnected display
+// cannot strand the overlay off-screen.
+func (a *App) restoreOrAnchor() {
+	initial := a.options.Initial
+	if !initial.Placed {
+		a.positionForWorkArea()
+		return
+	}
+	a.x = initial.X
+	a.y = initial.Y
+	a.clampToMonitor()
+}
+
+// syncAnimation installs the 50 ms pulse timer only while something is
+// actually pulsing. Before this, the timer ran at 20 Hz forever, waking the UI
+// thread 20 times a second to redraw an identical idle frame.
+func (a *App) syncAnimation() {
+	handle := a.handle.Load()
+	if handle == 0 {
+		return
+	}
+	want := !a.hidden && (a.pressed || a.state == session.StateWaitingPermission || a.state == session.StateError)
+	if want == a.animating {
+		return
+	}
+	a.animating = want
+	if want {
+		win.SetTimer(win.HWND(handle), timerAnimation, animationInterval, 0)
+		return
+	}
+	win.KillTimer(win.HWND(handle), timerAnimation)
 }
 
 func (a *App) showContextMenu(fromTray bool) {
@@ -629,6 +815,12 @@ func (a *App) showContextMenu(fromTray bool) {
 		a.appendMenu(menu, position, menuHide, "隐藏到托盘")
 		position++
 	}
+	a.appendMenu(menu, position, menuReset, "重置位置与大小")
+	position++
+	a.appendMenu(menu, position, menuNotifications, checkLabel("状态提醒", a.options.Settings.Notifications))
+	position++
+	a.appendMenu(menu, position, menuTopmost, checkLabel("窗口置顶", a.options.Settings.AlwaysOnTop))
+	position++
 	a.appendMenu(menu, position, menuExit, "退出")
 	var cursor win.POINT
 	win.GetCursorPos(&cursor)
@@ -639,8 +831,55 @@ func (a *App) showContextMenu(fromTray bool) {
 		a.showFromTray()
 	case menuHide:
 		a.hideToTray()
+	case menuReset:
+		a.resetPlacement()
+	case menuNotifications:
+		a.options.Settings.Notifications = !a.options.Settings.Notifications
+		a.publishSettings()
+	case menuTopmost:
+		a.options.Settings.AlwaysOnTop = !a.options.Settings.AlwaysOnTop
+		a.applyTopmost()
+		a.publishSettings()
 	case menuExit:
+		a.persistPlacement()
 		win.DestroyWindow(a.window())
+	}
+}
+
+// checkLabel prefixes a menu entry with a tick so the two tray switches read
+// their own state without a separate checked-menu plumbing.
+func checkLabel(label string, on bool) string {
+	if on {
+		return "✓ " + label
+	}
+	return "　 " + label
+}
+
+// applyTopmost pushes the current AlwaysOnTop preference onto the live window.
+func (a *App) applyTopmost() {
+	if a.handle.Load() == 0 {
+		return
+	}
+	win.SetWindowPos(a.window(), a.zOrder(), 0, 0, 0, 0, win.SWP_NOMOVE|win.SWP_NOSIZE|win.SWP_NOACTIVATE)
+}
+
+// resetPlacement drops the remembered geometry and re-anchors to the right
+// edge of the work area at 100% zoom, compact. It is the escape hatch for a
+// pet dragged somewhere awkward or onto a display that no longer exists.
+func (a *App) resetPlacement() {
+	a.zoom = 1
+	a.expanded = false
+	a.width, a.height = a.logicalWidth(), a.logicalHeight()
+	a.resize()
+	a.positionForWorkArea()
+	a.setTopmost()
+	a.postRefresh()
+	a.persistPlacement()
+}
+
+func (a *App) publishSettings() {
+	if a.options.OnSettingsChanged != nil {
+		a.options.OnSettingsChanged(a.options.Settings)
 	}
 }
 
@@ -664,6 +903,7 @@ func (a *App) hideToTray() {
 		win.ShowWindow(a.window(), win.SW_HIDE)
 	}
 	a.hidden = true
+	a.syncAnimation()
 }
 
 func (a *App) showFromTray() {
@@ -674,6 +914,7 @@ func (a *App) showFromTray() {
 	a.hidden = false
 	win.ShowWindow(win.HWND(handle), win.SW_SHOW)
 	a.load()
+	a.syncAnimation()
 	win.PostMessage(win.HWND(handle), wmRefresh, 0, 0)
 	a.setTopmost()
 }
@@ -711,9 +952,92 @@ func (a *App) notifyIcon() win.NOTIFYICONDATA {
 		UCallbackMessage: wmTray,
 		HIcon:            a.trayIcon,
 	}
-	tip, _ := syscall.UTF16FromString("AI Terminal Brief")
+	tip, _ := syscall.UTF16FromString(truncateUTF16(a.trayTip(), trayTipMax))
 	copy(data.SzTip[:], tip)
 	return data
+}
+
+// trayTip is the hover text: the aggregate state plus how many sessions are
+// behind it, so the tray icon is informative without opening the panel.
+func (a *App) trayTip() string {
+	if len(a.sessions) == 0 {
+		return windowTitle + " · 待机"
+	}
+	return fmt.Sprintf("%s · %d 会话 · %s", windowTitle, len(a.sessions), stateLabel(a.state))
+}
+
+// updateTooltip pushes a refreshed hover text to the shell. Cheap, but only
+// worth doing when the tray icon actually exists.
+func (a *App) updateTooltip() {
+	if !a.trayAdded {
+		return
+	}
+	data := a.notifyIcon()
+	data.UFlags = win.NIF_TIP
+	win.Shell_NotifyIcon(win.NIM_MODIFY, &data)
+}
+
+// notifyAlert pops a tray balloon for a session that just started waiting for
+// permission or failed. This is the point of the whole app: the overlay is
+// glanceable, but a balloon reaches the user even when the panel is hidden,
+// covered, or they are looking at another monitor.
+//
+// Alerts are deduplicated on "session + state" so a session parked in
+// waiting_permission notifies once instead of on every repaint.
+func (a *App) notifyAlert() {
+	if !a.options.Settings.Notifications || !a.trayAdded {
+		return
+	}
+	var target *session.Session
+	for index := range a.sessions {
+		current := &a.sessions[index]
+		if current.State != session.StateWaitingPermission && current.State != session.StateError {
+			continue
+		}
+		if target == nil || current.State.Priority() > target.State.Priority() {
+			target = current
+		}
+	}
+	if target == nil {
+		a.alertKey = ""
+		return
+	}
+	key := target.Source + "\x00" + target.SessionID + "\x00" + string(target.State)
+	if key == a.alertKey {
+		return
+	}
+	a.alertKey = key
+
+	title := "AI Terminal Brief"
+	flags := uint32(win.NIIF_WARNING)
+	if target.State == session.StateError {
+		title = "终端会话出错"
+		flags = win.NIIF_ERROR
+	} else {
+		title = "等待你的确认"
+	}
+	body := projectLabel(*target)
+	if reason := reasonLabel(*target); reason != "" {
+		body += " · " + reason
+	}
+	data := a.notifyIcon()
+	data.UFlags = win.NIF_INFO
+	data.DwInfoFlags = flags
+	infoTitle, _ := syscall.UTF16FromString(truncateUTF16(title, trayTitleMax))
+	infoBody, _ := syscall.UTF16FromString(truncateUTF16(body, trayInfoMax))
+	copy(data.SzInfoTitle[:], infoTitle)
+	copy(data.SzInfo[:], infoBody)
+	win.Shell_NotifyIcon(win.NIM_MODIFY, &data)
+}
+
+// truncateUTF16 limits a string to capacity-1 UTF-16 code units so the NUL
+// terminator the copy leaves behind is always in range.
+func truncateUTF16(value string, capacity int) string {
+	encoded, err := syscall.UTF16FromString(value)
+	if err != nil || len(encoded) <= capacity {
+		return value
+	}
+	return syscall.UTF16ToString(encoded[:capacity-1])
 }
 
 func (a *App) present() error {
@@ -739,7 +1063,7 @@ func (a *App) present() error {
 	defer win.ReleaseDC(0, screenDC)
 	destination := win.POINT{X: a.x, Y: a.y}
 	dimensions := win.SIZE{CX: int32(width), CY: int32(height)}
-	if err := updateLayeredWindow(a.window(), screenDC, &destination, dimensions, target.dc); err != nil {
+	if err := updateLayeredWindow(a.window(), screenDC, &destination, dimensions, target.dc, a.options.Opacity); err != nil {
 		return err
 	}
 	a.width = width
@@ -766,13 +1090,17 @@ func (a *App) load() {
 	a.revision = revision
 	a.sessions = a.values.List()
 	a.state = session.Aggregate(a.sessions)
+	// Both are cheap no-ops unless the tray icon exists, and both read only
+	// the freshly loaded snapshot.
+	a.updateTooltip()
+	a.notifyAlert()
 }
 
 func (a *App) setTopmost() {
 	if a.handle.Load() == 0 {
 		return
 	}
-	win.SetWindowPos(a.window(), win.HWND_TOPMOST, 0, 0, 0, 0, win.SWP_NOMOVE|win.SWP_NOSIZE|win.SWP_NOACTIVATE)
+	win.SetWindowPos(a.window(), a.zOrder(), 0, 0, 0, 0, win.SWP_NOMOVE|win.SWP_NOSIZE|win.SWP_NOACTIVATE)
 }
 
 // resize syncs the window frame to the current logical canvas size.
@@ -836,7 +1164,7 @@ func (a *App) clampToMonitor() {
 	info := win.MONITORINFO{CbSize: uint32(unsafe.Sizeof(win.MONITORINFO{}))}
 	if getMonitorInfo(monitor, &info) {
 		a.clampToWorkArea(info.RcWork, width, height)
-		win.SetWindowPos(a.window(), win.HWND_TOPMOST, a.x, a.y, 0, 0, win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
+		win.SetWindowPos(a.window(), a.zOrder(), a.x, a.y, 0, 0, win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
 	}
 }
 
@@ -872,6 +1200,7 @@ func (a *App) handleDPIChanged(wParam uintptr) {
 	a.clampToMonitor()
 	a.setTopmost()
 	a.postRefresh()
+	a.persistPlacement()
 }
 
 func (a *App) windowDpi() uint32 {

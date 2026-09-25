@@ -164,3 +164,43 @@ DIB 画布与命中缓冲复用（去掉每帧 GDI 分配）；watchdog 限 3 �
 `~/.gemini/antigravity-cli/settings.json.bak-20260925-pet-hooks`。
 
 **完整取证 / 验证矩阵见 `BASELINE-20260925.md`。** 遗留：`-race`/govulncheck/gosec 仍缺工具链。
+
+## 14. 打磨迭代 2026-09-25 夜（v0.2.0）
+
+本轮把浮窗从「能显示」推到「可用」，并补上扩展/轻量化路线图（见 `ROADMAP.md`）。
+
+**新增能力**
+- 位置记忆：`%LOCALAPPDATA%\AI-Terminal-Pet\state.json`（位置/缩放/展开），拖拽/缩放/展开后落盘，
+  启动原样恢复并做显示器钳制。写入经后台单协程合并（`app.placementSaver`），
+  避免在 UI 线程做文件 IO——本机 AV 钩挂下写文件可达数百毫秒。
+- `config.json`：通知开关 / 置顶 / 不透明度。缺失或损坏一律回落默认，绝不阻塞启动。
+- CLI：`--show` / `--toggle` / `--reset` / `--quit` / `--version` / `--help`。
+  用法错误走 stderr + exit 2（不写 error.log）；控制类命令不再意外拉起常驻实例。
+- 托盘：tooltip 实时显示会话数与聚合状态；等待确认/错误弹气泡（按会话+状态去重、可关、点击回跳）；
+  菜单加「重置位置与大小 / 状态提醒 / 窗口置顶」。
+- `reporters/generic.js`：任意 CLI 一行接入（`--state=working` 或 `--stdin` JSON）。
+
+**轻量化**
+- 脉冲动画定时器改为按状态装/卸（`syncAnimation`）：只有按压/等待/错误态才 50 ms，
+  其余时间 `KillTimer`。此前是 7×24 的 20 FPS 空转。
+- 复用 DIB 画布与命中缓冲（上一轮已加，本轮确认无回归）。
+
+**新增包与测试**
+- `internal/config`（7 个单测：容错解码、钳制、原子写、往返、无残留临时文件）。
+- `internal/ui` 新增 `TestExpandedCloseButtonRect`、`TestDecideRelease`。
+
+**验证（装机 hash `38567A0E…` 起，后随打磨更新）**
+DPI 感知探针实测：冷启动可见+响应 60x285（150% 缩放下的 40x190）／点击展开 300x375／
+关闭按钮收起／滚轮缩放／`--reset` 回锚／拖拽窗口位移与光标位移一致且尺寸不变／
+`--toggle` 生效／二次启动 178 ms 退出并激活已隐藏窗口／`--quit` 干净退出／
+种子 state.json 四组坐标（300,200）(900,300)(1200,500)(100,80) 全部原样恢复。
+
+**踩坑记录（重要）**
+- 验证探针必须自己声明 DPI 感知（`SetProcessDpiAwarenessContext(-4)`）。
+  否则 `GetWindowRect` 返回被虚拟化的坐标，150% 屏上会得到 2/3 的比例，
+  看起来像「位置恢复有偏移」——实际是测量坐标系错了。
+- 单实例互斥体：跑任何测试二进制前必须先 `taskkill AI-Terminal-Pet.exe`，
+  否则测试进程静默退出、探针探到的是生产实例的窗口。
+
+**遗留**：`ROADMAP.md` §6 列出的未修项（`-race`/govulncheck/gosec 缺工具链、UI 无视觉回归、
+管道抢占只做缓解）。

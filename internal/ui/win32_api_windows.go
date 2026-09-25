@@ -30,11 +30,18 @@ const (
 	wmRefresh         = wmApp + 1
 	wmTray            = wmApp + 2
 	wmActivate        = wmApp + 3
+	wmToggle          = wmApp + 4
+	wmReset           = wmApp + 5
 	wmDPIChanged      = 0x02E0
 	wmCaptureChanged  = 0x0215
 	wmCancelMode      = 0x001F
 	wmKeyEscape       = 0x1B
 	mkLButton         = 0x0001
+
+	// ninBalloonUserClick is the tray callback event raised when the user
+	// clicks a balloon tip, so a notification can double as a shortcut back
+	// to the overlay.
+	ninBalloonUserClick = 0x0405
 
 	htClient      = 1
 	htTransparent = ^uintptr(0)
@@ -71,12 +78,15 @@ func getMonitorInfo(monitor win.HMONITOR, info *win.MONITORINFO) bool {
 	return result != 0
 }
 
-func updateLayeredWindow(hwnd win.HWND, destinationDC win.HDC, destination *win.POINT, dimensions win.SIZE, sourceDC win.HDC) error {
+// updateLayeredWindow pushes a 32-bit premultiplied BGRA frame to the layered
+// window. opacity is the constant alpha applied to the whole surface
+// (0..255); the per-pixel alpha in sourceDC still controls the panel's shape.
+func updateLayeredWindow(hwnd win.HWND, destinationDC win.HDC, destination *win.POINT, dimensions win.SIZE, sourceDC win.HDC, opacity uint8) error {
 	source := win.POINT{}
 	blend := win.BLENDFUNCTION{
 		BlendOp:             acSrcOver,
 		BlendFlags:          0,
-		SourceConstantAlpha: 255,
+		SourceConstantAlpha: opacity,
 		AlphaFormat:         acSrcAlpha,
 	}
 	result, _, callErr := syscall.Syscall9(

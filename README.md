@@ -26,12 +26,58 @@ AI terminals ── reporters/*.js ── named pipe ── AI-Terminal-Pet.exe 
   overlay (collapsed `40x190`, expanded `200x250`, tray icon).
 - **Reporters** (`reporters/`): `opencode.js` (plugin),
   `claude-hook.js`, `antigravity-hook.js`, `antigravity-statusline.js`,
+  plus `generic.js` — a one-line bridge for any other CLI —
   sharing `protocol.js` (validation, redaction, retry-until-deadline,
   fail-fast, never throws into the host CLI).
 - **pet-statusline** (`cmd/pet-statusline`): dependency-free native
   replacement for the Node statusline reporter. On machines where AV
   hooks make every `node`/shell spawn cost seconds, the native shim
   answers in well under a second.
+
+## Control the overlay
+
+The overlay is single-instance and removes itself once no terminal session
+is left, so it is normally invisible in a process list. Every command below
+is safe to bind to a hotkey or shell alias:
+
+```powershell
+ai-terminal-pet --show      # reveal the running overlay
+ai-terminal-pet --toggle    # switch between compact and expanded
+ai-terminal-pet --reset     # re-anchor to the screen edge at 100% zoom
+ai-terminal-pet --quit      # stop the overlay
+ai-terminal-pet --version
+```
+
+Launching the executable with no arguments while an instance is already
+running reveals that instance instead of exiting silently.
+
+## Tray menu
+
+Right-click the tray icon:
+
+- **显示浮窗 / 隐藏到托盘**
+- **重置位置与大小** — escape hatch for a pet dragged somewhere awkward
+- **✓ 状态提醒** — tray balloons when a session starts waiting for
+  permission or fails
+- **✓ 窗口置顶**
+- **退出**
+
+## Settings and remembered state
+
+Two files under `%LOCALAPPDATA%\AI-Terminal-Pet\`:
+
+- `config.json` — yours. Read at startup, rewritten only when you flip a
+  tray switch, so editing it by hand while the app is stopped is safe.
+  Missing or malformed values fall back to defaults; a broken file never
+  stops the overlay from starting.
+
+  ```json
+  { "notifications": true, "alwaysOnTop": true, "opacity": 235 }
+  ```
+
+- `state.json` — the app's. Window position, zoom and expanded flag, so the
+  pet comes back where you left it. Delete it (or run `--reset`) to get the
+  default right-edge anchor back.
 
 ## Build from source (Windows, Go 1.23+)
 
@@ -55,6 +101,17 @@ go build -trimpath -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-status
 - **Antigravity**: point `statusLine.command` at the installed
   `pet-statusline.exe` (or the `.js` reporter if your Node is fast),
   and register `antigravity-hook.js` for agent/tool events.
+- **Anything else**: one line, no plugin needed. Any tool that can run a
+  shell command on state changes can report:
+
+  ```powershell
+  node reporters/generic.js --source=aider --state=working --project="$PWD"
+  node reporters/generic.js --source=codex --state=waiting_permission --reason=approve
+  echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --source=ci --stdin
+  ```
+
+  States: `idle thinking working tool_use waiting_permission error closed`.
+  `--help` lists every option.
 
 Reporters are fire-and-forget: any failure returns silently and never
 breaks the host CLI. Restart the terminal after changing its config so
@@ -63,15 +120,16 @@ the new reporter loads.
 ## Layout
 
 ```
-cmd/ai-terminal-pet    main exe entry (error.log + 1 MB rotation)
+cmd/ai-terminal-pet    main exe entry (CLI control flags + error.log rotation)
 cmd/pet-statusline     native statusline shim
-internal/app           wiring: mutex, pipe server, scanner, window
+internal/app           wiring: mutex, pipe server, scanner, window, state saver
+internal/config        config.json + state.json (atomic writes, fail-safe reads)
 internal/pipeserver    named-pipe server (user-isolated name, ACK/ERR)
 internal/store         session store (256 cap, tombstones, TTLs, snapshots)
 internal/session       schema validation + priority/aggregation/sort
 internal/platform      single-instance mutex, process-liveness probe
-internal/ui            layered overlay, canvas rasterizer, tray
-reporters/             JS push side (see above)
+internal/ui            layered overlay, canvas rasterizer, tray, notifications
+reporters/             JS push side (incl. generic.js)
 install.ps1            stop → copy → SHA256 verify (both binaries)
 ```
 
@@ -86,7 +144,8 @@ install.ps1            stop → copy → SHA256 verify (both binaries)
 - `go test -race` needs a gcc toolchain; UI has unit tests for pure
   logic only, visual behavior is verified manually.
 
-See [HANDOVER.md](HANDOVER.md) for the operational runbook.
+See [HANDOVER.md](HANDOVER.md) for the operational runbook and
+[ROADMAP.md](ROADMAP.md) for the extension and lightweighting plans.
 
 ## License
 
