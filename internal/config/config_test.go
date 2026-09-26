@@ -155,3 +155,23 @@ func TestSweepTemporaryFilesMissingDirectory(t *testing.T) {
 		t.Fatalf("empty directory must be a no-op, got %d", removed)
 	}
 }
+
+// TestSweepTemporaryFilesReclaimsAfterReinstall pins the window the app
+// actually passes. install.ps1 stops the overlay with Stop-Process -Force
+// before copying the new binary, so a reinstall is the ordinary way to orphan
+// a temporary; with the one-hour window this used to sit in the install
+// directory long after the user had moved on.
+func TestSweepTemporaryFilesReclaimsAfterReinstall(t *testing.T) {
+	directory := t.TempDir()
+	orphan := filepath.Join(directory, TempPrefix+"333.tmp")
+	if err := os.WriteFile(orphan, []byte("{}"), 0600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	old := time.Now().Add(-5 * time.Minute)
+	if err := os.Chtimes(orphan, old, old); err != nil {
+		t.Fatalf("age orphan: %v", err)
+	}
+	if removed := SweepTemporaryFiles(directory, 2*time.Minute); removed != 1 {
+		t.Fatalf("orphan from an interrupted reinstall must be reclaimed, got %d", removed)
+	}
+}

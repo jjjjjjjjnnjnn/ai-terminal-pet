@@ -24,6 +24,7 @@ const (
 	wmLButtonUp       = 0x0202
 	wmLButtonDblClk   = 0x0203
 	wmMouseMove       = 0x0200
+	wmMouseLeave      = 0x02A3
 	wmMouseWheel      = 0x020A
 	wmRButtonUp       = 0x0205
 	wmApp             = 0x8000

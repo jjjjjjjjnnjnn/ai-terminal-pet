@@ -373,6 +373,56 @@ func (c *canvas) alphaAt(x, y int) uint8 {
 	return c.pixels[y*c.stride+x*4+3]
 }
 
+// measure returns the advance width of value in pixels at the given font.
+func (c *canvas) measure(value string, fontHeight, weight int) int {
+	if value == "" {
+		return 0
+	}
+	encoded, err := syscall.UTF16FromString(value)
+	if err != nil || len(encoded) < 2 {
+		return 0
+	}
+	font := cachedFont(fontHeight, weight)
+	if font == 0 {
+		return 0
+	}
+	oldFont := win.SelectObject(c.dc, win.HGDIOBJ(font))
+	var size win.SIZE
+	ok := win.GetTextExtentPoint32(c.dc, &encoded[0], int32(len(encoded)-1), &size)
+	if oldFont != 0 {
+		win.SelectObject(c.dc, oldFont)
+	}
+	if !ok {
+		return 0
+	}
+	return int(size.CX)
+}
+
+// fitText trims value with a trailing ellipsis until it fits maxWidth.
+//
+// A layered window has no scrollbar and no tooltip, so text that does not fit
+// is not merely clipped, it is lost. DT_END_ELLIPSIS cannot help in a
+// DT_WORDBREAK box (the two flags are mutually exclusive), which is how long
+// project names used to spill straight out of both sides of the strip.
+func (c *canvas) fitText(value string, fontHeight, weight, maxWidth int) string {
+	if value == "" || maxWidth <= 0 {
+		return ""
+	}
+	if c.measure(value, fontHeight, weight) <= maxWidth {
+		return value
+	}
+	const ellipsis = "…"
+	runes := []rune(value)
+	for len(runes) > 0 {
+		runes = runes[:len(runes)-1]
+		candidate := string(runes) + ellipsis
+		if c.measure(candidate, fontHeight, weight) <= maxWidth {
+			return candidate
+		}
+	}
+	return ""
+}
+
 // hitMapInto writes the alpha channel into a caller-owned buffer so the
 // 20 FPS alert animation does not allocate a fresh width*height slice on
 // every frame. The buffer must be at least width*height bytes.

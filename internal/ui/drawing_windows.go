@@ -8,6 +8,7 @@ import (
 
 const (
 	dtVCenter     = 0x0004
+	dtWordBreak   = 0x0010
 	dtSingleLine  = 0x0020
 	dtNoPrefix    = 0x0800
 	dtEndEllipsis = 0x8000
@@ -74,6 +75,9 @@ func projectLabel(current session.Session) string {
 	return base
 }
 
+// reasonLabel is the "what is it doing" half of a session row. The fallback
+// used to be a flat "等待用户响应", which was simply wrong for a session that
+// was busy or idle; naming the state is always accurate.
 func reasonLabel(current session.Session) string {
 	if current.Reason != "" {
 		return current.Reason
@@ -81,5 +85,5 @@ func reasonLabel(current session.Session) string {
 	if current.Tool != "" {
 		return current.Tool
 	}
-	return "等待用户响应"
+	return stateLabel(current.State)
 }

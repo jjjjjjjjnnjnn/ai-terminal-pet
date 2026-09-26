@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"ai-terminal-pet/internal/session"
@@ -11,53 +12,81 @@ import (
 
 const dtCenter = 0x0001
 
+// Panel geometry in logical units at 96 DPI. The window sizing code and the
+// rasterizer both derive from these, so a layout change cannot leave the frame
+// a different size from the picture drawn inside it.
+const (
+	compactWidth  = 56
+	compactHeight = 156
+
+	expandedWidth          = 200
+	expandedHeaderHeight   = 46
+	expandedSummaryHeight  = 30
+	expandedRowHeight      = 34
+	expandedEmptyHeight    = 56
+	expandedOverflowHeight = 24
+	expandedFooterHeight   = 34
+	expandedMaxRows        = 6
+)
+
+// expandedPanelHeight sizes the expanded panel to what it actually has to
+// show. The old panel was a fixed 250 units tall with two hard-coded rows, so
+// a third session existed only as a number in the summary line - the panel
+// could not display the very thing the user opened it for.
+func expandedPanelHeight(count int) int {
+	body := expandedEmptyHeight
+	if count > 0 {
+		body = minInt(count, expandedMaxRows) * expandedRowHeight
+		if count > expandedMaxRows {
+			body += expandedOverflowHeight
+		}
+	}
+	return expandedHeaderHeight + expandedSummaryHeight + body + expandedFooterHeight
+}
+
 // expandedCloseButtonRect is the single source of truth for the expanded
-// panel's close button geometry. Both the rasterizer and the hit test go
-// through it so a drawn button can never disagree with its click target -
-// the two used to duplicate the same arithmetic in two files.
+// panel's close button geometry, used by the rasterizer. The button is a
+// visual affordance only - a tap anywhere on the panel collapses it - but it
+// still has to sit inside the header without colliding with the state pill.
 func expandedCloseButtonRect(width int) (left, top, size int) {
-	unit := float64(width) / 200
+	unit := float64(width) / expandedWidth
 	scale := func(base int) int {
 		return maxInt(int(float64(base)*unit+0.5), 1)
 	}
 	size = scale(20)
 	left = width - size - scale(12)
-	top = scale(9)
+	top = scale(13)
 	return left, top, size
 }
 
-// closeButtonHit reports whether a client-space point lands on the expanded
-// panel's close button. Kept pure so the geometry is unit-testable.
-func closeButtonHit(x, y, width int) bool {
-	left, top, size := expandedCloseButtonRect(width)
-	return x >= left && x < left+size && y >= top && y < top+size
-}
-
-func drawVerticalPanel(target *canvas, items []session.Session, now time.Time, expanded, pressed bool) {
+func drawVerticalPanel(target *canvas, items []session.Session, now time.Time, expanded, pressed, hovered bool) {
 	width := target.width
 	height := target.height
 	state := session.Aggregate(items)
 	accent := stateColor(state)
-	center := width / 2
 	inset := 0
 	if pressed {
 		inset = 1
 	}
-	if state == session.StateWaitingPermission || state == session.StateError {
-		pulse := alertPulse(state, now)
-		glowSize := 48 + int(float64(pulse)*8+0.5)
-		glow := accent
-		glow.A = uint8(18 + float64(pulse)*24)
-		target.fillEllipse(center-glowSize/2, 4, glowSize, glowSize, glow)
-	}
 	panel := rgba{10, 15, 29, 235}
 	raised := rgba{24, 32, 52, 225}
-	radius := minInt(width/2, 28)
+	// Hover is the only cue that the panel is a control and not just a
+	// picture. Lifting the fill as well as the outline matters because in the
+	// alert states the outline is already near-opaque state colour, so an
+	// outline-only cue was invisible exactly when the panel most wanted to be
+	// clicked.
+	if hovered {
+		panel = rgba{22, 30, 54, 242}
+	}
+	radius := minInt(width/2, 24)
 	target.fillRounded(inset, inset, width-inset*2, height-inset*2, radius, panel)
 	border := rgba{76, 91, 123, 150}
 	if state == session.StateWaitingPermission || state == session.StateError {
 		border = accent
 		border.A = 210
+	}
+	if hovered {
+		border.A = uint8(minInt(int(border.A)+55, 255))
 	}
 	if pressed {
 		border.A = uint8(minInt(int(border.A)+30, 255))
@@ -67,93 +96,120 @@ func drawVerticalPanel(target *canvas, items []session.Session, now time.Time, e
 		drawVerticalExpanded(target, items, now, state, accent, raised)
 		return
 	}
-	drawVerticalCompact(target, items, now, state, accent, raised, pressed)
+	drawVerticalCompact(target, items, now, state, accent, pressed)
 }
 
-func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba, pressed bool) {
+// drawVerticalCompact answers three questions in the order a glance asks
+// them: what is the state, how many sessions are behind it, and which one
+// wants me. Everything else the strip used to carry - a 24-segment ring, two
+// arrow-labelled counters, a divider and a chevron - encoded those same two
+// facts six different ways, which made the panel dense without making it
+// informative.
+func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent rgba, pressed bool) {
 	width := target.width
-	unit := float64(width) / 40
+	unit := float64(width) / compactWidth
 	value := func(base int) int {
 		return maxInt(int(float64(base)*unit+0.5), 1)
 	}
 	center := width / 2
-	orbSize := value(24)
-	drawStatusOrb(target, center, value(8), orbSize, state, now, pressed)
-	ringSize := value(34)
-	ringTop := value(38)
-	drawSessionRing(target, center, ringTop, ringSize, len(items), state)
-	target.text(center-ringSize/2, ringTop+value(9), ringSize, value(17), compactCount(len(items)), value(15), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-	target.text(center-ringSize/2, ringTop+value(37), ringSize, value(10), "会话", value(8), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-	metricTop := value(93)
-	drawCompactMetric(target, value(6), metricTop, value(14), "↑", "运", activeSessions(items), colorWorking, width, value)
-	drawCompactMetric(target, value(6), metricTop+value(20), value(14), "↓", "待", waitingSessions(items), colorWaiting, width, value)
-	dividerY := value(140)
-	target.fillRect(value(8), dividerY, width-value(16), 1, rgba{79, 94, 126, 120})
-	footer := "详情"
-	if state == session.StateWaitingPermission {
-		footer = "待处理"
+
+	drawStatusOrb(target, center, value(14), value(28), state, now, pressed)
+
+	target.text(value(4), value(50), width-value(8), value(26), compactCount(len(items)), value(22), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	target.text(value(4), value(76), width-value(8), value(12), "会话", value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+
+	target.fillRect(value(12), value(96), width-value(24), 1, rgba{79, 94, 126, 120})
+
+	target.text(value(2), value(102), width-value(4), value(16), stateLabel(state), value(11), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+
+	subject, subjectColor := compactSubject(items, state)
+	subject = target.fitText(subject, value(9), 400, width-value(8))
+	target.text(value(4), value(124), width-value(8), value(14), subject, value(9), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+}
+
+// compactSubject picks the one line of text worth showing under the count:
+// the session that wants the user when one does, otherwise the most recently
+// active one, otherwise a hint at what to do about the empty panel.
+//
+// items arrive priority-sorted from the store, so the first match is already
+// the most urgent. The label is deliberately not tinted with the state colour:
+// the word directly above it already carries that, and colouring both made the
+// strip read as one amber smear instead of two distinct facts.
+func compactSubject(items []session.Session, state session.State) (string, rgba) {
+	if len(items) == 0 {
+		return "等待 AI CLI", colorMuted
 	}
-	if state == session.StateError {
-		footer = "异常"
+	if state == session.StateWaitingPermission || state == session.StateError {
+		for _, current := range items {
+			if current.State == session.StateWaitingPermission || current.State == session.StateError {
+				return projectLabel(current), colorPrimary
+			}
+		}
 	}
-	target.text(value(6), value(151), width-value(18), value(14), footer, value(9), 400, footerColor(state), dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	target.text(width-value(13), value(150), value(9), value(15), "›", value(12), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix)
+	return projectLabel(items[0]), colorSecondary
 }
 
 func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba) {
 	width := target.width
-	unit := float64(width) / 200
+	height := target.height
+	unit := float64(width) / expandedWidth
 	value := func(base int) int {
 		return maxInt(int(float64(base)*unit+0.5), 1)
 	}
-	target.text(value(14), value(9), width-value(58), value(20), "终端", value(14), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	pillWidth := value(70)
-	pillX := width - pillWidth - value(42)
-	pillY := value(9)
+
+	// Header: title, live state, close.
+	target.text(value(14), value(13), width-value(120), value(22), "终端会话", value(13), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	pillWidth := value(74)
+	pillX := width - pillWidth - value(40)
+	pillY := value(13)
 	pill := accent
-	pill.A = 48
-	target.fillRounded(pillX, pillY, pillWidth, value(19), 9, pill)
-	accent.A = 255
-	target.text(pillX, pillY, pillWidth, value(19), stateLabel(state), value(10), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	pill.A = 46
+	target.fillRounded(pillX, pillY, pillWidth, value(20), 10, pill)
+	target.text(pillX, pillY, pillWidth, value(20), stateLabel(state), value(10), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+
 	closeX, closeY, closeSize := expandedCloseButtonRect(width)
 	target.fillEllipse(closeX, closeY, closeSize, closeSize, raised)
-	target.line(closeX+value(5), closeY+value(5), closeX+closeSize-value(5), closeY+closeSize-value(5), 1, colorSecondary)
-	target.line(closeX+closeSize-value(5), closeY+value(5), closeX+value(5), closeY+closeSize-value(5), 1, colorSecondary)
-	center := width / 2
-	ringSize := value(78)
-	ringTop := value(38)
-	drawSessionRing(target, center, ringTop, ringSize, len(items), state)
-	target.text(center-ringSize/2, ringTop+value(22), ringSize, value(25), compactCount(len(items)), value(22), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-	target.text(center-ringSize/2, ringTop+value(49), ringSize, value(13), "会话", value(10), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-	metricTop := value(126)
-	drawWideMetric(target, value(16), metricTop, value(22), "↑", "运行", activeSessions(items), colorWorking, width, value)
-	drawWideMetric(target, value(16), metricTop+value(27), value(22), "↓", "等待", waitingSessions(items), colorWaiting, width, value)
-	target.fillRect(value(14), value(181), width-value(28), 1, rgba{79, 94, 126, 120})
-	target.text(value(14), value(187), width-value(28), value(15), compactSummary(items), value(10), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.line(closeX+value(6), closeY+value(6), closeX+closeSize-value(6), closeY+closeSize-value(6), 1, colorSecondary)
+	target.line(closeX+closeSize-value(6), closeY+value(6), closeX+value(6), closeY+closeSize-value(6), 1, colorSecondary)
+
+	target.fillRect(value(14), value(expandedHeaderHeight-6), width-value(28), 1, rgba{79, 94, 126, 120})
+	target.text(value(14), value(expandedHeaderHeight), width-value(28), value(expandedSummaryHeight), summaryLine(items), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+
+	top := value(expandedHeaderHeight + expandedSummaryHeight)
 	if len(items) == 0 {
-		target.text(value(16), value(222), width-value(32), value(23), "等待终端会话", value(12), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix)
-		return
-	}
-	visible := len(items)
-	if visible > 2 {
-		visible = 2
-	}
-	rowHeight := value(20)
-	gap := value(2)
-	top := value(206)
-	for index := 0; index < visible; index++ {
-		drawVerticalSession(target, items[index], value(14), top+index*(rowHeight+gap), width-value(28), rowHeight, gap, value)
+		drawExpandedEmpty(target, top, width, value)
+	} else {
+		rows := minInt(len(items), expandedMaxRows)
+		for index := 0; index < rows; index++ {
+			drawVerticalSession(target, items[index], value(14), top+index*value(expandedRowHeight), width-value(28), value(expandedRowHeight)-value(4), now, value)
+		}
+		if hidden := len(items) - rows; hidden > 0 {
+			y := top + rows*value(expandedRowHeight)
+			target.text(value(14), y, width-value(28), value(expandedOverflowHeight), fmt.Sprintf("还有 %d 个会话", hidden), value(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+		}
 	}
 
+	// The footer teaches the controls once, so the panel does not need a
+	// visible handle or a chevron to advertise that it is interactive.
+	footerTop := height - value(expandedFooterHeight)
+	target.fillRect(value(14), footerTop-value(6), width-value(28), 1, rgba{79, 94, 126, 90})
+	hint := target.fitText("拖拽移动 · 滚轮缩放 · 点击收起", value(8), 400, width-value(24))
+	target.text(value(12), footerTop, width-value(24), value(expandedFooterHeight), hint, value(8), 400, colorMuted, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+}
+
+func drawExpandedEmpty(target *canvas, top, width int, scale func(int) int) {
+	// The summary line already says there are no sessions, so this block
+	// carries the actionable half instead of repeating it.
+	target.text(scale(16), top+scale(6), width-scale(32), scale(34), "在终端里启动 AI CLI，浮窗会自动出现", scale(9), 400, colorMuted, dtVCenter|dtCenter|dtNoPrefix|dtWordBreak)
 }
 
 func drawStatusOrb(target *canvas, centerX, top, size int, state session.State, now time.Time, pressed bool) {
 	if state == session.StateWaitingPermission || state == session.StateError {
 		pulse := alertPulse(state, now)
-		outer := size + 6 + int(float64(pulse)*6+0.5)
+		outer := size + 6 + int(float64(pulse)*8+0.5)
 		outerColor := stateColor(state)
-		outerColor.A = 60
-		target.fillEllipse(centerX-outer/2, top-3, outer, outer, outerColor)
+		outerColor.A = uint8(48 + float64(pulse)*40)
+		target.fillEllipse(centerX-outer/2, top-(outer-size)/2, outer, outer, outerColor)
 	}
 	orb := stateColor(state)
 	if pressed {
@@ -165,70 +221,77 @@ func drawStatusOrb(target *canvas, centerX, top, size int, state session.State, 
 	target.text(centerX-inner/2, top+4, inner, inner, statusGlyph(state), maxInt(size/2, 11), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }
 
-func drawSessionRing(target *canvas, centerX, top, size, count int, state session.State) {
-	segments := 24
-	activeSegments := count * 2
-	if state == session.StateWaitingPermission || state == session.StateError {
-		activeSegments = segments
-	}
-	if activeSegments > segments {
-		activeSegments = segments
-	}
-	if activeSegments < 2 && count > 0 {
-		activeSegments = 2
-	}
-	dot := maxInt(size/20, 2)
-	radius := size/2 - dot
-	centerY := top + size/2
-	muted := rgba{64, 77, 106, 125}
-	accent := stateColor(state)
-	for index := 0; index < segments; index++ {
-		angle := -math.Pi/2 + float64(index)*2*math.Pi/float64(segments)
-		x := centerX + int(math.Cos(angle)*float64(radius)+0.5) - dot/2
-		y := centerY + int(math.Sin(angle)*float64(radius)+0.5) - dot/2
-		value := muted
-		if index < activeSegments {
-			value = accent
-		}
-		target.fillEllipse(x, y, dot, dot, value)
-	}
-	target.fillEllipse(centerX-size/2+5, top+5, size-10, size-10, rgba{7, 12, 25, 225})
-}
-
-func drawCompactMetric(target *canvas, left, top, height int, icon, label string, value int, accent rgba, width int, scale func(int) int) {
-	target.text(left, top, height, height, icon, maxInt(height*3/4, 9), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix)
-	textLeft := left + height + scale(1)
-	target.text(textLeft, top, scale(8), height, label, maxInt(height/2, 9), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	valueWidth := scale(9)
-	target.text(width-valueWidth-scale(1), top, valueWidth, height, strconv.Itoa(value), maxInt(height*3/5, 9), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix)
-}
-
-func drawWideMetric(target *canvas, left, top, height int, icon, label string, value int, accent rgba, width int, scale func(int) int) {
-	target.text(left, top, height, height, icon, maxInt(height*3/4, 10), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix)
-	textLeft := left + height + scale(6)
-	target.text(textLeft, top, scale(70), height, label, maxInt(height/2, 10), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	valueWidth := scale(28)
-	target.text(width-valueWidth-scale(14), top, valueWidth, height, strconv.Itoa(value), maxInt(height*3/5, 11), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix)
-}
-
-func drawVerticalSession(target *canvas, current session.Session, left, top, width, height, gap int, scale func(int) int) {
-	target.fillRounded(left, top, width, height, 5, rgba{24, 32, 52, 225})
+// drawVerticalSession is one row of the expanded list: project and state on
+// the first line, where it came from and how long ago it spoke on the second.
+// The relative time is the part that makes the list actionable - "waiting for
+// approval" reads very differently at 10 seconds and at 40 minutes.
+func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int) {
+	target.fillRounded(left, top, width, height, 6, rgba{24, 32, 52, 205})
 	accent := stateColor(current.State)
-	target.fillRounded(left+gap, top+gap, 3, height-gap*2, 2, accent)
-	textLeft := left + gap + 7
-	stateWidth := scale(52)
-	stateX := left + width - gap - stateWidth
-	target.text(textLeft, top+2, stateX-textLeft-scale(4), scale(10), current.Source, scale(8), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	target.text(stateX, top+2, stateWidth, scale(10), stateLabel(current.State), scale(8), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	line := fmt.Sprintf("%s · %s", projectLabel(current), reasonLabel(current))
-	target.text(textLeft, top+scale(11), width-(textLeft-left)-gap-scale(4), scale(8), line, scale(8), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.fillRounded(left+scale(1), top+scale(1), scale(3), height-scale(2), 2, accent)
+
+	textLeft := left + scale(9)
+	stateWidth := scale(56)
+	stateX := left + width - stateWidth - scale(9)
+
+	target.text(textLeft, top+scale(3), stateX-textLeft-scale(6), scale(12), projectLabel(current), scale(10), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(stateX, top+scale(3), stateWidth, scale(12), stateLabel(current.State), scale(8), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+
+	detail := fmt.Sprintf("%s · %s", current.Source, reasonLabel(current))
+	target.text(textLeft, top+scale(17), stateX-textLeft-scale(6), scale(10), detail, scale(8), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(stateX, top+scale(17), stateWidth, scale(10), relativeTime(current.UpdatedAt, now), scale(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 }
 
+// summaryLine is the one-line census under the header. "运行" deliberately
+// excludes sessions that are waiting on the user: from the user's side those
+// are not running, they are blocking, and counting them as both made the old
+// metric rows double-count.
+func summaryLine(items []session.Session) string {
+	if len(items) == 0 {
+		return "暂无会话"
+	}
+	parts := []string{fmt.Sprintf("%d 个会话", len(items))}
+	if busy := busySessions(items); busy > 0 {
+		parts = append(parts, fmt.Sprintf("%d 运行", busy))
+	}
+	if waiting := waitingSessions(items); waiting > 0 {
+		parts = append(parts, fmt.Sprintf("%d 等待", waiting))
+	}
+	return strings.Join(parts, " · ")
+}
+
+// relativeTime renders coarse buckets rather than a clock: sessions live for
+// minutes, and "3 分钟前" is read faster than "14:07".
+func relativeTime(value, now time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	delta := now.Sub(value)
+	if delta < 0 {
+		delta = 0
+	}
+	switch {
+	case delta < 45*time.Second:
+		return "刚刚"
+	case delta < 90*time.Second:
+		return "1 分钟前"
+	case delta < time.Hour:
+		return fmt.Sprintf("%d 分钟前", int(delta.Minutes()))
+	case delta < 2*time.Hour:
+		return "1 小时前"
+	default:
+		return fmt.Sprintf("%d 小时前", int(delta.Hours()))
+	}
+}
+
+// alertPulse is a slow, calm breath (about 1.1 s per cycle). It used to run at
+// 180 ms, which read as a glitch rather than a signal - a status light should
+// be noticed once, not be hard to look at.
 func alertPulse(state session.State, now time.Time) float64 {
 	if state != session.StateWaitingPermission && state != session.StateError {
 		return 0
 	}
-	value := math.Sin(float64(now.UnixNano()) / float64(180*time.Millisecond))
+	value := math.Sin(float64(now.UnixNano()) / float64(175*time.Millisecond))
 	return (value + 1) / 2
 }
 
@@ -247,10 +310,13 @@ func statusGlyph(state session.State) string {
 	}
 }
 
-func activeSessions(items []session.Session) int {
+// busySessions counts sessions doing work right now, excluding those blocked
+// on the user.
+func busySessions(items []session.Session) int {
 	count := 0
 	for _, current := range items {
-		if current.State != session.StateIdle && current.State != session.StateClosed {
+		switch current.State {
+		case session.StateWorking, session.StateToolUse, session.StateThinking:
 			count++
 		}
 	}
@@ -272,21 +338,4 @@ func waitingSessions(items []session.Session) int {
 		}
 	}
 	return count
-}
-
-func compactSummary(items []session.Session) string {
-	if len(items) == 0 {
-		return "等待会话"
-	}
-	return fmt.Sprintf("%d 个会话 · %s", len(items), stateLabel(session.Aggregate(items)))
-}
-
-func footerColor(state session.State) rgba {
-	if state == session.StateWaitingPermission {
-		return colorWaiting
-	}
-	if state == session.StateError {
-		return colorError
-	}
-	return colorMuted
 }

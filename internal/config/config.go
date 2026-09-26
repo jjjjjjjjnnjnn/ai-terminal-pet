@@ -209,11 +209,16 @@ func WriteFileAtomic(path string, data []byte) error {
 //
 // WriteFileAtomic cleans up after itself on every error path, but a hard kill
 // (taskkill /F, power loss) between CreateTemp and Rename cannot: the process
-// simply stops existing. Nothing else revisits this directory, so without a
-// sweep those orphans accumulate one per interrupted save.
+// simply stops existing. That is not a rare case here - install.ps1 stops the
+// overlay with Stop-Process -Force before copying the new binary, so every
+// upgrade can orphan one. Nothing else revisits this directory, so without a
+// sweep those accumulate one per interrupted save.
 //
 // Only files older than minAge are considered, so a sweep can never race a
-// save that another process still has in flight.
+// save that another process still has in flight. Callers can afford a small
+// minAge because a temp file lives for milliseconds (create, write 80 bytes,
+// rename) and the overlay holds the single-instance mutex for its whole
+// lifetime, so no second writer exists.
 func SweepTemporaryFiles(directory string, minAge time.Duration) int {
 	if directory == "" {
 		return 0

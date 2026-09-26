@@ -115,6 +115,10 @@ type App struct {
 	expanded bool
 	hidden   bool
 	pressed  bool
+	// hovering is true while the cursor is over the panel. It only brightens
+	// the outline, but it is the difference between "a picture of a status"
+	// and "something I can click".
+	hovering bool
 	x        int32
 	y        int32
 	width    int
@@ -314,6 +318,11 @@ func (a *App) Run() error {
 	a.taskbarMessage = win.RegisterWindowMessage(&taskbarName[0])
 	a.addTray()
 	a.load()
+	// The window was created before load() knew how many sessions the
+	// remembered state carries, and the expanded panel is sized from that
+	// count, so publish the real frame before the first paint.
+	a.width, a.height = a.logicalWidth(), a.logicalHeight()
+	a.resize()
 	a.restoreOrAnchor()
 	if err := a.present(); err != nil {
 		return fmt.Errorf("present: %w", err)
@@ -477,6 +486,9 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 			a.lastAvailable = time.Now()
 		}
 		a.syncAnimation()
+		// Sessions coming and going change the expanded panel's content
+		// height. This is a no-op unless the size actually moved.
+		a.applyGeometry()
 		if !a.hidden {
 			_ = a.present()
 		}
@@ -500,15 +512,20 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 	case wmNCHitTest:
 		return a.hitTest(lParam)
 	case wmLButtonDown:
-		a.beginDrag(lParam)
+		a.beginDrag()
 		return 0
 	case wmMouseMove:
 		if a.drag.active && wParam&mkLButton != 0 {
 			a.moveDrag()
+			return 0
 		}
+		a.trackHover()
+		return 0
+	case wmMouseLeave:
+		a.clearHover()
 		return 0
 	case wmLButtonUp:
-		a.endDrag(lParam)
+		a.endDrag()
 		return 0
 	case wmMouseWheel:
 		a.zoomBy(float64(int16(uint16(wParam >> 16))))
@@ -581,9 +598,7 @@ func (a *App) handleTimer(hwnd win.HWND, timer uintptr) uintptr {
 		// expires), so re-check here and stop the pulse when nothing is
 		// pulsing any more.
 		a.syncAnimation()
-		if a.pressed || a.state == session.StateWaitingPermission || a.state == session.StateError {
-			a.postRefresh()
-		}
+		a.postRefresh()
 	}
 	return 0
 }
@@ -600,6 +615,31 @@ func (a *App) handleTrayMessage(message uint32, lParam uintptr) {
 	case wmRButtonUp, wmContextMenu:
 		a.showContextMenu(true)
 	}
+}
+
+// trackHover arms the one-shot WM_MOUSELEAVE notification the first time the
+// cursor enters the panel. Without TrackMouseEvent there is no leave message,
+// so the highlight would stay on forever after the first hover.
+func (a *App) trackHover() {
+	if a.hovering {
+		return
+	}
+	a.hovering = true
+	track := win.TRACKMOUSEEVENT{
+		CbSize:    uint32(unsafe.Sizeof(win.TRACKMOUSEEVENT{})),
+		DwFlags:   win.TME_LEAVE,
+		HwndTrack: a.window(),
+	}
+	win.TrackMouseEvent(&track)
+	a.postRefresh()
+}
+
+func (a *App) clearHover() {
+	if !a.hovering {
+		return
+	}
+	a.hovering = false
+	a.postRefresh()
 }
 
 func (a *App) hitTest(lParam uintptr) uintptr {
@@ -630,11 +670,11 @@ func classifyHit(x, y, width, height int, hit []byte) bool {
 	return hit[y*width+x] >= 20
 }
 
-func (a *App) beginDrag(lParam uintptr) {
-	y := int32(int16(uint16(lParam >> 16)))
-	if a.expanded && y > int32(float64(40)*float64(a.width)/200) {
-		return
-	}
+// beginDrag arms a press. The whole panel is draggable, including the
+// expanded body: the old code only allowed the top 40 units so that clicks on
+// the session rows could be reserved for something else, but nothing was ever
+// wired to them, and the result was a panel that looked grabbable and was not.
+func (a *App) beginDrag() {
 	var cursor win.POINT
 	if !win.GetCursorPos(&cursor) {
 		return
@@ -683,41 +723,37 @@ const (
 	releaseToggle
 )
 
-// decideRelease maps a completed drag to the action it triggers. It is pure
+// decideRelease maps a completed press to the action it triggers. It is pure
 // so the invariant "a drag that moved must never also toggle the panel" is
 // locked down by a test.
 //
-// The old code read a.drag.moved AFTER calling ReleaseCapture. ReleaseCapture
-// dispatches WM_CAPTURECHANGED synchronously to this same window, and that
-// handler clears a.drag, so moved was always observed as false: every drag
-// additionally toggled the panel between compact and expanded, which is what
-// "cannot drag the pet" looked like from the outside.
-func decideRelease(active, moved, expanded bool, x, y, width int) releaseAction {
+// The rule is deliberately the same in both directions - a tap toggles, a drag
+// moves - so there is nothing to learn and nothing to aim at. The old code
+// read a.drag.moved AFTER calling ReleaseCapture, which dispatches
+// WM_CAPTURECHANGED synchronously to this same window and clears a.drag, so
+// moved was always observed as false: every drag additionally toggled the
+// panel, which is what "cannot drag the pet" looked like from the outside. It
+// then also required a tap to land on a 20-unit close button to collapse,
+// which is what "the panel will not close" looked like.
+func decideRelease(active, moved bool) releaseAction {
 	if !active || moved {
 		return releaseNothing
 	}
-	if !expanded {
-		return releaseToggle
-	}
-	if closeButtonHit(x, y, width) {
-		return releaseToggle
-	}
-	return releaseNothing
+	return releaseToggle
 }
 
-func (a *App) endDrag(lParam uintptr) {
+func (a *App) endDrag() {
 	if !a.drag.active {
 		a.pressed = false
 		return
 	}
-	x := int(int16(uint16(lParam)))
-	y := int(int16(uint16(lParam >> 16)))
 	// Decide before touching capture: see decideRelease.
-	action := decideRelease(a.drag.active, a.drag.moved, a.expanded, x, y, a.width)
+	action := decideRelease(a.drag.active, a.drag.moved)
 	moved := a.drag.moved
 	a.drag = dragState{}
 	a.pressed = false
 	win.ReleaseCapture()
+	a.syncAnimation()
 	a.postRefresh()
 	if moved {
 		a.persistPlacement()
@@ -737,9 +773,7 @@ func (a *App) zoomBy(delta float64) {
 	}
 	a.zoom = math.Max(0.65, math.Min(1.6, a.zoom+step))
 	a.load()
-	a.width, a.height = a.logicalWidth(), a.logicalHeight()
-	a.resize()
-	a.clampToMonitor()
+	a.applyGeometry()
 	a.setTopmost()
 	a.postRefresh()
 	a.persistPlacement()
@@ -753,9 +787,7 @@ func (a *App) toggleExpanded() {
 	// issues UpdateLayeredWindow which has stalled for seconds under
 	// system load, and stalling an input handler is exactly what Windows
 	// reports as AppHang (busy cursor, ghost window, click "crash").
-	a.width, a.height = a.logicalWidth(), a.logicalHeight()
-	a.resize()
-	a.clampToMonitor()
+	a.applyGeometry()
 	a.setTopmost()
 	a.postRefresh()
 	a.persistPlacement()
@@ -794,12 +826,16 @@ func (a *App) restoreOrAnchor() {
 // syncAnimation installs the 50 ms pulse timer only while something is
 // actually pulsing. Before this, the timer ran at 20 Hz forever, waking the UI
 // thread 20 times a second to redraw an identical idle frame.
+//
+// A press is deliberately not an animation: the press feedback is a static
+// inset and a dimmed orb, so spinning up a repaint loop to draw the same frame
+// 20 times a second while the button is held was pure waste.
 func (a *App) syncAnimation() {
 	handle := a.handle.Load()
 	if handle == 0 {
 		return
 	}
-	want := !a.hidden && (a.pressed || a.state == session.StateWaitingPermission || a.state == session.StateError)
+	want := !a.hidden && (a.state == session.StateWaitingPermission || a.state == session.StateError)
 	if want == a.animating {
 		return
 	}
@@ -941,6 +977,9 @@ func (a *App) hideToTray() {
 		win.ShowWindow(a.window(), win.SW_HIDE)
 	}
 	a.hidden = true
+	// A hidden window gets no WM_MOUSELEAVE, so the highlight would still be
+	// on the next time the panel appears under a cursor that has long moved.
+	a.hovering = false
 	a.syncAnimation()
 }
 
@@ -1123,7 +1162,7 @@ func (a *App) present() error {
 	}
 	target := a.surface
 	target.clear()
-	drawVerticalPanel(target, a.sessions, time.Now(), a.expanded, a.pressed)
+	drawVerticalPanel(target, a.sessions, time.Now(), a.expanded, a.pressed, a.hovering)
 	screenDC := win.GetDC(0)
 	if screenDC == 0 {
 		return syscall.EINVAL
@@ -1184,19 +1223,41 @@ func (a *App) resize() {
 }
 
 func (a *App) logicalWidth() int {
-	base := 40
+	base := compactWidth
 	if a.expanded {
-		base = 200
+		base = expandedWidth
 	}
 	return scaledDimension(base, a.dpi, a.zoom)
 }
 
+// logicalHeight is the compact strip's fixed height, or the expanded panel's
+// content height. Sizing the expanded panel from the session count is what
+// lets it actually list what it has instead of hiding everything past the
+// second row.
 func (a *App) logicalHeight() int {
-	base := 190
+	base := compactHeight
 	if a.expanded {
-		base = 250
+		base = expandedPanelHeight(len(a.sessions))
 	}
 	return scaledDimension(base, a.dpi, a.zoom)
+}
+
+// applyGeometry publishes the current logical size to the frame, keeping the
+// window's centre fixed so the panel grows in both directions. Without the
+// centre correction, expanding a tall session list pushed the footer off the
+// bottom of the screen and the clamp then yanked the whole panel upward.
+func (a *App) applyGeometry() {
+	width, height := a.logicalWidth(), a.logicalHeight()
+	if width == a.width && height == a.height {
+		return
+	}
+	if a.width > 0 && a.height > 0 {
+		a.x -= int32((width - a.width) / 2)
+		a.y -= int32((height - a.height) / 2)
+	}
+	a.width, a.height = width, height
+	a.resize()
+	a.clampToMonitor()
 }
 
 func (a *App) positionForWorkArea() {
@@ -1263,9 +1324,7 @@ func (a *App) handleDPIChanged(wParam uintptr) {
 	}
 	a.dpi = dpi
 	a.load()
-	a.width, a.height = a.logicalWidth(), a.logicalHeight()
-	a.resize()
-	a.clampToMonitor()
+	a.applyGeometry()
 	a.setTopmost()
 	a.postRefresh()
 	a.persistPlacement()

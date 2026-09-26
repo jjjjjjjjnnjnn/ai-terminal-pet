@@ -23,7 +23,7 @@ AI terminals ── reporters/*.js ── named pipe ── AI-Terminal-Pet.exe 
   `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\` act as a fallback channel.
 - **App** (`cmd/ai-terminal-pet`): single instance (mutex), pipe server
   (32 conns, 5 s read timeout), snapshot scanner (2 s), Win32 layered
-  overlay (collapsed `40x190`, expanded `200x250`, tray icon).
+  overlay (compact `56x156`, expanded `200x<content>`, tray icon).
 - **Reporters** (`reporters/`): `opencode.js` (plugin),
   `claude-hook.js`, `antigravity-hook.js`, `antigravity-statusline.js`,
   plus `generic.js` — a one-line bridge for any other CLI —
@@ -34,11 +34,52 @@ AI terminals ── reporters/*.js ── named pipe ── AI-Terminal-Pet.exe 
   hooks make every `node`/shell spawn cost seconds, the native shim
   answers in well under a second.
 
-## Control the overlay
+## The overlay
+
+**Compact** answers three questions in the order a glance asks them:
+
+```
+   ◉      state orb - colour plus glyph, pulses while something waits on you
+   3      how many sessions are behind it
+ 会话
+  ────
+等待确认   what that state is, in words
+ai-term…  which project is the one waiting
+```
+
+**Expanded** is the list itself. It grows with the number of sessions
+(up to six rows, then "还有 N 个会话"), and each row shows the project, its
+state, where it came from and how long ago it last spoke:
+
+```
+终端会话                            [等待确认]  ✕
+──────────────────────────────────────────────
+3 个会话 · 2 运行 · 1 等待
+▍ai-terminal-pet          等待确认   2 分钟前
+  claude-hook · Bash(go test)
+▍webapp                   执行中     刚刚
+  opencode · editing src/app.tsx
+──────────────────────────────────────────────
+      拖拽移动 · 滚轮缩放 · 点击收起
+```
+
+Interaction is deliberately uniform — there is nothing to aim at:
+
+| gesture | effect |
+|---|---|
+| click anywhere | compact ↔ expanded |
+| drag anywhere | move, 1:1 with the cursor |
+| wheel | zoom 65 %–160 % |
+| hover | the panel lights up, so it reads as a control |
+| `Esc` | collapse |
+| right-click | menu (hide, reset, notifications, sound, topmost, autostart, quit) |
 
 The overlay is single-instance and removes itself once no terminal session
-is left, so it is normally invisible in a process list. Every command below
-is safe to bind to a hotkey or shell alias:
+is left, so it is normally invisible in a process list.
+
+## Control the overlay
+
+Every command below is safe to bind to a hotkey or shell alias:
 
 ```powershell
 ai-terminal-pet --show      # reveal the running overlay
@@ -124,7 +165,26 @@ go build -trimpath -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-status
 .\install.ps1   # stops the running pet, copies both binaries, SHA256-verifies
 ```
 
+`install.ps1` retries the copy: the reporters relaunch the overlay on demand,
+so it can be alive again milliseconds after being stopped, and a plain
+copy-over fails at random on a machine that is actually using the tool.
+
 `node --check reporters/*.js` covers the reporters (stdlib only).
+
+### Seeing a layout change without a window
+
+Layered-window geometry is easy to get subtly wrong and hard to look at
+because there is nothing to screenshot. The rasterizer can be driven straight
+to PNG instead:
+
+```powershell
+$env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
+go test ./internal/ui -run TestRenderPreview
+```
+
+That writes the compact and expanded panel in several states at 2–3x scale.
+It is a development aid, not an assertion, so it skips unless
+`PET_PREVIEW_DIR` is set.
 
 ## Wire up a terminal
 
@@ -163,9 +223,9 @@ internal/pipeserver    named-pipe server (user-isolated name, ACK/ERR)
 internal/store         session store (256 cap, tombstones, TTLs, snapshots)
 internal/session       schema validation + priority/aggregation/sort
 internal/platform      single-instance mutex, process-liveness probe
-internal/ui            layered overlay, canvas rasterizer, tray, notifications
+internal/ui            layered overlay, canvas rasterizer, panel layout, tray
 reporters/             JS push side (incl. generic.js)
-install.ps1            stop → copy → SHA256 verify (both binaries)
+install.ps1            stop → copy (retrying) → SHA256 verify (both binaries)
 ```
 
 ## Known limitations
@@ -176,8 +236,9 @@ install.ps1            stop → copy → SHA256 verify (both binaries)
 - Same-user pipe preemption is mitigated (mutex-first ordering), not
   eliminated — a future `FILE_FLAG_FIRST_PIPE_INSTANCE` or
   challenge-response upgrade is tracked in HANDOVER.md.
-- `go test -race` needs a gcc toolchain; UI has unit tests for pure
-  logic only, visual behavior is verified manually.
+- `go test -race` needs a gcc toolchain. The UI has unit tests for pure
+  logic (hit testing, panel sizing, release decisions, text fitting) and a
+  PNG preview renderer for layout, but no automated pixel regression.
 
 See [HANDOVER.md](HANDOVER.md) for the operational runbook and
 [ROADMAP.md](ROADMAP.md) for the extension and lightweighting plans.
