@@ -27,3 +27,6 @@ harness-out.json
 
 # Agent working memory (machine-local, not project source)
 .workbuddy-ai/
+
+# Generated panel preview (see README: "Seeing a layout change without a window")
+panel-preview.png
