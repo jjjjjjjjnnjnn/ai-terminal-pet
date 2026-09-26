@@ -56,13 +56,18 @@ type Config struct {
 	Sound bool `json:"sound"`
 	// AlwaysOnTop keeps the overlay above other windows.
 	AlwaysOnTop bool `json:"alwaysOnTop"`
+	// EdgeRetract slides the panel into the screen edge it is hugging whenever
+	// nothing needs the user's attention, leaving a slim state-coloured spine
+	// on screen. Hovering brings it back out, and a session that starts
+	// waiting for permission - or fails - brings it out on its own.
+	EdgeRetract bool `json:"edgeRetract"`
 	// Opacity is the layered window's constant alpha, MinOpacity..MaxOpacity.
 	Opacity int `json:"opacity"`
 }
 
 // Default returns the settings used when config.json is absent or unreadable.
 func Default() Config {
-	return Config{Notifications: true, Sound: true, AlwaysOnTop: true, Opacity: 235}
+	return Config{Notifications: true, Sound: true, AlwaysOnTop: true, EdgeRetract: true, Opacity: 235}
 }
 
 // Normalize clamps every field into a usable range, substituting the default

@@ -20,7 +20,7 @@ import (
 )
 
 // Version is reported by `ai-terminal-pet --version`.
-const Version = "0.4.0"
+const Version = "0.5.0"
 
 func Run() error {
 	// Single-instance gate doubles as pipe-preemption mitigation: only the
@@ -95,6 +95,7 @@ func Run() error {
 			Notifications: settings.Notifications,
 			Sound:         settings.Sound,
 			AlwaysOnTop:   settings.AlwaysOnTop,
+			EdgeRetract:   settings.EdgeRetract,
 		},
 		AutoStart: autostartEnabled,
 		Initial: ui.Placement{
@@ -120,6 +121,7 @@ func Run() error {
 			current.Notifications = value.Notifications
 			current.Sound = value.Sound
 			current.AlwaysOnTop = value.AlwaysOnTop
+			current.EdgeRetract = value.EdgeRetract
 			_ = config.Save(configPath, current)
 		},
 		OnAutoStartChanged: func(enabled bool) bool {

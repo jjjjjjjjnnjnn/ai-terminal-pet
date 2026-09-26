@@ -59,13 +59,82 @@ func expandedCloseButtonRect(width int) (left, top, size int) {
 	return left, top, size
 }
 
-func drawVerticalPanel(target *canvas, items []session.Session, now time.Time, expanded, pressed, hovered bool) {
+// renderedKey is the set of inputs that actually change what the panel looks
+// like, and where it sits.
+//
+// Two frames with the same key are pixel-identical, so present() can skip the
+// whole raster. Reporters push on every statusline render and most pushes
+// repeat the same state, which used to mean a full GDI repaint several times a
+// second for no visible change.
+type renderedKey struct {
+	width    int
+	height   int
+	digest   uint64
+	state    session.State
+	count    int
+	expanded bool
+	pressed  bool
+	hovered  bool
+	// tuck is scaled by 1000 so the slide, which is continuous, still produces
+	// a new key at every visible step.
+	tuck int32
+	// clock is what makes a time-driven frame differ from the last one.
+	clock int64
+}
+
+func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time) renderedKey {
+	key := renderedKey{
+		width:    width,
+		height:   height,
+		digest:   digest,
+		state:    state,
+		count:    count,
+		expanded: expanded,
+		pressed:  pressed,
+		hovered:  hovered,
+		tuck:     int32(math.Round(tuck * 1000)),
+	}
+	switch {
+	case animating:
+		// A pulse or a slide is driven by the clock, so every frame really is
+		// different.
+		key.clock = now.UnixNano()
+	case expanded:
+		// Relative timestamps are minute-grained; refreshing them every two
+		// seconds repaints the largest panel for no visible change.
+		key.clock = now.Unix() / 15
+	}
+	return key
+}
+
+// panelState is everything the rasterizer needs about the frame it is about to
+// draw. It is a struct rather than a parameter list because that list had grown
+// to six booleans and numbers whose order was easy to get wrong at the call
+// site - and getting it wrong draws a plausible-looking wrong panel.
+type panelState struct {
+	Items    []session.Session
+	Now      time.Time
+	Expanded bool
+	Pressed  bool
+	Hovered  bool
+	// Tuck is 0 when the panel is fully on screen and 1 when it has slid all
+	// the way into its docked edge.
+	Tuck float64
+	// Sliver is the width in canvas pixels that stays visible at Tuck 1.
+	Sliver int
+	// Dock is the edge being slid into, which decides which end of the frame
+	// stays on screen.
+	Dock dockSide
+}
+
+func drawVerticalPanel(target *canvas, state panelState) {
 	width := target.width
 	height := target.height
-	state := session.Aggregate(items)
-	accent := stateColor(state)
+	items := state.Items
+	aggregate := session.Aggregate(items)
+	accent := stateColor(aggregate)
 	inset := 0
-	if pressed {
+	if state.Pressed {
 		inset = 1
 	}
 	panel := rgba{10, 15, 29, 235}
@@ -75,28 +144,71 @@ func drawVerticalPanel(target *canvas, items []session.Session, now time.Time, e
 	// alert states the outline is already near-opaque state colour, so an
 	// outline-only cue was invisible exactly when the panel most wanted to be
 	// clicked.
-	if hovered {
+	if state.Hovered {
 		panel = rgba{22, 30, 54, 242}
 	}
 	radius := minInt(width/2, 24)
 	target.fillRounded(inset, inset, width-inset*2, height-inset*2, radius, panel)
 	border := rgba{76, 91, 123, 150}
-	if state == session.StateWaitingPermission || state == session.StateError {
+	if aggregate == session.StateWaitingPermission || aggregate == session.StateError {
 		border = accent
 		border.A = 210
 	}
-	if hovered {
+	if state.Hovered {
 		border.A = uint8(minInt(int(border.A)+55, 255))
 	}
-	if pressed {
+	if state.Pressed {
 		border.A = uint8(minInt(int(border.A)+30, 255))
 	}
 	target.outlineRounded(inset, inset, width-inset*2, height-inset*2, radius, 1, border)
-	if expanded {
-		drawVerticalExpanded(target, items, now, state, accent, raised)
+
+	// The silhouette deliberately stays opaque while the panel slides: it is
+	// the shape that becomes the docked tab, so fading it would make the strip
+	// blink out of existence on the way in. Only the contents fade.
+	if state.Tuck < 1 {
+		target.setAlphaScale(1 - state.Tuck)
+		if state.Expanded {
+			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised)
+		} else {
+			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed)
+		}
+		target.setAlphaScale(1)
+	}
+	if state.Tuck > 0 {
+		drawDockedTab(target, aggregate, state.Dock, state.Sliver, state.Tuck)
+	}
+}
+
+// drawDockedTab is what is left of the panel once it has slid into the screen
+// edge: a slim spine of state colour on the sliver that stays visible.
+//
+// This is the whole point of the tuck. The strip still says "something is
+// running" from across the room - green for busy, grey for idle - while
+// occupying a dozen pixels of the desktop. The states that actually need the
+// user never get here at all; wantsTuck vetoes them.
+func drawDockedTab(target *canvas, state session.State, dock dockSide, sliver int, tuck float64) {
+	if sliver <= 0 || dock == dockNone {
 		return
 	}
-	drawVerticalCompact(target, items, now, state, accent, pressed)
+	width := target.width
+	height := target.height
+	left := 0
+	if dock == dockLeft {
+		left = width - sliver
+	}
+	spineWidth := maxInt(sliver*2/5, 3)
+	spineLeft := left + (sliver-spineWidth)/2
+	top := height / 4
+	spineHeight := height / 2
+	radius := spineWidth / 2
+
+	target.setAlphaScale(tuck)
+	accent := stateColor(state)
+	target.fillRounded(spineLeft, top, spineWidth, spineHeight, radius, accent)
+	core := colorPrimary
+	core.A = 110
+	target.fillRounded(spineLeft+spineWidth/4, top, maxInt(spineWidth/2, 1), spineHeight, radius, core)
+	target.setAlphaScale(1)
 }
 
 // drawVerticalCompact answers three questions in the order a glance asks

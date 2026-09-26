@@ -297,3 +297,65 @@ DPI 感知探针（150% 缩放）：紧凑 `84x234`、展开 1 会话 `300x216` 
 `--reset` 重新贴边；展开时中心 y 位移 0；`--quit` 干净退出；`--toggle` 往返正确。
 离屏 PNG 预览（`TestRenderPreview`）复核了紧凑/展开/空态/告警/悬停各状态。
 `gofmt`/`vet` 干净，60 个单测全过，`error.log`/`hang.log` 均无新条目。
+
+## 17. 贴边收起 + 漂移修复 + 性能（v0.5.0）
+
+**动机**：用户两点反馈 —— (1) 点开展开再缩小，面板会**往左漂**（和原本位置不一样）；
+(2) 希望贴着屏幕边时，能像电脑管家浮窗一样**缩进屏幕边缘**。顺带把交互做顺、性能做轻。
+
+### 17.1 漂移是真 bug，且是 v0.4.0 我改版时引入的
+v0.4.0 的 `applyGeometry` 用「保持窗口中心」处理展开/收起。贴右边缘时，展开出的更宽窗口
+被边界钳制往回推，回程却仍从被推过的位置算中心 → 左移约一个 sliver 宽度。
+**正确模型是「锚定边」**：贴哪条边就保持哪条边，四周都不贴时才按中心扩张。抽出纯函数
+`dockedOrigin(edge, edgeCoord, gap, width)` = `edge - gap - width`（左）/ `edge + gap`（右），
+并加 `TestDockRoundTripIsExact` 锁「紧凑↔展开往返后 x 完全一致」。探针实测：
+紧凑 `x=2440`，展开、`--toggle` 收回，紧凑 `x=2440`，`drift_x=0 drift_y=0`。
+
+### 17.2 贴边收起（edge tuck）
+- 配置 `config.json` 新增 `edgeRetract`（默认 true）；托盘菜单新增「贴边收起」开关。
+- 逻辑全在 `internal/ui/dock_windows.go`：贴左/右边（容差 `dockTolerance` 内）时，鼠标不在面板上
+  且**没有等待确认/错误**会话时，面板滑出屏幕只留 `dockedSliver`（默认 10，按 DPI/缩放缩放，下限 6）
+  宽竖条；悬停滑出，告警态自动滑出。
+- 滑出/收回是**基于时间的缓动**（`slideOutDuration=160ms` 快显、`slideInDuration=240ms` 缓收，
+  `ease-out`）而非「每 tick 移动剩余距离的固定比例」——掉帧不会改变时长，桌面繁忙时反而更可预测。
+- 缓动只在 `a.tuck` 变化，位置随 `present()` 的 `UpdateLayeredWindow` 一次原子更新，不再额外
+  `SetWindowPos`（否则会先显示一帧旧内容再重绘，撕裂）。
+- `stepSlide` 只算 `a.tuck`，真正移动窗口在 `present()` 里（`frameX()` 用 `slideBetween` 插值），
+  所以几何完全同源，不会和点击/拖拽区域漂移。
+
+### 17.3 悬停的坑：verifyHover 看的是「真实光标」
+`verifyHover` 每 2s（`timerClock`）用 `GetCursorPos`+`GetWindowRect` 复核：真实光标不在面板上就
+`clearHover()`。这是 `WM_MOUSELEAVE` 丢失（远程桌面/合成光标/显示切换）时的兜底，**必须有**。
+代价：纯靠 `PostMessage(WM_MOUSEMOVE)` 合成悬停的自动化测试会失败——真实光标在别处，看门狗 2s 内就清掉。
+验证悬停必须让**真实光标停在 sliver 上**（探针 `park()` 到 `workRight-5, midY`）。
+
+### 17.4 重绘跳过（性能）
+`present()` 用 `frameKey(...)` 给当前帧签名；签名相同且已画过就直接 `return`，**整帧 GDI 光栅化跳过**。
+签名包含 `digest`（见下）、尺寸、状态、数量、展开/按压/悬停/收起/动画。关键修正：签名**不能**用
+`store.Revision`——reporter 每次推送都更新 `updatedAt`，Revision 必变，会让「相同状态」每次都重绘。
+改为 `sessionDigest()`：对「实际画出来的字段」（`State/Source/Project/Reason` + `UpdatedAt` 截断到 15s）
+做 FNV 哈希。探针实测：**20 次完全相同的推送 → 0 次额外重绘**（仅有的几次来自环境光标漂到面板上
+触发的悬停滑动）。`TestFrameKeySkipsUnchangedFrames` 锁这条不变式。
+
+### 17.5 帧率分工
+`timerAnimation` 间隔按事件切换：`pulseInterval=80ms`（告警呼吸，慢呼吸不需要更高帧率）
+vs `slideInterval=33ms`（滑动要顺）。`syncAnimation` 在「脉冲或滑动进行中」时才装计时器，
+空闲时完全不转。
+
+### 17.6 验证（装机 hash `179a5BA5`，两组 hash 各自一致）
+DPI 感知探针（150%）：
+- tuck on idle：收紧（x≈2545，sliver 留屏）✓
+- 真实光标停在 sliver → 滑出 ✓；移开 → 收回 ✓
+- 告警（waiting_permission）→ 自动保持全显 ✓
+- 告警清除（idle）→ 收回 ✓
+- `--toggle` 展开↔收回往返 x 稳定于 2545（drift_x=0）✓
+- 性能：20 次相同推送 0 次重绘 ✓
+`gofmt`/`vet` 干净，全量单测通过（新增 `TestDockRoundTripIsExact`/`TestSlideTuckIsTimeBased`/
+`TestFrameKeySkipsUnchangedFrames`），所有 `reporters/*.js` 通过 `node --check`。
+
+### 17.7 本机环境坑（再记一次，值）
+- **残留 reporter 会污染验证**：之前的探针跑完后 `runtime/` 里留有 `waiting_permission` 快照，
+  装好的浮窗按需拉起后读到它，状态一直是告警，看起来「贴边不生效」。验证前 `RemoveAll(runtime)`
+  并 `taskkill node.exe` 清掉残留上报进程。
+- **光标会自己漂移**：本机合成光标会把 `SetCursorPos` 后读回的坐标改掉。拖拽/悬停验证必须
+  `park()` + 读回确认，否则会把环境噪声当成产品 bug。

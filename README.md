@@ -122,6 +122,9 @@ Right-click the tray icon:
   permission or fails
 - **✓ 提示音** — a system alert tone on the same transitions
 - **✓ 窗口置顶**
+- **✓ 贴边收起** — when docked to a screen edge, the panel slides most of the
+  way off, leaving a thin sliver; hover the sliver to bring it back. A session
+  waiting for you (or one that errored) always stays fully visible.
 - **✓ 开机自启** — run at logon, via `HKCU\...\CurrentVersion\Run`
 - **退出**
 

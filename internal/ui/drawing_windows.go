@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"encoding/binary"
+	"hash/fnv"
 	"path/filepath"
 
 	"ai-terminal-pet/internal/session"
@@ -86,4 +88,30 @@ func reasonLabel(current session.Session) string {
 		return current.Tool
 	}
 	return stateLabel(current.State)
+}
+
+// sessionDigest fingerprints the parts of the session list the panel actually
+// draws.
+//
+// The store bumps its revision on every push because updatedAt moves, so the
+// revision alone would make every refresh look like a change and defeat the
+// redraw skip entirely. This is a cheap O(n) walk over the fields that reach
+// the screen, with updatedAt bucketed to 15 seconds so a ticking clock does
+// not keep the panel repainting either.
+func sessionDigest(items []session.Session) uint64 {
+	hash := fnv.New64a()
+	var stamp [8]byte
+	for _, current := range items {
+		hash.Write([]byte(current.State))
+		hash.Write([]byte{0})
+		hash.Write([]byte(current.Source))
+		hash.Write([]byte{0})
+		hash.Write([]byte(current.Project))
+		hash.Write([]byte{0})
+		hash.Write([]byte(current.Reason))
+		hash.Write([]byte{0})
+		binary.LittleEndian.PutUint64(stamp[:], uint64(current.UpdatedAt.Unix()/15))
+		hash.Write(stamp[:])
+	}
+	return hash.Sum64()
 }

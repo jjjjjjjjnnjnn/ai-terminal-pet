@@ -30,11 +30,15 @@ const (
 	menuReset         = 1006
 	menuSound         = 1007
 	menuAutoStart     = 1008
+	menuEdgeRetract   = 1009
 
-	// animationInterval drives the alert pulse. It is only installed while
-	// the overlay is actually animating (pressed, waiting or error); the
-	// rest of the time the timer is killed so an idle pet costs no CPU.
-	animationInterval = 50
+	// The pulse and the slide share one timer but want different frame rates.
+	//
+	// The pulse is a slow breath - about 1.1 s per cycle - so it looks smooth
+	// at 12 fps and repainting it 20 times a second is wasted work. The slide
+	// is short and reads as motion, so it wants every frame it can get.
+	pulseInterval = 80
+	slideInterval = 33
 
 	// windowClassName is also the rendezvous used by Control, so a
 	// short-lived second process can find the live overlay.
@@ -64,6 +68,9 @@ type Settings struct {
 	Notifications bool
 	Sound         bool
 	AlwaysOnTop   bool
+	// EdgeRetract slides the panel into the screen edge it is hugging when
+	// nothing needs attention.
+	EdgeRetract bool
 }
 
 // Options is everything the UI needs from outside. All callbacks are invoked
@@ -123,10 +130,39 @@ type App struct {
 	y        int32
 	width    int
 	height   int
-	sessions []session.Session
-	state    session.State
-	revision uint64
-	hit      []byte
+	// dock is the screen edge the panel hugs, dockEdge is that edge's x in
+	// screen space, and dockGap is the distance it settled at from that edge.
+	// All three are refreshed when the panel settles somewhere new. The gap is
+	// what makes expand/collapse exact - see dock_windows.go.
+	//
+	// tuck is how far the panel has slid into that edge, 0 (fully out) to 1
+	// (only a sliver left), and tuckTarget is where it is heading; the two
+	// differ only while the slide animation is running.
+	dock       dockSide
+	dockEdge   int32
+	dockGap    int32
+	tuck       float64
+	tuckTarget float64
+	// lastFrame is the key of the frame currently on the window, so repeated
+	// refreshes that change nothing cost nothing.
+	lastFrame renderedKey
+	// slideFrom and slideStart are where and when the current slide began, so
+	// stepSlide can drive it by elapsed time instead of by tick count.
+	slideFrom  float64
+	slideStart time.Time
+	// tuckHoldUntil suppresses the tuck until the given time, so an explicit
+	// reveal (tray click, --show, --reset) actually shows something instead of
+	// sliding back out of view before the user can look at it.
+	tuckHoldUntil time.Time
+	sessions      []session.Session
+	state         session.State
+	revision      uint64
+	// digest fingerprints the session content the panel actually draws. The
+	// store bumps revision on every push because updatedAt moves, so revision
+	// alone would make every refresh look like a change and defeat the redraw
+	// skip entirely; see sessionDigest.
+	digest uint64
+	hit    []byte
 	// surface is the reused DIB canvas. Recreating it every frame meant a
 	// CreateDIBSection/SelectObject/DeleteObject round trip at up to 20 FPS
 	// (the alert-state animation timer), which is pure GDI churn on a
@@ -136,6 +172,10 @@ type App struct {
 	// animating tracks whether the pulse timer is currently installed, so
 	// syncAnimation only calls SetTimer/KillTimer on a real transition.
 	animating bool
+	// timerInterval is the interval the installed timer is running at, so a
+	// change between pulse and slide frame rates retunes it instead of being
+	// ignored.
+	timerInterval uint32
 	// alertKey is the "session+state" of the last balloon shown. Balloons
 	// fire on transitions only, otherwise a session parked in
 	// waiting_permission would re-notify on every repaint.
@@ -324,6 +364,12 @@ func (a *App) Run() error {
 	a.width, a.height = a.logicalWidth(), a.logicalHeight()
 	a.resize()
 	a.restoreOrAnchor()
+	// Which edge the restored position hugs decides how the panel grows and
+	// whether it tucks, so settle that before the first paint. snapTuck
+	// rather than syncTuck: starting with a slide animation would show the
+	// panel fully open and then yank it away.
+	a.refreshDock()
+	a.snapTuck()
 	if err := a.present(); err != nil {
 		return fmt.Errorf("present: %w", err)
 	}
@@ -487,7 +533,9 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		}
 		a.syncAnimation()
 		// Sessions coming and going change the expanded panel's content
-		// height. This is a no-op unless the size actually moved.
+		// height, and a state change can veto the tuck. Both are no-ops
+		// unless something actually moved.
+		a.syncTuck()
 		a.applyGeometry()
 		if !a.hidden {
 			_ = a.present()
@@ -588,6 +636,12 @@ func (a *App) handleTimer(hwnd win.HWND, timer uintptr) uintptr {
 			a.load()
 			a.postRefresh()
 		}
+		// A tuck hold expires on a wall-clock deadline, and the animation
+		// timer is not running while the panel just sits there, so this is
+		// what actually notices that the hold is over. It also re-checks the
+		// hover in case a WM_MOUSELEAVE was dropped.
+		a.verifyHover()
+		a.syncTuck()
 		a.syncAnimation()
 	case timerAnimation:
 		if a.hidden {
@@ -595,8 +649,10 @@ func (a *App) handleTimer(hwnd win.HWND, timer uintptr) uintptr {
 		}
 		a.load()
 		// The state can go quiet without a wmRefresh (a session simply
-		// expires), so re-check here and stop the pulse when nothing is
-		// pulsing any more.
+		// expires), so re-check here and stop the timer when nothing is
+		// moving or pulsing any more.
+		a.stepSlide()
+		a.syncTuck()
 		a.syncAnimation()
 		a.postRefresh()
 	}
@@ -631,7 +687,34 @@ func (a *App) trackHover() {
 		HwndTrack: a.window(),
 	}
 	win.TrackMouseEvent(&track)
+	a.syncTuck()
 	a.postRefresh()
+}
+
+// verifyHover checks that the cursor really is still on the panel and clears
+// the highlight if it is not.
+//
+// WM_MOUSELEAVE is delivered by TrackMouseEvent, but it is not guaranteed when
+// the pointer is warped rather than moved - a remote desktop, a synthetic
+// SetCursorPos, or a display change can all drop it. The cost of a missed one
+// is that the panel stays out on screen indefinitely, which is exactly what
+// the tuck is supposed to prevent. This is the cheap backstop, and it is why
+// the tuck never depends on a single notification arriving.
+func (a *App) verifyHover() {
+	if !a.hovering || a.drag.active || a.hidden {
+		return
+	}
+	var cursor win.POINT
+	if !win.GetCursorPos(&cursor) {
+		return
+	}
+	var bounds win.RECT
+	if !win.GetWindowRect(a.window(), &bounds) {
+		return
+	}
+	if cursor.X < bounds.Left || cursor.X >= bounds.Right || cursor.Y < bounds.Top || cursor.Y >= bounds.Bottom {
+		a.clearHover()
+	}
 }
 
 func (a *App) clearHover() {
@@ -639,6 +722,7 @@ func (a *App) clearHover() {
 		return
 	}
 	a.hovering = false
+	a.syncTuck()
 	a.postRefresh()
 }
 
@@ -675,6 +759,10 @@ func classifyHit(x, y, width, height int, hit []byte) bool {
 // the session rows could be reserved for something else, but nothing was ever
 // wired to them, and the result was a panel that looked grabbable and was not.
 func (a *App) beginDrag() {
+	// Complete any slide first: the drag maths works from the frame position,
+	// and a frame that is deliberately hanging off the screen edge would give
+	// it a nonsense origin.
+	a.untuckNow()
 	var cursor win.POINT
 	if !win.GetCursorPos(&cursor) {
 		return
@@ -756,11 +844,17 @@ func (a *App) endDrag() {
 	a.syncAnimation()
 	a.postRefresh()
 	if moved {
+		// The panel has a new home. Pull it back on screen first - a drag can
+		// otherwise leave it somewhere unreachable - then work out which edge
+		// it now hugs.
+		a.clampHome()
+		a.refreshDock()
 		a.persistPlacement()
 	}
 	if action == releaseToggle {
 		a.toggleExpanded()
 	}
+	a.syncTuck()
 }
 
 func (a *App) zoomBy(delta float64) {
@@ -791,6 +885,7 @@ func (a *App) toggleExpanded() {
 	a.setTopmost()
 	a.postRefresh()
 	a.persistPlacement()
+	a.syncTuck()
 }
 
 // placement snapshots the geometry worth remembering across launches.
@@ -820,7 +915,26 @@ func (a *App) restoreOrAnchor() {
 	}
 	a.x = initial.X
 	a.y = initial.Y
-	a.clampToMonitor()
+	a.clampHome()
+}
+
+// clampHome pulls the remembered position back onto a monitor. This is the only
+// place that writes a.x/a.y from a clamp, and it only runs for positions that
+// cannot know the current display layout: a restored state file, or --reset.
+func (a *App) clampHome() {
+	work, ok := a.workArea()
+	if !ok {
+		return
+	}
+	a.clampToWorkArea(work, int32(a.logicalWidth()), int32(a.logicalHeight()))
+}
+
+// settleHome re-anchors the remembered position to where the frame visually is
+// and recomputes the dock. Used when the panel's own size changed underneath it
+// (a DPI change), where "stay where it looks like it is" is the right answer.
+func (a *App) settleHome() {
+	a.x, a.y = a.frameX(), a.frameY()
+	a.refreshDock()
 }
 
 // syncAnimation installs the 50 ms pulse timer only while something is
@@ -835,16 +949,21 @@ func (a *App) syncAnimation() {
 	if handle == 0 {
 		return
 	}
-	want := !a.hidden && (a.state == session.StateWaitingPermission || a.state == session.StateError)
-	if want == a.animating {
+	want := !a.hidden && (a.state == session.StateWaitingPermission || a.state == session.StateError || a.tuck != a.tuckTarget)
+	interval := uint32(pulseInterval)
+	if a.tuck != a.tuckTarget {
+		interval = slideInterval
+	}
+	if want && (interval != a.timerInterval || !a.animating) {
+		a.timerInterval = interval
+		a.animating = true
+		win.SetTimer(win.HWND(handle), timerAnimation, interval, 0)
 		return
 	}
-	a.animating = want
-	if want {
-		win.SetTimer(win.HWND(handle), timerAnimation, animationInterval, 0)
-		return
+	if !want {
+		a.animating = false
+		win.KillTimer(win.HWND(handle), timerAnimation)
 	}
-	win.KillTimer(win.HWND(handle), timerAnimation)
 }
 
 func (a *App) showContextMenu(fromTray bool) {
@@ -868,6 +987,8 @@ func (a *App) showContextMenu(fromTray bool) {
 	a.appendMenu(menu, position, menuSound, checkLabel("提示音", a.options.Settings.Sound))
 	position++
 	a.appendMenu(menu, position, menuTopmost, checkLabel("窗口置顶", a.options.Settings.AlwaysOnTop))
+	position++
+	a.appendMenu(menu, position, menuEdgeRetract, checkLabel("贴边收起", a.options.Settings.EdgeRetract))
 	position++
 	a.appendMenu(menu, position, menuAutoStart, checkLabel("开机自启", a.options.AutoStart))
 	position++
@@ -897,6 +1018,12 @@ func (a *App) showContextMenu(fromTray bool) {
 	case menuTopmost:
 		a.options.Settings.AlwaysOnTop = !a.options.Settings.AlwaysOnTop
 		a.applyTopmost()
+		a.publishSettings()
+	case menuEdgeRetract:
+		a.options.Settings.EdgeRetract = !a.options.Settings.EdgeRetract
+		// Turning it on while the cursor is elsewhere should tuck immediately;
+		// turning it off should bring the panel straight back.
+		a.syncTuck()
 		a.publishSettings()
 	case menuAutoStart:
 		a.toggleAutoStart()
@@ -946,9 +1073,12 @@ func (a *App) resetPlacement() {
 	a.width, a.height = a.logicalWidth(), a.logicalHeight()
 	a.resize()
 	a.positionForWorkArea()
+	a.refreshDock()
+	a.holdTuck(3 * time.Second)
 	a.setTopmost()
 	a.postRefresh()
 	a.persistPlacement()
+	a.syncTuck()
 }
 
 func (a *App) publishSettings() {
@@ -979,7 +1109,11 @@ func (a *App) hideToTray() {
 	a.hidden = true
 	// A hidden window gets no WM_MOUSELEAVE, so the highlight would still be
 	// on the next time the panel appears under a cursor that has long moved.
+	// Snap it fully out too: it should be where the user left it when it
+	// comes back, not mid-slide.
 	a.hovering = false
+	a.tuck, a.tuckTarget = 0, 0
+	a.applyFramePosition()
 	a.syncAnimation()
 }
 
@@ -989,6 +1123,11 @@ func (a *App) showFromTray() {
 		return
 	}
 	a.hidden = false
+	a.holdTuck(3 * time.Second)
+	a.syncTuck()
+	// Put the frame back where the geometry says before revealing it. Hiding
+	// snapped the slide out, and nothing since then has moved the window.
+	a.applyFramePosition()
 	win.ShowWindow(win.HWND(handle), win.SW_SHOW)
 	a.load()
 	a.syncAnimation()
@@ -1149,6 +1288,17 @@ func truncateUTF16(value string, capacity int) string {
 
 func (a *App) present() error {
 	width, height := a.logicalWidth(), a.logicalHeight()
+	now := time.Now()
+	// Two frames with the same key are pixel-identical and in the same place,
+	// so the whole raster can be skipped. This matters because reporters push
+	// on every statusline render and most pushes repeat the same state - which
+	// used to mean a full GDI repaint of the panel several times a second for
+	// nothing.
+	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now)
+	if key == a.lastFrame && a.surface != nil {
+		return nil
+	}
+	a.lastFrame = key
 	if a.surface != nil && (a.surface.width != width || a.surface.height != height) {
 		a.surface.close()
 		a.surface = nil
@@ -1162,13 +1312,22 @@ func (a *App) present() error {
 	}
 	target := a.surface
 	target.clear()
-	drawVerticalPanel(target, a.sessions, time.Now(), a.expanded, a.pressed, a.hovering)
+	drawVerticalPanel(target, panelState{
+		Items:    a.sessions,
+		Now:      time.Now(),
+		Expanded: a.expanded,
+		Pressed:  a.pressed,
+		Hovered:  a.hovering,
+		Tuck:     a.tuck,
+		Sliver:   a.sliverWidth(),
+		Dock:     a.dock,
+	})
 	screenDC := win.GetDC(0)
 	if screenDC == 0 {
 		return syscall.EINVAL
 	}
 	defer win.ReleaseDC(0, screenDC)
-	destination := win.POINT{X: a.x, Y: a.y}
+	destination := win.POINT{X: a.frameX(), Y: a.frameY()}
 	dimensions := win.SIZE{CX: int32(width), CY: int32(height)}
 	if err := updateLayeredWindow(a.window(), screenDC, &destination, dimensions, target.dc, a.options.Opacity); err != nil {
 		return err
@@ -1197,6 +1356,7 @@ func (a *App) load() {
 	a.revision = revision
 	a.sessions = a.values.List()
 	a.state = session.Aggregate(a.sessions)
+	a.digest = sessionDigest(a.sessions)
 	// Both are cheap no-ops unless the tray icon exists, and both read only
 	// the freshly loaded snapshot.
 	a.updateTooltip()
@@ -1242,22 +1402,21 @@ func (a *App) logicalHeight() int {
 	return scaledDimension(base, a.dpi, a.zoom)
 }
 
-// applyGeometry publishes the current logical size to the frame, keeping the
-// window's centre fixed so the panel grows in both directions. Without the
-// centre correction, expanding a tall session list pushed the footer off the
-// bottom of the screen and the clamp then yanked the whole panel upward.
+// applyGeometry publishes the current logical size to the frame.
+//
+// It does not move a.x/a.y. Where the frame ends up is derived on demand by
+// frameX/frameY from the dock the panel settled at, which is what makes an
+// expand/collapse round trip exact: the position is rebuilt from the screen
+// edge and the remembered gap rather than adjusted in place, so a clamp that
+// fires on the wide frame cannot accumulate into a drift.
 func (a *App) applyGeometry() {
 	width, height := a.logicalWidth(), a.logicalHeight()
 	if width == a.width && height == a.height {
 		return
 	}
-	if a.width > 0 && a.height > 0 {
-		a.x -= int32((width - a.width) / 2)
-		a.y -= int32((height - a.height) / 2)
-	}
 	a.width, a.height = width, height
 	a.resize()
-	a.clampToMonitor()
+	a.applyFramePosition()
 }
 
 func (a *App) positionForWorkArea() {
@@ -1280,21 +1439,11 @@ func (a *App) positionForWorkArea() {
 	a.clampToWorkArea(info.RcWork, width, height)
 }
 
+// clampToMonitor republishes the frame. It no longer moves anything: frameX
+// and frameY already keep the frame on screen, and moving the remembered
+// position here is precisely what made expand/collapse drift.
 func (a *App) clampToMonitor() {
-	width, height := int32(a.width), int32(a.height)
-	if width == 0 || height == 0 {
-		width, height = int32(a.logicalWidth()), int32(a.logicalHeight())
-	}
-	center := win.POINT{X: a.x + width/2, Y: a.y + height/2}
-	monitor := monitorFromPoint(&center)
-	if monitor == 0 {
-		return
-	}
-	info := win.MONITORINFO{CbSize: uint32(unsafe.Sizeof(win.MONITORINFO{}))}
-	if getMonitorInfo(monitor, &info) {
-		a.clampToWorkArea(info.RcWork, width, height)
-		win.SetWindowPos(a.window(), a.zOrder(), a.x, a.y, 0, 0, win.SWP_NOSIZE|win.SWP_NOZORDER|win.SWP_NOACTIVATE)
-	}
+	a.applyFramePosition()
 }
 
 func (a *App) clampToWorkArea(work win.RECT, width, height int32) {
@@ -1325,6 +1474,9 @@ func (a *App) handleDPIChanged(wParam uintptr) {
 	a.dpi = dpi
 	a.load()
 	a.applyGeometry()
+	// The panel just changed physical size, so re-anchor it where it looks like
+	// it is and work out the dock again.
+	a.settleHome()
 	a.setTopmost()
 	a.postRefresh()
 	a.persistPlacement()

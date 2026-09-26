@@ -42,6 +42,9 @@ func TestRenderPreview(t *testing.T) {
 	broken := []session.Session{
 		{Source: "claude-hook", SessionID: "e", Project: `C:\Users\me\work\infra`, State: session.StateError, Reason: "exit status 1", UpdatedAt: now.Add(-11 * time.Minute)},
 	}
+	idle := []session.Session{
+		{Source: "opencode", SessionID: "f", Project: `C:\Users\me\work\notes`, State: session.StateIdle, UpdatedAt: now.Add(-20 * time.Minute)},
+	}
 	many := make([]session.Session, 0, 9)
 	for index := 0; index < 9; index++ {
 		state := session.StateWorking
@@ -64,16 +67,25 @@ func TestRenderPreview(t *testing.T) {
 		expanded bool
 		pressed  bool
 		hovered  bool
+		tuck     float64
 		scale    int
+		// crop is how much of the frame is on screen, in logical units. A
+		// tucked panel is mostly past the screen edge, and the rasterizer
+		// still draws the whole frame - cropping here is what makes the
+		// preview show what the user actually sees.
+		crop int
 	}{
-		{"compact-waiting", waiting, false, false, false, 3},
-		{"compact-waiting-hover", waiting, false, false, true, 3},
-		{"compact-busy", busy, false, false, false, 3},
-		{"compact-error", broken, false, false, false, 3},
-		{"compact-empty", nil, false, false, false, 3},
-		{"expanded-waiting", waiting, true, false, false, 2},
-		{"expanded-many", many, true, false, false, 2},
-		{"expanded-empty", nil, true, false, false, 2},
+		{"compact-waiting", waiting, false, false, false, 0, 3, 0},
+		{"compact-waiting-hover", waiting, false, false, true, 0, 3, 0},
+		{"compact-busy", busy, false, false, false, 0, 3, 0},
+		{"compact-error", broken, false, false, false, 0, 3, 0},
+		{"compact-empty", nil, false, false, false, 0, 3, 0},
+		{"docked-tuck-half", busy, false, false, false, 0.5, 3, 33},
+		{"docked-tuck-full", busy, false, false, false, 1, 3, 10},
+		{"docked-tuck-full-idle", idle, false, false, false, 1, 3, 10},
+		{"expanded-waiting", waiting, true, false, false, 0, 2, 0},
+		{"expanded-many", many, true, false, false, 0, 2, 0},
+		{"expanded-empty", nil, true, false, false, 0, 2, 0},
 	}
 	for _, tc := range cases {
 		width := compactWidth
@@ -86,13 +98,32 @@ func TestRenderPreview(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: canvas: %v", tc.name, err)
 		}
-		drawVerticalPanel(target, tc.items, now, tc.expanded, tc.pressed, tc.hovered)
+		drawVerticalPanel(target, panelState{
+			Items:    tc.items,
+			Now:      now,
+			Expanded: tc.expanded,
+			Pressed:  tc.pressed,
+			Hovered:  tc.hovered,
+			Tuck:     tc.tuck,
+			Sliver:   dockedSliver,
+			Dock:     dockRight,
+		})
 		img := compositeOver(target, desktop)
 		target.close()
+		if tc.crop > 0 && tc.crop < width {
+			img = cropImage(img, tc.crop)
+		}
 		path := filepath.Join(dir, tc.name+".png")
 		writePNG(t, path, upscale(img, tc.scale))
 		t.Logf("wrote %s (%dx%d)", path, width, height)
 	}
+}
+
+// cropImage keeps the leftmost logicalWidth columns, which is the part of a
+// right-docked frame that is still on screen.
+func cropImage(source *image.RGBA, logicalWidth int) *image.RGBA {
+	width := minInt(logicalWidth, source.Bounds().Dx())
+	return source.SubImage(image.Rect(0, 0, width, source.Bounds().Dy())).(*image.RGBA)
 }
 
 func compositeOver(c *canvas, background color.RGBA) *image.RGBA {

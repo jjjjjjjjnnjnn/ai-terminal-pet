@@ -10,9 +10,9 @@
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 1.27.0），reporters 仅用 Node 标准库 |
-| 主程序 | `bin/AI-Terminal-Pet.exe` 3,954,688 B（`-trimpath -ldflags "-s -w"`） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` 3,977,216 B（`-trimpath -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` 3,644,416 B |
-| 代码量 | Go 6,744 行 / JS 1,058 行 |
+| 代码量 | Go 7,599 行 / JS 1,058 行 |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio(MIT) / lxn/win(BSD) / x/sys(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16 |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
@@ -26,6 +26,26 @@
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview` 直接光栅化出 PNG |
 
 ## 1. 本轮已完成
+
+### 1d. 2026-09-26（v0.5.0）—— 贴边收起 + 漂移修复 + 重绘跳过
+
+**动机**：两点用户反馈——(1) 展开再缩小，面板「往左漂」、和原本位置不一样；(2) 贴屏幕边时想
+像电脑管家浮窗那样缩进屏幕边缘。顺手把交互做顺、性能做轻。
+
+- **漂移是真 bug（v0.4.0 引入）**：旧 `applyGeometry` 用「保持窗口中心」处理展开/收起，贴右边缘时
+  更宽的展开窗口被边界钳制往回推，回程却仍从被推过的位置算中心 → 左移一个 sliver。改为「锚定边」：
+  贴哪条边就保持哪条边，`dockedOrigin(edge, edgeCoord, gap, width)` = `edge-gap-width`（左）/
+  `edge+gap`（右）。`TestDockRoundTripIsExact` 锁往返一致。探针实测 `drift_x=0 drift_y=0`。
+- **贴边收起**：`config.json` 新增 `edgeRetract`（默认 true），托盘菜单新增「贴边收起」开关。
+  逻辑在 `internal/ui/dock_windows.go`：贴左/右边且鼠标不在面板上、且无等待确认/错误会话时，
+  滑出屏幕只留 `dockedSliver`（默认 10，按 DPI/缩放缩放、下限 6）宽竖条；悬停滑出，告警态自动滑出。
+- **基于时间的缓动**：滑出 160ms、收回 240ms、ease-out；掉帧不改变时长。位置随
+  `UpdateLayeredWindow` 一次原子更新，不再额外 `SetWindowPos`（避免撕裂）。
+- **重绘跳过（性能）**：`present()` 用 `frameKey(...)` 给帧签名，相同则整帧 GDI 光栅化跳过。
+  签名用 `sessionDigest()`（对「实际画出来的字段」做 FNV 哈希，含 `UpdatedAt` 截断到 15s）——
+  **不能**用 `store.Revision`，reporter 每次推送都动 `updatedAt`，会让「相同状态」每推必重绘。
+  探针实测 20 次相同推送 → 0 次额外重绘。`TestFrameKeySkipsUnchangedFrames` 锁该不变式。
+- **帧率分工**：`timerAnimation` 在脉冲（80ms 慢呼吸）与滑动（33ms）间切换间隔，空闲不转。
 
 ### 1c. 2026-09-26（v0.4.0）—— 面板重做：更实用、更简洁、更好用
 

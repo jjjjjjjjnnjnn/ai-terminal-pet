@@ -32,6 +32,31 @@ type canvas struct {
 	height int
 	stride int
 	pixels []byte
+	// alphaScale multiplies every colour's alpha as it is blended, so a whole
+	// layer can be faded without rewriting the palette. The dock slide uses it
+	// to fade the panel's contents out while its silhouette slides into the
+	// screen edge. Reset to 1 when the layer is done.
+	alphaScale float64
+}
+
+// setAlphaScale sets the multiplier applied to every subsequent draw. Values
+// outside 0..1 are clamped; 1 (the default) is a no-op.
+func (c *canvas) setAlphaScale(scale float64) {
+	if scale < 0 {
+		scale = 0
+	}
+	if scale > 1 {
+		scale = 1
+	}
+	c.alphaScale = scale
+}
+
+// scaledAlpha applies the current layer fade to a colour's alpha.
+func (c *canvas) scaledAlpha(value uint8) float64 {
+	if c.alphaScale >= 1 {
+		return float64(value)
+	}
+	return float64(value) * c.alphaScale
 }
 
 func newCanvas(width, height int) (*canvas, error) {
@@ -71,6 +96,9 @@ func newCanvas(width, height int) (*canvas, error) {
 		height: height,
 		stride: width * 4,
 		pixels: unsafe.Slice((*byte)(bits), width*height*4),
+		// Zero would mean "fade everything to nothing", which is a nasty way
+		// to fail for a field whose whole job is to default to no-op.
+		alphaScale: 1,
 	}
 	result.clear()
 	return result, nil
@@ -320,7 +348,10 @@ func (c *canvas) blend(x, y int, value rgba) {
 	}
 	offset := y*c.stride + x*4
 	destinationA := float64(c.pixels[offset+3])
-	sourceA := float64(value.A)
+	sourceA := c.scaledAlpha(value.A)
+	if sourceA <= 0 {
+		return
+	}
 	outputA := sourceA + destinationA*(255-sourceA)/255
 	if outputA <= 0 {
 		c.pixels[offset] = 0
@@ -341,7 +372,8 @@ func (c *canvas) blend(x, y int, value rgba) {
 
 func (c *canvas) normalizeText(left, top, width, height int, color rgba) {
 	maximum := maxInt(int(color.R), maxInt(int(color.G), int(color.B)))
-	if maximum == 0 || color.A == 0 {
+	scale := c.alphaScale
+	if maximum == 0 || color.A == 0 || scale <= 0 {
 		return
 	}
 	for y := top; y < top+height; y++ {
@@ -357,7 +389,7 @@ func (c *canvas) normalizeText(left, top, width, height int, color rgba) {
 			if value == 0 {
 				continue
 			}
-			alpha := clampChannel(float64(value) * 255 / float64(maximum))
+			alpha := clampChannel(float64(value) * 255 / float64(maximum) * scale)
 			c.pixels[offset] = clampChannel(float64(color.B) * float64(alpha) / 255)
 			c.pixels[offset+1] = clampChannel(float64(color.G) * float64(alpha) / 255)
 			c.pixels[offset+2] = clampChannel(float64(color.R) * float64(alpha) / 255)
