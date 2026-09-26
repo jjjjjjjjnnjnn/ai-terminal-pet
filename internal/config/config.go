@@ -48,6 +48,12 @@ type Config struct {
 	// Notifications enables tray balloon alerts when a session enters
 	// waiting_permission or error.
 	Notifications bool `json:"notifications"`
+	// Sound plays a system alert tone on the same transitions. It is separate
+	// from Notifications because the two reach the user differently: a balloon
+	// is something you read when you look, a tone is something you hear when
+	// you are not looking. Someone in a quiet office may want one and not the
+	// other.
+	Sound bool `json:"sound"`
 	// AlwaysOnTop keeps the overlay above other windows.
 	AlwaysOnTop bool `json:"alwaysOnTop"`
 	// Opacity is the layered window's constant alpha, MinOpacity..MaxOpacity.
@@ -56,7 +62,7 @@ type Config struct {
 
 // Default returns the settings used when config.json is absent or unreadable.
 func Default() Config {
-	return Config{Notifications: true, AlwaysOnTop: true, Opacity: 235}
+	return Config{Notifications: true, Sound: true, AlwaysOnTop: true, Opacity: 235}
 }
 
 // Normalize clamps every field into a usable range, substituting the default

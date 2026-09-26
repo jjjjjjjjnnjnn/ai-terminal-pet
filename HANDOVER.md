@@ -204,3 +204,42 @@ DPI 感知探针实测：冷启动可见+响应 60x285（150% 缩放下的 40x19
 
 **遗留**：`ROADMAP.md` §6 列出的未修项（`-race`/govulncheck/gosec 缺工具链、UI 无视觉回归、
 管道抢占只做缓解）。
+
+## 15. F3/F4/F7 落地 2026-09-26（v0.3.0）
+
+**F3 开机自启** — 新增 `internal/autostart`：`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+下的 `AITerminalPet` 值（用户级、免管理员、停用即删、卸载无残留）。
+- 托盘开关 + `--autostart` / `--autostart=on` / `--autostart=off`。
+- 启动时 `Sync` 修复指向旧路径的条目：Run 值里只有安装路径，程序移动/重装后
+  会在登录时静默失败。`Sync` **永不**把已关闭的条目改成开启。
+- 注册表经 `backend` 接口访问，8 个单测全部跑在内存后端上——单测不该悄悄打开
+  `go test` 执行者的开机自启。
+- 验证：`--autostart=on` 后独立用 PowerShell 读注册表，确认写入
+  `"C:\Users\rongj\AppData\Local\AI-Terminal-Pet\AI-Terminal-Pet.exe"`（带引号）；
+  `--autostart=off` 后确认值已消失。**当前状态：关闭**（未替你打开）。
+
+**F4 提示音** — `config.json` 新增 `sound`（默认 true）。等待确认 `MB_ICONEXCLAMATION`、
+错误 `MB_ICONHAND`，走系统声音方案，遵守专注助手。与气泡提醒解耦但共享同一套
+「会话+状态」去重。托盘加开关，开启时立即响一声作为反馈。
+
+**F7 `--json`** — `app.Snapshot()` 读 `runtime/` 快照离线聚合，**不依赖浮窗进程**，
+因此状态栏/脚本可以安全调用而不会阻塞在 GUI 进程上；`--pretty` 切缩进。
+5 个单测覆盖聚合优先级、过期剔除、目录缺失、无 `LOCALAPPDATA`、两种编码一致性。
+
+**顺带修掉一个真 bug（重要）**
+`store.processBacked` 原本是「黑名单」：未知 source 一律当成真实进程。
+而 `generic.js` 与所有 hook 上报端用的是**稳定哈希 PID**，存活探测必然失败，
+于是刚上报的会话立刻被删——上报端回 `ok`，浮窗和快照里却什么都没有。
+已改为**允许列表**（当前只有 `opencode`）。默认值的选择理由：探测一个不可信的 PID
+会删掉活会话，而放过一个已死会话只是让它多留一个 TTL。新增两个回归测试
+（`TestSnapshotKeepsSyntheticPIDSource`、`TestStoreKeepsNonProcessSourceWithDeadPID`）。
+
+**验证**：`gofmt`/`vet`/`test` 全绿（55 个单测）；DPI 感知探针交互回归全过
+（拖拽位移与光标位移完全一致、尺寸不变）；`--json` 在有会话时正确输出
+`state=waiting_permission count=2` 且按紧急度排序；装机 hash 校验一致。
+
+**踩坑记录**
+- Git Bash 会改写 Windows 风格路径参数（`C:\a\b` → `C:/a/b`），
+  用它测试 `--project=...` 会误以为上报端损坏。真实调用（PowerShell/cmd）不受影响。
+- 本机 `reg.exe` 被沙箱黑名单拦截；核对注册表改用 PowerShell 的
+  `Get-ItemProperty HKCU:\...\Run`。

@@ -458,11 +458,25 @@ func key(value session.Session) string {
 	return value.Source + "\x00" + value.SessionID + "\x00" + strconv.Itoa(value.PID)
 }
 
+// processBackedSources lists the reporters whose PID is a real, long-lived
+// process, where probing liveness is worth doing so a dead session disappears
+// at once instead of at the next TTL. Everything else relies on the snapshot
+// TTL.
+//
+// This is deliberately an allow-list, and the default is the whole point.
+// Probing a PID we cannot trust *deletes live sessions*: generic.js and every
+// hook reporter key their session on a stable hash rather than a real process
+// id, so a liveness check against that hash always fails and the session would
+// vanish the instant it was reported - silently, because the removal is a
+// best-effort unlink of a file nobody is watching.
+//
+// The cost of the other default is a session lingering for one TTL after its
+// reporter died, which is free.
+var processBackedSources = map[string]struct{}{
+	"opencode": {},
+}
+
 func processBacked(source string) bool {
-	switch source {
-	case "claude-hook", "antigravity-hook", "antigravity-statusline":
-		return false
-	default:
-		return true
-	}
+	_, known := processBackedSources[source]
+	return known
 }

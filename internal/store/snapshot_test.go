@@ -69,7 +69,32 @@ func writeSnapshot(t *testing.T, directory, name, content string) {
 }
 
 func snapshotJSON(now time.Time, pid int, updated time.Time, state session.State) string {
-	return fmt.Sprintf(`{"schemaVersion":"ai-terminal-pet.v1","source":"test","sessionId":"session","pid":%d,"state":%q,"startedAt":%q,"updatedAt":%q}`, pid, state, now.Add(-time.Hour).Format(time.RFC3339Nano), updated.Format(time.RFC3339Nano))
+	// "opencode" on purpose: it is a process-backed source, which is what the
+	// liveness assertions around this helper are about.
+	return fmt.Sprintf(`{"schemaVersion":"ai-terminal-pet.v1","source":"opencode","sessionId":"session","pid":%d,"state":%q,"startedAt":%q,"updatedAt":%q}`, pid, state, now.Add(-time.Hour).Format(time.RFC3339Nano), updated.Format(time.RFC3339Nano))
+}
+
+// TestSnapshotKeepsSyntheticPIDSource is the regression guard for a bug that
+// made generic.js useless: a reporter that keys its session on a stable hash
+// rather than a real process id was treated as process-backed, so the liveness
+// probe always failed and the snapshot was deleted the moment it was written.
+// The reporter reported "ok" and nothing ever appeared in the overlay.
+func TestSnapshotKeepsSyntheticPIDSource(t *testing.T) {
+	now := time.Date(2026, 9, 26, 7, 0, 0, 0, time.UTC)
+	directory := t.TempDir()
+	payload := fmt.Sprintf(`{"schemaVersion":"ai-terminal-pet.v1","source":"generic","sessionId":"generic","pid":741006029,"state":"working","startedAt":%q,"updatedAt":%q}`,
+		now.Add(-time.Hour).Format(time.RFC3339Nano), now.Add(-time.Second).Format(time.RFC3339Nano))
+	writeSnapshot(t, directory, "generic.json", payload)
+
+	// Nothing is alive as far as this scanner is concerned.
+	scanner := SnapshotScanner{Directory: directory, TTL: 15 * time.Second, Now: func() time.Time { return now }, Alive: func(int) bool { return false }}
+	items := scanner.Scan()
+	if len(items) != 1 || items[0].Source != "generic" {
+		t.Fatalf("synthetic-PID snapshot was dropped: %#v", items)
+	}
+	if _, err := os.Stat(filepath.Join(directory, "generic.json")); err != nil {
+		t.Fatalf("synthetic-PID snapshot was removed: %v", err)
+	}
 }
 
 func TestSnapshotScannerRejectsOversizedFileBeforeReading(t *testing.T) {

@@ -28,6 +28,8 @@ const (
 	menuNotifications = 1004
 	menuTopmost       = 1005
 	menuReset         = 1006
+	menuSound         = 1007
+	menuAutoStart     = 1008
 
 	// animationInterval drives the alert pulse. It is only installed while
 	// the overlay is actually animating (pressed, waiting or error); the
@@ -60,6 +62,7 @@ type Placement struct {
 // Settings is the subset of user preferences the tray menu can flip.
 type Settings struct {
 	Notifications bool
+	Sound         bool
 	AlwaysOnTop   bool
 }
 
@@ -70,6 +73,9 @@ type Options struct {
 	Opacity uint8
 	// Settings is the initial state of the tray switches.
 	Settings Settings
+	// AutoStart is the initial state of the run-at-logon switch. It lives in
+	// the registry rather than config.json, so the UI only mirrors it.
+	AutoStart bool
 	// Initial is the remembered geometry, or the zero value when the window
 	// has never been placed.
 	Initial Placement
@@ -78,6 +84,10 @@ type Options struct {
 	OnPlacementChanged func(Placement)
 	// OnSettingsChanged fires when a tray switch is flipped.
 	OnSettingsChanged func(Settings)
+	// OnAutoStartChanged fires when the run-at-logon switch is flipped. It
+	// returns whether the change took effect; the UI keeps the old state when
+	// it returns false, so the tick never lies about the registry.
+	OnAutoStartChanged func(bool) bool
 }
 
 var activeWindow atomic.Pointer[App]
@@ -819,7 +829,11 @@ func (a *App) showContextMenu(fromTray bool) {
 	position++
 	a.appendMenu(menu, position, menuNotifications, checkLabel("状态提醒", a.options.Settings.Notifications))
 	position++
+	a.appendMenu(menu, position, menuSound, checkLabel("提示音", a.options.Settings.Sound))
+	position++
 	a.appendMenu(menu, position, menuTopmost, checkLabel("窗口置顶", a.options.Settings.AlwaysOnTop))
+	position++
+	a.appendMenu(menu, position, menuAutoStart, checkLabel("开机自启", a.options.AutoStart))
 	position++
 	a.appendMenu(menu, position, menuExit, "退出")
 	var cursor win.POINT
@@ -836,14 +850,38 @@ func (a *App) showContextMenu(fromTray bool) {
 	case menuNotifications:
 		a.options.Settings.Notifications = !a.options.Settings.Notifications
 		a.publishSettings()
+	case menuSound:
+		a.options.Settings.Sound = !a.options.Settings.Sound
+		// Play the tone immediately on enable: the switch is otherwise
+		// silent until the next session happens to need attention.
+		if a.options.Settings.Sound {
+			beep(beepExclamation)
+		}
+		a.publishSettings()
 	case menuTopmost:
 		a.options.Settings.AlwaysOnTop = !a.options.Settings.AlwaysOnTop
 		a.applyTopmost()
 		a.publishSettings()
+	case menuAutoStart:
+		a.toggleAutoStart()
 	case menuExit:
 		a.persistPlacement()
 		win.DestroyWindow(a.window())
 	}
+}
+
+// toggleAutoStart flips the run-at-logon entry. The registry is the source of
+// truth, so the tick only moves when the app layer confirms the write - a
+// checkmark that disagrees with the registry would be worse than no switch.
+func (a *App) toggleAutoStart() {
+	if a.options.OnAutoStartChanged == nil {
+		return
+	}
+	want := !a.options.AutoStart
+	if !a.options.OnAutoStartChanged(want) {
+		return
+	}
+	a.options.AutoStart = want
 }
 
 // checkLabel prefixes a menu entry with a tick so the two tray switches read
@@ -977,17 +1015,39 @@ func (a *App) updateTooltip() {
 	win.Shell_NotifyIcon(win.NIM_MODIFY, &data)
 }
 
-// notifyAlert pops a tray balloon for a session that just started waiting for
-// permission or failed. This is the point of the whole app: the overlay is
-// glanceable, but a balloon reaches the user even when the panel is hidden,
-// covered, or they are looking at another monitor.
+// alertOnTransitions fires the configured alerts for a session that has just
+// entered waiting_permission or error. This is the point of the whole app: the
+// overlay is glanceable, but an alert reaches the user when the panel is
+// hidden, covered, or they are looking at another monitor.
 //
 // Alerts are deduplicated on "session + state" so a session parked in
-// waiting_permission notifies once instead of on every repaint.
-func (a *App) notifyAlert() {
-	if !a.options.Settings.Notifications || !a.trayAdded {
+// waiting_permission alerts once instead of on every repaint. The sound and the
+// balloon share that one decision, so turning either off never changes when the
+// other fires.
+func (a *App) alertOnTransitions() {
+	if !a.options.Settings.Notifications && !a.options.Settings.Sound {
 		return
 	}
+	target := a.alertTarget()
+	if target == nil {
+		a.alertKey = ""
+		return
+	}
+	key := target.Source + "\x00" + target.SessionID + "\x00" + string(target.State)
+	if key == a.alertKey {
+		return
+	}
+	a.alertKey = key
+	if a.options.Settings.Sound {
+		beep(beepKind(target.State))
+	}
+	if a.options.Settings.Notifications {
+		a.balloon(*target)
+	}
+}
+
+// alertTarget returns the most urgent session that wants attention, or nil.
+func (a *App) alertTarget() *session.Session {
 	var target *session.Session
 	for index := range a.sessions {
 		current := &a.sessions[index]
@@ -998,26 +1058,34 @@ func (a *App) notifyAlert() {
 			target = current
 		}
 	}
-	if target == nil {
-		a.alertKey = ""
-		return
-	}
-	key := target.Source + "\x00" + target.SessionID + "\x00" + string(target.State)
-	if key == a.alertKey {
-		return
-	}
-	a.alertKey = key
+	return target
+}
 
-	title := "AI Terminal Brief"
+// beepKind maps a state to a system alert tone. Windows plays the sound the
+// user configured for that event, so this stays consistent with the rest of
+// their desktop and respects Focus Assist / quiet hours.
+func beepKind(state session.State) uint32 {
+	if state == session.StateError {
+		return beepError
+	}
+	return beepExclamation
+}
+
+// balloon shows the tray balloon tip. It is a no-op when the tray icon is not
+// registered, which happens briefly during startup and after an Explorer
+// restart.
+func (a *App) balloon(target session.Session) {
+	if !a.trayAdded {
+		return
+	}
+	title := "等待你的确认"
 	flags := uint32(win.NIIF_WARNING)
 	if target.State == session.StateError {
 		title = "终端会话出错"
 		flags = win.NIIF_ERROR
-	} else {
-		title = "等待你的确认"
 	}
-	body := projectLabel(*target)
-	if reason := reasonLabel(*target); reason != "" {
+	body := projectLabel(target)
+	if reason := reasonLabel(target); reason != "" {
 		body += " · " + reason
 	}
 	data := a.notifyIcon()
@@ -1093,7 +1161,7 @@ func (a *App) load() {
 	// Both are cheap no-ops unless the tray icon exists, and both read only
 	// the freshly loaded snapshot.
 	a.updateTooltip()
-	a.notifyAlert()
+	a.alertOnTransitions()
 }
 
 func (a *App) setTopmost() {

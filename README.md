@@ -51,6 +51,26 @@ ai-terminal-pet --version
 Launching the executable with no arguments while an instance is already
 running reveals that instance instead of exiting silently.
 
+## Read the state from a script
+
+`--json` prints the current sessions and exits. It reads the reporter
+snapshots on disk rather than talking to the overlay, so it works whether or
+not the overlay is running and can never block on a GUI process:
+
+```powershell
+ai-terminal-pet --json            # one line, for jq / status lines
+ai-terminal-pet --json --pretty   # indented, for humans
+```
+
+```json
+{"schemaVersion":"ai-terminal-pet.v1","state":"waiting_permission","count":2,
+ "generatedAt":"2026-09-26T05:31:37Z","sessions":[{"source":"opencode", ...}]}
+```
+
+`state` is the highest-priority state across all sessions; `sessions` is the
+same list, already sorted by urgency. A reporter that stopped writing is
+absent, not stale.
+
 ## Tray menu
 
 Right-click the tray icon:
@@ -59,7 +79,9 @@ Right-click the tray icon:
 - **重置位置与大小** — escape hatch for a pet dragged somewhere awkward
 - **✓ 状态提醒** — tray balloons when a session starts waiting for
   permission or fails
+- **✓ 提示音** — a system alert tone on the same transitions
 - **✓ 窗口置顶**
+- **✓ 开机自启** — run at logon, via `HKCU\...\CurrentVersion\Run`
 - **退出**
 
 ## Settings and remembered state
@@ -72,12 +94,25 @@ Two files under `%LOCALAPPDATA%\AI-Terminal-Pet\`:
   stops the overlay from starting.
 
   ```json
-  { "notifications": true, "alwaysOnTop": true, "opacity": 235 }
+  { "notifications": true, "sound": true, "alwaysOnTop": true, "opacity": 235 }
   ```
+
+  `sound` is separate from `notifications` because the two reach you
+  differently: a balloon is something you read when you look, a tone is
+  something you hear when you are not looking.
 
 - `state.json` — the app's. Window position, zoom and expanded flag, so the
   pet comes back where you left it. Delete it (or run `--reset`) to get the
   default right-edge anchor back.
+
+Autostart is not in either file — the registry is its source of truth, so it
+can also be driven from a script:
+
+```powershell
+ai-terminal-pet --autostart        # report the current state
+ai-terminal-pet --autostart=on     # run at logon
+ai-terminal-pet --autostart=off    # stop running at logon
+```
 
 ## Build from source (Windows, Go 1.23+)
 

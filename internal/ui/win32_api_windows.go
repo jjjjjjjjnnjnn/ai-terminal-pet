@@ -43,6 +43,12 @@ const (
 	// to the overlay.
 	ninBalloonUserClick = 0x0405
 
+	// MessageBeep kinds. Using the standard icons means Windows plays whatever
+	// sound the user assigned to that event, so the overlay stays consistent
+	// with the rest of their desktop and honours Focus Assist.
+	beepError       = 0x00000010 // MB_ICONHAND
+	beepExclamation = 0x00000030 // MB_ICONEXCLAMATION
+
 	htClient      = 1
 	htTransparent = ^uintptr(0)
 )
@@ -55,12 +61,20 @@ var (
 	monitorFromPointProc   = user32.NewProc("MonitorFromPoint")
 	getMonitorInfoProc     = user32.NewProc("GetMonitorInfoW")
 	updateLayeredProc      = user32.NewProc("UpdateLayeredWindow")
+	messageBeepProc        = user32.NewProc("MessageBeep")
 )
 
 var windowProcedure = syscall.NewCallback(procedure)
 
 func enableDPIAwareness() {
 	setProcessDpiAwareness.Call(^uintptr(3))
+}
+
+// beep plays a system alert tone. MessageBeep is asynchronous and returns
+// immediately, so calling it from the UI thread cannot stall the pump; if the
+// system has no sound scheme configured it is a silent no-op.
+func beep(kind uint32) {
+	messageBeepProc.Call(uintptr(kind))
 }
 
 func unregisterClass(name *uint16, instance win.HINSTANCE) bool {

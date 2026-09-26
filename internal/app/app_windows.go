@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"ai-terminal-pet/internal/autostart"
 	"ai-terminal-pet/internal/config"
 	"ai-terminal-pet/internal/pipeserver"
 	"ai-terminal-pet/internal/platform"
@@ -18,7 +20,7 @@ import (
 )
 
 // Version is reported by `ai-terminal-pet --version`.
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 func Run() error {
 	// Single-instance gate doubles as pipe-preemption mitigation: only the
@@ -66,13 +68,33 @@ func Run() error {
 	saver := newPlacementSaver(statePath)
 	defer saver.flush()
 
+	autostartManager := autostart.New()
+	executable, executableErr := os.Executable()
+	autostartEnabled := false
+	if executableErr == nil {
+		// Repair a stale path first. The install path is the only thing in
+		// the Run value, so a moved or reinstalled binary would fail silently
+		// at logon - the worst possible way to fail. Sync never enables a
+		// disabled entry, so this cannot turn autostart on by itself.
+		if _, err := autostartManager.Sync(executable); err != nil {
+			// Autostart is a convenience, not a prerequisite: a registry that
+			// refuses to cooperate must not stop the overlay from running.
+			_ = err
+		}
+		if status, err := autostartManager.Status(); err == nil {
+			autostartEnabled = status.Enabled
+		}
+	}
+
 	values := store.New()
 	window := ui.New(values, ui.Options{
 		Opacity: uint8(settings.Opacity),
 		Settings: ui.Settings{
 			Notifications: settings.Notifications,
+			Sound:         settings.Sound,
 			AlwaysOnTop:   settings.AlwaysOnTop,
 		},
+		AutoStart: autostartEnabled,
 		Initial: ui.Placement{
 			Placed:   placement.Placed,
 			X:        placement.X,
@@ -94,8 +116,18 @@ func Run() error {
 			// (opacity) survives the round trip.
 			current := config.Load(configPath)
 			current.Notifications = value.Notifications
+			current.Sound = value.Sound
 			current.AlwaysOnTop = value.AlwaysOnTop
 			_ = config.Save(configPath, current)
+		},
+		OnAutoStartChanged: func(enabled bool) bool {
+			if executableErr != nil {
+				return false
+			}
+			if enabled {
+				return autostartManager.Enable(executable) == nil
+			}
+			return autostartManager.Disable() == nil
 		},
 	})
 	apply := func() bool {
@@ -223,4 +255,62 @@ func (s *placementSaver) flush() {
 	if pending {
 		_ = config.SaveState(s.path, value)
 	}
+}
+
+// Report is the machine-readable view printed by `--json`.
+type Report struct {
+	SchemaVersion string            `json:"schemaVersion"`
+	State         session.State     `json:"state"`
+	Count         int               `json:"count"`
+	GeneratedAt   time.Time         `json:"generatedAt"`
+	Sessions      []session.Session `json:"sessions"`
+}
+
+// Snapshot reads the on-disk reporter snapshots and returns the same aggregate
+// the overlay would show.
+//
+// It deliberately does not talk to the running overlay. Reading runtime/ works
+// whether or not the overlay is alive, needs no IPC, and cannot be blocked by
+// the single-instance mutex - which matters because the main use of --json is
+// to feed a status line or a script, and those must never hang on a GUI
+// process. The trade is freshness: the view is only as current as the
+// snapshots, and entries older than store.DefaultSnapshotTTL count as gone,
+// exactly as they do in the overlay.
+func Snapshot() (Report, error) {
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		return Report{}, errors.New("LOCALAPPDATA is not set")
+	}
+	scanner := store.SnapshotScanner{
+		Directory: filepath.Join(localAppData, "AI-Terminal-Pet", "runtime"),
+		TTL:       store.DefaultSnapshotTTL,
+		Now:       time.Now,
+		Alive:     platform.ProcessAlive,
+	}
+	values := store.New()
+	now := time.Now()
+	for _, value := range scanner.Scan() {
+		values.UpsertSnapshot(value, now)
+	}
+	values.Cleanup(now, platform.ProcessAlive, store.DefaultSnapshotTTL)
+	items := values.List()
+	if items == nil {
+		items = []session.Session{}
+	}
+	return Report{
+		SchemaVersion: session.SchemaVersion,
+		State:         session.Aggregate(items),
+		Count:         len(items),
+		GeneratedAt:   now.UTC(),
+		Sessions:      items,
+	}, nil
+}
+
+// EncodeReport renders a report as JSON. pretty switches to indented output for
+// humans; the default single line is what scripts and status lines want.
+func EncodeReport(report Report, pretty bool) ([]byte, error) {
+	if pretty {
+		return json.MarshalIndent(report, "", "  ")
+	}
+	return json.Marshal(report)
 }

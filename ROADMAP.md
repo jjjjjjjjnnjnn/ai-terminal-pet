@@ -1,6 +1,6 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 2026-09-25。本文分四块：现状基线、本轮已完成、扩展计划、轻量化计划，
+> 快照时间 2026-09-26。本文分四块：现状基线、本轮已完成、扩展计划、轻量化计划，
 > 以及一组实用功能候选与非目标。每项都标注了**动机**和**为什么现在不做/怎么做**，
 > 便于下一位维护者直接挑一项开工。
 
@@ -10,18 +10,37 @@
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 1.27.0），reporters 仅用 Node 标准库 |
-| 主程序 | `bin/AI-Terminal-Pet.exe` 3,915,264 B（`-trimpath -ldflags "-s -w"`） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` 3,954,688 B（`-trimpath -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` 3,644,416 B |
-| 代码量 | Go 5,317 行 / JS 1,058 行（不含新增 generic.js） |
+| 代码量 | Go 6.3k 行 / JS 1.2k 行 |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio(MIT) / lxn/win(BSD) / x/sys(BSD) |
-| 运行期占用 | 有活跃会话时工作集约 38 MB（含共享页），线程 8–16 |
+| 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16 |
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
 | 管道 | `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>`（按用户隔离，跨语言 golden 测试锁定） |
-| 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / **`generic.js`（新）** / `pet-statusline.exe` |
+| 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` |
 | 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）+ 无会话自毁（5 s 宽限，会话 TTL 30 s） |
-| 持久化 | `state.json`（位置/缩放/展开，跨启动记忆）· `config.json`（用户设置） |
+| 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/提示音/置顶/不透明度）· `HKCU\...\Run`（开机自启） |
+| 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--version/--help` |
+| 单测 | 55 个（config 9 / autostart 8 / app 5 / store 10 / ui 3 / session 8 / pipeserver 12） |
 
-## 1. 本轮已完成（2026-09-25 打磨）
+## 1. 本轮已完成
+
+### 1a. 2026-09-26（v0.3.0）—— F3 / F4 / F7
+
+- **F3 开机自启**：新增 `internal/autostart`，写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+  （用户级、免管理员、停用即删除，卸载无残留）。托盘开关 + `--autostart[=on|off]` CLI。
+  启动时自动修复指向旧路径的条目——安装路径是 Run 值里唯一的内容，程序被移动或重装后
+  会在登录时静默失败，那是最糟的失败方式。`Sync` 永不把「关闭」的条目改成开启。
+  注册表经 `backend` 接口访问，8 个单测全部跑在内存后端上——单测绝不该悄悄打开
+  `go test` 执行者的开机自启。
+- **F4 提示音**：`config.json` 新增 `sound`。等待确认用 `MB_ICONEXCLAMATION`、错误用
+  `MB_ICONHAND`，走系统声音方案，因此与桌面其余部分一致并遵守专注助手/静默时段。
+  与气泡提醒解耦但共享同一套「会话+状态」去重，关掉任一个都不会改变另一个的触发时机。
+- **F7 `--json` 导出**：`app.Snapshot()` 直接读 `runtime/` 快照离线聚合，**不依赖浮窗进程**，
+  因此可以被状态栏或脚本安全调用而不会阻塞在 GUI 进程上；`--pretty` 切换缩进输出。
+  代价是新鲜度受快照 TTL（15 s）约束，这一点与浮窗完全一致。
+
+### 1b. 2026-09-25（v0.2.0）—— 打磨
 
 - **记住位置**：拖拽/缩放/展开后落盘 `state.json`，下次启动原样恢复（含多显示器钳制）。
   写入走后台单协程合并，避免在 UI 线程上做文件 IO（本机 AV 钩挂下写文件可达数百毫秒）。
@@ -33,8 +52,13 @@
 - **轻量化**：脉冲动画定时器改为按状态自适应——只有按压/等待/错误态才装 50 ms 定时器，
   其余时间直接 `KillTimer`（此前是 7×24 的 20 FPS 空转）；DIB 画布与命中缓冲复用，去掉每帧 GDI 分配。
 - **通用上报器** `reporters/generic.js`：任意 CLI 一条命令接入（见 §2 E2）。
-- **新增单测**：`internal/config` 7 个（容错解码、钳制、原子写、往返）；`internal/ui` 3 个
-  （命中判定、关闭按钮几何同源、拖拽判定不变式）。
+- **修复**：`store.processBacked` 由「黑名单」改为「允许列表」。原实现把未知 source 当成真实进程，
+  而 `generic.js` 与所有 hook 上报端用的是稳定哈希 PID，存活探测必然失败，
+  于是**刚上报的会话立刻被删**——上报端回 `ok`，浮窗里却永远看不到。
+  允许列表的默认值更安全：探测一个不可信的 PID 会删掉活会话，而放过一个已死会话
+  只是让它多留一个 TTL。
+- **新增单测**：`internal/config` 7 个、`internal/ui` 3 个、`internal/app` 5 个（离线聚合）、
+  `internal/autostart` 8 个、`internal/store` 2 个（合成 PID 保留 + 非进程源保留）。
 
 ## 2. 扩展计划
 
@@ -114,18 +138,22 @@ go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `conn
 
 ## 4. 实用功能候选
 
+已完成：~~F3 开机自启~~、~~F4 提示音~~、~~F7 `--json` 导出~~（见 §1a）。
+
 | 编号 | 功能 | 价值 | 复杂度 |
 |---|---|---|---|
 | F1 | 悬停展开面板时显示完整会话明细（tooltip 或就地浮层） | 高 | 低 |
 | F2 | 键盘快捷键：`Esc` 收起（已有）、方向键在会话行间移动、`Enter` 跳转 | 中 | 中 |
-| F3 | 托盘菜单「开机自启」开关（写 HKCU Run 键） | 高 | 低 |
-| F4 | 等待确认/错误时的可选提示音（`MessageBeep` 或自定义 wav） | 中 | 低 |
 | F5 | 记住所在显示器（多屏场景下按显示器恢复，而不是全局坐标） | 中 | 中 |
 | F6 | 会话时长/最近活动时间显示（数据已在 `StartedAt`/`UpdatedAt`） | 中 | 低 |
-| F7 | `--json` 导出当前快照，供状态栏/其他工具消费 | 中 | 低 |
 | F8 | 会话行右键：复制项目路径 / 在资源管理器中打开 | 低 | 低 |
 
-F3、F4、F6、F7 都是「一个下午」的量级，且不触碰渲染核心，适合作为下一次迭代的起点。
+F6 和 F8 都是「一个下午」的量级，且不触碰渲染核心，适合作为下一次迭代的起点。
+F1 需要 tooltip 或多行文本布局，是展开面板的第一次真正的版式改动，建议单独一轮做。
+
+**已交付但值得回头看的一项**：`--json` 目前只读快照，因此看不到「只走管道、不写快照」
+的上报路径（如果将来有上报端选择不落盘）。真需要时可以给它加一个查询运行中实例的
+IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 
 ## 5. 非目标
 

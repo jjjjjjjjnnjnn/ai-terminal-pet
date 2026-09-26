@@ -11,8 +11,11 @@ import (
 func TestStoreCleanup(t *testing.T) {
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	values := New()
-	stale := session.Session{Source: "a", SessionID: "stale", PID: 1, State: session.StateIdle, StartedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
-	live := session.Session{Source: "b", SessionID: "live", PID: 2, State: session.StateWorking, StartedAt: now.Add(-time.Hour), UpdatedAt: now}
+	// "opencode" on purpose: only process-backed sources are dropped when
+	// their PID dies, and this test is about that path. Every other source
+	// waits out the TTL instead.
+	stale := session.Session{Source: "opencode", SessionID: "stale", PID: 1, State: session.StateIdle, StartedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour)}
+	live := session.Session{Source: "opencode", SessionID: "live", PID: 2, State: session.StateWorking, StartedAt: now.Add(-time.Hour), UpdatedAt: now}
 	values.UpsertSnapshot(stale, now)
 	values.UpsertPipe(live, now)
 	if values.UpsertSnapshot(stale, now.Add(10*time.Second)) {
@@ -26,6 +29,21 @@ func TestStoreCleanup(t *testing.T) {
 	values.Cleanup(now.Add(21*time.Second), func(pid int) bool { return false }, 15*time.Second)
 	if values.HasAvailable() {
 		t.Fatal("dead sessions were not removed")
+	}
+}
+
+// TestStoreKeepsNonProcessSourceWithDeadPID pins the safer default: a source we
+// cannot probe is left to the TTL rather than deleted on a liveness check that
+// is guaranteed to be meaningless.
+func TestStoreKeepsNonProcessSourceWithDeadPID(t *testing.T) {
+	now := time.Date(2026, 9, 26, 7, 0, 0, 0, time.UTC)
+	values := New()
+	value := session.Session{Source: "generic", SessionID: "generic-1", PID: 741006029, State: session.StateWorking, StartedAt: now, UpdatedAt: now}
+	values.UpsertPipe(value, now)
+	values.Cleanup(now.Add(time.Second), func(int) bool { return false }, 15*time.Second)
+	items := values.List()
+	if len(items) != 1 {
+		t.Fatalf("non-process source was dropped on a dead PID: %#v", items)
 	}
 }
 

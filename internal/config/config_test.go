@@ -30,7 +30,7 @@ func TestDecodeConfigKeepsAbsentFieldsAtDefault(t *testing.T) {
 	// A partial file must not silently turn notifications off: absent keys
 	// keep their default, only present keys override.
 	got := DecodeConfig([]byte(`{"opacity": 200}`))
-	if !got.Notifications || !got.AlwaysOnTop {
+	if !got.Notifications || !got.AlwaysOnTop || !got.Sound {
 		t.Fatalf("absent booleans must keep defaults, got %+v", got)
 	}
 	if got.Opacity != 200 {
@@ -39,8 +39,8 @@ func TestDecodeConfigKeepsAbsentFieldsAtDefault(t *testing.T) {
 }
 
 func TestDecodeConfigHonoursExplicitFalse(t *testing.T) {
-	got := DecodeConfig([]byte(`{"notifications": false, "alwaysOnTop": false}`))
-	if got.Notifications || got.AlwaysOnTop {
+	got := DecodeConfig([]byte(`{"notifications": false, "alwaysOnTop": false, "sound": false}`))
+	if got.Notifications || got.AlwaysOnTop || got.Sound {
 		t.Fatalf("explicit false must stick, got %+v", got)
 	}
 }

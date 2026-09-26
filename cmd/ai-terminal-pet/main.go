@@ -7,9 +7,9 @@
 //     demand by a reporter (reporters/*.js, cmd/pet-statusline), and removes
 //     itself once no session is left.
 //   - With a control flag, as a short-lived client that talks to a running
-//     overlay and exits. These exist so the pet can be driven from a script,
-//     a shell alias or a terminal status line without knowing anything about
-//     named pipes or window handles.
+//     overlay, reads local state, or prints a snapshot, then exits. These exist
+//     so the pet can be driven from a script, a shell alias or a terminal
+//     status line without knowing anything about named pipes or window handles.
 package main
 
 import (
@@ -18,9 +18,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"ai-terminal-pet/internal/app"
+	"ai-terminal-pet/internal/autostart"
 	"ai-terminal-pet/internal/config"
 	"ai-terminal-pet/internal/ui"
 )
@@ -33,8 +35,15 @@ usage:
   ai-terminal-pet --toggle        switch between compact and expanded
   ai-terminal-pet --reset         re-anchor to the screen edge at 100% zoom
   ai-terminal-pet --quit          stop the running overlay
+  ai-terminal-pet --json          print the current sessions as JSON
+  ai-terminal-pet --autostart     report the run-at-logon state
+  ai-terminal-pet --autostart=on  run the overlay at logon
+  ai-terminal-pet --autostart=off stop running the overlay at logon
   ai-terminal-pet --version       print the version
   ai-terminal-pet --help          print this message
+
+--json prints one line; add --pretty for indented output. It reads the
+reporter snapshots on disk, so it works whether or not the overlay is running.
 
 The overlay also exits on its own once no terminal session is reporting.
 `
@@ -67,26 +76,31 @@ func run(args []string) error {
 	if len(args) == 0 {
 		return app.Run()
 	}
-	switch args[0] {
-	case "--help", "-h", "help":
+	command := args[0]
+	switch {
+	case command == "--help" || command == "-h" || command == "help":
 		fmt.Print(usage)
 		return nil
-	case "--version", "-v", "version":
+	case command == "--version" || command == "-v" || command == "version":
 		fmt.Printf("ai-terminal-pet %s\n", app.Version)
 		return nil
-	case "--show":
+	case command == "--json":
+		return printSnapshot(args[1:])
+	case command == "--autostart" || strings.HasPrefix(command, "--autostart="):
+		return controlAutoStart(command)
+	case command == "--show":
 		// Fall through to a normal start when nothing is running, so the
 		// command is safe to bind to a hotkey.
 		if ui.Control(ui.ControlActivate) {
 			return nil
 		}
 		return app.Run()
-	case "--toggle":
+	case command == "--toggle":
 		if ui.Control(ui.ControlToggle) {
 			return nil
 		}
 		return app.Run()
-	case "--reset":
+	case command == "--reset":
 		if err := clearState(); err != nil {
 			return err
 		}
@@ -94,13 +108,86 @@ func run(args []string) error {
 			return nil
 		}
 		return app.Run()
-	case "--quit":
+	case command == "--quit":
 		ui.Control(ui.ControlQuit)
 		return nil
 	default:
-		fmt.Fprintf(os.Stderr, "ai-terminal-pet: unknown argument %q\n\n%s", args[0], usage)
-		return errUsage
+		return usageError("unknown argument %q", command)
 	}
+}
+
+// printSnapshot renders the on-disk session view. Extra arguments are rejected
+// rather than ignored: silently accepting a typo like --pretry would leave the
+// caller staring at compact output wondering why.
+func printSnapshot(extra []string) error {
+	pretty := false
+	for _, value := range extra {
+		switch value {
+		case "--pretty":
+			pretty = true
+		default:
+			return usageError("unknown argument %q for --json", value)
+		}
+	}
+	report, err := app.Snapshot()
+	if err != nil {
+		return err
+	}
+	encoded, err := app.EncodeReport(report, pretty)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(encoded))
+	return nil
+}
+
+// controlAutoStart reports or changes the run-at-logon entry. The registry is
+// the source of truth, so a bare --autostart always re-reads it rather than
+// consulting any cached flag.
+func controlAutoStart(command string) error {
+	manager := autostart.New()
+	action := ""
+	if strings.HasPrefix(command, "--autostart=") {
+		action = strings.TrimPrefix(command, "--autostart=")
+	}
+	switch action {
+	case "":
+		status, err := manager.Status()
+		if err != nil {
+			return err
+		}
+		if !status.Enabled {
+			fmt.Println("autostart: off")
+			return nil
+		}
+		fmt.Printf("autostart: on -> %s\n", status.Target)
+		return nil
+	case "on", "off":
+		executable, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		if action == "on" {
+			if err := manager.Enable(executable); err != nil {
+				return err
+			}
+			fmt.Printf("autostart: on -> %s\n", executable)
+			return nil
+		}
+		if err := manager.Disable(); err != nil {
+			return err
+		}
+		fmt.Println("autostart: off")
+		return nil
+	default:
+		return usageError("--autostart takes on or off, got %q", action)
+	}
+}
+
+// usageError prints to stderr and returns the sentinel main maps to exit 2.
+func usageError(format string, args ...any) error {
+	fmt.Fprintf(os.Stderr, "ai-terminal-pet: "+format+"\n\n"+usage, args...)
+	return errUsage
 }
 
 // clearState removes the remembered window placement. The running instance
