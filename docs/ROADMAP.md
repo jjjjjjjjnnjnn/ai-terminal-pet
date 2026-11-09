@@ -164,7 +164,7 @@ IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法
 1. 缩小二进制（见 L2）——镜像越小，AV 全量扫描越便宜。
 2. 上报端在**状态未变化时直接短路**：`pet-statusline` 先读 `runtime/` 里自己的上一个快照，
    若 `state`/`reason`/`project` 全同则跳过管道投递（快照仍写，保证 TTL）。可省掉每次渲染的 IPC 往返。
-3. AV 排除目录（需管理员，用户决策）——BASELINE §13 已记录这是唯一能真正压到亚秒的手段。
+3. AV 排除目录（需管理员，用户决策）——docs/archive/BASELINE-20260924.md §13 已记录这是唯一能真正压到亚秒的手段。
 4. 已落地：`--reset`/`--toggle` 等控制路径不再走 `app.Run()`，避免控制命令意外拉起常驻实例。
 
 ### L2 — 二进制体积（3.7 MiB → 目标 <2.5 MiB）
