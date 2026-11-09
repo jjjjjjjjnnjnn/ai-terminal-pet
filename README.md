@@ -86,6 +86,10 @@ Interaction is deliberately uniform — there is nothing to aim at:
 The overlay is single-instance and removes itself once no terminal session
 is left, so it is normally invisible in a process list.
 
+Exception: with auto-approve on, a tap on the *expanded* panel denies the
+most urgent waiting request instead of collapsing — the hook is about to
+approve on silence, so a tap can only usefully mean "don't".
+
 ### Control the overlay
 
 Every command below is safe to bind to a hotkey or shell alias:
@@ -127,15 +131,45 @@ Right-click the tray icon:
 
 - **显示浮窗 / 隐藏到托盘**
 - **重置位置与大小** — escape hatch for a pet dragged somewhere awkward
+- **设置… / Settings…** — opens the settings window (also
+  `ai-terminal-pet --settings`)
 - **✓ 状态提醒** — tray balloons when a session starts waiting for
   permission or fails
-- **✓ 提示音** — a system alert tone on the same transitions
+- **✓ 提示音** — a synthesised alert tone on the same transitions
 - **✓ 窗口置顶**
 - **✓ 贴边收起** — when docked to a screen edge, the panel slides most of the
   way off, leaving a thin sliver; hover the sliver to bring it back. A session
   waiting for you (or one that errored) always stays fully visible.
+- **语言 / Language** — `自动（跟随系统） / Auto (System)` (default),
+  `English`, `简体中文`. Follows the OS locale (`zh*` → Chinese, anything
+  else → English); switches instantly.
+- **☐ 5秒未响应时自动允许权限请求 / Auto-approve tool permissions after
+  5s** — off by default. When on, a permission prompt the hook reports gets
+  a 5-second veto window on the expanded panel (`Allow (5s)` + a draining
+  bar). Tap the panel to deny; silence approves. Dangerous commands
+  (`rm -rf`, `git push --force`, `format`, … — see `DANGEROUS_PATTERNS` in
+  `reporters/protocol.js`) never auto-approve. Works on the permission-prompt
+  path of the Claude and Antigravity hooks; ordinary tool calls are never
+  delayed.
 - **✓ 开机自启** — run at logon, via `HKCU\...\CurrentVersion\Run`
 - **退出**
+
+### Settings window
+
+**设置…** in the tray menu (or `ai-terminal-pet --settings`) opens a settings
+window with three tabs. Everything applies immediately — there is no OK button —
+and the window is only as tall as the tab it is showing.
+
+| Tab | Controls |
+| --- | --- |
+| **通用 / General** | status alerts, always on top, dock-and-retract, panel opacity, language, run at logon |
+| **声音 / Sound** | alert sound on/off, tone (`Chime` / `Bell` / `Soft` / `Pulse`), volume, separate switches for waiting / error / finished, audition button |
+| **会话 / Sessions** | auto-approve permissions, countdown length, restore defaults |
+
+Clicking a tone plays it at once, so picking one is not guesswork. Changes are
+written to `config.json` on a background goroutine — the read, the merge and the
+write all stay off the UI thread — and a write this process made is not echoed
+back through the config watcher, so a switch never flips back on its own.
 
 ### Settings and remembered state
 
@@ -147,12 +181,23 @@ Two files under `%LOCALAPPDATA%\AI-Terminal-Pet\`:
   stops the overlay from starting.
 
   ```json
-  { "notifications": true, "sound": true, "alwaysOnTop": true, "opacity": 235 }
+  { "notifications": true, "sound": true, "soundVolume": 85,
+    "soundScheme": "chime", "soundOnWaiting": true, "soundOnError": true,
+    "notifyOnFinish": true, "alwaysOnTop": true, "edgeRetract": true,
+    "opacity": 235, "language": "auto", "autoApprove": false,
+    "autoApproveTimeoutSec": 5 }
   ```
+
+  `soundScheme` picks the timbre (`chime` / `bell` / `soft` / `pulse`), and
+  `soundVolume` is 0–100. `soundOnWaiting` / `soundOnError` gate the tone per
+  event; `notifyOnFinish` gates the softer completion tone.
 
   `sound` is separate from `notifications` because the two reach you
   differently: a balloon is something you read when you look, a tone is
   something you hear when you are not looking.
+  `language` is `auto` (follow the OS), `en` or `zh-CN`.
+  `autoApprove` is off by default; `autoApproveTimeoutSec` (1–60) is the
+  veto window the hooks wait out on a permission prompt.
 
 - `state.json` — the app's. Window position, zoom and expanded flag, so the
   pet comes back where you left it. Delete it (or run `--reset`) to get the
@@ -236,6 +281,7 @@ internal/store         session store (256 cap, tombstones, TTLs, snapshots)
 internal/session       schema validation + priority/aggregation/sort
 internal/platform      single-instance mutex, process-liveness probe
 internal/ui            layered overlay, canvas rasterizer, panel layout, tray
+internal/i18n          en/zh-CN dictionary, OS-locale resolve, English fallback
 reporters/             JS push side (incl. generic.js)
 install.ps1            stop → copy (retrying) → SHA256 verify (both binaries)
 ```
@@ -247,13 +293,13 @@ install.ps1            stop → copy (retrying) → SHA256 verify (both binaries
   native shim and/or add an AV exclusion for the install directory.
 - Same-user pipe preemption is mitigated (mutex-first ordering), not
   eliminated — a future `FILE_FLAG_FIRST_PIPE_INSTANCE` or
-  challenge-response upgrade is tracked in HANDOVER.md.
+  challenge-response upgrade is tracked in [HANDOVER.md](docs/HANDOVER.md).
 - `go test -race` needs a gcc toolchain. The UI has unit tests for pure
   logic (hit testing, panel sizing, release decisions, text fitting) and a
   PNG preview renderer for layout, but no automated pixel regression.
 
-See [HANDOVER.md](HANDOVER.md) for the operational runbook and
-[ROADMAP.md](ROADMAP.md) for the extension and lightweighting plans.
+See [HANDOVER.md](docs/HANDOVER.md) for the operational runbook and
+[ROADMAP.md](docs/ROADMAP.md) for the extension and lightweighting plans.
 
 ### License
 
@@ -339,6 +385,9 @@ ai-term…  正在等的那个项目是哪个
 浮层是单实例的，当没有任何终端会话时它会自行移除，所以在进程列表里
 通常看不到它。
 
+例外：开启自动同意后，点击*展开态*面板是否决最紧急的等待请求，而不是收起——
+hook 即将在沉默中批准，这时点一下只可能是「不要批」的意思。
+
 ### 控制浮层
 
 下面每条命令都可以安全地绑到快捷键或 shell 别名：
@@ -378,13 +427,36 @@ ai-terminal-pet --json --pretty   # 缩进美化，给人看
 
 - **显示浮窗 / 隐藏到托盘**
 - **重置位置与大小** — 当浮窗被拖到别扭位置时的一键逃生口
+- **设置…** — 打开设置窗口（命令行 `ai-terminal-pet --settings` 等效）
 - **✓ 状态提醒** — 有会话开始等你批准或失败时弹出托盘气泡
-- **✓ 提示音** — 同样的状态切换时发出系统提示音
+- **✓ 提示音** — 同样的状态切换时播放合成提示音
 - **✓ 窗口置顶**
 - **✓ 贴边收起** — 当浮窗贴在屏幕边缘时，会滑出大半、只留一条细边；
   把光标悬停在细边上即可唤回。正在等你（或出错）的会话永远保持完整可见。
+- **语言 / Language** — `自动（跟随系统）`（默认）、`English`、`简体中文`。
+  跟随系统语言（`zh*`→中文，其余→英文），切换即时生效。
+- **☐ 5秒未响应时自动允许权限请求** — 默认关闭。开启后，hook 上报的权限请求
+  在展开态获得 5 秒否决窗口（`允许（5 秒）` + 耗尽进度条）：点一下浮窗即拒绝，
+  5 秒不操作即自动允许。危险命令（`rm -rf`、`git push --force`、`format` 等，
+  见 `reporters/protocol.js` 的 `DANGEROUS_PATTERNS`）永不自动允许。
+  只覆盖 Claude / Antigravity hook 的权限提示路径，普通工具调用不会被拖慢。
 - **✓ 开机自启** — 通过 `HKCU\...\CurrentVersion\Run` 在登录时运行
 - **退出**
+
+### 设置窗口
+
+托盘菜单里的 **设置…**（或 `ai-terminal-pet --settings`）会打开一个三页设置
+窗口。所有改动即时生效、没有确定按钮；窗口高度只到当前页内容为止。
+
+| 标签页 | 可设置项 |
+| --- | --- |
+| **通用** | 状态提醒、窗口置顶、贴边收起、面板不透明度、语言、开机自启 |
+| **声音** | 提示音开关、音效方案（清脆 / 钟声 / 柔和 / 脉冲）、音量、等待 / 出错 / 完成三个独立开关、试听 |
+| **会话** | 自动同意权限、倒计时时长、恢复默认设置 |
+
+点一下音效方案就会试听，不必凭名字猜。改动由后台协程写入 `config.json`
+（读取、合并、写入都不在 UI 线程上），且本进程自己写入的值不会被配置
+热加载回灌，所以开关不会自己跳回去。
 
 ### 设置与记忆的状态
 
@@ -395,11 +467,22 @@ ai-terminal-pet --json --pretty   # 缩进美化，给人看
   一个坏掉的文件绝不会让浮层起不来。
 
   ```json
-  { "notifications": true, "sound": true, "alwaysOnTop": true, "opacity": 235 }
+  { "notifications": true, "sound": true, "soundVolume": 85,
+    "soundScheme": "chime", "soundOnWaiting": true, "soundOnError": true,
+    "notifyOnFinish": true, "alwaysOnTop": true, "edgeRetract": true,
+    "opacity": 235, "language": "auto", "autoApprove": false,
+    "autoApproveTimeoutSec": 5 }
   ```
+
+  `soundScheme` picks the timbre (`chime` / `bell` / `soft` / `pulse`), and
+  `soundVolume` is 0–100. `soundOnWaiting` / `soundOnError` gate the tone per
+  event; `notifyOnFinish` gates the softer completion tone.
 
   `sound` 与 `notifications` 分开，是因为两者触达你的方式不同：气泡是
   「你去看时读到的」，提示音是「你没看时听到的」。
+  `language` 取 `auto`（跟随系统，默认）、`en`、`zh-CN`。
+  `autoApprove` 默认关闭；`autoApproveTimeoutSec`（1–60 秒）是 hook 在权限
+  提示处等待否决的窗口长度。
 
 - `state.json` — 属于应用的。记录窗口位置、缩放与展开标记，让浮窗下次
   回到你离开时的样子。删掉它（或运行 `--reset`）即可回到默认的右边缘
@@ -479,6 +562,7 @@ internal/store         会话存储（上限 256，墓碑、TTL、快照）
 internal/session        schema 校验 + 优先级/聚合/排序
 internal/platform       单实例互斥体、进程存活性探测
 internal/ui            分层浮层、画布光栅化、面板版式、托盘
+internal/i18n          中英字典、系统语言判定、英文回退
 reporters/             JS 上报端（含 generic.js）
 install.ps1            停止 → 拷贝（重试）→ SHA256 校验（两个二进制）
 ```
@@ -489,13 +573,13 @@ install.ps1            停止 → 拷贝（重试）→ SHA256 校验（两个�
 - 每次启动的杀毒扫描会让 Node 上报端变慢；请使用原生 shim，和/或给
   安装目录加杀毒排除项。
 - 同用户管道抢占已缓解（互斥体优先排序），但未被根除——未来的
-  `FILE_FLAG_FIRST_PIPE_INSTANCE` 或挑战-应答升级记录在 HANDOVER.md。
+  `FILE_FLAG_FIRST_PIPE_INSTANCE` 或挑战-应答升级记录在 [HANDOVER.md](docs/HANDOVER.md)。
 - `go test -race` 需要 gcc 工具链。UI 对纯逻辑（命中测试、面板尺寸、
   释放判定、文本适配）有单元测试，以及用于版式的 PNG 预览渲染器，但
   没有自动化的像素回归测试。
 
-运行手册见 [HANDOVER.md](HANDOVER.md)，扩展与轻量化计划见
-[ROADMAP.md](ROADMAP.md)。
+运行手册见 [HANDOVER.md](docs/HANDOVER.md)，扩展与轻量化计划见
+[ROADMAP.md](docs/ROADMAP.md)。
 
 ### 许可证
 
