@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"ai-terminal-pet/internal/i18n"
 	"ai-terminal-pet/internal/session"
 )
 
@@ -115,28 +116,32 @@ func TestExpandedPanelHeight(t *testing.T) {
 func TestRelativeTime(t *testing.T) {
 	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
 	cases := []struct {
-		ago  time.Duration
-		want string
+		ago time.Duration
+		zh  string
+		en  string
 	}{
-		{ago: 0, want: "刚刚"},
-		{ago: 30 * time.Second, want: "刚刚"},
-		{ago: 60 * time.Second, want: "1 分钟前"},
-		{ago: 9 * time.Minute, want: "9 分钟前"},
-		{ago: 59 * time.Minute, want: "59 分钟前"},
-		{ago: 90 * time.Minute, want: "1 小时前"},
-		{ago: 5 * time.Hour, want: "5 小时前"},
+		{ago: 0, zh: "刚刚", en: "just now"},
+		{ago: 30 * time.Second, zh: "刚刚", en: "just now"},
+		{ago: 60 * time.Second, zh: "1 分钟前", en: "1 minute ago"},
+		{ago: 9 * time.Minute, zh: "9 分钟前", en: "9 minutes ago"},
+		{ago: 59 * time.Minute, zh: "59 分钟前", en: "59 minutes ago"},
+		{ago: 90 * time.Minute, zh: "1 小时前", en: "1 hour ago"},
+		{ago: 5 * time.Hour, zh: "5 小时前", en: "5 hours ago"},
 	}
 	for _, tc := range cases {
-		if got := relativeTime(now.Add(-tc.ago), now); got != tc.want {
-			t.Fatalf("%v ago: got %q want %q", tc.ago, got, tc.want)
+		if got := relativeTime(now.Add(-tc.ago), now, i18n.LangZhCN); got != tc.zh {
+			t.Fatalf("%v ago zh: got %q want %q", tc.ago, got, tc.zh)
+		}
+		if got := relativeTime(now.Add(-tc.ago), now, i18n.LangEn); got != tc.en {
+			t.Fatalf("%v ago en: got %q want %q", tc.ago, got, tc.en)
 		}
 	}
 	// A clock skew that puts updatedAt slightly ahead must not render
 	// "0 分钟前" or a negative count.
-	if got := relativeTime(now.Add(time.Minute), now); got != "刚刚" {
+	if got := relativeTime(now.Add(time.Minute), now, i18n.LangZhCN); got != "刚刚" {
 		t.Fatalf("future timestamp: got %q", got)
 	}
-	if got := relativeTime(time.Time{}, now); got != "" {
+	if got := relativeTime(time.Time{}, now, i18n.LangEn); got != "" {
 		t.Fatalf("zero timestamp: got %q", got)
 	}
 }
@@ -151,13 +156,16 @@ func TestSummaryLineSeparatesRunningFromWaiting(t *testing.T) {
 		{State: session.StateThinking},
 		{State: session.StateIdle},
 	}
-	if got := summaryLine(items); got != "4 个会话 · 2 运行 · 1 等待" {
+	if got := summaryLine(items, i18n.LangZhCN); got != "4 个会话 · 2 运行 · 1 等待" {
 		t.Fatalf("summary = %q", got)
 	}
-	if got := summaryLine(nil); got != "暂无会话" {
+	if got := summaryLine(items, i18n.LangEn); got != "4 sessions · 2 running · 1 waiting" {
+		t.Fatalf("english summary = %q", got)
+	}
+	if got := summaryLine(nil, i18n.LangZhCN); got != "暂无会话" {
 		t.Fatalf("empty summary = %q", got)
 	}
-	if got := summaryLine([]session.Session{{State: session.StateIdle}}); got != "1 个会话" {
+	if got := summaryLine([]session.Session{{State: session.StateIdle}}, i18n.LangZhCN); got != "1 个会话" {
 		t.Fatalf("idle-only summary = %q", got)
 	}
 }
@@ -170,16 +178,20 @@ func TestCompactSubjectPrefersTheUrgentSession(t *testing.T) {
 		{State: session.StateWaitingPermission, Project: `C:\work\blocked`},
 		{State: session.StateWorking, Project: `C:\work\busy`},
 	}
-	label, _ := compactSubject(items, session.Aggregate(items))
+	label, _ := compactSubject(items, session.Aggregate(items), i18n.LangZhCN)
 	if label != "blocked" {
 		t.Fatalf("subject = %q, want the waiting session", label)
 	}
-	label, _ = compactSubject(items, session.StateWorking)
+	label, _ = compactSubject(items, session.StateWorking, i18n.LangEn)
 	if label != "blocked" {
 		t.Fatalf("subject = %q, want the highest-priority session", label)
 	}
-	label, _ = compactSubject(nil, session.StateIdle)
+	label, _ = compactSubject(nil, session.StateIdle, i18n.LangZhCN)
 	if label != "等待 AI CLI" {
 		t.Fatalf("empty subject = %q", label)
+	}
+	label, _ = compactSubject(nil, session.StateIdle, i18n.LangEn)
+	if label != "Waiting for AI CLI" {
+		t.Fatalf("empty english subject = %q", label)
 	}
 }

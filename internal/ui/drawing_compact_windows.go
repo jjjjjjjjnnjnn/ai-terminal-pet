@@ -7,10 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"ai-terminal-pet/internal/i18n"
 	"ai-terminal-pet/internal/session"
 )
 
 const dtCenter = 0x0001
+
+// dtRight right-aligns a label inside its box. It is only used by the settings
+// window, where values sit on the far side of a row from their title.
+const dtRight = 0x0002
 
 // Panel geometry in logical units at 96 DPI. The window sizing code and the
 // rasterizer both derive from these, so a layout change cannot leave the frame
@@ -78,21 +83,28 @@ type renderedKey struct {
 	// tuck is scaled by 1000 so the slide, which is continuous, still produces
 	// a new key at every visible step.
 	tuck int32
+	// lang is the display language: switching it repaints every label.
+	lang i18n.Lang
+	// approveSec is the hottest auto-approve countdown in whole seconds, -1
+	// when nothing is pending. It makes the ticking numbers repaint.
+	approveSec int64
 	// clock is what makes a time-driven frame differ from the last one.
 	clock int64
 }
 
-func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time) renderedKey {
+func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64) renderedKey {
 	key := renderedKey{
-		width:    width,
-		height:   height,
-		digest:   digest,
-		state:    state,
-		count:    count,
-		expanded: expanded,
-		pressed:  pressed,
-		hovered:  hovered,
-		tuck:     int32(math.Round(tuck * 1000)),
+		width:      width,
+		height:     height,
+		digest:     digest,
+		state:      state,
+		count:      count,
+		expanded:   expanded,
+		pressed:    pressed,
+		hovered:    hovered,
+		tuck:       int32(math.Round(tuck * 1000)),
+		lang:       lang,
+		approveSec: approveSec,
 	}
 	switch {
 	case animating:
@@ -117,6 +129,12 @@ type panelState struct {
 	Expanded bool
 	Pressed  bool
 	Hovered  bool
+	// Lang is the display language every label is rendered in.
+	Lang i18n.Lang
+	// Countdown carries the live auto-approve numbers by session key
+	// (see approvalSessionKey). Nil unless auto-approve is on and a
+	// permission turn is actually pending.
+	Countdown map[string]approvalView
 	// Tuck is 0 when the panel is fully on screen and 1 when it has slid all
 	// the way into its docked edge.
 	Tuck float64
@@ -137,22 +155,23 @@ func drawVerticalPanel(target *canvas, state panelState) {
 	if state.Pressed {
 		inset = 1
 	}
-	panel := rgba{10, 15, 29, 235}
-	raised := rgba{24, 32, 52, 225}
+	panel := colorPanel
+	raised := colorRaised
 	// Hover is the only cue that the panel is a control and not just a
 	// picture. Lifting the fill as well as the outline matters because in the
-	// alert states the outline is already near-opaque state colour, so an
-	// outline-only cue was invisible exactly when the panel most wanted to be
-	// clicked.
+	// alert states the outline is tinted, so an outline-only cue was invisible
+	// exactly when the panel most wanted to be clicked.
 	if state.Hovered {
-		panel = rgba{22, 30, 54, 242}
+		panel = colorPanelHover
 	}
 	radius := minInt(width/2, 24)
 	target.fillRounded(inset, inset, width-inset*2, height-inset*2, radius, panel)
-	border := rgba{76, 91, 123, 150}
+	// The outline is a hairline, not a coloured frame: a fully saturated
+	// amber border made the whole compact strip look like a warning light.
+	border := colorBorder
 	if aggregate == session.StateWaitingPermission || aggregate == session.StateError {
 		border = accent
-		border.A = 210
+		border.A = 120
 	}
 	if state.Hovered {
 		border.A = uint8(minInt(int(border.A)+55, 255))
@@ -168,9 +187,9 @@ func drawVerticalPanel(target *canvas, state panelState) {
 	if state.Tuck < 1 {
 		target.setAlphaScale(1 - state.Tuck)
 		if state.Expanded {
-			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised)
+			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised, state.Lang, state.Countdown)
 		} else {
-			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed)
+			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed, state.Lang)
 		}
 		target.setAlphaScale(1)
 	}
@@ -217,7 +236,7 @@ func drawDockedTab(target *canvas, state session.State, dock dockSide, sliver in
 // arrow-labelled counters, a divider and a chevron - encoded those same two
 // facts six different ways, which made the panel dense without making it
 // informative.
-func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent rgba, pressed bool) {
+func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent rgba, pressed bool, lang i18n.Lang) {
 	width := target.width
 	unit := float64(width) / compactWidth
 	value := func(base int) int {
@@ -228,13 +247,26 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 	drawStatusOrb(target, center, value(14), value(28), state, now, pressed)
 
 	target.text(value(4), value(50), width-value(8), value(26), compactCount(len(items)), value(22), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-	target.text(value(4), value(76), width-value(8), value(12), "会话", value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	target.text(value(4), value(76), width-value(8), value(12), i18n.T(lang, i18n.KeyPanelSessions), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 
-	target.fillRect(value(12), value(96), width-value(24), 1, rgba{79, 94, 126, 120})
+	target.fillRect(value(12), value(96), width-value(24), 1, colorDivider)
 
-	target.text(value(2), value(102), width-value(4), value(16), stateLabel(state), value(11), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	target.text(value(2), value(102), width-value(4), value(16), stateLabel(state, lang), value(11), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 
-	subject, subjectColor := compactSubject(items, state)
+	// When a session needs a decision - or has finished and is waiting to be
+	// read - the subject line becomes a one-tap jump bar. It still names the
+	// project, so "who wants me" is not lost. A panel with everything busy
+	// keeps the plain subject line and its original silhouette.
+	if jump, ok := mostUrgentJump(items); ok {
+		// Keep "who wants me" visible: lift the subject line a few units to
+		// make room for the one-tap bar, then draw the bar below it.
+		subject, subjectColor := compactSubject(items, state, lang)
+		subject = target.fitText(subject, value(8), 400, width-value(8))
+		target.text(value(4), value(119), width-value(8), value(13), subject, value(8), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		drawCompactJump(target, jump, lang)
+		return
+	}
+	subject, subjectColor := compactSubject(items, state, lang)
 	subject = target.fitText(subject, value(9), 400, width-value(8))
 	target.text(value(4), value(124), width-value(8), value(14), subject, value(9), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }
@@ -247,21 +279,21 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 // the most urgent. The label is deliberately not tinted with the state colour:
 // the word directly above it already carries that, and colouring both made the
 // strip read as one amber smear instead of two distinct facts.
-func compactSubject(items []session.Session, state session.State) (string, rgba) {
+func compactSubject(items []session.Session, state session.State, lang i18n.Lang) (string, rgba) {
 	if len(items) == 0 {
-		return "等待 AI CLI", colorMuted
+		return i18n.T(lang, i18n.KeyPanelWaiting), colorMuted
 	}
 	if state == session.StateWaitingPermission || state == session.StateError {
 		for _, current := range items {
 			if current.State == session.StateWaitingPermission || current.State == session.StateError {
-				return projectLabel(current), colorPrimary
+				return projectLabel(current, lang), colorPrimary
 			}
 		}
 	}
-	return projectLabel(items[0]), colorSecondary
+	return projectLabel(items[0], lang), colorSecondary
 }
 
-func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba) {
+func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba, lang i18n.Lang, countdown map[string]approvalView) {
 	width := target.width
 	height := target.height
 	unit := float64(width) / expandedWidth
@@ -270,111 +302,153 @@ func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time
 	}
 
 	// Header: title, live state, close.
-	target.text(value(14), value(13), width-value(120), value(22), "终端会话", value(13), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(value(14), value(13), width-value(120), value(22), i18n.T(lang, i18n.KeyPanelTitle), value(13), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 	pillWidth := value(74)
 	pillX := width - pillWidth - value(40)
 	pillY := value(13)
 	pill := accent
 	pill.A = 46
 	target.fillRounded(pillX, pillY, pillWidth, value(20), 10, pill)
-	target.text(pillX, pillY, pillWidth, value(20), stateLabel(state), value(10), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	target.text(pillX, pillY, pillWidth, value(20), stateLabel(state, lang), value(10), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 
 	closeX, closeY, closeSize := expandedCloseButtonRect(width)
 	target.fillEllipse(closeX, closeY, closeSize, closeSize, raised)
 	target.line(closeX+value(6), closeY+value(6), closeX+closeSize-value(6), closeY+closeSize-value(6), 1, colorSecondary)
 	target.line(closeX+closeSize-value(6), closeY+value(6), closeX+value(6), closeY+closeSize-value(6), 1, colorSecondary)
 
-	target.fillRect(value(14), value(expandedHeaderHeight-6), width-value(28), 1, rgba{79, 94, 126, 120})
-	target.text(value(14), value(expandedHeaderHeight), width-value(28), value(expandedSummaryHeight), summaryLine(items), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.fillRect(value(14), value(expandedHeaderHeight-6), width-value(28), 1, colorDivider)
+	target.text(value(14), value(expandedHeaderHeight), width-value(28), value(expandedSummaryHeight), summaryLine(items, lang), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 
 	top := value(expandedHeaderHeight + expandedSummaryHeight)
 	if len(items) == 0 {
-		drawExpandedEmpty(target, top, width, value)
+		drawExpandedEmpty(target, top, width, value, lang)
 	} else {
 		rows := minInt(len(items), expandedMaxRows)
 		for index := 0; index < rows; index++ {
-			drawVerticalSession(target, items[index], value(14), top+index*value(expandedRowHeight), width-value(28), value(expandedRowHeight)-value(4), now, value)
+			view, ok := lookupCountdown(countdown, items[index])
+			drawVerticalSession(target, items[index], value(14), top+index*value(expandedRowHeight), width-value(28), value(expandedRowHeight)-value(4), now, value, lang, view, ok)
 		}
 		if hidden := len(items) - rows; hidden > 0 {
 			y := top + rows*value(expandedRowHeight)
-			target.text(value(14), y, width-value(28), value(expandedOverflowHeight), fmt.Sprintf("还有 %d 个会话", hidden), value(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+			target.text(value(14), y, width-value(28), value(expandedOverflowHeight), fmt.Sprintf(i18n.T(lang, i18n.KeyPanelMore), hidden), value(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 		}
 	}
 
 	// The footer teaches the controls once, so the panel does not need a
 	// visible handle or a chevron to advertise that it is interactive.
 	footerTop := height - value(expandedFooterHeight)
-	target.fillRect(value(14), footerTop-value(6), width-value(28), 1, rgba{79, 94, 126, 90})
-	hint := target.fitText("拖拽移动 · 滚轮缩放 · 点击收起", value(8), 400, width-value(24))
+	softDivider := colorDivider
+	softDivider.A = 58
+	target.fillRect(value(14), footerTop-value(6), width-value(28), 1, softDivider)
+	hint := target.fitText(i18n.T(lang, i18n.KeyPanelHint), value(8), 400, width-value(24))
 	target.text(value(12), footerTop, width-value(24), value(expandedFooterHeight), hint, value(8), 400, colorMuted, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }
 
-func drawExpandedEmpty(target *canvas, top, width int, scale func(int) int) {
+func drawExpandedEmpty(target *canvas, top, width int, scale func(int) int, lang i18n.Lang) {
 	// The summary line already says there are no sessions, so this block
 	// carries the actionable half instead of repeating it.
-	target.text(scale(16), top+scale(6), width-scale(32), scale(34), "在终端里启动 AI CLI，浮窗会自动出现", scale(9), 400, colorMuted, dtVCenter|dtCenter|dtNoPrefix|dtWordBreak)
+	target.text(scale(16), top+scale(6), width-scale(32), scale(34), i18n.T(lang, i18n.KeyPanelEmpty), scale(9), 400, colorMuted, dtVCenter|dtCenter|dtNoPrefix|dtWordBreak)
 }
 
 func drawStatusOrb(target *canvas, centerX, top, size int, state session.State, now time.Time, pressed bool) {
+	accent := stateColor(state)
 	if state == session.StateWaitingPermission || state == session.StateError {
 		pulse := alertPulse(state, now)
-		outer := size + 6 + int(float64(pulse)*8+0.5)
-		outerColor := stateColor(state)
-		outerColor.A = uint8(48 + float64(pulse)*40)
+		outer := size + 4 + int(float64(pulse)*5+0.5)
+		outerColor := accent
+		outerColor.A = uint8(18 + float64(pulse)*22)
 		target.fillEllipse(centerX-outer/2, top-(outer-size)/2, outer, outer, outerColor)
 	}
-	orb := stateColor(state)
+	// A thin ring of state colour around a dark core, instead of a solid
+	// disc. The old 3.5px saturated ring plus the pulse halo filled the top
+	// third of the strip with one colour; a hairline reads as an indicator.
+	ring := accent
+	ring.A = 225
 	if pressed {
-		orb.A = 215
+		ring.A = 200
 	}
-	target.fillEllipse(centerX-size/2, top, size, size, orb)
-	inner := size - 7
-	target.fillEllipse(centerX-inner/2, top+4, inner, inner, rgba{7, 12, 24, 205})
-	target.text(centerX-inner/2, top+4, inner, inner, statusGlyph(state), maxInt(size/2, 11), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	target.fillEllipse(centerX-size/2, top, size, size, ring)
+	inner := size - 4
+	target.fillEllipse(centerX-inner/2, top+2, inner, inner, colorOrbInner)
+	target.text(centerX-inner/2, top+2, inner, inner, statusGlyph(state), maxInt(size/2, 11), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+}
+
+// lookupCountdown finds the live auto-approve numbers for one session, if
+// auto-approve is on and this exact permission turn is still pending.
+func lookupCountdown(countdown map[string]approvalView, current session.Session) (approvalView, bool) {
+	if len(countdown) == 0 {
+		return approvalView{}, false
+	}
+	view, ok := countdown[approvalSessionKey(current.Source, current.SessionID, current.PID)]
+	return view, ok
 }
 
 // drawVerticalSession is one row of the expanded list: project and state on
 // the first line, where it came from and how long ago it spoke on the second.
 // The relative time is the part that makes the list actionable - "waiting for
 // approval" reads very differently at 10 seconds and at 40 minutes.
-func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int) {
-	target.fillRounded(left, top, width, height, 6, rgba{24, 32, 52, 205})
+//
+// While an auto-approve countdown runs for the session, the second line's
+// right half becomes the ticking Allow (Ns) plus a draining bar, so the
+// user sees exactly how long they have to veto.
+func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int, lang i18n.Lang, view approvalView, hasCountdown bool) {
+	target.fillRounded(left, top, width, height, 6, colorRaisedRow)
 	accent := stateColor(current.State)
-	target.fillRounded(left+scale(1), top+scale(1), scale(3), height-scale(2), 2, accent)
+	// The rail is the one place a row uses a large patch of colour. Keeping it
+	// slightly translucent stops it from overpowering the neutral panel.
+	rail := accent
+	rail.A = 190
+	target.fillRounded(left+scale(1), top+scale(1), scale(3), height-scale(2), 2, rail)
 
 	textLeft := left + scale(9)
-	stateWidth := scale(56)
-	stateX := left + width - stateWidth - scale(9)
+	stateWidth := scale(48)
+	// Every row carries its own jump arrow. The geometry comes from the
+	// shared helper so the painted button and the clickable button coincide.
+	focusX, focusY, focusSize := expandedRowFocusRect(target.width, top, height)
+	stateX := left + width - stateWidth - focusSize - scale(8)
 
-	target.text(textLeft, top+scale(3), stateX-textLeft-scale(6), scale(12), projectLabel(current), scale(10), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	target.text(stateX, top+scale(3), stateWidth, scale(12), stateLabel(current.State), scale(8), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(textLeft, top+scale(3), stateX-textLeft-scale(6), scale(12), projectLabel(current, lang), scale(10), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(stateX, top+scale(3), stateWidth, scale(12), stateLabel(current.State, lang), scale(8), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 
-	detail := fmt.Sprintf("%s · %s", current.Source, reasonLabel(current))
+	detail := fmt.Sprintf("%s · %s", current.Source, reasonLabel(current, lang))
 	target.text(textLeft, top+scale(17), stateX-textLeft-scale(6), scale(10), detail, scale(8), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	target.text(stateX, top+scale(17), stateWidth, scale(10), relativeTime(current.UpdatedAt, now), scale(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	stamp := relativeTime(current.UpdatedAt, now, lang)
+	if hasCountdown {
+		stamp = fmt.Sprintf(i18n.T(lang, i18n.KeyApproveCountdown), view.RemainingSec)
+	}
+	target.text(stateX, top+scale(17), stateWidth, scale(10), stamp, scale(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	if hasCountdown && view.Fraction > 0 {
+		barWidth := int(float64(width-scale(18)) * view.Fraction)
+		if barWidth > 0 {
+			bar := accent
+			bar.A = 160
+			target.fillRounded(textLeft, top+height-scale(3), barWidth, maxInt(scale(2), 1), 1, bar)
+		}
+	}
+	drawExpandedFocusButton(target, focusX, focusY, focusSize, accent)
 }
 
 // summaryLine is the one-line census under the header. "运行" deliberately
 // excludes sessions that are waiting on the user: from the user's side those
 // are not running, they are blocking, and counting them as both made the old
 // metric rows double-count.
-func summaryLine(items []session.Session) string {
+func summaryLine(items []session.Session, lang i18n.Lang) string {
 	if len(items) == 0 {
-		return "暂无会话"
+		return i18n.T(lang, i18n.KeySummaryEmpty)
 	}
-	parts := []string{fmt.Sprintf("%d 个会话", len(items))}
+	parts := []string{fmt.Sprintf(i18n.T(lang, i18n.KeySummarySessions), len(items))}
 	if busy := busySessions(items); busy > 0 {
-		parts = append(parts, fmt.Sprintf("%d 运行", busy))
+		parts = append(parts, fmt.Sprintf(i18n.T(lang, i18n.KeySummaryRunning), busy))
 	}
 	if waiting := waitingSessions(items); waiting > 0 {
-		parts = append(parts, fmt.Sprintf("%d 等待", waiting))
+		parts = append(parts, fmt.Sprintf(i18n.T(lang, i18n.KeySummaryWaiting), waiting))
 	}
 	return strings.Join(parts, " · ")
 }
 
 // relativeTime renders coarse buckets rather than a clock: sessions live for
 // minutes, and "3 分钟前" is read faster than "14:07".
-func relativeTime(value, now time.Time) string {
+func relativeTime(value, now time.Time, lang i18n.Lang) string {
 	if value.IsZero() {
 		return ""
 	}
@@ -384,15 +458,15 @@ func relativeTime(value, now time.Time) string {
 	}
 	switch {
 	case delta < 45*time.Second:
-		return "刚刚"
+		return i18n.T(lang, i18n.KeyTimeNow)
 	case delta < 90*time.Second:
-		return "1 分钟前"
+		return i18n.T(lang, i18n.KeyTimeMin1)
 	case delta < time.Hour:
-		return fmt.Sprintf("%d 分钟前", int(delta.Minutes()))
+		return fmt.Sprintf(i18n.T(lang, i18n.KeyTimeMins), int(delta.Minutes()))
 	case delta < 2*time.Hour:
-		return "1 小时前"
+		return i18n.T(lang, i18n.KeyTimeHour1)
 	default:
-		return fmt.Sprintf("%d 小时前", int(delta.Hours()))
+		return fmt.Sprintf(i18n.T(lang, i18n.KeyTimeHours), int(delta.Hours()))
 	}
 }
 

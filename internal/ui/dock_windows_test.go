@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"ai-terminal-pet/internal/i18n"
 	"ai-terminal-pet/internal/session"
 )
 
@@ -137,23 +138,25 @@ func TestSlideTuckIsTimeBased(t *testing.T) {
 // TestFrameKeySkipsUnchangedFrames is the redraw optimisation: a reporter that
 // pushes the same state repeatedly must not cost a full GDI raster each time.
 func TestFrameKeySkipsUnchangedFrames(t *testing.T) {
-	base := frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0))
-	same := frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1010, 0))
+	base := frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1)
+	same := frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1010, 0), i18n.LangZhCN, -1)
 	if base != same {
 		t.Fatal("an idle compact panel must produce the same key ten seconds later")
 	}
 	// Every input that is actually drawn must move the key.
 	cases := map[string]renderedKey{
-		"width":     frameKey(90, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0)),
-		"height":    frameKey(84, 300, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0)),
-		"digest":    frameKey(84, 234, 8, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0)),
-		"state":     frameKey(84, 234, 7, session.StateError, 2, false, false, false, 0, false, time.Unix(1000, 0)),
-		"count":     frameKey(84, 234, 7, session.StateWorking, 3, false, false, false, 0, false, time.Unix(1000, 0)),
-		"expanded":  frameKey(84, 234, 7, session.StateWorking, 2, true, false, false, 0, false, time.Unix(1000, 0)),
-		"pressed":   frameKey(84, 234, 7, session.StateWorking, 2, false, true, false, 0, false, time.Unix(1000, 0)),
-		"hovered":   frameKey(84, 234, 7, session.StateWorking, 2, false, false, true, 0, false, time.Unix(1000, 0)),
-		"tuck":      frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0.5, false, time.Unix(1000, 0)),
-		"animating": frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, true, time.Unix(1000, 0)),
+		"width":      frameKey(90, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"height":     frameKey(84, 300, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"digest":     frameKey(84, 234, 8, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"state":      frameKey(84, 234, 7, session.StateError, 2, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"count":      frameKey(84, 234, 7, session.StateWorking, 3, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"expanded":   frameKey(84, 234, 7, session.StateWorking, 2, true, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"pressed":    frameKey(84, 234, 7, session.StateWorking, 2, false, true, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"hovered":    frameKey(84, 234, 7, session.StateWorking, 2, false, false, true, 0, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"tuck":       frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0.5, false, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"animating":  frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, true, time.Unix(1000, 0), i18n.LangZhCN, -1),
+		"lang":       frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangEn, -1),
+		"approveSec": frameKey(84, 234, 7, session.StateWorking, 2, false, false, false, 0, false, time.Unix(1000, 0), i18n.LangZhCN, 4),
 	}
 	for name, key := range cases {
 		if key == base {
@@ -161,8 +164,8 @@ func TestFrameKeySkipsUnchangedFrames(t *testing.T) {
 		}
 	}
 	// While animating, every frame differs, because the pulse is clock-driven.
-	first := frameKey(84, 234, 7, session.StateWaitingPermission, 2, false, false, false, 0, true, time.Unix(1000, 0))
-	second := frameKey(84, 234, 7, session.StateWaitingPermission, 2, false, false, false, 0, true, time.Unix(1000, 1))
+	first := frameKey(84, 234, 7, session.StateWaitingPermission, 2, false, false, false, 0, true, time.Unix(1000, 0), i18n.LangZhCN, -1)
+	second := frameKey(84, 234, 7, session.StateWaitingPermission, 2, false, false, false, 0, true, time.Unix(1000, 1), i18n.LangZhCN, -1)
 	if first == second {
 		t.Fatal("an animating frame must not be skipped")
 	}

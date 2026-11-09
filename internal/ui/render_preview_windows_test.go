@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"ai-terminal-pet/internal/i18n"
 	"ai-terminal-pet/internal/session"
 )
 
@@ -69,23 +70,31 @@ func TestRenderPreview(t *testing.T) {
 		hovered  bool
 		tuck     float64
 		scale    int
+		lang     i18n.Lang
+		// approve attaches a live auto-approve countdown to the first
+		// waiting session in items, so the Allow (Ns) row + bar renders.
+		approve bool
 		// crop is how much of the frame is on screen, in logical units. A
 		// tucked panel is mostly past the screen edge, and the rasterizer
 		// still draws the whole frame - cropping here is what makes the
 		// preview show what the user actually sees.
 		crop int
 	}{
-		{"compact-waiting", waiting, false, false, false, 0, 3, 0},
-		{"compact-waiting-hover", waiting, false, false, true, 0, 3, 0},
-		{"compact-busy", busy, false, false, false, 0, 3, 0},
-		{"compact-error", broken, false, false, false, 0, 3, 0},
-		{"compact-empty", nil, false, false, false, 0, 3, 0},
-		{"docked-tuck-half", busy, false, false, false, 0.5, 3, 33},
-		{"docked-tuck-full", busy, false, false, false, 1, 3, 10},
-		{"docked-tuck-full-idle", idle, false, false, false, 1, 3, 10},
-		{"expanded-waiting", waiting, true, false, false, 0, 2, 0},
-		{"expanded-many", many, true, false, false, 0, 2, 0},
-		{"expanded-empty", nil, true, false, false, 0, 2, 0},
+		{"compact-waiting", waiting, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
+		{"compact-waiting-hover", waiting, false, false, true, 0, 3, i18n.LangZhCN, false, 0},
+		{"compact-busy", busy, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
+		{"compact-error", broken, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
+		{"compact-empty", nil, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
+		{"compact-waiting-en", waiting, false, false, false, 0, 3, i18n.LangEn, false, 0},
+		{"docked-tuck-half", busy, false, false, false, 0.5, 3, i18n.LangZhCN, false, 33},
+		{"docked-tuck-full", busy, false, false, false, 1, 3, i18n.LangZhCN, false, 10},
+		{"docked-tuck-full-idle", idle, false, false, false, 1, 3, i18n.LangZhCN, false, 10},
+		{"expanded-waiting", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0},
+		{"expanded-waiting-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0},
+		{"expanded-approve-zh", waiting, true, false, false, 0, 2, i18n.LangZhCN, true, 0},
+		{"expanded-approve-en", waiting, true, false, false, 0, 2, i18n.LangEn, true, 0},
+		{"expanded-many", many, true, false, false, 0, 2, i18n.LangZhCN, false, 0},
+		{"expanded-empty", nil, true, false, false, 0, 2, i18n.LangZhCN, false, 0},
 	}
 	for _, tc := range cases {
 		width := compactWidth
@@ -98,15 +107,28 @@ func TestRenderPreview(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: canvas: %v", tc.name, err)
 		}
+		var countdown map[string]approvalView
+		if tc.approve {
+			for _, current := range tc.items {
+				if current.State == session.StateWaitingPermission {
+					countdown = map[string]approvalView{
+						approvalSessionKey(current.Source, current.SessionID, current.PID): {RemainingSec: 3, Fraction: 0.6},
+					}
+					break
+				}
+			}
+		}
 		drawVerticalPanel(target, panelState{
-			Items:    tc.items,
-			Now:      now,
-			Expanded: tc.expanded,
-			Pressed:  tc.pressed,
-			Hovered:  tc.hovered,
-			Tuck:     tc.tuck,
-			Sliver:   dockedSliver,
-			Dock:     dockRight,
+			Items:     tc.items,
+			Now:       now,
+			Expanded:  tc.expanded,
+			Pressed:   tc.pressed,
+			Hovered:   tc.hovered,
+			Lang:      tc.lang,
+			Countdown: countdown,
+			Tuck:      tc.tuck,
+			Sliver:    dockedSliver,
+			Dock:      dockRight,
 		})
 		img := compositeOver(target, desktop)
 		target.close()

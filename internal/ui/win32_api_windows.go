@@ -33,20 +33,28 @@ const (
 	wmActivate        = wmApp + 3
 	wmToggle          = wmApp + 4
 	wmReset           = wmApp + 5
-	wmDPIChanged      = 0x02E0
-	wmCaptureChanged  = 0x0215
-	wmCancelMode      = 0x001F
-	wmKeyEscape       = 0x1B
-	mkLButton         = 0x0001
+	// wmFocusResult reports a failed off-thread lookup (no matching window).
+	wmFocusResult = wmApp + 6
+	// wmFocusActivate carries the resolved HWND in wParam and asks the UI
+	// thread to activate it. The UI thread owns the foreground right after
+	// the click, so no AttachThreadInput / z-order tricks are needed.
+	wmFocusActivate = wmApp + 7
+	// wmSettings opens the settings window (tray, --settings, hotkey).
+	wmSettings       = wmApp + 8
+	wmDPIChanged     = 0x02E0
+	wmCaptureChanged = 0x0215
+	wmCancelMode     = 0x001F
+	wmKeyEscape      = 0x1B
+	mkLButton        = 0x0001
 
 	// ninBalloonUserClick is the tray callback event raised when the user
 	// clicks a balloon tip, so a notification can double as a shortcut back
 	// to the overlay.
 	ninBalloonUserClick = 0x0405
 
-	// MessageBeep kinds. Using the standard icons means Windows plays whatever
-	// sound the user assigned to that event, so the overlay stays consistent
-	// with the rest of their desktop and honours Focus Assist.
+	// MessageBeep kinds are kept only as the last-resort fallback in beep()
+	// (see sound_windows.go). The real alert tones are synthesised WAV data
+	// played through winmm, whose volume the user controls.
 	beepError       = 0x00000010 // MB_ICONHAND
 	beepExclamation = 0x00000030 // MB_ICONEXCLAMATION
 
@@ -56,6 +64,7 @@ const (
 
 var (
 	user32 = syscall.NewLazyDLL("user32.dll")
+	winmm  = syscall.NewLazyDLL("winmm.dll")
 
 	setProcessDpiAwareness = user32.NewProc("SetProcessDpiAwarenessContext")
 	unregisterClassProc    = user32.NewProc("UnregisterClassW")
@@ -63,6 +72,7 @@ var (
 	getMonitorInfoProc     = user32.NewProc("GetMonitorInfoW")
 	updateLayeredProc      = user32.NewProc("UpdateLayeredWindow")
 	messageBeepProc        = user32.NewProc("MessageBeep")
+	playSoundProc          = winmm.NewProc("PlaySoundW")
 )
 
 var windowProcedure = syscall.NewCallback(procedure)
@@ -71,11 +81,12 @@ func enableDPIAwareness() {
 	setProcessDpiAwareness.Call(^uintptr(3))
 }
 
-// beep plays a system alert tone. MessageBeep is asynchronous and returns
-// immediately, so calling it from the UI thread cannot stall the pump; if the
-// system has no sound scheme configured it is a silent no-op.
-func beep(kind uint32) {
-	messageBeepProc.Call(uintptr(kind))
+// playSoundW plays a complete WAV image held in Go memory. SND_ASYNC returns
+// immediately, so a slow or absent audio device can never stall the UI pump.
+// The caller keeps the backing slice alive until playback finishes.
+func playSoundW(data *byte, flags uint32) bool {
+	result, _, _ := playSoundProc.Call(uintptr(unsafe.Pointer(data)), 0, uintptr(flags))
+	return result != 0
 }
 
 func unregisterClass(name *uint16, instance win.HINSTANCE) bool {

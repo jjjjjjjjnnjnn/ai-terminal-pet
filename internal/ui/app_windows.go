@@ -12,6 +12,8 @@ import (
 	"time"
 	"unsafe"
 
+	"ai-terminal-pet/internal/i18n"
+	"ai-terminal-pet/internal/platform"
 	"ai-terminal-pet/internal/session"
 	"ai-terminal-pet/internal/store"
 	win "github.com/lxn/win"
@@ -31,13 +33,22 @@ const (
 	menuSound         = 1007
 	menuAutoStart     = 1008
 	menuEdgeRetract   = 1009
+	menuLangAuto      = 1010
+	menuLangEn        = 1011
+	menuLangZh        = 1012
+	menuAutoApprove   = 1013
+	menuSoundVolume   = 1014
+	menuNotifyFinish  = 1015
+	menuSettings      = 1016
 
 	// The pulse and the slide share one timer but want different frame rates.
 	//
-	// The pulse is a slow breath - about 1.1 s per cycle - so it looks smooth
-	// at 12 fps and repainting it 20 times a second is wasted work. The slide
-	// is short and reads as motion, so it wants every frame it can get.
-	pulseInterval = 80
+	// The pulse is a slow breath - about 1.1 s per cycle. Every animation
+	// tick is a full GDI raster of the layered window, so a session parked in
+	// waiting_permission used to burn CPU forever at 12.5 fps. At 160 ms
+	// (6.25 fps) the breath still reads as a breath but costs half as much.
+	// The slide is short and reads as motion, so it keeps the higher rate.
+	pulseInterval = 160
 	slideInterval = 33
 
 	// windowClassName is also the rendezvous used by Control, so a
@@ -67,10 +78,54 @@ type Placement struct {
 type Settings struct {
 	Notifications bool
 	Sound         bool
-	AlwaysOnTop   bool
+	// SoundVolume is the tone amplitude, 0..100. It is mirrored into the
+	// audio layer on startup, hot reload and every tray change.
+	SoundVolume int
+	// SoundScheme picks one of the built-in timbres; see ui.SoundSchemes.
+	SoundScheme string
+	// SoundOnWaiting / SoundOnError gate the tone per event, so someone who
+	// only wants to hear genuine blockers can mute the rest.
+	SoundOnWaiting bool
+	SoundOnError   bool
+	// NotifyOnFinish makes a session settling into idle/closed an alert too.
+	NotifyOnFinish bool
+	AlwaysOnTop    bool
 	// EdgeRetract slides the panel into the screen edge it is hugging when
 	// nothing needs attention.
 	EdgeRetract bool
+	// Language is the persisted language preference: "auto" follows the
+	// host OS locale, "en" and "zh-CN" pin one. See internal/i18n.
+	Language string
+	// AutoApprove lets a permission prompt auto-approve after the timeout
+	// when the user says nothing. Off by default.
+	AutoApprove bool
+	// AutoApproveTimeoutSec is the countdown length; the settings window can
+	// change it at runtime (it used to be read only at startup).
+	AutoApproveTimeoutSec int
+	// Opacity is the layered window's constant alpha, 1..255.
+	Opacity int
+}
+
+// DefaultSettings is what "restore defaults" puts back, and what the overlay
+// starts with when no config file exists. It mirrors config.Default(): the ui
+// package does not import internal/config (the app layer owns file paths), so
+// a test in the app package pins the two together.
+func DefaultSettings() Settings {
+	return Settings{
+		Notifications:         true,
+		Sound:                 true,
+		SoundVolume:           85,
+		SoundScheme:           soundSchemeChime,
+		SoundOnWaiting:        true,
+		SoundOnError:          true,
+		NotifyOnFinish:        true,
+		AlwaysOnTop:           true,
+		EdgeRetract:           true,
+		Language:              "auto",
+		AutoApprove:           false,
+		AutoApproveTimeoutSec: 5,
+		Opacity:               235,
+	}
 }
 
 // Options is everything the UI needs from outside. All callbacks are invoked
@@ -83,6 +138,12 @@ type Options struct {
 	// AutoStart is the initial state of the run-at-logon switch. It lives in
 	// the registry rather than config.json, so the UI only mirrors it.
 	AutoStart bool
+	// AutoApproveTimeoutSec is the countdown length for auto-approve.
+	// Out-of-range values fall back to 5 seconds.
+	AutoApproveTimeoutSec int
+	// OpenSettings opens the settings window right after the first paint, so
+	// `--settings` works even when it had to start the overlay itself.
+	OpenSettings bool
 	// Initial is the remembered geometry, or the zero value when the window
 	// has never been placed.
 	Initial Placement
@@ -114,14 +175,17 @@ type messageEnvelope struct {
 }
 
 type App struct {
-	values   *store.Store
-	handle   atomic.Uintptr
-	options  Options
-	dpi      uint32
-	zoom     float64
-	expanded bool
-	hidden   bool
-	pressed  bool
+	values  *store.Store
+	handle  atomic.Uintptr
+	options Options
+	// pendingSettings carries a config reload from the app layer's background
+	// watcher to the UI thread. The UI never reads the config file itself.
+	pendingSettings atomic.Pointer[Settings]
+	dpi             uint32
+	zoom            float64
+	expanded        bool
+	hidden          bool
+	pressed         bool
 	// hovering is true while the cursor is over the panel. It only brightens
 	// the outline, but it is the difference between "a picture of a status"
 	// and "something I can click".
@@ -176,14 +240,27 @@ type App struct {
 	// change between pulse and slide frame rates retunes it instead of being
 	// ignored.
 	timerInterval uint32
-	// alertKey is the "session+state" of the last balloon shown. Balloons
-	// fire on transitions only, otherwise a session parked in
-	// waiting_permission would re-notify on every repaint.
-	alertKey string
-	// lastAvailable is the grace anchor for the idle self-destruct: with no
+	// alertStates is the last observed state of every session. Tracking each
+	// conversation separately matters: a single global "most urgent session"
+	// key used to be reset whenever that session ended, so another still-
+	// waiting session re-alerted later - or an unrelated new session looked
+	// like the cause of a balloon. The first load only seeds this map, which
+	// stops hot reload/restart from replaying old alerts.
+	alertStates map[string]session.State
+	// lastAvailable is the grace anchor for the idle self-destruct. With the
+	// new existence model a live terminal keeps its session indefinitely, so
+	// this only ever fires after every AI terminal has really been closed.
 	// sessions the overlay removes itself, so the reporters' on-demand
 	// launch path stays the only thing that keeps a process alive.
-	lastAvailable   time.Time
+	lastAvailable time.Time
+	// lang is the resolved display language. It is fixed at New() from the
+	// settings plus the OS locale, and refreshed whenever the tray language
+	// switches - drawing code reads it but never resolves it.
+	lang i18n.Lang
+	// approvals tracks the live auto-approve countdowns, keyed by session.
+	// approveTimeout is how long each countdown runs. UI thread only.
+	approvals       *approvalTracker
+	approveTimeout  time.Duration
 	taskbarMessage  uint32
 	trayIcon        win.HICON
 	trayAdded       bool
@@ -197,25 +274,66 @@ type App struct {
 	// lastMessage is the most recent window message id, recorded so a hang
 	// dump can name the message the UI thread was last asked to handle.
 	lastMessage atomic.Uint32
+	// Settings window. It is a second top-level window on the same UI thread,
+	// created lazily the first time it is opened: most runs never need it, and
+	// a window plus a DIB is real memory for a panel nobody configured.
+	settingsHandle     atomic.Uintptr
+	settingsSurface    *canvas
+	settingsDPI        uint32
+	settingsGeometry   settingsGeometry
+	settingsFrame      settingsFrameKey
+	settingsTab        int
+	settingsHover      settingsControl
+	settingsHoverIndex int
+	settingsPress      settingsControl
+	// settingsDrag is the slider currently being dragged, settingsNone when
+	// the pointer is not held. A drag repaints but does not persist; release
+	// writes config.json once.
+	settingsDrag settingsControl
+	// settingsHoverTracking records whether WM_MOUSELEAVE is armed for the
+	// settings window; TrackMouseEvent must be re-armed after every leave.
+	settingsHoverTracking bool
+	// settingsMoving is a header drag. settingsMoveDX/DY are the grab offset
+	// inside the window, so the window does not jump to the cursor.
+	settingsMoving bool
+	settingsMoveDX int32
+	settingsMoveDY int32
+	settingsX      int32
+	settingsY      int32
 }
 
 func New(values *store.Store, options Options) *App {
 	if options.Opacity == 0 {
 		options.Opacity = 235
 	}
+	if options.Settings.Opacity > 0 {
+		options.Opacity = uint8(options.Settings.Opacity)
+	}
+	setSoundVolume(options.Settings.SoundVolume)
+	setSoundScheme(options.Settings.SoundScheme)
 	zoom := options.Initial.Zoom
 	if math.IsNaN(zoom) || zoom < 0.65 || zoom > 1.6 {
 		zoom = 1
 	}
+	timeout := options.AutoApproveTimeoutSec
+	if options.Settings.AutoApproveTimeoutSec > 0 {
+		timeout = options.Settings.AutoApproveTimeoutSec
+	}
+	if timeout < 1 || timeout > 60 {
+		timeout = 5
+	}
 	return &App{
-		values:        values,
-		options:       options,
-		dpi:           96,
-		zoom:          zoom,
-		expanded:      options.Initial.Expanded,
-		state:         session.StateIdle,
-		revision:      ^uint64(0),
-		lastAvailable: time.Now(),
+		values:         values,
+		options:        options,
+		dpi:            96,
+		zoom:           zoom,
+		expanded:       options.Initial.Expanded,
+		state:          session.StateIdle,
+		revision:       ^uint64(0),
+		lastAvailable:  time.Now(),
+		lang:           i18n.Resolve(i18n.Setting(options.Settings.Language), i18n.SystemLocale()),
+		approvals:      newApprovalTracker(),
+		approveTimeout: time.Duration(timeout) * time.Second,
 	}
 }
 
@@ -234,6 +352,9 @@ const (
 	ControlQuit
 	// ControlReset drops the remembered geometry and re-anchors.
 	ControlReset
+	// ControlSettings opens the settings window. It is a separate action so a
+	// hotkey or a shortcut can reach it without going through the tray.
+	ControlSettings
 )
 
 // Control sends action to an already-running instance and reports whether one
@@ -258,6 +379,8 @@ func Control(action ControlAction) bool {
 		message = wmClose
 	case ControlReset:
 		message = wmReset
+	case ControlSettings:
+		message = wmSettings
 	default:
 		return false
 	}
@@ -266,6 +389,37 @@ func Control(action ControlAction) bool {
 
 func (a *App) Refresh() {
 	a.postRefresh()
+}
+
+// QueueSettings applies a hot-reloaded configuration on the UI thread.
+// The app layer owns config.json and does the file read on a background
+// goroutine; all this does is stage the resulting plain struct and wake the
+// message pump, so no file IO or cross-thread mutation happens here.
+func (a *App) QueueSettings(value Settings) {
+	staged := value
+	a.pendingSettings.Store(&staged)
+	a.postRefresh()
+}
+
+func (a *App) applyQueuedSettings(value Settings) {
+	a.options.Settings = value
+	setSoundVolume(value.SoundVolume)
+	setSoundScheme(value.SoundScheme)
+	if value.Opacity > 0 {
+		a.options.Opacity = uint8(value.Opacity)
+	}
+	if value.AutoApproveTimeoutSec > 0 {
+		a.approveTimeout = time.Duration(value.AutoApproveTimeoutSec) * time.Second
+	}
+	a.lang = i18n.Resolve(i18n.Setting(value.Language), i18n.SystemLocale())
+	a.setTopmost()
+	a.syncTuck()
+	a.updateTooltip()
+	// frameKey includes lang and the tuck state, so the refresh already in
+	// flight repaints exactly once with the new settings.
+	if a.settingsHandle.Load() != 0 {
+		_ = a.paintSettings()
+	}
 }
 
 // postRefresh coalesces paint requests onto the message queue so input
@@ -337,6 +491,12 @@ func (a *App) Run() error {
 		return fmt.Errorf("register class: %w", syscall.GetLastError())
 	}
 	defer unregisterClass(&className[0], instance)
+	// The settings window has its own class and its own procedure, but lives on
+	// this same thread and message pump. Registering it here means Run owns
+	// both lifetimes, so neither can outlive the thread that created it.
+	if settingsClass, ok := registerSettingsClass(instance); ok {
+		defer unregisterClass(settingsClass, instance)
+	}
 	style := uint32(win.WS_EX_TOOLWINDOW | win.WS_EX_LAYERED)
 	if a.options.Settings.AlwaysOnTop {
 		style |= uint32(win.WS_EX_TOPMOST)
@@ -375,9 +535,16 @@ func (a *App) Run() error {
 	}
 	win.ShowWindow(created, win.SW_SHOW)
 	a.setTopmost()
-	win.SetTimer(created, timerIdle, 500, 0)
+	// The idle check used to fire every 500 ms and destroy the window after
+	// just five quiet seconds. Combined with heartbeat-based TTLs that made
+	// the panel blink out while the terminal was still working. Now it is a
+	// slow safety net: 30 s polling, ten empty minutes before exit.
+	win.SetTimer(created, timerIdle, 30000, 0)
 	win.SetTimer(created, timerClock, 2000, 0)
 	a.syncAnimation()
+	if a.options.OpenSettings {
+		a.openSettings()
+	}
 	a.lastDispatchNs.Store(time.Now().UnixNano())
 	watchStop := make(chan struct{})
 	defer close(watchStop)
@@ -527,6 +694,9 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		return 1
 	case wmRefresh:
 		a.refreshPending.Store(false)
+		if pending := a.pendingSettings.Swap(nil); pending != nil {
+			a.applyQueuedSettings(*pending)
+		}
 		a.load()
 		if len(a.sessions) > 0 {
 			a.lastAvailable = time.Now()
@@ -552,6 +722,10 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		a.resetPlacement()
 		a.showFromTray()
 		return 0
+	case wmSettings:
+		a.showFromTray()
+		a.openSettings()
+		return 0
 	case wmTray:
 		a.handleTrayMessage(message, lParam)
 		return 0
@@ -573,7 +747,29 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		a.clearHover()
 		return 0
 	case wmLButtonUp:
-		a.endDrag()
+		// WM_LBUTTONUP carries client-space coordinates in lParam. Use them
+		// instead of GetCursorPos: this desktop moves the cursor on its own,
+		// so a re-read position can be hundreds of pixels off and would make
+		// an aimed tap land on the wrong control.
+		pointX := int(int16(uint16(lParam)))
+		pointY := int(int16(uint16(lParam >> 16)))
+		a.endDrag(pointX, pointY)
+		return 0
+	case wmFocusActivate:
+		// Activation happens on the UI thread, which owns the foreground
+		// because the user just clicked the overlay. Nothing here touches
+		// any other window's input queue or z-order.
+		if !platform.ActivateTarget(uintptr(wParam)) {
+			a.focusFailure()
+			return 0
+		}
+		// Keep the panel out for a moment: without this, losing hover as the
+		// pointer leaves for the terminal can slide it into the screen edge,
+		// which reads as "the overlay closed itself".
+		a.holdTuck(2 * time.Second)
+		return 0
+	case wmFocusResult:
+		a.focusFailure()
 		return 0
 	case wmMouseWheel:
 		a.zoomBy(float64(int16(uint16(wParam >> 16))))
@@ -604,6 +800,10 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		return 0
 	case wmClose:
 		a.persistPlacement()
+		// Tear the settings window down first: DestroyWindow on the overlay
+		// ends the message loop, and an orphaned settings window would then
+		// keep a dead class alive until the process exits.
+		a.destroySettings()
 		win.DestroyWindow(hwnd)
 		return 0
 	case wmDestroy:
@@ -628,13 +828,21 @@ func (a *App) handleTimer(hwnd win.HWND, timer uintptr) uintptr {
 	case timerIdle:
 		if a.values.HasAvailable() {
 			a.lastAvailable = time.Now()
-		} else if time.Since(a.lastAvailable) >= 5*time.Second {
+		} else if time.Since(a.lastAvailable) >= 10*time.Minute {
 			win.DestroyWindow(hwnd)
 		}
 	case timerClock:
 		if a.expanded && !a.hidden {
 			a.load()
 			a.postRefresh()
+		}
+		// Reclaim handshake files orphaned by killed hooks. The sweep only
+		// touches the approvals directory and only when the feature is on;
+		// a live hook deletes its own files, so anything old here is trash.
+		// Twice the timeout is the grace: a request can legitimately sit
+		// for one full timeout plus polling slack.
+		if a.options.Settings.AutoApprove {
+			sweepApprovals(2*a.approveTimeout + 30*time.Second)
 		}
 		// A tuck hold expires on a wall-clock deadline, and the animation
 		// timer is not running while the panel just sits there, so this is
@@ -830,7 +1038,7 @@ func decideRelease(active, moved bool) releaseAction {
 	return releaseToggle
 }
 
-func (a *App) endDrag() {
+func (a *App) endDrag(x, y int) {
 	if !a.drag.active {
 		a.pressed = false
 		return
@@ -852,9 +1060,86 @@ func (a *App) endDrag() {
 		a.persistPlacement()
 	}
 	if action == releaseToggle {
+		// An aimed tap on a jump arrow switches to that terminal instead of
+		// collapsing the panel. It takes priority over the auto-approve veto
+		// because it is an explicit action on a distinct control.
+		_, hasJump := mostUrgentJump(a.sessions)
+		if row, hit := focusHit(x, y, a.width, a.height, a.expanded, hasJump, len(a.sessions)); hit && a.jumpTo(row) {
+			a.syncTuck()
+			return
+		}
+		// With auto-approve on, a tap on the expanded panel is a veto, not
+		// a collapse: the hook is about to approve on silence, so the only
+		// thing a tap can usefully mean is "don't". Taps on the compact
+		// strip still toggle, so the pending request stays one tap away.
+		if a.expanded && a.options.Settings.AutoApprove {
+			if key := a.approvals.urgentKey(a.sessions); key != "" {
+				a.approvals.deny(key, a.sessions)
+				a.postRefresh()
+				a.syncTuck()
+				return
+			}
+		}
 		a.toggleExpanded()
 	}
 	a.syncTuck()
+}
+
+// jumpTo brings the terminal that owns one session to the foreground.
+//
+// Resolving the window walks other processes' windows (EnumWindows /
+// GetWindowText), which can stall if any of them is hung. That must never
+// happen on the UI thread, so the lookup runs in a goroutine and posts its
+// result back. row < 0 means the compact one-tap bar (most urgent session).
+// It returns false when there is no session to jump to, so the caller can
+// fall through to the ordinary click behaviour.
+func (a *App) jumpTo(row int) bool {
+	var target session.Session
+	if row < 0 {
+		picked, ok := mostUrgentJump(a.sessions)
+		if !ok {
+			return false
+		}
+		target = picked
+	} else {
+		if row >= len(a.sessions) {
+			return false
+		}
+		target = a.sessions[row]
+	}
+	request := platform.FocusTarget{
+		PID:       target.PID,
+		ParentPID: target.ParentPID,
+		Title:     target.Title,
+		Project:   target.Project,
+		Source:    target.Source,
+		Terminal:  target.Terminal,
+	}
+	handle := uintptr(a.window())
+	go func() {
+		// Only the lookup runs off-thread (EnumWindows touches other
+		// processes). The resolved HWND is posted back so activation happens
+		// on the UI thread, which holds the foreground after the click.
+		target, _, ok := platform.ResolveTarget(request)
+		if handle == 0 {
+			return
+		}
+		if !ok || target == 0 {
+			win.PostMessage(win.HWND(handle), wmFocusResult, 0, 0)
+			return
+		}
+		win.PostMessage(win.HWND(handle), wmFocusActivate, target, 0)
+	}()
+	return true
+}
+
+// focusFailure tells the user we could not switch terminals. It never forces
+// a foreground change: silently yanking focus away from whatever the user is
+// doing would be worse than a small notification.
+func (a *App) focusFailure() {
+	beep(beepExclamation)
+	a.balloonText(i18n.T(a.lang, i18n.KeyBalloonJumpTitle),
+		i18n.T(a.lang, i18n.KeyBalloonJumpBody), win.NIIF_WARNING)
 }
 
 func (a *App) zoomBy(delta float64) {
@@ -972,27 +1257,44 @@ func (a *App) showContextMenu(fromTray bool) {
 		return
 	}
 	defer win.DestroyMenu(menu)
+	lang := a.lang
 	position := uint32(0)
 	if fromTray {
-		a.appendMenu(menu, position, menuShow, "显示浮窗")
+		a.appendMenu(menu, position, menuShow, i18n.T(lang, i18n.KeyTrayShow))
 		position++
 	} else {
-		a.appendMenu(menu, position, menuHide, "隐藏到托盘")
+		a.appendMenu(menu, position, menuHide, i18n.T(lang, i18n.KeyTrayHide))
 		position++
 	}
-	a.appendMenu(menu, position, menuReset, "重置位置与大小")
+	a.appendMenu(menu, position, menuReset, i18n.T(lang, i18n.KeyTrayReset))
 	position++
-	a.appendMenu(menu, position, menuNotifications, checkLabel("状态提醒", a.options.Settings.Notifications))
+	a.appendMenu(menu, position, menuSettings, i18n.T(lang, i18n.KeyTraySettings))
 	position++
-	a.appendMenu(menu, position, menuSound, checkLabel("提示音", a.options.Settings.Sound))
+	a.appendSeparator(menu, position)
 	position++
-	a.appendMenu(menu, position, menuTopmost, checkLabel("窗口置顶", a.options.Settings.AlwaysOnTop))
+	a.appendMenu(menu, position, menuNotifications, checkLabel(i18n.T(lang, i18n.KeyTrayNotify), a.options.Settings.Notifications))
 	position++
-	a.appendMenu(menu, position, menuEdgeRetract, checkLabel("贴边收起", a.options.Settings.EdgeRetract))
+	a.appendMenu(menu, position, menuSound, checkLabel(i18n.T(lang, i18n.KeyTraySound), a.options.Settings.Sound))
 	position++
-	a.appendMenu(menu, position, menuAutoStart, checkLabel("开机自启", a.options.AutoStart))
+	a.appendMenu(menu, position, menuSoundVolume, fmt.Sprintf("%s · %d%%", i18n.T(lang, i18n.KeyTraySoundVolume), a.options.Settings.SoundVolume))
 	position++
-	a.appendMenu(menu, position, menuExit, "退出")
+	a.appendMenu(menu, position, menuNotifyFinish, checkLabel(i18n.T(lang, i18n.KeyTrayNotifyFinish), a.options.Settings.NotifyOnFinish))
+	position++
+	a.appendMenu(menu, position, menuTopmost, checkLabel(i18n.T(lang, i18n.KeyTrayTopmost), a.options.Settings.AlwaysOnTop))
+	position++
+	a.appendMenu(menu, position, menuEdgeRetract, checkLabel(i18n.T(lang, i18n.KeyTrayRetract), a.options.Settings.EdgeRetract))
+	position++
+	a.appendMenu(menu, position, menuAutoApprove, checkLabel(i18n.T(lang, i18n.KeyTrayAutoApprove), a.options.Settings.AutoApprove))
+	position++
+	a.appendMenu(menu, position, menuLangAuto, langLabel(i18n.T(lang, i18n.KeyTrayLangTitle)+" · "+i18n.T(lang, i18n.KeyTrayLangAuto), a.options.Settings.Language == "" || i18n.NormalizeSetting(a.options.Settings.Language) == i18n.SettingAuto))
+	position++
+	a.appendMenu(menu, position, menuLangEn, langLabel("English", i18n.NormalizeSetting(a.options.Settings.Language) == i18n.SettingEn))
+	position++
+	a.appendMenu(menu, position, menuLangZh, langLabel("简体中文", i18n.NormalizeSetting(a.options.Settings.Language) == i18n.SettingZhCN))
+	position++
+	a.appendMenu(menu, position, menuAutoStart, checkLabel(i18n.T(lang, i18n.KeyTrayAutostart), a.options.AutoStart))
+	position++
+	a.appendMenu(menu, position, menuExit, i18n.T(lang, i18n.KeyTrayQuit))
 	var cursor win.POINT
 	win.GetCursorPos(&cursor)
 	win.SetForegroundWindow(a.window())
@@ -1004,6 +1306,8 @@ func (a *App) showContextMenu(fromTray bool) {
 		a.hideToTray()
 	case menuReset:
 		a.resetPlacement()
+	case menuSettings:
+		a.openSettings()
 	case menuNotifications:
 		a.options.Settings.Notifications = !a.options.Settings.Notifications
 		a.publishSettings()
@@ -1013,6 +1317,26 @@ func (a *App) showContextMenu(fromTray bool) {
 		// silent until the next session happens to need attention.
 		if a.options.Settings.Sound {
 			beep(beepExclamation)
+		}
+		a.publishSettings()
+	case menuSoundVolume:
+		// Three useful steps rather than a free slider: clicking cycles
+		// 60 -> 85 -> 100 -> 60 and previews the new loudness at once.
+		switch {
+		case a.options.Settings.SoundVolume < 70:
+			a.options.Settings.SoundVolume = 85
+		case a.options.Settings.SoundVolume < 95:
+			a.options.Settings.SoundVolume = 100
+		default:
+			a.options.Settings.SoundVolume = 60
+		}
+		setSoundVolume(a.options.Settings.SoundVolume)
+		beep(beepExclamation)
+		a.publishSettings()
+	case menuNotifyFinish:
+		a.options.Settings.NotifyOnFinish = !a.options.Settings.NotifyOnFinish
+		if a.options.Settings.NotifyOnFinish {
+			beep(beepFinished)
 		}
 		a.publishSettings()
 	case menuTopmost:
@@ -1025,6 +1349,26 @@ func (a *App) showContextMenu(fromTray bool) {
 		// turning it off should bring the panel straight back.
 		a.syncTuck()
 		a.publishSettings()
+	case menuAutoApprove:
+		a.options.Settings.AutoApprove = !a.options.Settings.AutoApprove
+		if !a.options.Settings.AutoApprove {
+			a.approvals.update(nil, time.Now(), false, 0)
+		}
+		a.publishSettings()
+		a.postRefresh()
+	case menuLangAuto, menuLangEn, menuLangZh:
+		switch command {
+		case menuLangEn:
+			a.options.Settings.Language = string(i18n.SettingEn)
+		case menuLangZh:
+			a.options.Settings.Language = string(i18n.SettingZhCN)
+		default:
+			a.options.Settings.Language = string(i18n.SettingAuto)
+		}
+		a.lang = i18n.Resolve(i18n.Setting(a.options.Settings.Language), i18n.SystemLocale())
+		a.publishSettings()
+		a.updateTooltip()
+		a.postRefresh()
 	case menuAutoStart:
 		a.toggleAutoStart()
 	case menuExit:
@@ -1054,6 +1398,16 @@ func checkLabel(label string, on bool) string {
 		return "✓ " + label
 	}
 	return "　 " + label
+}
+
+// langLabel marks the active language with a filled dot, the others with a
+// hollow one. Same idea as checkLabel, but a tick would wrongly suggest the
+// languages are independent switches rather than one choice.
+func langLabel(label string, active bool) string {
+	if active {
+		return "● " + label
+	}
+	return "○ " + label
 }
 
 // applyTopmost pushes the current AlwaysOnTop preference onto the live window.
@@ -1100,6 +1454,17 @@ func (a *App) appendMenu(menu win.HMENU, position uint32, id uintptr, label stri
 	}
 	win.InsertMenuItem(menu, position, true, &info)
 	runtime.KeepAlive(encoded)
+}
+
+// appendSeparator inserts a menu divider, so the settings entry reads as its own
+// group rather than another toggle in the list.
+func (a *App) appendSeparator(menu win.HMENU, position uint32) {
+	info := win.MENUITEMINFO{
+		CbSize: uint32(unsafe.Sizeof(win.MENUITEMINFO{})),
+		FMask:  win.MIIM_FTYPE,
+		FType:  win.MFT_SEPARATOR,
+	}
+	win.InsertMenuItem(menu, position, true, &info)
 }
 
 func (a *App) hideToTray() {
@@ -1177,9 +1542,12 @@ func (a *App) notifyIcon() win.NOTIFYICONDATA {
 // behind it, so the tray icon is informative without opening the panel.
 func (a *App) trayTip() string {
 	if len(a.sessions) == 0 {
-		return windowTitle + " · 待机"
+		if a.lang == i18n.LangZhCN {
+			return windowTitle + " · 待机"
+		}
+		return windowTitle + " · Idle"
 	}
-	return fmt.Sprintf("%s · %d 会话 · %s", windowTitle, len(a.sessions), stateLabel(a.state))
+	return fmt.Sprintf("%s · %d %s · %s", windowTitle, len(a.sessions), i18n.T(a.lang, i18n.KeyPanelSessions), stateLabel(a.state, a.lang))
 }
 
 // updateTooltip pushes a refreshed hover text to the shell. Cheap, but only
@@ -1193,55 +1561,150 @@ func (a *App) updateTooltip() {
 	win.Shell_NotifyIcon(win.NIM_MODIFY, &data)
 }
 
-// alertOnTransitions fires the configured alerts for a session that has just
-// entered waiting_permission or error. This is the point of the whole app: the
-// overlay is glanceable, but an alert reaches the user when the panel is
-// hidden, covered, or they are looking at another monitor.
+// alertLevel ranks what just happened across all sessions in one load.
+type alertLevel uint8
+
+const (
+	alertNone alertLevel = iota
+	alertFinished
+	alertUrgent
+)
+
+// busyState is true for states that mean "the agent is doing something".
+// Leaving one of these for idle/closed is a real completion, whereas an idle
+// session that stays idle is not.
+func busyState(state session.State) bool {
+	switch state {
+	case session.StateWorking, session.StateToolUse, session.StateThinking,
+		session.StateWaitingPermission, session.StateError:
+		return true
+	}
+	return false
+}
+
+// transitionLevel is the pure decision behind alertOnTransitions. A new
+// session that opens already in an alert state does need announcing, but a
+// plain new working session must not: that was the "it only pops up when I
+// start a new session" complaint.
+func transitionLevel(previous session.State, existed bool, current session.State) alertLevel {
+	if !existed {
+		if current == session.StateWaitingPermission || current == session.StateError {
+			return alertUrgent
+		}
+		return alertNone
+	}
+	if previous == current {
+		return alertNone
+	}
+	switch current {
+	case session.StateWaitingPermission, session.StateError:
+		return alertUrgent
+	case session.StateIdle, session.StateClosed:
+		if busyState(previous) {
+			return alertFinished
+		}
+	}
+	return alertNone
+}
+
+func sessionAlertKey(value session.Session) string {
+	return fmt.Sprintf("%s\x00%s\x00%d", value.Source, value.SessionID, value.PID)
+}
+
+func currentAlertStates(items []session.Session) map[string]session.State {
+	states := make(map[string]session.State, len(items))
+	for _, value := range items {
+		states[sessionAlertKey(value)] = value.State
+	}
+	return states
+}
+
+// decideAlerts is the pure half of alertOnTransitions. Keeping it separate is
+// what lets a regression test reproduce the ghost-popup scenario: one session
+// ending used to reset a single global key and re-announce a sibling that had
+// been waiting the whole time.
+func decideAlerts(previous map[string]session.State, items []session.Session) (alertLevel, *session.Session) {
+	level := alertNone
+	var subject *session.Session
+	for index := range items {
+		candidate := &items[index]
+		was, existed := previous[sessionAlertKey(*candidate)]
+		if found := transitionLevel(was, existed, candidate.State); found > level {
+			level, subject = found, candidate
+		}
+	}
+	// List() drops closed sessions entirely. A disappearance is the
+	// strongest completion signal there is, but it must never masquerade
+	// as an urgent alert from a different, still-waiting conversation.
+	present := currentAlertStates(items)
+	for key, was := range previous {
+		if _, stillHere := present[key]; !stillHere && busyState(was) && level < alertFinished {
+			level = alertFinished
+		}
+	}
+	return level, subject
+}
+
+// alertOnTransitions fires the configured alerts on real state transitions.
+// This is the point of the whole app: the overlay is glanceable, but an alert
+// reaches the user when the panel is hidden, covered, or they are looking at
+// another monitor.
 //
-// Alerts are deduplicated on "session + state" so a session parked in
-// waiting_permission alerts once instead of on every repaint. The sound and the
-// balloon share that one decision, so turning either off never changes when the
-// other fires.
+// Every conversation is tracked independently. The old implementation kept a
+// single global key for the *most urgent* session: when that session ended the
+// key was cleared, so a still-waiting sibling re-alerted later and looked like
+// it had been caused by an unrelated new session. The first load only seeds
+// the map, so hot reload / restart never replays historical alerts. The sound
+// and the balloon share one decision, so turning either off never changes when
+// the other fires.
 func (a *App) alertOnTransitions() {
-	if !a.options.Settings.Notifications && !a.options.Settings.Sound {
+	current := currentAlertStates(a.sessions)
+	if a.alertStates == nil || (!a.options.Settings.Notifications && !a.options.Settings.Sound) {
+		// Keep the baseline fresh even while muted, so re-enabling alerts
+		// cannot replay everything that happened while they were off.
+		a.alertStates = current
 		return
 	}
-	target := a.alertTarget()
-	if target == nil {
-		a.alertKey = ""
+
+	level, subject := decideAlerts(a.alertStates, a.sessions)
+	a.alertStates = current
+	if level == alertNone || (level == alertFinished && !a.options.Settings.NotifyOnFinish) {
 		return
 	}
-	key := target.Source + "\x00" + target.SessionID + "\x00" + string(target.State)
-	if key == a.alertKey {
-		return
-	}
-	a.alertKey = key
-	if a.options.Settings.Sound {
-		beep(beepKind(target.State))
+	if level == alertUrgent && subject != nil {
+		// Per-event switches: someone who only wants to hear genuine blockers
+		// can mute the "waiting for approval" tone without losing the error
+		// one. The completion tone is gated by NotifyOnFinish above.
+		if soundForState(a.options.Settings, subject.State) {
+			beep(beepKind(subject.State))
+		}
+	} else if a.options.Settings.Sound {
+		beep(beepFinished)
 	}
 	if a.options.Settings.Notifications {
-		a.balloon(*target)
+		if level == alertUrgent && subject != nil {
+			a.balloon(*subject)
+		} else {
+			a.balloonText(i18n.T(a.lang, i18n.KeyBalloonDoneTitle),
+				i18n.T(a.lang, i18n.KeyBalloonDoneBody), niifInfo)
+		}
 	}
 }
 
-// alertTarget returns the most urgent session that wants attention, or nil.
-func (a *App) alertTarget() *session.Session {
-	var target *session.Session
-	for index := range a.sessions {
-		current := &a.sessions[index]
-		if current.State != session.StateWaitingPermission && current.State != session.StateError {
-			continue
-		}
-		if target == nil || current.State.Priority() > target.State.Priority() {
-			target = current
-		}
+// soundForState reports whether this transition should make a noise, honouring
+// both the master switch and the per-event one.
+func soundForState(settings Settings, state session.State) bool {
+	if !settings.Sound {
+		return false
 	}
-	return target
+	if state == session.StateError {
+		return settings.SoundOnError
+	}
+	return settings.SoundOnWaiting
 }
 
-// beepKind maps a state to a system alert tone. Windows plays the sound the
-// user configured for that event, so this stays consistent with the rest of
-// their desktop and respects Focus Assist / quiet hours.
+// beepKind maps a state onto one of the synthesised timbres: errors get the
+// descending figure, everything else the rising one.
 func beepKind(state session.State) uint32 {
 	if state == session.StateError {
 		return beepError
@@ -1253,22 +1716,32 @@ func beepKind(state session.State) uint32 {
 // registered, which happens briefly during startup and after an Explorer
 // restart.
 func (a *App) balloon(target session.Session) {
+	title := i18n.T(a.lang, i18n.KeyBalloonWaitTitle)
+	flags := uint32(win.NIIF_WARNING)
+	if target.State == session.StateError {
+		title = i18n.T(a.lang, i18n.KeyBalloonErrTitle)
+		flags = win.NIIF_ERROR
+	}
+	body := projectLabel(target, a.lang)
+	if reason := reasonLabel(target, a.lang); reason != "" {
+		body += " · " + reason
+	}
+	a.balloonText(title, body, flags)
+}
+
+// balloonText shows a tray balloon with arbitrary copy. Alert balloons and
+// "could not find that terminal" feedback share the same construction.
+func (a *App) balloonText(title, body string, flags uint32) {
 	if !a.trayAdded {
 		return
 	}
-	title := "等待你的确认"
-	flags := uint32(win.NIIF_WARNING)
-	if target.State == session.StateError {
-		title = "终端会话出错"
-		flags = win.NIIF_ERROR
-	}
-	body := projectLabel(target)
-	if reason := reasonLabel(target); reason != "" {
-		body += " · " + reason
-	}
 	data := a.notifyIcon()
 	data.UFlags = win.NIF_INFO
-	data.DwInfoFlags = flags
+	// Windows would otherwise play its own quiet scheme sound with the
+	// balloon, and that sound is queued independently - which is how an
+	// alert from a finished terminal could appear only after the next one
+	// started. Our synthesised tone is the single, immediate audio cue.
+	data.DwInfoFlags = flags | niifNoSound
 	infoTitle, _ := syscall.UTF16FromString(truncateUTF16(title, trayTitleMax))
 	infoBody, _ := syscall.UTF16FromString(truncateUTF16(body, trayInfoMax))
 	copy(data.SzInfoTitle[:], infoTitle)
@@ -1294,34 +1767,45 @@ func (a *App) present() error {
 	// on every statusline render and most pushes repeat the same state - which
 	// used to mean a full GDI repaint of the panel several times a second for
 	// nothing.
-	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now)
+	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now, a.lang, a.approvals.maxRemainingSeconds(now))
 	if key == a.lastFrame && a.surface != nil {
 		return nil
 	}
-	a.lastFrame = key
-	if a.surface != nil && (a.surface.width != width || a.surface.height != height) {
-		a.surface.close()
-		a.surface = nil
-	}
-	if a.surface == nil {
-		target, err := newCanvas(width, height)
-		if err != nil {
-			return err
+	opacity := a.options.Opacity
+	// A breathing alert changes no pixels: reuse the rendered bitmap and just
+	// vary the layered window's constant alpha. This is what keeps a parked
+	// permission prompt from burning a core on GDI work forever.
+	reused := a.surface != nil && purePulseFrame(a.lastFrame, key, a.state, a.tuck, a.tuckTarget)
+	if reused {
+		opacity = pulseOpacity(a.options.Opacity, a.state, now)
+	} else {
+		if a.surface != nil && (a.surface.width != width || a.surface.height != height) {
+			a.surface.close()
+			a.surface = nil
 		}
-		a.surface = target
+		if a.surface == nil {
+			target, err := newCanvas(width, height)
+			if err != nil {
+				return err
+			}
+			a.surface = target
+		}
+		target := a.surface
+		target.clear()
+		drawVerticalPanel(target, panelState{
+			Items:     a.sessions,
+			Now:       time.Now(),
+			Expanded:  a.expanded,
+			Pressed:   a.pressed,
+			Hovered:   a.hovering,
+			Lang:      a.lang,
+			Countdown: a.approvals.views(time.Now()),
+			Tuck:      a.tuck,
+			Sliver:    a.sliverWidth(),
+			Dock:      a.dock,
+		})
 	}
-	target := a.surface
-	target.clear()
-	drawVerticalPanel(target, panelState{
-		Items:    a.sessions,
-		Now:      time.Now(),
-		Expanded: a.expanded,
-		Pressed:  a.pressed,
-		Hovered:  a.hovering,
-		Tuck:     a.tuck,
-		Sliver:   a.sliverWidth(),
-		Dock:     a.dock,
-	})
+	a.lastFrame = key
 	screenDC := win.GetDC(0)
 	if screenDC == 0 {
 		return syscall.EINVAL
@@ -1329,15 +1813,17 @@ func (a *App) present() error {
 	defer win.ReleaseDC(0, screenDC)
 	destination := win.POINT{X: a.frameX(), Y: a.frameY()}
 	dimensions := win.SIZE{CX: int32(width), CY: int32(height)}
-	if err := updateLayeredWindow(a.window(), screenDC, &destination, dimensions, target.dc, a.options.Opacity); err != nil {
+	if err := updateLayeredWindow(a.window(), screenDC, &destination, dimensions, a.surface.dc, opacity); err != nil {
 		return err
 	}
-	a.width = width
-	a.height = height
-	if len(a.hit) != width*height {
-		a.hit = make([]byte, width*height)
+	if !reused {
+		a.width = width
+		a.height = height
+		if len(a.hit) != width*height {
+			a.hit = make([]byte, width*height)
+		}
+		a.surface.hitMapInto(a.hit)
 	}
-	target.hitMapInto(a.hit)
 	return nil
 }
 
@@ -1357,6 +1843,11 @@ func (a *App) load() {
 	a.sessions = a.values.List()
 	a.state = session.Aggregate(a.sessions)
 	a.digest = sessionDigest(a.sessions)
+	// Reconcile the auto-approve countdowns with what is actually waiting.
+	// Sessions that left waiting (approved in the terminal, denied, closed,
+	// expired) lose their countdowns here, on the only path that observes
+	// store changes.
+	a.approvals.update(a.sessions, time.Now(), a.options.Settings.AutoApprove, a.approveTimeout)
 	// Both are cheap no-ops unless the tray icon exists, and both read only
 	// the freshly loaded snapshot.
 	a.updateTooltip()
