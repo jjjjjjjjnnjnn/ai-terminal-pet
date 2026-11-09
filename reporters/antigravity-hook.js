@@ -1,6 +1,6 @@
 "use strict"
 
-const { readStdin, sendStatus, stableProcessId } = require("./protocol.js")
+const { approvalPlan, readStdin, sendStatus, stableProcessId, waitForApprovalDecision } = require("./protocol.js")
 
 function modelName(value) {
   if (typeof value === "string") return value
@@ -26,6 +26,38 @@ function statusFor(input) {
   return ["idle", "hook"]
 }
 
+// isPermissionGate detects the permission-prompt path in this harness's
+// input. Only gated events enter the veto window; plain toolCall
+// observations keep the legacy fire-and-forget behaviour (see
+// protocol.js for why the window never covers non-prompting tools).
+function isPermissionGate(input) {
+  if (!input || typeof input !== "object") return false
+  if (input.tool_confirmation_pending === true) return true
+  if (input.permission_required === true || input.permissionRequired === true) return true
+  const tool = input.toolCall && typeof input.toolCall === "object" ? input.toolCall : null
+  if (tool && (tool.requiresApproval === true || tool.requiresConfirmation === true)) return true
+  for (const key of ["decision_request", "decisionRequest", "prompt_type", "promptType", "event"]) {
+    const value = input[key]
+    if (typeof value === "string" && /(permission|confirm|approval|waiting)/i.test(value)) return true
+  }
+  return false
+}
+
+function toolText(input) {
+  const parts = []
+  const tool = input.toolCall && typeof input.toolCall === "object" ? input.toolCall : null
+  if (tool && tool.name) parts.push(String(tool.name))
+  if (tool && tool.input != null) {
+    try {
+      parts.push(typeof tool.input === "string" ? tool.input : JSON.stringify(tool.input))
+    } catch {
+      parts.push(String(tool.input))
+    }
+  }
+  if (input.command) parts.push(String(input.command))
+  return parts.join("\n")
+}
+
 async function main() {
   const raw = (await readStdin()).toString("utf8")
   let input = {}
@@ -35,9 +67,10 @@ async function main() {
   } catch {}
   const mapped = statusFor(input)
   const sessionId = input.conversation_id || input.session_id || input.sessionId || "global"
-  void sendStatus({
+  const pid = input.pid || stableProcessId(`antigravity-hook:${sessionId}`)
+  const base = {
     source: "antigravity-hook",
-    pid: input.pid || stableProcessId(`antigravity-hook:${sessionId}`),
+    pid,
     parentPid: input.parentPid || process.ppid,
     sessionId,
     parentSessionId: input.parent_session_id || input.parentSessionId || null,
@@ -49,7 +82,31 @@ async function main() {
     startedAt: input.started_at || input.startedAt || input.session_start_time || null,
     tool: input.toolCall?.name || null,
     terminal: "antigravity"
-  }, { retryMs: 750 }).catch(() => {})
+  }
+
+  if (isPermissionGate(input)) {
+    const plan = approvalPlan(toolText(input))
+    if (plan.mode === "auto") {
+      void sendStatus({ ...base, state: "waiting_permission", reason: "permission" }, { retryMs: 750 }).catch(() => {})
+      const decision = await waitForApprovalDecision(
+        { source: "antigravity-hook", sessionId: String(sessionId), pid, tool: input.toolCall?.name || null },
+        { timeoutMs: plan.timeoutMs }
+      )
+      process.stdout.write(decision === "deny" ? '{"decision":"deny"}' : '{"decision":"allow"}')
+      return
+    }
+    if (plan.mode === "manual") {
+      // Dangerous command with auto-approve on: this harness has no
+      // "ask the user natively" fallback (the hook IS the decider), so
+      // the only safe answer is deny. The panel still alarms via the
+      // report below, so the user sees what was stopped.
+      void sendStatus({ ...base, state: "waiting_permission", reason: "permission_dangerous" }, { retryMs: 750 }).catch(() => {})
+      process.stdout.write('{"decision":"deny"}')
+      return
+    }
+  }
+
+  void sendStatus(base, { retryMs: 750 }).catch(() => {})
   process.stdout.write('{"decision":"allow"}')
 }
 

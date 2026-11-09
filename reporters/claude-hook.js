@@ -1,6 +1,6 @@
 "use strict"
 
-const { readStdin, sendStatus, stableProcessId } = require("./protocol.js")
+const { approvalPlan, readStdin, sendStatus, stableProcessId, waitForApprovalDecision } = require("./protocol.js")
 
 function modelName(value) {
   if (typeof value === "string") return value
@@ -24,6 +24,23 @@ function statusFor(input) {
   return ["idle", "hook"]
 }
 
+// toolText gathers what the blacklist sees: the tool name plus its input.
+// The input shape varies by Claude version, so stringify the lot rather
+// than guessing field names - a missed field could auto-approve a
+// destructive command.
+function toolText(input) {
+  const parts = []
+  if (input.tool_name) parts.push(String(input.tool_name))
+  if (input.tool_input != null) {
+    try {
+      parts.push(typeof input.tool_input === "string" ? input.tool_input : JSON.stringify(input.tool_input))
+    } catch {
+      parts.push(String(input.tool_input))
+    }
+  }
+  return parts.join("\n")
+}
+
 async function main() {
   const raw = (await readStdin()).toString("utf8")
   let input = {}
@@ -33,9 +50,10 @@ async function main() {
   } catch {}
   const mapped = statusFor(input)
   const sessionId = input.session_id || input.sessionId || "global"
-  void sendStatus({
+  const pid = input.pid || stableProcessId(`claude-hook:${sessionId}`)
+  const base = {
     source: "claude-hook",
-    pid: input.pid || stableProcessId(`claude-hook:${sessionId}`),
+    pid,
     parentPid: input.parentPid || process.ppid,
     sessionId,
     parentSessionId: input.parent_session_id || input.parentSessionId || null,
@@ -47,7 +65,36 @@ async function main() {
     startedAt: input.started_at || input.startedAt || new Date(Date.now() - process.uptime() * 1000).toISOString(),
     tool: input.tool_name || null,
     terminal: "claude"
-  }, { retryMs: 750 }).catch(() => {})
+  }
+
+  // The veto window applies to the permission-prompt path only. Plain
+  // tool observations never block (see protocol.js).
+  if (mapped[0] === "waiting_permission") {
+    const plan = approvalPlan(toolText(input))
+    if (plan.mode === "auto") {
+      // Report first (unawaited): the overlay needs the session now to
+      // start its countdown while this hook waits out the veto window.
+      void sendStatus(base, { retryMs: 750 }).catch(() => {})
+      const decision = await waitForApprovalDecision(
+        { source: "claude-hook", sessionId: String(sessionId), pid, tool: input.tool_name || null },
+        { timeoutMs: plan.timeoutMs }
+      )
+      process.stdout.write(decision === "deny" ? '{"decision":"deny"}' : '{"decision":"allow"}')
+      return
+    }
+    if (plan.mode === "manual") {
+      // Dangerous command with auto-approve on: alarm the panel, but
+      // decide nothing here - the terminal's native prompt owns the
+      // verdict. The overlay countdown (if any) expires harmlessly: this
+      // hook is already gone and filed no pending request, so silence
+      // approves nothing.
+      void sendStatus({ ...base, reason: "permission_dangerous" }, { retryMs: 750 }).catch(() => {})
+      process.stdout.write("{}")
+      return
+    }
+  }
+
+  void sendStatus(base, { retryMs: 750 }).catch(() => {})
   process.stdout.write("{}")
 }
 

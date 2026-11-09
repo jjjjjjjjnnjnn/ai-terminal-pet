@@ -92,7 +92,7 @@ function normalizePayload(payload) {
   const input = payload && typeof payload === "object" ? payload : {}
   const now = new Date().toISOString()
   const processStartedAt = new Date(Date.now() - process.uptime() * 1000).toISOString()
-  return {
+  const result = {
     schemaVersion: SCHEMA_VERSION,
     source: token(input.source, 48, "unknown"),
     sessionId: boundedId(input.sessionId, 200, "unknown"),
@@ -109,6 +109,21 @@ function normalizePayload(payload) {
     tool: text(input.tool, 120),
     terminal: text(input.terminal, 120)
   }
+  // The server rejects "updatedAt precedes startedAt" and timestamps more
+  // than 5 minutes in the future, and the snapshot scanner then deletes the
+  // file. A reporter whose clock is a little fast - or that passed a local
+  // time as UTC - would therefore lose its whole status silently. Clamp it
+  // here, in the single protocol source, so every adapter stays immune.
+  // This stays idempotent: sendStatus() calls normalizePayload twice.
+  const started = Date.parse(result.startedAt)
+  const updated = Date.parse(result.updatedAt)
+  if (Number.isFinite(started) && Number.isFinite(updated)) {
+    const ceiling = Date.now() + 4 * 60 * 1000
+    const clamp = (millis) => new Date(Math.min(millis, ceiling)).toISOString()
+    result.startedAt = clamp(Math.min(started, updated))
+    result.updatedAt = clamp(updated)
+  }
+  return result
 }
 
 function stdinError(message, code) {
@@ -315,6 +330,192 @@ function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
+// ---- Auto-approve handshake (hook side of approvals/) ----
+//
+// The overlay is a read-only panel: it cannot click "allow" inside a
+// terminal. So auto-approve works the other way round - the hook blocks
+// for up to the configured timeout waiting for a veto from the overlay,
+// and silence means approval:
+//
+//   hook    writes approvals/pending-<...>.json, polls for a sibling
+//           <same>.deny every 100 ms, deletes its pending file on exit.
+//   overlay while a waiting_permission session is on screen with
+//           auto-approve on, runs a countdown per session. A tap on the
+//           expanded panel writes the .deny file; the countdown reaching
+//           zero writes nothing - the hook treats the missing veto as
+//           approval.
+//
+// The veto window applies to the permission-prompt path only (events the
+// hook classifies as waiting_permission). Plain tool observations
+// (PreToolUse/tool_use that will not prompt) never block: stalling every
+// tool call by the full timeout would make the agent unusable.
+
+// APPROVAL_POLL_MS is the veto check interval. 100 ms keeps the deny
+// snappy without spinning on the filesystem.
+const APPROVAL_POLL_MS = 100
+const APPROVAL_PENDING_PREFIX = "pending-"
+const DEFAULT_APPROVE_TIMEOUT_SEC = 5
+
+// DANGEROUS_PATTERNS never auto-approve: a match forces the manual path
+// (Claude: fall through to the terminal's native prompt; Antigravity:
+// deny). Case-insensitive, matched against "tool name + tool input".
+// Extend freely - a missed pattern auto-approves, so err on the broad
+// side for genuinely destructive commands.
+const DANGEROUS_PATTERNS = [
+  /\brm\s+[^;|&]*-[a-z]*r/i, // rm -r / rm -rf
+  /\brd\s+\/s/i, // rd /s (Windows recursive delete)
+  /\bmv\b[^;|&]*\/dev\/null/i, // mv ... /dev/null
+  /\bmkfs\b/i, // make filesystem
+  /\bdd\b[^;|&]*\bof\s*=\s*\/dev\//i, // dd of=/dev/...
+  /:\(\)\s*\{/, // fork bomb :(){ :|:& };
+  /\bgit\s+push\b[^;|&]*--force/i, // git push --force
+  /\bformat\s+[a-zA-Z]:/i, // format C:
+  /\bdel\b[^;|&]*\\windows/i, // del ... \Windows
+  /\bshutdown\s+\/s/i, // shutdown /s
+  /remove-item\b[^;|&]*system32/i // Remove-Item ... System32
+]
+
+function isDangerousCommand(...parts) {
+  const text = parts.filter((part) => part != null && String(part).trim()).join("\n")
+  if (!text) return false
+  return DANGEROUS_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+// loadPetConfig reads the overlay's config.json for the auto-approve
+// switch. Any failure (missing file, bad JSON, no LOCALAPPDATA) means
+// "off": a hook that cannot read the user's intent must not approve.
+function loadPetConfig() {
+  const fallback = { autoApprove: false, autoApproveTimeoutSec: DEFAULT_APPROVE_TIMEOUT_SEC }
+  try {
+    if (!process.env.LOCALAPPDATA) return fallback
+    const raw = fs.readFileSync(path.join(process.env.LOCALAPPDATA, "AI-Terminal-Pet", "config.json"), "utf8")
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== "object") return fallback
+    const timeout = Number(parsed.autoApproveTimeoutSec)
+    return {
+      autoApprove: parsed.autoApprove === true,
+      autoApproveTimeoutSec: Number.isInteger(timeout)
+        ? Math.min(60, Math.max(1, timeout))
+        : DEFAULT_APPROVE_TIMEOUT_SEC
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function approvalsDirectory() {
+  if (!process.env.LOCALAPPDATA) return null
+  return path.join(process.env.LOCALAPPDATA, "AI-Terminal-Pet", "approvals")
+}
+
+// sanitizeStem mirrors sanitizeApprovalStem in internal/ui: only
+// [A-Za-z0-9_-], truncated to 64 chars. Stems are cosmetic (the JSON
+// body carries the exact identity), so byte-vs-char differences for
+// non-ASCII session ids do not matter.
+function sanitizeStem(value) {
+  const input = String(value ?? "")
+  let out = ""
+  for (const char of input) {
+    if (out.length >= 64) break
+    out += /[A-Za-z0-9_-]/.test(char) ? char : "_"
+  }
+  return out || "session"
+}
+
+// writeApprovalPending files one request for the overlay to veto.
+// Returns the pending path, or null when it cannot be filed. Atomic
+// (temp + rename) so the overlay never reads a half-written file.
+function writeApprovalPending(info) {
+  try {
+    const directory = approvalsDirectory()
+    if (!directory) return null
+    const item = info && typeof info === "object" ? info : {}
+    const source = String(item.source || "hook")
+    const sessionId = String(item.sessionId || "global")
+    const pid = Number.isSafeInteger(item.pid) ? item.pid : process.pid
+    const name = `${APPROVAL_PENDING_PREFIX}${sanitizeStem(source)}-${sanitizeStem(sessionId)}-${pid}-${Date.now()}.json`
+    const target = path.join(directory, name)
+    const body = JSON.stringify({
+      source,
+      sessionId,
+      pid,
+      tool: item.tool == null ? null : String(item.tool),
+      createdAt: new Date().toISOString()
+    })
+    fs.mkdirSync(directory, { recursive: true })
+    const temporary = `${target}.${process.pid}.tmp`
+    fs.writeFileSync(temporary, `${body}\n`, { encoding: "utf8", mode: 0o600 })
+    fs.renameSync(temporary, target)
+    return target
+  } catch {
+    return null
+  }
+}
+
+// pollApprovalDeny waits up to timeoutMs for the overlay's veto file.
+// True = the user tapped deny on the panel. Never throws.
+function pollApprovalDeny(pendingPath, timeoutMs) {
+  const deadline = Date.now() + Math.max(0, Number(timeoutMs) || 0)
+  const veto = `${pendingPath}.deny`
+  return (async () => {
+    try {
+      while (true) {
+        try {
+          if (fs.existsSync(veto)) return true
+        } catch {}
+        if (Date.now() >= deadline) return false
+        await delay(Math.min(APPROVAL_POLL_MS, Math.max(1, deadline - Date.now())))
+      }
+    } catch {
+      return false
+    }
+  })()
+}
+
+function removeApprovalPending(pendingPath) {
+  if (!pendingPath) return
+  try {
+    fs.unlinkSync(pendingPath)
+  } catch {}
+}
+
+// approvalPlan is the hook's decision tree for one permission gate:
+// "off"    auto-approve is disabled - keep the legacy behaviour.
+// "manual" dangerous command - never auto-approve (Claude falls through
+//          to the terminal's native prompt, Antigravity denies).
+// "auto"   file a pending request and wait out the veto window.
+function approvalPlan(toolText) {
+  const config = loadPetConfig()
+  if (!config.autoApprove) return { mode: "off", timeoutMs: 0 }
+  if (isDangerousCommand(toolText)) return { mode: "manual", timeoutMs: 0 }
+  return { mode: "auto", timeoutMs: config.autoApproveTimeoutSec * 1000 }
+}
+
+// waitForApprovalDecision files a pending request and blocks for the
+// veto window. Returns "allow" (silence) or "deny" (the user tapped the
+// panel). Fail-closed: when the request cannot even be filed, or
+// anything unexpected happens, it returns "deny". Never throws - a hook
+// must never crash its host CLI.
+function waitForApprovalDecision(info, options = {}) {
+  return (async () => {
+    try {
+      const opts = options && typeof options === "object" ? options : {}
+      const timeoutMs = Number.isFinite(Number(opts.timeoutMs)) && Number(opts.timeoutMs) > 0
+        ? Number(opts.timeoutMs)
+        : DEFAULT_APPROVE_TIMEOUT_SEC * 1000
+      const pendingPath = writeApprovalPending(info)
+      if (!pendingPath) return "deny"
+      try {
+        return (await pollApprovalDeny(pendingPath, timeoutMs)) ? "deny" : "allow"
+      } finally {
+        removeApprovalPending(pendingPath)
+      }
+    } catch {
+      return "deny"
+    }
+  })()
+}
+
 async function sendStatus(payload, options = {}) {
   options = options && typeof options === "object" ? options : {}
   let item
@@ -346,14 +547,24 @@ async function sendStatus(payload, options = {}) {
 }
 
 module.exports = {
+  APPROVAL_POLL_MS,
+  DANGEROUS_PATTERNS,
   PIPE_PATH,
   SCHEMA_VERSION,
   STATES,
+  approvalPlan,
   executablePath,
+  isDangerousCommand,
+  loadPetConfig,
   normalizePayload,
+  pollApprovalDeny,
   readStdin,
+  removeApprovalPending,
   removeRuntimeSnapshot,
+  sanitizeStem,
   sendStatus,
   snapshotPath,
-  stableProcessId
+  stableProcessId,
+  waitForApprovalDecision,
+  writeApprovalPending
 }
