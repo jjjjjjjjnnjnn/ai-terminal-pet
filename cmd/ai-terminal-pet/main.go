@@ -34,6 +34,7 @@ usage:
   ai-terminal-pet --show          reveal the running overlay
   ai-terminal-pet --toggle        switch between compact and expanded
   ai-terminal-pet --reset         re-anchor to the screen edge at 100% zoom
+  ai-terminal-pet --settings      open the settings window
   ai-terminal-pet --quit          stop the running overlay
   ai-terminal-pet --json          print the current sessions as JSON
   ai-terminal-pet --autostart     report the run-at-logon state
@@ -108,6 +109,13 @@ func run(args []string) error {
 			return nil
 		}
 		return app.Run()
+	case command == "--settings":
+		// Opening settings implies the panel should be visible: a settings
+		// window floating next to a hidden overlay is confusing.
+		if ui.Control(ui.ControlSettings) {
+			return nil
+		}
+		return app.RunWith(true)
 	case command == "--quit":
 		ui.Control(ui.ControlQuit)
 		return nil
