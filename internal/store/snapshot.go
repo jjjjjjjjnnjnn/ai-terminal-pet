@@ -28,6 +28,14 @@ type SnapshotScanner struct {
 	TTL       time.Duration
 	Now       func() time.Time
 	Alive     func(int) bool
+	// KeepAlive answers "is this session's host terminal still there?".
+	// A snapshot whose payload has not been updated within TTL is retained
+	// (and returned) while its host is alive. Reporters only write on state
+	// changes, so a session that has been working for ten minutes has an old
+	// timestamp but is very much alive. Deleting that file was what made the
+	// panel - and --json - lose sessions that never actually went away.
+	// Nil keeps the legacy TTL-only behaviour, which the offline tests use.
+	KeepAlive func(session.Session) bool
 	MaxFiles  int
 }
 
@@ -36,7 +44,22 @@ type snapshotFile struct {
 	info os.FileInfo
 }
 
+// Scan returns the sessions whose snapshot files are still on disk.
 func (s SnapshotScanner) Scan() []session.Session {
+	items, _ := s.ScanWithKeys()
+	return items
+}
+
+// ScanWithKeys also reports which session identities were observed on disk in
+// this pass. The running overlay uses that set as the authority for "does this
+// conversation still exist?" - a reporter that ends a session removes (or
+// closes) its snapshot, and the store can then drop the in-memory entry
+// instead of keeping it forever on the strength of a long-lived parent pid.
+//
+// `closed` snapshots are intentionally absent from the key set: the scanner
+// consumes and deletes them in the same pass, and the store already tombstones
+// them from the payload itself.
+func (s SnapshotScanner) ScanWithKeys() ([]session.Session, map[string]bool) {
 	now := time.Now()
 	if s.Now != nil {
 		now = s.Now()
@@ -47,11 +70,11 @@ func (s SnapshotScanner) Scan() []session.Session {
 
 	directoryInfo, err := os.Lstat(s.Directory)
 	if err != nil || !directoryInfo.IsDir() || directoryInfo.Mode()&os.ModeSymlink != 0 {
-		return []session.Session{}
+		return []session.Session{}, map[string]bool{}
 	}
 	directory, err := os.Open(s.Directory)
 	if err != nil {
-		return []session.Session{}
+		return []session.Session{}, map[string]bool{}
 	}
 	defer directory.Close()
 
@@ -87,6 +110,7 @@ func (s SnapshotScanner) Scan() []session.Session {
 	}
 
 	items := make([]session.Session, 0, len(candidates))
+	keys := make(map[string]bool, len(candidates))
 	cutoff := now.Add(-ttl)
 	for _, candidate := range candidates {
 		data, info, err := readSnapshot(candidate.path)
@@ -101,7 +125,7 @@ func (s SnapshotScanner) Scan() []session.Session {
 			removeSnapshotIfUnchanged(candidate.path, info)
 			continue
 		}
-		if value.UpdatedAt.Before(cutoff) {
+		if value.UpdatedAt.Before(cutoff) && (s.KeepAlive == nil || !s.KeepAlive(value)) {
 			removeSnapshotIfUnchanged(candidate.path, info)
 			continue
 		}
@@ -114,13 +138,15 @@ func (s SnapshotScanner) Scan() []session.Session {
 			items = append(items, value)
 			continue
 		}
-		if s.Alive != nil && processBacked(value.Source) && !s.Alive(value.PID) {
+		if s.Alive != nil && processBacked(value.Source) && !s.Alive(value.PID) &&
+			(s.KeepAlive == nil || !s.KeepAlive(value)) {
 			removeSnapshotIfUnchanged(candidate.path, info)
 			continue
 		}
+		keys[key(value)] = true
 		items = append(items, value)
 	}
-	return items
+	return items, keys
 }
 
 func (s SnapshotScanner) Err() error {
