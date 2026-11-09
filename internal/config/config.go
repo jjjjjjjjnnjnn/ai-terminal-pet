@@ -41,19 +41,72 @@ const (
 	// directory. Both live next to the executable's data, not the source.
 	FileName      = "config.json"
 	StateFileName = "state.json"
+
+	// DefaultAutoApproveTimeoutSec is the countdown before a permission
+	// prompt auto-approves when AutoApprove is on. Five seconds is long
+	// enough to glance over and hit deny, short enough not to stall the
+	// agent.
+	DefaultAutoApproveTimeoutSec = 5
+	MinAutoApproveTimeoutSec     = 1
+	MaxAutoApproveTimeoutSec     = 60
+
+	// DefaultSoundVolume is the amplitude of the synthesised alert tone as a
+	// percentage of full scale. 85% is clearly audible on laptop speakers
+	// while staying below clipping; 0 mutes just the tone (the tray switch
+	// can still mute everything).
+	DefaultSoundVolume = 85
+
+	// Sound schemes are synthesised waveforms, not files, so switching is
+	// instant and needs no external assets.
+	SoundSchemeChime = "chime"
+	SoundSchemeBell  = "bell"
+	SoundSchemeSoft  = "soft"
+	SoundSchemePulse = "pulse"
+
+	DefaultSoundScheme = SoundSchemeChime
 )
+
+// SoundSchemes is the complete, user-visible set of alert timbres.
+var SoundSchemes = []string{SoundSchemeChime, SoundSchemeBell, SoundSchemeSoft, SoundSchemePulse}
+
+// ValidSoundScheme normalises unknown or empty values to the default so a
+// hand-edited config.json can never silence the app by accident.
+func ValidSoundScheme(value string) string {
+	for _, scheme := range SoundSchemes {
+		if strings.EqualFold(strings.TrimSpace(value), scheme) {
+			return scheme
+		}
+	}
+	return DefaultSoundScheme
+}
 
 // Config is the user-editable settings file.
 type Config struct {
 	// Notifications enables tray balloon alerts when a session enters
 	// waiting_permission or error.
 	Notifications bool `json:"notifications"`
-	// Sound plays a system alert tone on the same transitions. It is separate
-	// from Notifications because the two reach the user differently: a balloon
-	// is something you read when you look, a tone is something you hear when
-	// you are not looking. Someone in a quiet office may want one and not the
+	// Sound plays an alert tone on status transitions. It is separate from
+	// Notifications because the two reach the user differently: a balloon is
+	// something you read when you look, a tone is something you hear when you
+	// are not looking. Someone in a quiet office may want one and not the
 	// other.
 	Sound bool `json:"sound"`
+	// SoundVolume scales the synthesised tone, 0..100. MessageBeep used the
+	// system "default beep" event, which is silent or barely audible on many
+	// machines; this makes loudness a real setting.
+	SoundVolume int `json:"soundVolume"`
+	// SoundScheme picks one of the built-in timbres (chime / bell / soft /
+	// pulse). The settings window lets the user audition each one.
+	SoundScheme string `json:"soundScheme"`
+	// SoundOnWaiting / SoundOnError gate the tone per event. Notifications
+	// (balloons) remain governed by Notifications. This lets someone who only
+	// wants to hear genuine blockers mute the completion/finish chatter.
+	SoundOnWaiting bool `json:"soundOnWaiting"`
+	SoundOnError   bool `json:"soundOnError"`
+	// NotifyOnFinish sounds a softer, distinct tone when a busy session
+	// settles into idle/closed. Without it the panel only ever announced
+	// problems, so a finished task looked identical to a stalled one.
+	NotifyOnFinish bool `json:"notifyOnFinish"`
 	// AlwaysOnTop keeps the overlay above other windows.
 	AlwaysOnTop bool `json:"alwaysOnTop"`
 	// EdgeRetract slides the panel into the screen edge it is hugging whenever
@@ -63,11 +116,29 @@ type Config struct {
 	EdgeRetract bool `json:"edgeRetract"`
 	// Opacity is the layered window's constant alpha, MinOpacity..MaxOpacity.
 	Opacity int `json:"opacity"`
+	// Language pins the display language: "auto" follows the host OS locale
+	// (Chinese when it starts with zh, English otherwise), "en" and "zh-CN"
+	// pin one. Anything else is treated as "auto" by Normalize.
+	Language string `json:"language"`
+	// AutoApprove lets a permission prompt auto-approve after
+	// AutoApproveTimeoutSec seconds without user input. Off by default:
+	// silently running a tool the user never saw is the most dangerous
+	// thing this overlay can do.
+	AutoApprove bool `json:"autoApprove"`
+	// AutoApproveTimeoutSec is the countdown length for AutoApprove.
+	// Clamped to MinAutoApproveTimeoutSec..MaxAutoApproveTimeoutSec.
+	AutoApproveTimeoutSec int `json:"autoApproveTimeoutSec"`
 }
 
 // Default returns the settings used when config.json is absent or unreadable.
 func Default() Config {
-	return Config{Notifications: true, Sound: true, AlwaysOnTop: true, EdgeRetract: true, Opacity: 235}
+	return Config{
+		Notifications: true, Sound: true, SoundVolume: DefaultSoundVolume,
+		SoundScheme: DefaultSoundScheme, SoundOnWaiting: true, SoundOnError: true,
+		NotifyOnFinish: true, AlwaysOnTop: true, EdgeRetract: true,
+		Opacity: 235, Language: "auto", AutoApprove: false,
+		AutoApproveTimeoutSec: DefaultAutoApproveTimeoutSec,
+	}
 }
 
 // Normalize clamps every field into a usable range, substituting the default
@@ -75,6 +146,21 @@ func Default() Config {
 func (c Config) Normalize() Config {
 	if c.Opacity < MinOpacity || c.Opacity > MaxOpacity {
 		c.Opacity = Default().Opacity
+	}
+	if c.SoundVolume < 0 || c.SoundVolume > 100 {
+		c.SoundVolume = Default().SoundVolume
+	}
+	c.SoundScheme = ValidSoundScheme(c.SoundScheme)
+	switch strings.ToLower(strings.TrimSpace(c.Language)) {
+	case "en":
+		c.Language = "en"
+	case "zh-cn":
+		c.Language = "zh-CN"
+	default:
+		c.Language = Default().Language
+	}
+	if c.AutoApproveTimeoutSec < MinAutoApproveTimeoutSec || c.AutoApproveTimeoutSec > MaxAutoApproveTimeoutSec {
+		c.AutoApproveTimeoutSec = Default().AutoApproveTimeoutSec
 	}
 	return c
 }

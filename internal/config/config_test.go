@@ -36,6 +36,9 @@ func TestDecodeConfigKeepsAbsentFieldsAtDefault(t *testing.T) {
 	if got.Opacity != 200 {
 		t.Fatalf("opacity must be honoured, got %d", got.Opacity)
 	}
+	if got.Language != "auto" || got.AutoApprove || got.AutoApproveTimeoutSec != DefaultAutoApproveTimeoutSec {
+		t.Fatalf("new fields must keep defaults on old files, got %+v", got)
+	}
 }
 
 func TestDecodeConfigHonoursExplicitFalse(t *testing.T) {
@@ -55,6 +58,28 @@ func TestConfigNormalizeClampsOpacity(t *testing.T) {
 		if got := (Config{Opacity: opacity}).Normalize(); got.Opacity != opacity {
 			t.Fatalf("opacity %d must be preserved, got %d", opacity, got.Opacity)
 		}
+	}
+}
+
+func TestConfigNormalizeLanguageAndTimeout(t *testing.T) {
+	for _, language := range []string{"", "AUTO", "fr", "chinese", "zh"} {
+		if got := (Config{Language: language}).Normalize(); got.Language != "auto" {
+			t.Fatalf("language %q must fall back to auto, got %q", language, got.Language)
+		}
+	}
+	for _, language := range []string{"en", "zh-CN"} {
+		if got := (Config{Language: language}).Normalize(); got.Language != language {
+			t.Fatalf("language %q must be preserved, got %q", language, got.Language)
+		}
+	}
+	for _, timeout := range []int{-5, 0, MinAutoApproveTimeoutSec - 1, MaxAutoApproveTimeoutSec + 1, 3600} {
+		if got := (Config{AutoApproveTimeoutSec: timeout}).Normalize(); got.AutoApproveTimeoutSec != DefaultAutoApproveTimeoutSec {
+			t.Fatalf("timeout %d must fall back to default, got %d", timeout, got.AutoApproveTimeoutSec)
+		}
+	}
+	got := DecodeConfig([]byte(`{"language":"zh-CN","autoApprove":true,"autoApproveTimeoutSec":5}`))
+	if got.Language != "zh-CN" || !got.AutoApprove || got.AutoApproveTimeoutSec != 5 {
+		t.Fatalf("explicit language/autoApprove must stick, got %+v", got)
 	}
 }
 
@@ -173,5 +198,26 @@ func TestSweepTemporaryFilesReclaimsAfterReinstall(t *testing.T) {
 	}
 	if removed := SweepTemporaryFiles(directory, 2*time.Minute); removed != 1 {
 		t.Fatalf("orphan from an interrupted reinstall must be reclaimed, got %d", removed)
+	}
+}
+
+// Alert loudness and completion alerts are real settings, not hard-coded
+// behaviour. Missing fields must fall back to the audible defaults, while an
+// explicit 0 (mute) or 100 must survive the round trip.
+func TestDecodeConfigSoundDefaults(t *testing.T) {
+	if got := DecodeConfig([]byte(`{"sound":true}`)); got.SoundVolume != DefaultSoundVolume || !got.NotifyOnFinish {
+		t.Fatalf("missing fields fell back to %+v, want volume=%d finish=true", got, DefaultSoundVolume)
+	}
+	if got := DecodeConfig([]byte(`{"soundVolume":0,"notifyOnFinish":false}`)); got.SoundVolume != 0 || got.NotifyOnFinish {
+		t.Fatalf("explicit mute/off was overwritten: %+v", got)
+	}
+	if got := DecodeConfig([]byte(`{"soundVolume":100}`)); got.SoundVolume != 100 {
+		t.Fatalf("explicit 100 was overwritten: %d", got.SoundVolume)
+	}
+	if got := (Config{SoundVolume: 500}).Normalize(); got.SoundVolume != DefaultSoundVolume {
+		t.Fatalf("out-of-range volume became %d, want default", got.SoundVolume)
+	}
+	if got := (Config{SoundVolume: -1}).Normalize(); got.SoundVolume != DefaultSoundVolume {
+		t.Fatalf("negative volume became %d, want default", got.SoundVolume)
 	}
 }
