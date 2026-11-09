@@ -22,7 +22,7 @@ reporters/*.js  ──[Named Pipe / JSON-lines]──►  cmd/ai-terminal-pet (G
 ### Key Subsystems:
 - `cmd/ai-terminal-pet/`: Primary application entry point. Handles CLI arguments (`--show`, `--toggle`, `--reset`, `--json`), error logging rotation, and bootstrap.
 - `cmd/pet-statusline/`: High-performance native statusline shim (avoids Node.js startup penalty under Windows AV hooks).
-- `internal/ui/`: Win32 layered overlay, GDI+ canvas rasterization, panel layout, system tray icon, and click-drag-wheel gestures.
+- `internal/ui/`: Win32 layered overlay, GDI canvas rasterization (CreateDIBSection + UpdateLayeredWindow), panel layout, system tray icon, and click-drag-wheel gestures.
 - `internal/pipeserver/`: Named pipe server (`\\.\pipe\ai-terminal-pet-v1-<hash>`) with ACK/ERR response.
 - `internal/store/`: In-memory state store with tombstone cleanup and snapshot file fallback under `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\`.
 - `reporters/`: Host CLI hooks (`claude-hook.js`, `opencode.js`, `antigravity-hook.js`, `generic.js`).
