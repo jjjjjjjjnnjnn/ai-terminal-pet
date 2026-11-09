@@ -1,31 +1,140 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 2026-09-26。本文分四块：现状基线、本轮已完成、扩展计划、轻量化计划，
-> 以及一组实用功能候选与非目标。每项都标注了**动机**和**为什么现在不做/怎么做**，
-> 便于下一位维护者直接挑一项开工。
+> 快照时间 **2026-11-09（v0.9.0）**（上一版快照为 2026-09-26 的 v0.5.0）。本文分四块：现状基线、
+> 已交付批次、扩展计划、轻量化计划，以及一组实用功能候选与非目标。每项都标注了**动机**和
+> **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
+>
+> 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§25；按版本发布的变更摘要在
+> [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 0. 现状基线
 
-| 维度 | 数值 |
+| 维度 | 数值（2026-11-09，v0.9.0） |
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
-| 工具链 | Go 1.23+（实测 1.27.0），reporters 仅用 Node 标准库 |
-| 主程序 | `bin/AI-Terminal-Pet.exe` 3,977,216 B（`-trimpath -ldflags "-s -w"`） |
-| 状态行 shim | `bin/pet-statusline.exe` 3,644,416 B |
-| 代码量 | Go 7,599 行 / JS 1,058 行 |
-| 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio(MIT) / lxn/win(BSD) / x/sys(BSD) |
-| 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16 |
-| 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
+| 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
+| 版本 | `0.9.0`（`internal/app/app_windows.go:23`） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,178,432 B**（`-trimpath -ldflags "-s -w"`） |
+| 状态行 shim | `bin/pet-statusline.exe` **3,644,416 B** |
+| 代码量 | Go 非测试源码 **10,201 行** / 测试 **3,831 行** / JS **1,633 行**（47 个 .go 文件，合计 14,032 行） |
+| 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
+| 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
+| 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
+| 设置窗口 | 第二个顶层窗口类 `AITerminalPetSettings`，三页签 general/sound/sessions，高度按内容 450↔504↔306（150% DPI） |
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
 | 管道 | `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>`（按用户隔离，跨语言 golden 测试锁定） |
-| 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` |
-| 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）+ 无会话自毁（5 s 宽限，会话 TTL 30 s） |
-| 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/提示音/置顶/不透明度）· `HKCU\...\Run`（开机自启） |
-| 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--version/--help` |
-| 单测 | 60 个（config 11 / autostart 8 / app 5 / store 17 / ui 7 / session 5 / pipeserver 7） |
-| 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview` 直接光栅化出 PNG |
+| 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
+| 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；扫描 5 s / 存活探测 10 s |
+| 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run`（开机自启）· `approvals\`（auto-approve 握手） |
+| 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--version/--help` |
+| 单测 | **140 个 `func Test`**（ui 49 / store 26 / platform 20 / config 13 / app 9 / autostart 8 / pipeserver 7 / session 5 / i18n 3） |
+| 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图 |
 
-## 1. 本轮已完成
+## 1. 已交付批次（按时间倒序）
+
+### 1h. 2026-11-08/09（v0.9.0）—— 设置窗口、四套合成音效、按会话告警、DSH 桥
+
+**动机**：浮窗刻意只是一条状态带，所有偏好原先只有两个入口——托盘里的一串勾选，或者手改 `config.json`。
+「换个提示音」「调音量」这两件最想改的事，前者根本不存在、后者要在托盘里点三下循环；
+不透明度、auto-approve 倒计时、语言也没有任何界面。
+
+- **设置窗口**（`internal/ui/settings_windows.go`，1,382 行 + 228 行测试）：第二个顶层窗口类
+  `AITerminalPetSettings`，三页签 general / sound / sessions，**跑在与浮窗同一条消息泵上**
+  （`Run()` 里 `runtime.LockOSThread()` 之后创建）——Win32 要求创建窗口的线程就是泵消息的线程，
+  这条铁律正是 §13 幽灵窗口的根因。几何单一来源 `settingsGeometryFor(dpi, tab, rows)` 同时供绘制与命中；
+  切页签按内容改高度且保持中心不动（真机 450↔504↔306）；每项改动立即生效，没有 OK 按钮。
+- **四套音色 + 按事件开关**（`sound_windows.go` 的 `schemeSpecs()`）：`chime`（默认）/ `bell` / `soft` /
+  `pulse`，每套都有等待/出错/完成三条波形，仍是内存合成 44.1 kHz 16-bit 单声道 PCM + `PlaySoundW(SND_ASYNC)`。
+  `config` 新增 `soundScheme` / `soundOnWaiting` / `soundOnError`，`alertOnTransitions` 改为按事件判断
+  （`soundForState`），所以「只想听真正卡住的会话」可以关掉等待音而保留出错音。
+  `config.SoundSchemes` 与 `ui.SoundSchemes` 两份镜像由 `TestDefaultSettingsMirrorConfig` 钉住。
+- **告警按会话**（`alert_windows.go`）：旧实现只有一个全局 most-urgent key，该会话结束时被重置，
+  于是无关的等待会话后来重复告警、气泡像是来自错误的终端。现在按每个会话上次状态做纯函数
+  `transitionLevel` / `decideAlerts`，首次加载只播种不重放（热重载/重启不重复旧告警）。
+  等待态呼吸从 12.5 fps 降到 6.25 fps——每次动画 tick 都是整层 GDI 光栅。
+- **本地化绘制**：所有文案走 `internal/i18n` 的 `a.lang`（`New()` 固定、托盘切语言时刷新），
+  光栅器不再解析 locale。
+- **配置生命周期归 `internal/app`**（`configSaver`，与 `placementSaver` 同构）：`OnSettingsChanged` 只入队，
+  后台 goroutine 读/合并/写（手写的、本版本不认识的键不会丢），`echo(config)` 让 30 s 的 `watchConfig`
+  跳过自己的写入，滑块拖动只改内存、松手才 publish 一次。`--settings` 无实例时先起浮窗、首帧后再开窗。
+- **auto-approve 否决握手**（`approve_windows.go` + `reporters/protocol.js`）：浮窗无法代点别人终端里的
+  Allow，所以反向做——hook 写 `pending-<source>-<session>-<pid>-<epoch>.json` 到 `%LOCALAPPDATA%\AI-Terminal-Pet\approvals`，
+  每 100 ms 轮询同名 `.deny`；展开面板显示 `Allow (Ns)` 与倒计时条，点一下否决最紧急的等待会话，
+  沉默即由 hook 放行。危险命令（`rm -rf` / `git push --force` / `format` 等 `DANGEROUS_PATTERNS`）
+  在倒计时开始前就判，永远走人工。
+- **顺带**：`--settings` CLI；`install.ps1` 刷新为新的部署集（主程序 + shim + `protocol.js` + DSH bundle）；
+  `docs/assets/render_assets.py` 由真实光栅器输出产出 README 全部配图。
+- 详细 runbook：HANDOVER §25（设置窗口与可切换音效）。
+
+### 1g. 2026-11-08（v0.8.0）—— 合成提示音、通知时序、DSH 适配
+
+- **提示音从系统事件改为内存合成**（`sound_windows.go`）：`MessageBeep` 走系统默认事件，在很多机器上
+  静默或几乎听不见，还受专注助手影响。改为内存合成 44.1 kHz/16-bit 单声道 PCM +
+  `PlaySoundW(SND_MEMORY | SND_ASYNC | SND_NODEFAULT)`，三种音型（等待=两轮上行双音 ~0.9 s、
+  错误=下行低音、完成=短上行三音），`soundVolume` 0..100 默认 85，缓冲按 kind 缓存防 GC 越过异步播放器。
+- **通知时序**：`alertStates` 逐会话记录，纯函数 `transitionLevel` / `decideAlerts`；
+  waiting/error→urgent，busy→idle/closed 或消失→finished；新 busy 不告警；`notifyOnFinish` 默认开。
+- **协议钳制**：`protocol.js:normalizePayload` 把 `startedAt = min(started, updated)`、两者夹到 now+4 min，
+  幂等——否则 `validate()` 会以「updatedAt precedes startedAt」拒收，随后扫描把快照删掉。
+- **DeepSeek Harness 桥**（`integrations/deepseek-harness/ai-terminal-pet-bridge`）：浮窗此前只聚合
+  OpenCode / Claude Code / Antigravity，而本项目恰好在 DSH 里开发，做活时面板什么都不显示。
+  Cordis bundle 用 `ai-terminal-pet.v1` 上报 Harness 会话：一个对话一个稳定会话、时间戳归一 UTC 并夹在
+  服务端上限之下（时钟偏差不能让 `startedAt` 跟着 `updatedAt`）、审批请求保留 waterfall 链、
+  `dispose` 只移除监听器不结束会话（HMR 重载不是退出）。`verify.mjs` 是离线测试，
+  用临时 `LOCALAPPDATA` 桩掉官方 protocol 模块并断言发出的 payload，不需要管道/浮窗/运行中的 Harness。
+  部署侧 `install.ps1` 增 `BundleSource`/`BundleDestination`，每次安装同步 7 个文件并逐个 SHA256 校验。
+  Go 侧 `isEditorProcess`/`isCLIProcess` 加 `deepseek harness.exe`（`Chrome_WidgetWin_1` 得分 24），
+  `terminalKeyword` 加 `deepseek`，`PET_DSH_PROBE=1` 保留为探针。
+- 详细 runbook：HANDOVER §24。
+
+### 1f. 2026-11-05（v0.7.0 / v0.7.1）—— 会话存在性重构、一键跳转、幽灵堆积
+
+- **会话存在性重构（v0.7.0，HANDOVER §21）**：旧模型「没上报 = 结束」——reporter 为事件驱动且状态去重，
+  快照 TTL 15 s / 管道 TTL 30 s，`Scan()` 到点直接删文件，tombstone 的 `UpdatedAt` 门槛又挡住旧时间戳无法自愈，
+  UI 每 500 ms 检查、5 s 没有会话就 `DestroyWindow`。新模型：**存在性由 OS 观测**（进程表 + 终端窗口），
+  state 可以陈旧；删除需连续不可观测 ≥ `DefaultAbsenceGrace`（2 分钟）。三类 tombstone：
+  `closed`（保留门槛）/ `expired`（不设门槛、可自愈）/ `evicted`（保留门槛）。`store.Reconcile` 取代运行期 `Cleanup`，
+  保活只刷 `pipeSeen`/`snapshotSeen`/`lastSeen`，不改 payload 不 bump revision（零重绘）。
+  运算表：空闲检查 500 ms→30 s、扫描 2 s→5 s、存活探测 每会话 OpenProcess/2s→一次 Toolhelp/10 s、
+  窗口枚举 仅跳转时→10 s 共用、告警呼吸 80 ms 全帧光栅→160 ms 零 GDI、配置 仅启动→30 s Stat。
+  三轮采样第 3 轮 120 s 累计 0.562 s（约 0.5% 单核，较第 2 轮降约 96%）。
+- **一键跳转终端（HANDOVER §20）**：只用现有 pid/parentPid/title/project/source/terminal 定位，协议零改动。
+  `internal/platform/focus_windows.go` 走 Toolhelp 祖先链 → `EnumWindows` → 打分（祖先距离/会话标题/项目基名/
+  终端关键词/窗口类名）→ 前台激活；跨进程枚举不在 UI 线程。点击坐标用 `WM_LBUTTONUP` 的 lParam。
+  弱匹配 <40 判失败。Windows Terminal 能定位到标签（`CASCADIA_HOSTING_WINDOW_CLASS`），
+  conhost 多会话 / VS Code 只能到窗口级。
+- **跳转差点动用户窗口（HANDOVER §22）**：`activateFocusWindow` 里的 `AttachThreadInput` 与
+  `SetWindowPos(TOPMOST)→NOTOPMOST` 会动别人的窗口，全部删除。改为 `ResolveTarget` 只定位、
+  `ui.jumpTo` 把 `wmFocusActivate` 投回 UI 线程；`platform.ActivateTarget` 仅 `IsIconic→SW_RESTORE` +
+  一次 `SetForegroundWindow` + `GetForegroundWindow` 复核，失败走 `focusFailure()` **绝不抢前台**；
+  **禁止** `LockOSThread`/`UnlockOSThread`（会重现 §13 幽灵窗口）。25 次合成 + 15 次真实点击、
+  12 次「用户正在处理窗口」场景 FAILS=0。
+- **幽灵堆积 + Slate 配色（v0.7.1，HANDOVER §23）**：取证 内存 ≥7 会话 vs 磁盘 4 文件 vs 4 个终端标签，
+  时区陷阱（payload `updatedAt` 是 UTC、本机 GMT+1）。三根因：宿主存活 ≠ 会话存在、删文件 ≠ 结束会话
+  （插件 `cleanupAll`/`closed` 只 unlink 不送 closed）、**事件 ID 当会话 ID**（`e.data?.id || e.id` 兜底）。
+  修法：`ScanWithKeys()` 返回磁盘 key 集合 + `snapshotAwareAlive()`（曾有快照但现在没有→判结束）；
+  `Presence.SessionAlive` 按 specificity 分级（终端标签标题命中→无条件保活 / 可信真实 PID 优先 /
+  hook 的 parentPid / 近期活动超 `DefaultOrphanAfter` 45 min 孤儿回收）；
+  opencode 插件 `sessionIdentity()` 只认明确 sessionID、拒 `evt_`/`msg_`/`prt_`/`prj_`/`default-session`，
+  `closed` 同步写 `state:closed` 快照；`cleanupAll` 只在 `process.on(exit)`。
+  另把结构色收进 `internal/ui/drawing_windows.go` 顶部调色板（Slate：背景蓝黑→中性石墨，
+  状态球实心大圆盘→细环+深色内核+状态色字形，外框 alpha 210→120）。
+- **收尾 bug（HANDOVER §24.6，由 `ce81a8e` 落地）**：`snapshotAwareAlive` 对「磁盘文件还在」的会话仍调
+  `Presence.SessionAlive`，弱 OS 证据下 `Reconcile` 连续缺席 2 min 删条目 → `HasAvailable()` 变假 →
+  10 min 自毁（「浮窗自己消失」）。改为 `present[key]` 为真即直接保活（closed 仍优先判死），
+  OS 证据只留给从未写过快照的纯 pipe 会话。`TestSnapshotAwareAliveTrustsTheDisk` 锁定。
+
+### 1e. 2026-11-09（v0.6.0）—— i18n 与权限 5 秒自动同意
+
+- **`internal/i18n`**（零依赖字典 `Lang`/`T`/`Resolve`，`en` + `zh-CN` + `auto`）：`GetUserDefaultLocaleName`
+  解析一次，`zh*`→中文、其余/失败→英文；`config.language` 默认 `auto`，托盘三项单选；
+  全部硬编码文案走 `i18n.T`，绘制函数加 `lang` 参数，`frameKey` 加 `lang`，测试锁两字典 key 对齐。
+- **auto-approve**（默认 `autoApprove=false`、`autoApproveTimeoutSec=5`，钳 1..60）：握手目录
+  `%LOCALAPPDATA%\AI-Terminal-Pet\approvals`，hook 建 pending 文件并每 100 ms 轮询同名 `.deny`，
+  overlay 点展开态等待行写 `.deny`；超时无否决 = allow；hook `finally` 删 pending，
+  overlay 每 2 s 清扫超过 `2*timeout+30s` 的残留。否决窗口只覆盖「等待权限」路径。
+  验证：黑名单 13 例、off→`{}`(90 ms)、危险→`{}`(100 ms)、超时→allow(1.1 s)、中途否决→deny(212 ms)。
+- 详细 runbook：HANDOVER §18。
 
 ### 1d. 2026-09-26（v0.5.0）—— 贴边收起 + 漂移修复 + 重绘跳过
 
@@ -116,7 +225,40 @@
 
 ## 2. 扩展计划
 
-### E1 — 把 Node 上报端全部原生化（收益最高）
+> 状态标记：**已交付** / **部分交付** / **未开工**。已交付项保留原文，便于回看当时的动机与验收标准。
+
+### E4 — 会话可交互 ✅ 已交付（2026-11-05，v0.7.0）
+**结果**：展开态每行右侧有跳转箭头（紧凑态底部 `↗` 跳转条仅在有可跳转会话时出现）。
+`internal/platform/focus_windows.go`（392 行）+ `focus_windows_test.go`（280 行）实现
+Toolhelp 祖先链 → `EnumWindows` → 打分 → 前台激活；`internal/ui/focus_windows.go`（194 行）
+保证 `compactFocusRect` / `expandedRowFocusRect` 与绘制同源，`jumpPriority`
+（waiting 4 / error 3 / idle 2 / closed 1 / 忙碌 -1）与 `mostUrgentJump`、纯函数 `focusHit`。
+`PET_FOCUS_PROBE=1` 保留为探针入口。
+**与原计划的偏差**：原文担心的「稳定哈希 PID 无法定位」由 `platform.Presence` 的真实进程探测解决——
+合成 PID 不参与窗口匹配，窗口匹配必须命中 `title` 或项目名。
+**已知限制**：Windows Terminal 能定位到标签，conhost 多会话 / VS Code 只能到窗口级；
+同标题按 Z 序取第一；合成点击需先 `SetForegroundWindow(petHwnd)`。
+**后续修复**：§22 的「跳转关闭用户窗口」——`AttachThreadInput` 与 `SetWindowPos(TOPMOST)` 全部删除，
+`ActivateTarget` 只做一次 `SetForegroundWindow` + 复核，失败不抢前台。
+
+### E2b — auto-approve 否决窗口 ✅ 已交付（2026-11-05 v0.6.0 / 2026-11-09 v0.9.0）
+**动机**：浮窗能看见「谁在等确认」，却无法替用户点 Allow——它拿不到别人终端的对话框。
+**做法（反向握手）**：不再由浮窗点 Allow，而是由 hook 写审批请求文件、浮窗只负责「否决」。
+hook 建 `pending-<source>-<session>-<pid>-<epochMs>.json` 后每 100 ms 轮询同名 `.deny`；
+展开面板显示 `Allow (Ns)` 与倒计时条，点一下写 `.deny`；沉默 = 超时放行。
+`DANGEROUS_PATTERNS` 在倒计时开始前就判，破坏性命令永远走人工。
+**验收补充**：fail-closed（config 缺失/损坏 → auto-approve off）；hook 侧每步文件操作都包住，
+绝不向宿主 CLI 抛异常（AGENTS.md 的铁律）。
+
+### E5 — 配置档扩展 ⏳ 部分交付（2026-11-09，v0.9.0）
+**已交付**：`config.json` 现在覆盖 `notifications` / `sound` / `soundVolume` / `soundScheme` /
+`soundOnWaiting` / `soundOnError` / `notifyOnFinish` / `alwaysOnTop` / `edgeRetract` / `opacity` /
+`language` / `autoApprove` / `autoApproveTimeoutSec`，并有设置窗口（三页签）作为 UI。
+**未交付的部分（仍按原计划）**：`theme`（配色组）、`size`（紧凑/展开的基准尺寸预设）、
+`perSourceColor`（按 source 指定强调色）、`hidden`（启动即隐藏到托盘）。
+`internal/config` 的「缺字段用默认」解码方式未变，加字段仍不会破坏旧文件。
+
+### E1 — 把 Node 上报端全部原生化（收益最高）⏳ 未开工
 **动机**：本机每创建一个进程约 **1 s**（AV 钩挂），而 `claude-hook.js` / `antigravity-hook.js`
 每次事件都要起一个 `node`（实测 `node -e exit` 0.9–1.2 s）。`pet-statusline.exe` 已经是这条路的先例：
 Go 原生 shim 稳态 0.5–0.9 s，比 node 路径的 13–17 s（经 runner）低一个数量级。
@@ -124,32 +266,24 @@ Go 原生 shim 稳态 0.5–0.9 s，比 node 路径的 13–17 s（经 runner）
 用 `--mode=claude|antigravity` 区分事件映射。三个 JS hook 保留为参照实现与降级路径。
 **验收**：同 payload 下原生与 JS 输出同一 session PID（FNV-1a UTF-16 已对齐）与同一 state。
 
-### E2 — 通用接入成为一等公民
+### E2 — 通用接入成为一等公民 ⏳ 未开工
+
+**现状**：`docs/PROTOCOL.md` 仍不存在（2026-11-09 确认）。`reporters/generic.js` 已可用，
+DeepSeek Harness 桥是现成的第三个接入样例（`integrations/deepseek-harness/ai-terminal-pet-bridge`），
+写 `PROTOCOL.md` 时可以直接拿它和 `pet-statusline.exe` 作为两个参照实现。
 **动机**：`reporters/generic.js` 已能一行接入任意工具，但协议本身还只写在代码里。
 **做法**：新增 `docs/PROTOCOL.md`，把 `ai-terminal-pet.v1` 的字段、状态语义、优先级、
 管道命名算法、回执契约、脱敏规则写成规范；README 给出 5 行以内的接入示例（shell alias / Makefile / 编辑器 task）。
 **验收**：不读源码也能写出一个合规上报端。
 
-### E3 — 跨平台（macOS / Linux）
+### E3 — 跨平台（macOS / Linux）⏳ 未开工
 **动机**：目前 UI 层与平台层直接调 Win32，无法移植。核心逻辑（session/store/pipeserver 的协议部分）其实已平台无关。
 **做法**：把 `internal/ui` 的窗口实现抽成接口（`Presenter`），Win32 实现留在 `_windows.go`，
 新增 `_darwin.go` / `_linux.go`（macOS 用 NSWindow + NSVisualEffectView，Linux 用 GTK/Wayland layer-shell）。
 IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法保持不变以免破坏跨语言契约。
 **注意**：这是一次真正的架构改动，建议先做 E2（协议文档）再动，否则契约会跟着实现漂移。
 
-### E4 — 会话可交互
-**动机**：现在展开面板只能「看」，看到某个会话在等待却无法跳过去。
-**做法**：展开态会话行做命中检测（几何与绘制同源，参照 `expandedCloseButtonRect` 的做法），
-点击时用 `EnumWindows` + `GetWindowThreadProcessId` 找到该 PID 的顶层窗口并 `SetForegroundWindow`。
-**限制**：`claude-hook` / `antigravity-*` 的 PID 是稳定哈希而非真实进程号，这些行不响应点击；
-要么保持「无窗口则无动作」，要么顺带给这些上报端补上真实 PID（与 E1 一起做更自然）。
-
-### E5 — 配置档扩展
-**做法**：`config.json` 增加 `theme`（配色组）、`size`（紧凑/展开的基准尺寸预设）、
-`perSourceColor`（按 source 指定强调色）、`hidden`（启动即隐藏到托盘）。
-`internal/config` 的解码已是「缺字段用默认」，加字段不会破坏旧文件。
-
-### E6 — `--doctor` 自检
+### E6 — `--doctor` 自检 ⏳ 未开工（本轮排查仍靠 `PET_FOCUS_PROBE` / `PET_SOUND_PROBE` / `PET_DSH_PROBE` 等临时探针）
 **动机**：本轮的排查花了大量时间在「进程活着但窗口不可见」这类无声故障上。
 **做法**：`--doctor` 打印并校验：进程/互斥体状态、窗口 `WS_VISIBLE` 与消息泵响应性
 （`SendMessageTimeout` + `SMTO_ABORTIFHUNG`，本轮探针已实现）、管道名与 ACK 往返、三处终端配置是否接入、
@@ -192,8 +326,11 @@ go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `conn
 
 ## 4. 实用功能候选
 
-已完成：~~F3 开机自启~~、~~F4 提示音~~、~~F7 `--json` 导出~~（见 §1a）；
-~~F6 相对时间~~（展开态每行显示「刚刚 / 3 分钟前 / 1 小时前」，见 §1c）。
+已完成：~~F3 开机自启~~、~~F4 提示音~~（v0.9.0 已升级为四套合成音色 + 按事件开关，见 §1h）、
+~~F7 `--json` 导出~~（见 §1a）；~~F6 相对时间~~（展开态每行显示「刚刚 / 3 分钟前 / 1 小时前」，见 §1c）。
+
+v0.6.0–v0.9.0 期间落地、原先不在候选表里的四项：**语言切换**（en/zh-CN + auto，§1e）、
+**设置窗口**（§1h）、**auto-approve 否决窗口**（§2 E2b）、**DeepSeek Harness 接入**（§1h）。
 
 | 编号 | 功能 | 价值 | 复杂度 |
 |---|---|---|---|
@@ -224,7 +361,9 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 
 ## 6. 已知残留（不计划修，但需知情）
 
-- `hang.log` 看门狗是**事后取证**而非自愈；本轮已把转储上限压到 3 次并记录最后消息名。
-- UI 无自动化视觉回归，靠 `--doctor`（待做）+ 探针脚本人工验证。
-- `go test -race` / `govulncheck` / `gosec` 因缺工具链（gcc 等）仍未跑。
+- `hang.log` 看门狗是**事后取证**而非自愈；转储上限已压到 3 次 + 2 min 冷却 + 记录最后消息名。
+- UI 无自动化视觉回归，靠 `--doctor`（E6，未开工）+ 探针脚本 + `TestRenderPreview` / `TestRenderSettingsPreview` 光栅化 PNG 人工验证。
+- `go test -race` / `govulncheck` / `gosec` 因缺工具链（gcc 等）仍未跑（2026-11-09 复核仍然如此）。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
+- 设置窗口不参与贴边收起、不跟随浮窗透明度（固定 255），关掉「窗口置顶」后它仍置顶（它是对话框）。
+- 安装目录可能残留上一轮的 `pet-statusline-core.exe` / `-old.exe` / `-v1-backup.exe` / `shim.js`（`install.ps1` 只覆盖不清理）。
