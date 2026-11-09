@@ -14,11 +14,6 @@ type rgba struct {
 	A uint8
 }
 
-type canvasPoint struct {
-	X int
-	Y int
-}
-
 const (
 	maxCanvasDimension = 4096
 	maxCanvasPixels    = 16 * 1024 * 1024
@@ -200,35 +195,6 @@ func (c *canvas) fillEllipse(left, top, width, height int, value rgba) {
 	}
 }
 
-func (c *canvas) fillPolygon(points []canvasPoint, value rgba) {
-	if len(points) < 3 || value.A == 0 {
-		return
-	}
-	minimumX, minimumY := points[0].X, points[0].Y
-	maximumX, maximumY := minimumX, minimumY
-	for _, point := range points[1:] {
-		if point.X < minimumX {
-			minimumX = point.X
-		}
-		if point.X > maximumX {
-			maximumX = point.X
-		}
-		if point.Y < minimumY {
-			minimumY = point.Y
-		}
-		if point.Y > maximumY {
-			maximumY = point.Y
-		}
-	}
-	for y := minimumY; y <= maximumY; y++ {
-		for x := minimumX; x <= maximumX; x++ {
-			if pointInside(float64(x)+0.5, float64(y)+0.5, points) {
-				c.blend(x, y, value)
-			}
-		}
-	}
-}
-
 func (c *canvas) line(x1, y1, x2, y2, width int, value rgba) {
 	if width < 1 {
 		width = 1
@@ -398,13 +364,6 @@ func (c *canvas) normalizeText(left, top, width, height int, color rgba) {
 	}
 }
 
-func (c *canvas) alphaAt(x, y int) uint8 {
-	if x < 0 || y < 0 || x >= c.width || y >= c.height {
-		return 0
-	}
-	return c.pixels[y*c.stride+x*4+3]
-}
-
 // measure returns the advance width of value in pixels at the given font.
 func (c *canvas) measure(value string, fontHeight, weight int) int {
 	if value == "" {
@@ -466,20 +425,6 @@ func (c *canvas) hitMapInto(result []byte) {
 	for index := 0; index < len(result); index++ {
 		result[index] = c.pixels[index*4+3]
 	}
-}
-
-func pointInside(x, y float64, points []canvasPoint) bool {
-	inside := false
-	previous := len(points) - 1
-	for current := 0; current < len(points); current++ {
-		currentX, currentY := float64(points[current].X), float64(points[current].Y)
-		previousX, previousY := float64(points[previous].X), float64(points[previous].Y)
-		if (currentY > y) != (previousY > y) && x < (previousX-currentX)*(y-currentY)/(previousY-currentY)+currentX {
-			inside = !inside
-		}
-		previous = current
-	}
-	return inside
 }
 
 func clampChannel(value float64) uint8 {

@@ -512,21 +512,6 @@ func (s *Store) ensureLocked() {
 	}
 }
 
-func (s *Store) remove(key string) bool {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.ensureLocked()
-	_, hasEntry := s.entries[key]
-	_, hasTombstone := s.tombstones[key]
-	if !hasEntry && !hasTombstone {
-		return false
-	}
-	delete(s.entries, key)
-	delete(s.tombstones, key)
-	s.revision++
-	return true
-}
-
 func recordBefore(leftKey string, leftSeen time.Time, rightKey string, rightSeen time.Time) bool {
 	if leftSeen.Before(rightSeen) {
 		return true

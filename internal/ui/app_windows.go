@@ -170,8 +170,7 @@ type dragState struct {
 }
 
 type messageEnvelope struct {
-	event   win.MSG
-	reserve [32]byte
+	event win.MSG
 }
 
 type App struct {
@@ -1928,13 +1927,6 @@ func (a *App) positionForWorkArea() {
 	a.x = info.RcWork.Right - width - int32(24*a.dpi/96)
 	a.y = info.RcWork.Top + (info.RcWork.Bottom-info.RcWork.Top-height)/2
 	a.clampToWorkArea(info.RcWork, width, height)
-}
-
-// clampToMonitor republishes the frame. It no longer moves anything: frameX
-// and frameY already keep the frame on screen, and moving the remembered
-// position here is precisely what made expand/collapse drift.
-func (a *App) clampToMonitor() {
-	a.applyFramePosition()
 }
 
 func (a *App) clampToWorkArea(work win.RECT, width, height int32) {
