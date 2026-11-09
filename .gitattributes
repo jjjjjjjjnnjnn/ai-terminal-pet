@@ -1,0 +1,4 @@
+# Normalize every text file to LF in the repository and the working tree.
+# The project is Windows-only but every source file is authored in UTF-8/LF;
+# .ps1 scripts, Go sources and reporters all work with LF endings.
+* text=auto eol=lf
