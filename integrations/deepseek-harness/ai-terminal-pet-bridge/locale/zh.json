@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "AI 终端状态浮窗桥接",
+    "description": "把 DeepSeek Harness 的会话状态同步到 AI Terminal Pet 桌面浮窗，包括等待确认、工具执行、出错与完成提醒。"
+  }
+}

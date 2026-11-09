@@ -1,0 +1,8 @@
+# Host-only bundle. `insert:` is required: a bare `- id: ...` is a patch of
+# an existing loader row and would mount nothing while looking installed.
+# The row id is prefixed so it can never collide with an upstream service.
+- insert:
+    - id: compat-ai-terminal-pet-bridge
+      name: '@local/ai-terminal-pet-bridge'
+      config:
+        enabled: true

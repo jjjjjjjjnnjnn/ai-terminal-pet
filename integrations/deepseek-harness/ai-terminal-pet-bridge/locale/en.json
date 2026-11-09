@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "AI Terminal Pet bridge",
+    "description": "Shows DeepSeek Harness session states on the AI Terminal Pet desktop overlay, including waiting for approval, tool use, errors and completion."
+  }
+}
