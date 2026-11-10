@@ -282,6 +282,12 @@
   - 该注册表的分类器 `scripts/registry-core.mjs` 的 `classifyInstall` 被本地重放了一遍（把它的 `yaml` 依赖替换成空桩后直接 import 它自己的源码，不是手抄判定）：对当前这棵树得到 `profiles: [desktop, headless, web]`、`profileSource: "manifest"`、`runtimeArtifactsCommitted: true`、`reviewReasons: []`。
   - 打包实测：`dsh-ai-terminal-pet-1.2.3.tgz` **1,915,013 B / 16 files / unpacked 4,461,408 B / sha256 `1172aa72c63482442ccf0c1dfc12446fa15e1b12220f921fbe06a56c4db87c35` / shasum `0508ff6b9159674ae4c7136cb00bf1870d44eb35`**。解包核对：`package/README.md` 与工作区那份逐字节相同（7,546 B）、`package/package.json` version 1.2.3、`dsh.marketplace` 块在位、`scripts.prepack` 仍为 `undefined`。
   - 与 1.2.2 的 1,914,751 B 相比只多 262 B，全部来自两块 `dsh.marketplace` 与包内 README 的新增段落；`lib/index.js`、两份 vendor 二进制、`cordis.patch.yml`、`dsh.catalog`、`screenshots/` 逐字节不变。
+  - 一次 CI 红灯值得记下来：`b4474a6` 把包版本写成 1.2.3，而 `docs/market-index.json` 还停在 1.2.2，`verify.mjs` 的
+    `caseMarketIndex` 断言「索引里的最新版本 == 包版本」，于是那次 run `42894142140` 在 `Verify the DSH plugin package`
+    这一步失败（日志原文 `fail: the newest indexed version is the packaged version (1.2.3)`）。索引是在下一个提交
+    `fabb591` 才前移的，所以那条 tag 指向的提交本身是红的（tag 与 Release 资产不受影响——索引不在 `files` 白名单里）。
+    **因此定一条规矩：发版的同一个提交里必须把 `docs/market-index.json` 一起前移**，否则 tag 上的 CI 必红；
+    `fabb591` 之后 run `42896771226` 恢复 success。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，

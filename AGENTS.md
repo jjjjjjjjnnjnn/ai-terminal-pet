@@ -100,8 +100,10 @@ Two conventions in those commands are load-bearing, not style:
 | How do I install, use, and wire up a terminal? | [README.md](README.md) (bilingual: English then 中文) |
 | What changed in which version? | [CHANGELOG.md](CHANGELOG.md) |
 | What is planned, and why? | [docs/ROADMAP.md](docs/ROADMAP.md) |
-| How did we get here? (runbooks §13–§26) | [docs/HANDOVER.md](docs/HANDOVER.md) |
+| How did we get here? (runbooks §13–§27) | [docs/HANDOVER.md](docs/HANDOVER.md) |
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |
+| What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
+| How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |
 | Frozen historical documents | [docs/archive/README.md](docs/archive/README.md) |
 
 ---
@@ -131,7 +133,14 @@ Two conventions in those commands are load-bearing, not style:
      (`reporters/protocol.js`) — and pinned by `TestPipePathForUserMatchesReporterAlgorithm`.
      Changing one side without the other breaks every reporter silently. Schema changes follow
      `docs/PROTOCOL.md` §11.
-6. **Portability**:
+6. **Release commit must carry the market index**:
+   - `docs/market-index.json` states the version each release should install, and
+     `verify.mjs` asserts that its newest entry equals the packaged version. Bumping the
+     version without moving the index in the same commit turns the tagged commit's CI red
+     (that is exactly what happened to `b4474a6`: run `42894142140`, step
+     `Verify the DSH plugin package`, `fail: the newest indexed version is the packaged version`).
+     Move the index, the two manifests and the packaged README together, then tag.
+7. **Portability**:
    - Never commit machine-specific absolute paths into source, tests, scripts or docs. Use
      `os.Getenv("LOCALAPPDATA")`, `os.UserHomeDir()`, `Path(__file__).resolve().parent`, or an
      environment variable that fails with a human-readable message.
