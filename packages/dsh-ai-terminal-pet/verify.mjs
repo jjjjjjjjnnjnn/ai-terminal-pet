@@ -243,13 +243,19 @@ async function caseThrowingProtocol() {
 async function caseManifest() {
   const manifest = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'))
   check(manifest.name === 'dsh-ai-terminal-pet', 'package name is dsh-ai-terminal-pet')
-  check(manifest.version === '1.0.0', 'version is 1.0.0')
+  // Any released 1.x will do: the version is bumped per release, and pinning the
+  // assertion to one number just makes every release edit it.
+  check(/^1\.[0-9]+\.[0-9]+$/.test(manifest.version), 'version is a released 1.x')
   check(manifest.type === 'module', 'the package is ESM')
   check(manifest.main === 'lib/index.js', 'main is lib/index.js')
   check(manifest.exports['.'] === './lib/index.js', 'exports["."] resolves lib/index.js')
   check(manifest.dependencies === undefined, 'zero runtime dependencies')
   check(manifest.scripts?.postinstall === undefined && manifest.scripts?.preinstall === undefined, 'no install lifecycle scripts')
-  check(typeof manifest.scripts?.prepack === 'string', 'prepack vendors the binary')
+  // vendor/ is committed and verified instead of regenerated at pack time. A
+  // prepack hook makes installing from an unpinned git source fail with an
+  // allowBuilds error that never mentions this package (see README, Install).
+  check(manifest.scripts?.prepack === undefined, 'no prepack hook that would block a git install')
+  check(typeof manifest.scripts?.['vendor:check'] === 'string', 'vendor:check verifies the committed vendor/ files')
   // The storefront entry accepts raster icons only (an SVG is rejected), so the
   // manifest icon and the one the registry renders must be the same PNG.
   check(manifest.icon === './icon.png', 'icon points at the raster icon.png')

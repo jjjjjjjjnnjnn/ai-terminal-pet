@@ -43,18 +43,21 @@ pin the release tag. Both are verified end to end:
 
 ```sh
 # release tarball: no clone, no Go toolchain
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.1.0/dsh-ai-terminal-pet-1.1.0.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.0.0&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.1.0&path:/packages/dsh-ai-terminal-pet"
 ```
 
-Do not hand pnpm a bare repository URL. The package regenerates its vendored
-overlay in a `prepack` step, and pnpm blocks that step for unpinned git sources
-until you copy the `allowBuilds` key it prints into your profile's
-`pnpm-workspace.yaml`; the install fails with a message that never mentions AI
-Terminal Pet. Installing by package name (`add dsh-ai-terminal-pet`) starts
-working only after the npm release, which is currently blocked on credentials.
+Do not hand pnpm a bare repository URL. pnpm resolves a git dependency by
+running the package's lifecycle scripts, and it blocks those for unpinned
+git sources until you copy the `allowBuilds` key it prints into your profile's
+`pnpm-workspace.yaml`; the failure message never mentions AI Terminal Pet. The
+package therefore ships no lifecycle hook, and its vendored overlay is a
+committed file rather than a build product.
+
+Installing by package name (`add dsh-ai-terminal-pet`) starts working only after
+the npm release, which is currently blocked on registry credentials.
 
 `add` is the whole install: the profile records the dependency, and the bundle
 declares itself through `dsh.bundle.patch`, so no separate `enable` step exists.
