@@ -210,12 +210,14 @@
   `install.ps1` 从不新增 Run 值、递归删除只作用于一个经 `Assert-SafeInstallDirectory` 校验的目录；
   该仓库没有抑制机制，是否接受由维护者决定。
   同日 16:22Z 该仓库的 `build-registry`（run `42812806941`，schedule，12:05:32Z 起）跑完了：
-  `registry.json` 更新为 `generated_at 2026-11-10T14:14:03.842Z` / `count 26242`，本仓库条目有了
-  `pkg_name: dsh-ai-terminal-pet` 与 `version: 1.2.0`、topics 11 个，且**不带 `risk_tier` / `risk_flags`**；
-  `installability-report.json` 里也从 `verdict: script` 改成 **`verdict: bundle-plugin`**——根清单的
-  `dsh.bundle.patch` 终于被它看见。**但「没有 risk_tier」不等于 safe**：它的前端把缺字段渲染成「未评估」，
-  而扫描器本身没有抑制机制。**两条旗标的输入随后就消失了**：`evalRepoRisk` 只按文件名抓仓库根的
-  `install.ps1` / `install.sh` / `package.json`，而安装脚本已移进 `scripts/`（见下一条），它下次评估时读不到落点。
+  `installability-report.json` 里从 `verdict: script` 改成 **`verdict: bundle-plugin`**——根清单的
+  `dsh.bundle.patch` 终于被它看见。**但那次条目仍不带 `risk_tier`**：它的前端把缺字段渲染成「未评估」，
+  扫描器本身也没有抑制机制，所以「没有 risk_tier」当时不等于 safe。**到 18:08:44Z 那次重建就真的变成 safe 了**：
+  本仓库条目是 `pkg_name: dsh-ai-terminal-pet` / `version: 1.2.1` / topics 11 个 / **`risk_tier: "safe"` 且
+  `risk_flags` 为空**（`risk_at` 17:09:14Z，是安装脚本移进 `scripts/` 后第一次真的扫到本仓库）。
+  这不是靠抑制字段换来的——`evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，
+  脚本移走后那两个正则没有落点；issue #367 先回帖于 17:58:34Z（`#issuecomment-6775035737`），19:04:00Z
+  再补一条（`#issuecomment-6776560881`）写明 18:08:44Z 重建后已是 `safe`、旗标清零、可由此关闭。
 - **安装脚本下沉到 `scripts/`，消掉市场扫描器的两条误报**（`bdc6c36`，2026-11-10T17:38:20Z 推送，未发版）：仓库根的 `install.ps1`
   （27,358 B / 583 行）移到 `scripts/install.ps1`（现 27,930 B / 590 行），仓库根不再有同名文件。动机是 [DSH-Plugins-Marketplace]
   (https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的 `evalRepoRisk` **只按文件名抓仓库根的

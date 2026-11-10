@@ -36,12 +36,12 @@
   文件里的 `tarball` 生成安装命令，所以它给出的仍是 1.2.0 资产。跟进 PR #14063（指向 1.2.1）已被
   评论说明后关闭，改由 **#14076**（分支 `bump-tarball-1.2.2`，只改一行 `tarball:`）指向 1.2.2 的资产，
   等维护者合并；在那之前，目录里那条安装命令装到的仍是旧版本。
-  DSH-Plugins-Marketplace 当日 16:22Z 那次索引重建也完成了：本仓库从 `verdict: script` 改判为
-  **`verdict: bundle-plugin`**（`pkg_name: dsh-ai-terminal-pet`、`version: 1.2.0`、topics 11 个），
-  且该条目这次**没有被打任何风险档位**（既无 `risk_tier` 也无 `risk_flags`；前端对没有档位的条目按「未知」
-  渲染，不显示徽章），所以页面上不再有那个 critical 徽章；**但「没有档位」只是「未评估」不是「safe」**——
-  而 `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，安装脚本已于
-  2026-11-10 移进 `scripts/`（§27.11），它下次评估时读不到那两个正则的落点，旗标不会再产出。
+  DSH-Plugins-Marketplace 当日 16:22Z 那次重建把本仓库从 `verdict: script` 改判为 **`bundle-plugin`**；
+  到 18:08:44Z 那次重建（`risk_at` 17:09:14Z，是安装脚本移进 `scripts/` 后第一次真的扫到本仓库），条目是
+  `pkg_name: dsh-ai-terminal-pet`、`version: 1.2.1`、topics 11 个、**`risk_tier: "safe"` 且 `risk_flags` 为空**——
+  原先那个 critical 徽章（`registry-run-key`）与 medium 旗标（`remove-item-force-recurse`）就此消失。
+  `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，安装脚本已于
+  2026-11-10 移进 `scripts/`（§27.11），它读不到那两个正则的落点，也没用到任何抑制字段。
   npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，此前整场会话 E401），但**任何版本都还没发布到 npm**
   （`npm view` 仍 E404，且发布要求一次性密码，非交互 shell 里拿不到），所以按包名安装暂时不可达；
   `docs/market-index.json` 是仓库自建的 format-1 索引，钉在 1.2.2 的发布 commit（`694ff3f`），可让 Discover 先按 git 源可用。
@@ -1394,23 +1394,21 @@ git cat-file -s "$(git ls-files -s packages/dsh-ai-terminal-pet/vendor/AI-Termin
   `README.md` 又改了 13 B（6,652 → 6,665 B），摘要随之作废。**教训：dry-run 的摘要只在包内容不再变时有效。**
 - **`lib/release-pins.json` 未建**：下载回落当前是 no-op。它不是「功能未完成」而是「刻意留空」——
   没有它就没有远端资产可信；填它之前必须先有稳定的 Release 与 SHA-256。
-- **市场条目已改判，但风险档位只是「未知」不是「安全」**：DSH-Plugins-Marketplace 的
-  `installability-report.json` 在 2026-11-10T16:22Z 那次重建后已把本仓库从 `verdict: script`
-  改判为 **`verdict: bundle-plugin`**，`registry.json` 里也有了 `pkg_name: dsh-ai-terminal-pet` /
-  `version: 1.2.0` / topics 11 个，且该条目**没有 `risk_tier` 字段**。但按它的前端语义（`lib/client.js`），
-  缺 `risk_tier` 只是「未评估」——页面不渲染徽章，不等于评级为 safe。扫描器（`lib/domain/security-scan.js`）
-  **没有任何 suppress / allowlist 机制**，但两条旗标的输入已在 2026-11-10 消失：`evalRepoRisk` 只抓仓库根的
-  `install.ps1` / `install.sh` / `package.json`，而安装脚本已移进 `scripts/`（§27.11）。历史行号仅供查证——
-  `/CurrentVersion\Run(?:Once)?\b/i` 命中原根脚本 :31 的 `$RunKeyPath` 常量与 :353 的提示文本，
-  `/\bremove-item\s+[^\n]*-recurse[^\n]*-force/i` 命中 :308 的 `Remove-Item -Recurse -Force`（medium）。
-  移走后这两条正则已没有可匹配的根文件，`risk` 徽章不会因它们回来；但扫描器仍是启发式，换别的规则仍可能命中。
-  那两条旗标本身确实与本项目行为有关（自启项、递归清理），只是匹配点落在保护逻辑上——issue #367 已如实说明。
+- **市场条目已改判并拿到 `safe`**：DSH-Plugins-Marketplace 的 `installability-report.json` 在 16:22Z 那次重建后
+  已把本仓库从 `verdict: script` 改判为 **`verdict: bundle-plugin`**；`registry.json` 到 18:08:44Z 那次重建
+  （`risk_at` 17:09:14Z）是 `pkg_name: dsh-ai-terminal-pet` / `version: 1.2.1` / topics 11 个 /
+  **`risk_tier: "safe"` 且 `risk_flags` 为空**——`riskScorecardOf` 的语义是「无命中即 safe」，所以这不是「未评估」。
+  两条旗标的输入在 2026-11-10 消失：`evalRepoRisk` 只抓仓库根的 `install.ps1` / `install.sh` / `package.json`，
+  而安装脚本已移进 `scripts/`（§27.11）；历史行号仅供查证——`/CurrentVersion\Run(?:Once)?\b/i` 命中原根脚本
+  :31 的 `$RunKeyPath` 常量与 :353 的提示文本，`/\bremove-item\s+[^\n]*-recurse[^\n]*-force/i` 命中 :308 的
+  `Remove-Item -Recurse -Force`（medium）。扫描器仍无 suppress / allowlist，换别的规则仍可能命中，所以「safe」
+  只代表当前规则表下的结论。issue #367 已回帖说明（17:58:34Z 的 `#issuecomment-6775035737`，19:04:00Z 又补了 `#issuecomment-6776560881` 写明 18:08:44Z 重建后已是 `safe`、旗标清零、可关闭）。
 - **注册表条目与 `dsh.catalog` 不同步**：PR #13937 的 `data/plugins/<slug>.yml` 写的是它自己的
   `category` / `summary`，与包内 `dsh.catalog` 是两份独立文案；合并之后若要改文案，两边都得改。
 
 ### 27.8 仓库根的清单 shim 与 CI 里的插件套件（2026-11-10）
 
-`06d4cae` 加的是**仓库根**的 `package.json`（1.2.0 口径 1,877 B / 59 行），`d06001d` 让验证脚本与 CI
+`06d4cae` 加的是**仓库根**的 `package.json`（1,877 B / 59 行，1.2.0 到 1.2.2 都没变——只改了版本号那一位），`d06001d` 让验证脚本与 CI
 都覆盖到它。两件事合起来才让「按仓库 URL 安装」成为一条可长期成立的路，而不是一次手工碰运气。
 
 **根 shim 为什么必须存在**：`dsh plugin add github:owner/repo` 这类写法读的是**仓库根清单**。
@@ -1531,6 +1529,12 @@ commit: 4d777e32e0a9ef57bb7714287dccd7cae065346f, path: packages/dsh-ai-terminal
 移走后该分支不再命中，判定落到第二分支——根 `package.json` 的 `hasDshPluginDeclaration`（`pkg.dsh` 是对象）
 与 `isBundlePackage`（`dsh.bundle.patch` 非空字符串），结果是 `bundleDeclared` / type `bundle`。这与
 16:22Z 那次重建得出的 `verdict: bundle-plugin` 一致，等于两条独立证据指向同一结论。
+
+**两条风险旗标也随之消失**：18:08:44Z 那次 `build-registry` 重建（`risk_at` 17:09:14Z，是脚本移走后
+第一次真的扫到本仓库）把条目写成 **`risk_tier: "safe"`、`risk_flags` 为空**，`pkg_name` / `version: 1.2.1`
+也补上了。这不是靠抑制字段得到的——`evalRepoRisk` 抓不到根目录的脚本，正则表无从命中。issue #367
+先回帖于 17:58:34Z（`#issuecomment-6775035737`），19:04:00Z 再补一条（`#issuecomment-6776560881`）写明
+重建后的 scorecard 与 `verdict: bundle-plugin`，并建议由维护者关闭。
 
 **技术要点**：`param()` 的默认值在**参数绑定阶段**求值，此时脚本体的赋值还没执行，所以不能写
 `Join-Path $RepoRoot ...`；`$PSScriptRoot` 是唯一在那时就可用的自动变量，因此四个默认值写成
