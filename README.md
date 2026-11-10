@@ -5,7 +5,7 @@ Stop glancing across terminal windows to track agent states. It costs one small 
 ![ai-terminal-pet](docs/assets/hero.png)
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Go](https://img.shields.io/badge/go-1.23-00ADD8) ![Version](https://img.shields.io/badge/version-0.9.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green) ![Size](https://img.shields.io/badge/size-3.98%20MiB-blue) ![Dependencies](https://img.shields.io/badge/dependencies-3-informational) ![Tests](https://img.shields.io/badge/tests-140-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green) ![Size](https://img.shields.io/badge/size-4.17%20MiB-blue) ![Dependencies](https://img.shields.io/badge/dependencies-3-informational) ![Tests](https://img.shields.io/badge/tests-154-brightgreen)
 
 > 🇬🇧 [English](#english) &nbsp;·&nbsp; 🇨🇳 [中文](#中文)
 
@@ -102,8 +102,8 @@ Installation takes about 30 seconds on Windows using PowerShell:
 
 1. Build both executables:
    ```powershell
-   go build -trimpath -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
-   go build -trimpath -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
+   go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
+   go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
    ```
 
 2. Run the installer to copy binaries and sync assets:
@@ -113,8 +113,22 @@ Installation takes about 30 seconds on Windows using PowerShell:
 
 3. Verify that the installation works:
    ```powershell
-   ai-terminal-pet --json
+   & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
    ```
+4. Re-verify the installed artifacts at any time with per-file SHA256 checks:
+   ```powershell
+   .\install.ps1 -VerifyOnly
+   ```
+   It prints `install: verified - 10 file(s) match the repository, 0 warning(s)` and exits 0 only when every deployed artifact matches (the 10 artifacts are the overlay, the statusline shim, `protocol.js`, and the 7 files of the DeepSeek Harness bundle).
+   The installer itself stops a running overlay first and waits for the process to release its file handles; a plain file copy over a live binary fails at random, which is what the retry loop and the SHA256 comparison after every copy are for.
+5. Optional — put `ai-terminal-pet` on your PATH so you can type the bare command:
+   ```powershell
+   .\install.ps1 -AddToPath
+   ```
+   It writes **only** `HKCU\Environment\Path` (never `HKLM`), backs the previous value up to `<install dir>\path-backup.txt` first, and does nothing if the directory is already listed. **Open a new terminal** for the change to take effect. `-Uninstall` also removes that PATH entry, so uninstalling does not leave a dead entry behind (the previous value is backed up again, this time into `%TEMP%`).
+   Without this step the installer does not touch your PATH at all, so keep using the full path `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`.
+
+Run `ai-terminal-pet --doctor` at any point after installing to self-check the environment, install files, runtime state, pipe, autostart entry, and node availability. To remove the deployed artifacts, run `.\install.ps1 -Uninstall`; it asks for a typed `yes` confirmation first, refuses unsafe target directories, and accepts `-Force` for unattended removal.
 
 Installing a terminal hook is required for that terminal to report; see the next section to connect your tools.
 
@@ -127,6 +141,8 @@ Installing a terminal hook is required for that terminal to report; see the next
 | Antigravity | Set `statusLine.command` to `pet-statusline.exe` and configure `antigravity-hook.js` for agent and tool events | Fast statusline updates, agent state changes, and permission request forwarding |
 | DeepSeek Harness | Install the Cordis bundle from `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge\` via the plugin manager (`install_bundle`) | turn/start to working, tool/call to tool_use, approval/asked to waiting_permission, tool/result with an error to error, turn/end to idle, process exit to closed |
 | Anything else | Run `node reporters/generic.js` with `--source`, `--state`, and `--project` flags | Instant status reporting from any custom script or CLI tool |
+
+Writing your own reporter for a tool that is not listed here needs no source reading: [docs/PROTOCOL.md](docs/PROTOCOL.md) specifies the wire protocol (fields, state semantics, pipe-name derivation, acknowledgment contract, and redaction rules) that a conforming reporter must implement.
 
 The Harness side is a host-only Cordis bundle: it holds no pipe-name, state-set or snapshot logic of its own, it loads the protocol from `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` and delegates everything to it.
 
@@ -144,6 +160,8 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 ### Control it from a script
 
+The commands below assume `ai-terminal-pet` is on your PATH (install step 5, `.\install.ps1 -AddToPath`). If you skipped that step, prefix every command with the full path instead: `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`.
+
 | Command | Effect |
 |---|---|
 | `ai-terminal-pet` | Start the overlay (no-op if already running) |
@@ -153,6 +171,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --settings` | Open the settings window |
 | `ai-terminal-pet --quit` | Stop the running overlay |
 | `ai-terminal-pet --json` | Print the current sessions as JSON (add `--pretty` for formatted output) |
+| `ai-terminal-pet --doctor` | Run 9 environment and install checks; exit code 1 when a check fails. Again: needs the install directory on PATH, or call it by full path |
 | `ai-terminal-pet --autostart` | Report the run-at-logon state |
 | `ai-terminal-pet --autostart=on` | Enable run at logon |
 | `ai-terminal-pet --autostart=off` | Disable run at logon |
@@ -210,11 +229,11 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 - **Native hook binary**: A unified `pet-hook.exe` executable to eliminate per-event Node.js spawns for Claude Code and Antigravity (planned).
 
-- **Protocol specification**: A formal `docs/PROTOCOL.md` document defining the wire protocol for custom reporter implementations (planned).
-
 - **Cross-platform support**: Extracting the UI layer behind a presenter interface with Unix domain socket transport for macOS and Linux (not started).
 
-- **Binary size reduction**: Bring both executables under 5 MiB combined, targeting under 2.5 MiB for the main binary (currently 3.7 MiB) by stripping reflection metadata, dropping unused packages, and replacing the regexp-based redaction in pet-statusline with a hand-written scanner (planned).
+- **Binary size reduction**: Bring the main executable under 2.5 MiB (currently 4.17 MiB) by stripping reflection metadata and dropping unused packages, and replace the regexp-based redaction in pet-statusline with a hand-written scanner.
+
+Shipped after v0.9.0: the wire protocol specification ([docs/PROTOCOL.md](docs/PROTOCOL.md)) and the `ai-terminal-pet --doctor` self-check command, so both items previously listed here as pending are now available.
 
 ### Non-goals
 
@@ -232,11 +251,16 @@ Run verification commands when modifying code:
 ```powershell
 go vet ./...
 go test -count=1 ./...
-node --check reporters/*.js
+# node --check only validates the FIRST file it is given, so check each one:
+for f in reporters/*.js; do node --check "$f"; done
 node integrations/deepseek-harness/verify.mjs
 $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 ```
+
+`-buildvcs=false` in the two build commands is not decoration: it strips the VCS stamp, which encodes the commit and working-tree state at build time. Two builds of the same source therefore produce identical bytes, on any machine and at any date. Without it a rebuild of `pet-statusline.exe` weighs 3,644,416 B instead of 3,643,392 B, so `.\install.ps1 -VerifyOnly` — which compares the installed files against the copy in your working tree — reports a false failure whenever one side carries the stamp and the other does not. The binaries themselves are not committed (`bin/` is ignored); you always build them locally.
+
+`.\install.ps1 -VerifyOnly` re-checks every installed artifact against the recorded SHA256 list, and `.\install.ps1 -Uninstall` removes them. CI runs the same gates on every push: `.github/workflows/ci.yml` builds on `windows-latest` and fails the job on any `gofmt -l` output, `go vet` finding, failing `go test -count=1 ./...`, unsuccessful `go build -trimpath -buildvcs=false -ldflags "-s -w"` build, any reporter failing its own `node --check`, or failed `node integrations/deepseek-harness/verify.mjs`.
 
 ---
 
@@ -327,17 +351,27 @@ AI 编码终端 (Claude Code / OpenCode / Antigravity)
 
 ```powershell
 # 1. 编译主程序与原生状态栏 shim
-go build -trimpath -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
-go build -trimpath -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
+go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
+go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
 
 # 2. 安装到系统本地目录并做哈希校验
 .\install.ps1
 
-# 3. 验证安装输出
-ai-terminal-pet --json
+# 3. 验证安装输出（未把安装目录加进 PATH 时用全路径）
+& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
+
+# 4. 随时复核已部署制品（逐项 SHA256 校验）
+.\install.ps1 -VerifyOnly
+
+# 5. 可选：把安装目录加进用户 PATH，之后可以只敲 ai-terminal-pet
+.\install.ps1 -AddToPath
 ```
 
-`install.ps1` 在安装时会自动停止正在运行的浮窗，等待系统进程释放文件句柄，并在拷贝后对主程序、状态栏 shim、协议脚本和插件包逐一执行 SHA256 哈希校验。
+`install.ps1` 在安装时会自动停止正在运行的浮窗，等待系统进程释放文件句柄，并在拷贝后对主程序、状态栏 shim、协议脚本和插件包逐一执行 SHA256 哈希校验。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 10 file(s) match the repository, 0 warning(s)` 并以 0 退出（10 项 = 主程序 + 状态栏 shim + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
+
+第 5 步是可选的：`-AddToPath` 只写 `HKCU\Environment\Path`（绝不碰 `HKLM`），写入前先把原值备份到 `<安装目录>\path-backup.txt`，目录已在 PATH 中时不做任何改动；**改完要新开一个终端**才生效；`-Uninstall` 卸载时会一并移除这条 PATH 记录（原值同样先备份，备份位置改为 `%TEMP%`），不会留下指向已删目录的死条目。不加这个开关时安装脚本不会动 PATH，请继续用全路径 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
+
+装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性以及开机自启项共 9 项。需要清理已部署的制品时运行 `.\install.ps1 -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。
 
 安装完成后浮窗与状态栏 shim 已部署就绪，但终端默认不会自动推送事件；你必须按照下一节的说明，为正在使用的终端环境配置对应的上报端。
 
@@ -355,6 +389,8 @@ ai-terminal-pet --json
 | DeepSeek Harness | 在官方插件管理器中运行 `install_bundle`，传入 `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge\` 的绝对路径。 | 真实事件映射：turn/start→working、tool/call→tool_use、approval/asked→waiting_permission、tool/result 出错→error、turn/end→idle、进程退出→closed。 |
 | 其他任意 CLI | 在状态变化时调用 `reporters/generic.js`。支持通过命令行参数或标准输入管道传递状态。 | 一行脚本接入任意外部 CLI 或自定义脚本任务。 |
 
+如果要为上面未列出的终端自行编写上报端，无需阅读源码：[docs/PROTOCOL.md](docs/PROTOCOL.md) 完整规定了上报端必须遵守的线协议——字段定义、状态语义、管道名派生规则、`OK`/`ERR` 回执契约与脱敏要求。
+
 Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状态集与快照逻辑，它从 `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` 加载协议，全部委托给官方 protocol.js。
 
 针对 Antigravity CLI，推荐将状态栏命令直接指向编译好的原生二进制 `pet-statusline.exe`。在开启杀毒软件的机器上，原生 shim 能够消除频繁启动 Node 运行时的进程创建延迟。
@@ -371,6 +407,8 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 ### 用脚本控制它
 
+下表默认 `ai-terminal-pet` 已在 PATH 中（即安装第 5 步执行过 `.\install.ps1 -AddToPath`）。若跳过了那一步，请把每条命令换成全路径形式，例如 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
+
 浮窗提供完整的命令行控制参数，各命令行为如下：
 
 | 命令 | 作用 |
@@ -382,6 +420,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --settings` | 打开三页设置窗口 |
 | `ai-terminal-pet --quit` | 退出正在运行的浮窗进程 |
 | `ai-terminal-pet --json` | 打印当前会话状态 JSON（可加 `--pretty`） |
+| `ai-terminal-pet --doctor` | 运行 9 项环境与安装自检，任一失败时退出码为 1。同样需要安装目录在 PATH 中，否则请用全路径调用 |
 | `ai-terminal-pet --autostart` | 查询当前的开机自启状态 |
 | `ai-terminal-pet --autostart=on` | 设置为登录时自动启动 |
 | `ai-terminal-pet --autostart=off` | 取消开机自启设置 |
@@ -432,10 +471,10 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 以下为当前计划进行的改进项：
 
 - **上报端原生化**：计划开发统一的原生二进制 `pet-hook.exe`（支持 `--mode=claude|antigravity`），替代每次事件拉起 Node 运行时的开销。
-- **协议规范文档**：计划补充完善 `docs/PROTOCOL.md`，使第三方开发者无需查阅源码即可编写合规的上报端。
 - **跨平台抽象探索**：计划将窗口渲染层抽象为通用接口，为后续探索基于 Unix 域套接字的平台移植奠定结构基础。
-- **自检诊断工具**：计划增加 `--doctor` 命令，用于自动排查互斥体状态、窗口可见性、管道连通性与配置异常。
-- **二进制体积压缩**：计划将主程序体积从现状 3.7 MiB 降至 2.5 MiB 以内，两个可执行文件合计控制在 5 MiB 以内。手段包括剥离无用反射元数据、去掉未用包，以及把 pet-statusline 里基于 regexp 的脱敏规则改成手写扫描器。
+- **二进制体积压缩**：计划将主程序体积从现状 4.17 MiB 降至 2.5 MiB 以内。手段包括剥离无用反射元数据、去掉未用包，以及把 pet-statusline 里基于 regexp 的脱敏规则改成手写扫描器。
+
+v0.9.0 之后已交付：线协议规范文档 [docs/PROTOCOL.md](docs/PROTOCOL.md)（第三方可据此编写合规上报端）与 `ai-terminal-pet --doctor` 自检命令，原先列在此处的两项待办均已完成。
 
 ### 非目标（明确不做）
 
@@ -459,11 +498,15 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 go vet ./...
 go test -count=1 ./...
 
-# 上报端脚本语法与适配校验
-node --check reporters/*.js
+# 上报端脚本语法与适配校验（node --check 只校验第一个参数，必须逐个检查）
+for f in reporters/*.js; do node --check "$f"; done
 node integrations/deepseek-harness/verify.mjs
 
 # UI 布局光栅化预览（在临时目录生成 PNG）
 $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 ```
+
+安装步骤里那两条构建命令的 `-buildvcs=false` 不是装饰：它会去掉 VCS 戳记，而戳记里含构建时的 commit 与工作区状态，所以同一份源码**在任何机器、任何时间**重建出的产物字节一致。少了这个旗标，重建的 `pet-statusline.exe` 会带上戳记变成 3,644,416 B（不带戳记是 3,643,392 B），`install.ps1 -VerifyOnly` 一旦发现两侧（已部署副本 vs 工作区的 `bin/`）构建方式不同就会误报失败。二进制本身不入库（`bin/` 被 `.gitignore` 忽略），每次都要在本地重建。
+
+`.\install.ps1 -VerifyOnly` 用于随时复核已部署制品与记录的 SHA256 清单是否一致，`.\install.ps1 -Uninstall` 用于清理部署。CI 在同一组门禁上把关：`.github/workflows/ci.yml` 在 `windows-latest` 上运行，`gofmt -l` 有任何输出、`go vet` 有任何发现、`go test -count=1 ./...` 失败、`go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 报错或 `node integrations/deepseek-harness/verify.mjs` 失败，都会让流水线失败。

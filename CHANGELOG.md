@@ -30,7 +30,132 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-未发布版本：无。
+未发布版本：见下方 `[Unreleased]` 段——2026-11-10 在 v0.9.0 之上完成的文档、自检工具、安装脚本与 CI 改动，
+版本常量仍是 `0.9.0`，尚未发版。
+
+---
+
+## [Unreleased] — 2026-11-10
+
+这一批不发新版本号（`internal/app/app_windows.go` 里的 `Version` 仍是 `0.9.0`），
+目的是让这个仓库在**别人的机器上**也能跑通、自查、接入与持续验证：可移植性、`--doctor` 自检、
+正式线协议文档、安装脚本的只读/卸载/Path 开关，以及 GitHub Actions 门禁。详细 runbook 见
+[docs/HANDOVER.md](docs/HANDOVER.md) §1（当前状态）与 [docs/ROADMAP.md](docs/ROADMAP.md) §1i。
+
+### Added
+
+- **`ai-terminal-pet --doctor`**（`internal/app/doctor_windows.go` 563 行 + 375 行测试 /
+  14 个 `func Test`）：一次跑完 **9 项**自检——`environment`（编译目标与 `LOCALAPPDATA`）、
+  `install files`（安装目录里的 `AI-Terminal-Pet.exe` / `pet-statusline.exe` / `protocol.js`）、
+  `version`、`runtime`（快照目录）、`config`、`pipe`、`instance`、`node`、`autostart`。
+  每项输出一行 `[ok]` / `[warn]` / `[fail] name: detail`，末行汇总 `doctor: N ok, N warn, N fail`，
+  任一 `fail` 时退出码为 **1**；退出码经 `errDoctorFailed` 哨兵值传递，因此**不会写进 `error.log`**
+  （自检失败是用户主动请求的诊断结果，不是程序自己出了故障）。用法错误仍走 `usageError` → 退出码 **2**。
+  - **刻意不碰互斥体**：`CreateMutex` 会**创建**这个对象、干扰正在运行的实例，所以 `checkInstance`
+    改用「管道有人监听」作为实例存在的证据。
+  - 管道探测 `probePipe` 连上即关（`doctorDialTimeout` 250 ms），不写任何字节——服务端把立即 EOF
+    当作空负载、不会触发 update 回调，所以跑 doctor 不会改变浮窗显示的内容。
+  - `node` 探测 `node --version` 限时 300 ms，并把 `Missing` 与 `TimedOut` 分开：
+    「没装 Node」和「装了但没应答」对用户是两件相反的事。子进程带 `HideWindow`，从快捷方式启动时不闪黑框。
+  - 每项检查都包在 `runCheck` 的 recover 墙里：将来某一项 panic 只产出它自己的 `fail` 行，
+    不会带走另外八项；返回空 verdict 也会被计成 `fail` 而不是悄悄消失。
+  - 只提供人读文本，**没有 `--json` 变体**：报告是贴进 issue 的，每行已经比可解析格式更好读。
+- **`docs/PROTOCOL.md`**（388 行）：正式线协议规范。第三方为未列出的终端自行编写上报端时
+  不必再读源码，字段、状态语义、管道名派生规则、`OK`/`ERR` 回执契约与脱敏要求都在这里；
+  schema 变更流程见该文档 §11。
+- **`reporters/package.json`**（26 行）：给 `reporters/` 目录写显式 `exports`，覆盖 6 个 `.js`
+  （`protocol.js`、`opencode.js`、`claude-hook.js`、`antigravity-hook.js`、`antigravity-statusline.js`、
+  `generic.js`），不再依赖 Node 的隐式解析；`private: true`，不发布到 npm。
+  **刻意不写 `"type"` 字段**：5 个 hook 是 `require()` 的 CommonJS，而 `opencode.js` 是真正的 ESM——
+  写 `"module"` 会打断前者，写 `"commonjs"` 会打断后者。无名 type 的代价是首次 import `opencode.js` 时
+  Node 打印一条 `MODULE_TYPELESS_PACKAGE_JSON` 提示并按语法探测重解析为 ESM：预期行为，只多一次解析。
+  把 `opencode.js` 改名 `.mjs` 的方案被否决，因为 README 与用户配置里引用的是 `.js` 路径。
+- **Harness 桥 README 去掉写死的主机路径**：`integrations/deepseek-harness/ai-terminal-pet-bridge/README.md`
+  里那句给用户照抄的 `plugin_manager` 目标原为 `C:\Users\<name>\...`，现改为
+  `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge` 并补三行说明：该字符串是贴进
+  Harness 插件管理器的路径，按用户解析才有意义，写死某个用户名在别人机器上必然不对。
+- **`.github/workflows/ci.yml`**（130 行）：`windows-latest` 上的单 job 门禁，任一失败即挂——
+  `gofmt -l` 有任何输出、`go vet ./...` 有发现、`go test -count=1 ./...` 失败、两个
+  `go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 失败、
+  `node integrations/deepseek-harness/verify.mjs` 失败。细节：`concurrency` 让同分支的新推送取消旧运行；
+  `fetch-depth: 1`（只要树）；`go-version-file: go.mod` 让 `go.mod` 的 `go 1.23.0` 成为唯一工具链来源；
+  Node 22（ESM 语法探测自 22.7.0 起默认开启）；`core.autocrlf` 显式关掉，避免 runner 检出 CRLF 让
+  `gofmt` 误报。**`node --check` 是逐文件循环而不是 `node --check reporters/*.js`**：
+  后者只检查第一个参数（Node 24 实测：第二个参数是坏文件也退出 0），循环是唯一真正覆盖全部文件的写法。
+  live-desktop 探针测试在对应 `PET_*` 变量未设置时 `Skip`，所以不需要桌面会话或任何 secret。
+
+### Changed
+
+- **构建命令统一加 `-buildvcs=false`**：`go build -trimpath -ldflags "-s -w"` →
+  `go build -trimpath -buildvcs=false -ldflags "-s -w"`，四处同步——`install.ps1` 的缺失文件提示、
+  `.github/workflows/ci.yml` 的两条 build 步骤、`AGENTS.md` 的 Production build、README 的安装步骤。
+  **为什么必须加**：不加时二进制里带一块 VCS 戳记，而戳记含构建时的 commit 与工作区状态，所以同一个
+  提交在不同时间、不同机器上重建出的产物字节不同；`install.ps1 -VerifyOnly` 只要发现已部署副本与工作区
+  里的 `bin/` 是两种构建方式下的产物，就会误报 `[fail]`。二进制本身不入库（`.gitignore` 忽略 `bin/`）。
+  **实测差值**：加上之后 `pet-statusline.exe` 由 **3,644,416 B → 3,643,392 B**（差 1,024 B，
+  即被去掉的戳记），主程序两种写法同为 **4,371,968 B**。
+  按新命令重建后 sha256：主程序 `bbb5163c296cd460d7c9a4c85e10342e125c0bd8017a065f913aa01567d41f0a`、
+  shim `31c21739c60e427a387e1360b19395c5f3e9b48fc7597820bcb983a348b82328`；
+  `install.ps1 -VerifyOnly` 实测 **10/10 `[ok]`**、末行
+  `install: verified - 10 file(s) match the repository, 0 warning(s)`、exit 0。
+- **`install.ps1` 三个新开关**，并新增 `Assert-SafeInstallDirectory` 等保护：
+  - **`-VerifyOnly`**：只读，绝不写文件。按**同一份 10 项制品清单**（5 个分组：overlay / statusline /
+    protocol / bundle manifest / bundle runtime）逐项比对仓库侧与已部署侧的 SHA256，
+    每项打印 `[ok]` / `[warn]` / `[fail]`，末尾分组小计；全部吻合才打印
+    `install: verified - N file(s) match the repository` 并 `exit 0`，否则 `install: not verified`
+    并 `exit 1`。清单只有一处定义（`Get-InstallArtifacts`），因为「校验集 ≠ 安装集」正是过去
+    一次升级后残留旧 `protocol.js`、所有上报端静默失联的成因。
+  - **`-Uninstall`**：先要求输入 `yes`（无控制台且未加 `-Force` 时 `exit 2`；用户拒绝时 `exit 3`，
+    什么都没删），然后停掉浮窗与 shim、删安装目录（5 次重试，防 reporter 中途重新拉起），
+    只在 `HKCU\...\Run` 条目**指向被删目录内部**时才删除该条目（指向别的副本的条目属于那个副本），
+    并调用 `Remove-InstallDirectoryFromUserPath` 清掉 `-AddToPath` 写入的那条 PATH 条目以避免死条目——
+    此时安装目录即将消失，PATH 原值改备份到 `%TEMP%`。PATH 清理失败只报 `[warn]`：文件已经删了，
+    残留条目是整洁问题而非失败。
+    `Assert-SafeInstallDirectory` 拒绝盘根与任何叶子名不是 `AI-Terminal-Pet` 的目录——
+    **`-Force` 不绕过名字检查**，只跳过确认；一个只靠提示词兜底的卸载器离误删只差一次手滑。
+  - **`-AddToPath`**：只写 `HKCU\Environment` 的 `Path`，绝不碰 HKLM（工具是按用户装的，
+    机器级 PATH 需要管理员权限且会改到这台机器上的所有账号）。写入前把原值（含注册表值类型）
+    备份到 `<安装目录>\path-backup.txt`，已在 PATH 中则不改动只回报。
+  - 三个开关的互斥组合在参数解析阶段就以 `[fail]` + `exit 2` 拒绝（`-VerifyOnly` 与 `-Uninstall` 互斥，
+    `-AddToPath` 不能与这两个同时用）。
+- **安装目录的"装完就是好的"改为"随时可证"**：README 的安装步骤多了第 4 步 `-VerifyOnly`，
+  并在装完后用 `--doctor` 自查；卸载与 Path 开关同样写进 README 的中英两半。
+- **`.gitattributes` 固定 `* text=auto eol=lf`**（`1330fbe`）：仓库本来就按 LF 存取，但 Windows 上
+  `core.autocrlf=true` 会一直报规范化警告；钉进树里之后警告消失，Go 源码与 Markdown 在各次克隆间字节一致。
+
+### Fixed
+
+- **可移植性：`docs/assets/render_assets.py` 不再写死本机绝对路径**（`98 行`改动）。
+  旧版把 `PREVIEW` 写成 `C:\Users\<本人>\AppData\Local\Temp\petpreview2`、`ASSETS` 写成
+  `C:\Users\<本人>\Desktop\项目开发\ai-terminal-pet\docs\assets`，任何别人的克隆一跑就断。
+  现在预演目录读环境变量 `PET_PREVIEW_DIR`、输出目录取 `Path(__file__).resolve().parent`；
+  变量未设置或目录不存在时打印中英双语的可执行提示（先跑哪两条 `go test`）并 `exit 2`，
+  缺 Pillow 同样给出 `pip install pillow` 后 `exit 2`，而不是抛 Python traceback。
+  另外 `sys.stdout`/`sys.stderr` 显式 `reconfigure(encoding="utf-8")`，保证在非 UTF-8 代码页下重定向时中文不乱码。
+- **测试夹具里的本机路径全部中性化**：`internal/platform/focus_windows_test.go`（3 处）、
+  `internal/platform/presence_windows_test.go`（4 处）、`internal/pipeserver/server_windows_test.go`（1 处）
+  原先把 `C:\Users\<本人>\Desktop\项目开发\...` 当作期望值钉在测试里，
+  现在换成 `C:\work\项目\...` / `C:/Users/pet-test` 等中性路径。
+- **管道名测试改为按算法现算**：`TestPipePathForUserMatchesReporterAlgorithm` 过去硬编码
+  `-42ce7d78` 并 `t.Setenv("USERPROFILE", `C:\Users\rongj``)，现在用
+  `sha256.Sum256([]byte(`c:\users\pet-test`))` 取前 4 字节转 8 位十六进制得到期望后缀，
+  并特意用**混合大小写 + 结尾分隔符**的输入，仍然钉住 Go/JS 共享契约
+  （home 小写化 → 去尾分隔符 → 取 sha256 前 4 字节）。
+- **删除七处不可达声明**（`3fd49c3`，staticcheck U1000）：`internal/store/store.go` 的 `(*Store).remove`、
+  `internal/ui/app_windows.go` 的 `messageEnvelope.reserve` 与 `(*App).clampToMonitor`、
+  `internal/ui/canvas_windows.go` 的 `fillPolygon` / `alphaAt` / `pointInside` / `canvasPoint`。
+  行为不变，`gofmt` / `go vet` / `go test` 保持干净，没有为了消 warning 加 `//nolint` 或假引用。
+  唯一保留的 staticcheck 发现是 `internal/ui/win32_api_windows.go` 里 `syscall.Syscall9` 的 SA1019，
+  因为 `UpdateLayeredWindow` 的调用签名需要它。
+
+### Docs
+
+- **README 重写并配真实截图**（`7c0aaaa`，双语严格镜像）：安装、CLI、五类终端接入、路线图、非目标、
+  从源码开发全部对齐 v0.9.0 之后的事实；`docs/assets/README.md`（`4574cba`）逐个说明 8 张 PNG
+  的用途与复现步骤（两张 preview 测试共享同一个 `PET_PREVIEW_DIR`），并标注 3 张未被 README 引用的变体为何保留。
+- **停用期 runbook 归档**（`8ada28b`）：`docs/HANDOVER.md` §1–§12（2026-09-24 全局停用态）逐字搬入
+  `docs/archive/HANDOVER-2026-09-DISABLE.md`，正文只留指回链接；`docs/archive/README.md` 成为归档索引。
+- 早期宣传稿与草稿移入 `docs/archive/promo-2026-11-09/`，不再混在对外文档里。
 
 ---
 

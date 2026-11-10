@@ -1,6 +1,6 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 **2026-11-09（v0.9.0）**（上一版快照为 2026-09-26 的 v0.5.0）。本文分四块：现状基线、
+> 快照时间 **2026-11-10（v0.9.0 + 未发版增量）**（上一版快照为 2026-11-09 的 v0.9.0）。本文分四块：现状基线、
 > 已交付批次、扩展计划、轻量化计划，以及一组实用功能候选与非目标。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
 >
@@ -9,14 +9,14 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-09，v0.9.0） |
+| 维度 | 数值（2026-11-10，v0.9.0 + 未发版增量） |
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
 | 版本 | `0.9.0`（`internal/app/app_windows.go:23`） |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,178,432 B**（`-trimpath -ldflags "-s -w"`） |
-| 状态行 shim | `bin/pet-statusline.exe` **3,644,416 B** |
-| 代码量 | Go 非测试源码 **10,201 行** / 测试 **3,831 行** / JS **1,633 行**（47 个 .go 文件，合计 14,032 行） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,371,968 B**（4.17 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 状态行 shim | `bin/pet-statusline.exe` **3,643,392 B**（3.47 MiB，合计 8,015,360 B = 7.64 MiB） |
+| 代码量 | Go 非测试源码 **10,719 行** / 测试 **4,212 行** / JS **1,742 行**（49 个 .go 文件，合计 14,931 行） |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
@@ -26,11 +26,66 @@
 | 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
 | 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；扫描 5 s / 存活探测 10 s |
 | 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run`（开机自启）· `approvals\`（auto-approve 握手） |
-| 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--version/--help` |
-| 单测 | **140 个 `func Test`**（ui 49 / store 26 / platform 20 / config 13 / app 9 / autostart 8 / pipeserver 7 / session 5 / i18n 3） |
+| 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--doctor/--version/--help` |
+| 单测 | **154 个 `func Test`**（ui 49 / store 26 / app 23 / platform 20 / config 13 / autostart 8 / pipeserver 7 / session 5 / i18n 3） |
+| 持续集成 | `.github/workflows/ci.yml`（130 行）：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 两个 `-trimpath -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` |
+| 自检 | `ai-terminal-pet --doctor` 9 项（environment / install files / version / runtime / config / pipe / instance / node / autostart），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
+| 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图 |
 
 ## 1. 已交付批次（按时间倒序）
+
+### 1i. 2026-11-10（v0.9.0 之后，未发版）—— 可移植性、--doctor、线协议文档、CI
+
+**动机**：v0.9.0 让浮窗「能调」，但是要交给别人用还差四件事——
+(1) 仓库里写死了只有作者本机才存在的绝对路径，别人 clone 下来跑不通；
+(2) 浮窗失败是**静默**的，装错了、管道没通、Node 不在，从外面看都是「宠物没出现」，
+    用户没法自己查；(3) 协议只写在代码里，第三方想写上报端必须读源码；
+(4) 没有任何自动门禁，改坏了要等下一次手动跑测试才发现。这一批把四件事一起补上，**不发版本号**，
+`internal/app/app_windows.go` 的 `Version` 仍是 `0.9.0`。
+
+- **`--doctor` 自检**（`internal/app/doctor_windows.go` 563 行 + 375 行测试 / 14 个 `func Test`）：
+  9 项检查 environment / install files / version / runtime / config / pipe / instance / node / autostart，
+  逐行 `[ok]`/`[warn]`/`[fail] name: detail`，末行 `doctor: N ok, N warn, N fail`，任一 fail 退出码 1。
+  退出码走 `errDoctorFailed` 哨兵而不是 `writeError`——自检失败是用户**主动请求**的诊断结果，
+  记进 `error.log` 会把真正的故障埋掉；用法错误仍是 `usageError` → 退出码 2。
+  **不探测互斥体**：`CreateMutex` 会**创建**对象并干扰正在运行的实例，所以 `checkInstance` 改用
+  「管道有人监听」作为证据。管道探测连上即关（250 ms 上限、不写字节，服务端把立即 EOF 当空负载，
+  因此跑 doctor 不会改变浮窗显示）。node 探测 `node --version` 限 300 ms 并把 `Missing`/`TimedOut` 分开。
+  每项包在 `runCheck` 的 recover 墙里，将来某一项 panic 只产出它自己的 fail 行。
+  没有 `--json` 变体：这份报告是贴进 issue 给人读的。
+- **`docs/PROTOCOL.md`**（388 行）落地，E2 的主要产物：字段、状态语义、优先级、
+  管道名派生算法、`OK`/`ERR` 回执契约、脱敏规则成文，schema 变更流程见该文档 §11。
+- **`reporters/package.json`**（26 行）：显式 `exports` 覆盖 6 个 `.js`，不再依赖隐式解析；
+  `private: true` 不发布。**刻意不写 `"type"`**——5 个 hook 是 CommonJS、`opencode.js` 是真 ESM，
+  写任一值都会打断另一半；代价是首次 import 时一条 `MODULE_TYPELESS_PACKAGE_JSON` 提示并按语法重解析，
+  属预期行为。改名为 `.mjs` 的方案被否决（README 与用户配置引用的是 `.js`）。
+- **`.github/workflows/ci.yml`**（130 行）：`windows-latest` 单 job 门禁——
+  `gofmt -l` 有输出即挂 / `go vet` / `go test -count=1` / 两个 `-trimpath -ldflags "-s -w"` 构建 /
+  **逐文件** `node --check` / `node integrations/deepseek-harness/verify.mjs`。
+  「逐文件」不是装饰：`node --check a.js b.js` 只检查第一个参数（Node 24 实测第二个参数是坏文件也退出 0），
+  所以 `node --check reporters/*.js` 只能守住字母序第一个文件。live-desktop 探针在对应 `PET_*`
+  变量未设置时 `Skip`，runner 不需要桌面会话或 secret。
+- **`install.ps1` 三个开关** + `Assert-SafeInstallDirectory`：
+  `-VerifyOnly` 只读、按**同一份** 10 项制品清单（5 组）逐项 SHA256 比对，全对才 `install: verified` / `exit 0`，
+  否则 `exit 1`——「校验集 ≠ 安装集」正是过去残留旧 `protocol.js`、所有上报端静默失联的成因；
+  `-Uninstall` 需输入 `yes`（无控制台且无 `-Force` 时 `exit 2`，用户拒绝 `exit 3`），
+  拒绝盘根与叶子名不是 `AI-Terminal-Pet` 的目录（**`-Force` 只跳过确认、不绕过名字检查**），
+  只在 `HKCU\...\Run` 条目指向被删目录内部时才删该条目，并调用 `Remove-InstallDirectoryFromUserPath`
+  清掉 `-AddToPath` 写入的 PATH 条目（安装目录即将消失，PATH 原值改备份到 `%TEMP%`；清理失败只报 `[warn]`）；
+  `-AddToPath` 只写 `HKCU\Environment\Path`（绝不碰 HKLM），写前把原值连注册表值类型备份到
+  `<安装目录>\path-backup.txt`。三个开关的非法组合在参数解析阶段就以 `[fail]` + `exit 2` 拒绝。
+- **可移植性**：`docs/assets/render_assets.py` 去掉写死的本机绝对路径（预演目录读 `PET_PREVIEW_DIR`、
+  输出目录取 `Path(__file__).resolve().parent`），缺变量/缺目录/缺 Pillow 都给人话提示并 `exit 2`；
+  `internal/platform/focus_windows_test.go`（3 处）、`presence_windows_test.go`（4 处）、
+  `internal/pipeserver/server_windows_test.go`（1 处）的本机路径换成中性路径，
+  管道名测试改为按 `sha256` 现算期望后缀（输入特意用混合大小写 + 结尾分隔符，仍钉住 Go/JS 共享契约）。
+- **删除七处不可达声明**（`3fd49c3`，staticcheck U1000）：`(*Store).remove`、
+  `messageEnvelope.reserve`、`(*App).clampToMonitor`、`fillPolygon`/`alphaAt`/`pointInside`/`canvasPoint`；
+  行为不变，未加 `//nolint` 或假引用。
+- **`.gitattributes` 钉 `* text=auto eol=lf`**（`1330fbe`）：消除 Windows `core.autocrlf` 下反复的规范化警告，
+  Go 源码与 Markdown 在各次克隆间字节一致。
+- 详细 runbook：HANDOVER §1（当前状态）。
 
 ### 1h. 2026-11-08/09（v0.9.0）—— 设置窗口、四套合成音效、按会话告警、DSH 桥
 
@@ -266,11 +321,11 @@ Go 原生 shim 稳态 0.5–0.9 s，比 node 路径的 13–17 s（经 runner）
 用 `--mode=claude|antigravity` 区分事件映射。三个 JS hook 保留为参照实现与降级路径。
 **验收**：同 payload 下原生与 JS 输出同一 session PID（FNV-1a UTF-16 已对齐）与同一 state。
 
-### E2 — 通用接入成为一等公民 ⏳ 未开工
+### E2 — 通用接入成为一等公民 ✅ 已交付（2026-11-10，见 §1i）
 
-**现状**：`docs/PROTOCOL.md` 仍不存在（2026-11-09 确认）。`reporters/generic.js` 已可用，
+**现状**：`docs/PROTOCOL.md` **已交付**（388 行，2026-11-10）。`reporters/generic.js` 已可用，
 DeepSeek Harness 桥是现成的第三个接入样例（`integrations/deepseek-harness/ai-terminal-pet-bridge`），
-写 `PROTOCOL.md` 时可以直接拿它和 `pet-statusline.exe` 作为两个参照实现。
+文档成文时就是拿它和 `pet-statusline.exe` 作为两个参照实现来对照的。
 **动机**：`reporters/generic.js` 已能一行接入任意工具，但协议本身还只写在代码里。
 **做法**：新增 `docs/PROTOCOL.md`，把 `ai-terminal-pet.v1` 的字段、状态语义、优先级、
 管道命名算法、回执契约、脱敏规则写成规范；README 给出 5 行以内的接入示例（shell alias / Makefile / 编辑器 task）。
@@ -283,11 +338,18 @@ DeepSeek Harness 桥是现成的第三个接入样例（`integrations/deepseek-h
 IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法保持不变以免破坏跨语言契约。
 **注意**：这是一次真正的架构改动，建议先做 E2（协议文档）再动，否则契约会跟着实现漂移。
 
-### E6 — `--doctor` 自检 ⏳ 未开工（本轮排查仍靠 `PET_FOCUS_PROBE` / `PET_SOUND_PROBE` / `PET_DSH_PROBE` 等临时探针）
+### E6 — `--doctor` 自检 ✅ 已交付（2026-11-10，见 §1i）
 **动机**：本轮的排查花了大量时间在「进程活着但窗口不可见」这类无声故障上。
-**做法**：`--doctor` 打印并校验：进程/互斥体状态、窗口 `WS_VISIBLE` 与消息泵响应性
-（`SendMessageTimeout` + `SMTO_ABORTIFHUNG`，本轮探针已实现）、管道名与 ACK 往返、三处终端配置是否接入、
-`runtime/` 快照与 `error.log`/`hang.log` 现状。把本轮的临时探针固化成产品功能。
+**实际交付的 9 项**：environment / install files / version / runtime / config / pipe / instance / node / autostart，
+逐行 `[ok]`/`[warn]`/`[fail] name: detail`，末行 `doctor: N ok, N warn, N fail`，任一 fail 退出码 1。
+**与原计划的差异（有意为之）**：
+- **没有探测互斥体**：`CreateMutex` 会创建对象并可能干扰正在运行的实例；改用「管道有人监听」作为实例存在的证据。
+- `runtime/`、`config`、`error.log` 只报了**状态**，没有把 `hang.log` 纳入——那是事后取证文件，不是安装是否健康的判据。
+- **没有做窗口 `WS_VISIBLE` 与消息泵响应性检查**：这类检查需要把探针注入别人的进程（`SendMessageTimeout`
+  + `SMTO_ABORTIFHUNG`），本轮探针能做是因为当时只有一个已知实例；作为产品功能它会变成「诊断工具自己去戳
+  一个可能卡住的窗口」。仍留在 `PET_FOCUS_PROBE` / `PET_SOUND_PROBE` / `PET_DSH_PROBE` 这几个 opt-in 测试里，
+  等 E1（原生 hook）落地后再评估是否值得产品化。
+- 三处终端配置的接入检查也没有做：`--doctor` 只查这台机器上**装了什么**，不读别人的终端配置文件。
 
 ## 3. 轻量化计划
 
@@ -301,11 +363,18 @@ IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法
 3. AV 排除目录（需管理员，用户决策）——docs/archive/BASELINE-20260924.md §13 已记录这是唯一能真正压到亚秒的手段。
 4. 已落地：`--reset`/`--toggle` 等控制路径不再走 `app.Run()`，避免控制命令意外拉起常驻实例。
 
-### L2 — 二进制体积（3.7 MiB → 目标 <2.5 MiB）
-**做法**：`-ldflags "-s -w"` 已用；继续可做 `-buildvcs=false`、剥离 `net/http` 等未用包的
-反射元数据（本项目不用 http，但 `net` 被管道复用）、用 `-tags` 关掉不需要的 `crypto` 实现。
+### L2 — 二进制体积（4.17 MiB → 目标 <2.5 MiB）
+**现状**：主程序 **4,371,968 B**（4.17 MiB）、shim **3,643,392 B**（3.47 MiB），合计 8,015,360 B = 7.64 MiB。
+本版新增 `--doctor` 让主程序比 v0.9.0 的 4,178,432 B 增加了 **193,536 B**（约 +189 KiB，+4.6%），
+其中 `internal/app/doctor_windows.go` 占 22,932 字节源码——这是「可自查」换来的体积。
+**做法**：`-ldflags "-s -w"` 已用。**`-buildvcs=false` 已实测并入**：同样的 -s -w，
+加上它会去掉 VCS 戳记，`pet-statusline.exe` 由 3,644,416 B 降到 3,643,392 B（差 1,024 B），主程序两种写法同为
+4,371,968 B。现在 `install.ps1` 的缺失提示、`AGENTS.md` 与 CI 用的都是这条命令，所以**同一份源码在任何
+机器、任何时间重建出的产物字节一致**（二进制不入库，`bin/` 被 `.gitignore` 忽略）；`-VerifyOnly` 拿已部署
+副本与工作区里的 `bin/` 逐项比对，两侧构建方式不同就会误报。继续可做：剥离 `net/http` 等未用包的反射元数据（本项目不用 http，
+但 `net` 被管道复用）、用 `-tags` 关掉不需要的 `crypto` 实现。
 注意 `pet-statusline` 引了 `regexp`（脱敏规则）——这是体积大头之一，可改为手写扫描器。
-**验收**：`go build` 后两个 exe 合计 < 5 MiB，且 `node --check` 与全部单测不变。
+**验收**：`go build` 后主程序 < 2.5 MiB，且 `node --check` 与全部单测不变。
 
 ### L3 — 管道连接的 goroutine churn
 **现状**：`hang.log` 里出现过 goroutine 编号 79 万+，说明 10 小时内创建了约 80 万个短命 goroutine——
@@ -317,7 +386,8 @@ go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `conn
 ### L4 — 光栅化与重绘
 **已做**：DIB 画布复用、命中缓冲复用、动画定时器按状态装/卸。
 **可做**：脏区重绘（当前每帧全画），或把 `fillRounded`/`fillEllipse` 的内层循环向量化。
-面板只有 40×190 / 200×250 逻辑像素，收益有限——**建议先测再动**，别为 0.3 ms 增加复杂度。
+面板只有 56×156（紧凑）与 200×<内容高度>（展开，1–6 行自适应）逻辑像素，收益有限——
+**建议先测再动**，别为 0.3 ms 增加复杂度。（旧版本节写的 `40×190 / 200×250` 是 v0.5.0 之前的固定几何，早已被 `drawing_compact_windows.go:23-35` 的常量取代。）
 
 ### L5 — 启动与扫描路径
 **现状**：快照扫描 2 s 一次，全目录 `ReadDir`。会话多、`runtime/` 残留多时会变贵。
@@ -331,6 +401,10 @@ go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `conn
 
 v0.6.0–v0.9.0 期间落地、原先不在候选表里的四项：**语言切换**（en/zh-CN + auto，§1e）、
 **设置窗口**（§1h）、**auto-approve 否决窗口**（§2 E2b）、**DeepSeek Harness 接入**（§1h）。
+
+v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展项**，原先分别挂在 §2/§3 里：
+~~E2 线协议文档 `docs/PROTOCOL.md`~~、~~E6 `--doctor` 自检~~、~~安装脚本 `-VerifyOnly`/`-Uninstall`/`-AddToPath`~~、
+~~CI 门禁 `.github/workflows/ci.yml`~~。
 
 | 编号 | 功能 | 价值 | 复杂度 |
 |---|---|---|---|
@@ -362,7 +436,7 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 ## 6. 已知残留（不计划修，但需知情）
 
 - `hang.log` 看门狗是**事后取证**而非自愈；转储上限已压到 3 次 + 2 min 冷却 + 记录最后消息名。
-- UI 无自动化视觉回归，靠 `--doctor`（E6，未开工）+ 探针脚本 + `TestRenderPreview` / `TestRenderSettingsPreview` 光栅化 PNG 人工验证。
+- UI 无自动化视觉回归，靠 `--doctor`（E6，已交付但只覆盖环境/安装/运行期状态，**不做视觉比对**）+ 探针脚本 + `TestRenderPreview` / `TestRenderSettingsPreview` 光栅化 PNG 人工验证。
 - `go test -race` / `govulncheck` / `gosec` 因缺工具链（gcc 等）仍未跑（2026-11-09 复核仍然如此）。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
 - 设置窗口不参与贴边收起、不跟随浮窗透明度（固定 255），关掉「窗口置顶」后它仍置顶（它是对话框）。

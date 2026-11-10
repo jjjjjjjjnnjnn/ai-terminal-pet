@@ -1,18 +1,27 @@
 # HANDOVER — ai-terminal-pet 交接文档
 
-> 交接时间：2026-09-24（UTC+8 下午）；2026-11-09 刷新到 v0.9.0。
+> 交接时间：2026-09-24（UTC+8 下午）；2026-11-09 刷新到 v0.9.0；2026-11-10 补记 v0.9.0 之后未发版的工作。
 > 下一位 AI 直接从 §1「当前状态」开始读，然后按 §13–§25 的时间序读 runbook，不必回溯长上下文。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（v0.9.0，2026-11-09）
+## 1. 当前状态（v0.9.0 之后，2026-11-10，未发版）
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：`0.9.0`（`internal/app/app_windows.go:23` 的 `Version` 常量；最后一个提交 2026-11-09 `1565669`）。
-- **健康**：`gofmt -d` clean；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（140 个 `func Test`）；
-  `node --check reporters/*.js` 全过；`node integrations/deepseek-harness/verify.mjs` 输出 VERIFY PASSED。
-- **规模**：Go 非测试源码 10,201 行 / 测试 3,831 行 / JS 1,633 行；`bin/AI-Terminal-Pet.exe` 4,178,432 B、
-  `bin/pet-statusline.exe` 3,644,416 B；第三方依赖 3 个（go-winio MIT、lxn/win BSD、x/sys BSD）。
+- **版本**：`0.9.0`（`internal/app/app_windows.go:23` 的 `Version` 常量，`--doctor` 与文档刷新都没有改它）。
+  最新提交 `4574cba`（2026-11-10 已推送）；此后本地还有一批未提交改动（见下）。
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**154 个** `func Test`，
+  由 `go test -list '.*' ./...` 计数）；六个上报端逐个 `node --check` 全过；
+  `node integrations/deepseek-harness/verify.mjs` 输出 VERIFY PASSED；
+  `install.ps1 -VerifyOnly` 10/10 `[ok]`、exit 0。
+- **规模**：Go 非测试源码 **10,719** 行 / 测试 **4,212** 行 / JS **1,742** 行（49 个 `.go`、8 个 `.js`+`.mjs`）；
+  `bin/AI-Terminal-Pet.exe` **4,371,968 B**、`bin/pet-statusline.exe` **3,643,392 B**（均按
+  `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；第三方依赖 3 个（go-winio MIT、lxn/win BSD、x/sys BSD）。
+  v0.9.0 提交时的旧值（10,201 / 3,831 / 1,633 行，4,178,432 / 3,644,416 B，140 个 `func Test`）已作废。
+- **新增**（全部在 v0.9.0 之后、未发版）：`--doctor` 自检（9 项检查）、`docs/PROTOCOL.md` 线协议规范、
+  `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
+  `install.ps1` 的 `-VerifyOnly` / `-Uninstall` / `-AddToPath` 三个开关（卸载同时清理 PATH 条目）。
+  细节见 §26。
 - **接入**：OpenCode（`reporters/opencode.js` 插件）、Claude Code（`reporters/claude-hook.js` 7 事件）、
   Antigravity（`bin/pet-statusline.exe` + `reporters/antigravity-hook.js`）、DeepSeek Harness
   （`integrations/deepseek-harness/ai-terminal-pet-bridge` bundle）、任意 CLI（`reporters/generic.js`）。
@@ -922,3 +931,106 @@ DPI 感知探针（150%）：
 - 「恢复默认设置」只重置行为，不动窗口位置；不透明度会回到 235。
 - 托盘里仍保留「提示音 / 提示音音量 / 会话结束时提醒」三个快捷开关，
   它们与设置窗口写同一份 config，不冲突。
+
+## 26. v0.9.0 之后、未发版的一批工作 2026-11-10
+
+目标从「对外宣传」升级为：**任意机器可用**（可移植性 / 通用性）+ **可作为 DeepSeek Harness 与 OpenCode 插件对外开源分发**。
+本节的数字都是 2026-11-10 实测，命令按 §1 的「健康」口径复跑。
+
+### 26.1 可移植性（去写死本机路径）
+
+- `docs/assets/render_assets.py` 重写成 190 行：删掉模块级的 `PREVIEW = C:\\Users\\rongj\\...` 与
+  `ASSETS` 常量，改为 `PREVIEW_ENV = "PET_PREVIEW_DIR"` + `ASSETS = Path(__file__).resolve().parent`；
+  未设环境变量 / 目录不存在 / 缺 PNG / 缺 Pillow 四种情况各自打印人话提示并 `exit 2`，不再抛 traceback。
+  端到端复跑：全新 `$TEMP/petpreview-fresh` + 两条 preview 测试 + 本脚本，8 张 PNG 与 git HEAD 版逐像素相同。
+- 测试夹具中性化（只改 `_test.go`）：`internal/platform/focus_windows_test.go` 与
+  `presence_windows_test.go` 里的 `C:\Users\rongj\...` 换成 `C:\work\项目\...` / `C:/Users/pet-test`；
+  `internal/pipeserver/server_windows_test.go` 改为按算法现算期望管道后缀（`sha256("c:\\users\\pet-test")` 前 4 字节），
+  不再钉死某个历史哈希。全仓非测试源码 grep `rongj|Desktop` 命中 0。
+- `integrations/deepseek-harness/ai-terminal-pet-bridge/README.md` 里给用户照抄的 `plugin_manager` 目标
+  由 `C:\Users\<name>\...` 改成 `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge`。
+- 有意保留：`docs/HANDOVER.md` §2 的主机路径是**事实记录**（这台机器上的安装位置），不是给用户照抄的指令。
+
+### 26.2 `--doctor` 自检
+
+`internal/app/doctor_windows.go` 563 行、`doctor_windows_test.go` 375 行 / 14 个 `func Test`。
+九项检查按序：`environment`、`install files`、`version`、`runtime`、`config`、`pipe`、`instance`、`node`、`autostart`。
+每项一行 `[ok]` / `[warn]` / `[fail] name: detail`，末行 `doctor: N ok, N warn, N fail`；任一 fail → exit 1，
+经 `errDoctorFailed` 哨兵传递，因此**不写 `error.log`**。用法错误仍是 exit 2。
+
+三条刻意设计，改代码前必须知道：
+
+1. **不碰互斥体**。`CreateMutex` 会创建对象并干扰正在运行的实例，所以 `checkInstance` 只用「管道有人监听」
+   作为可观察证据，并在文案里写明「mutex 未被探测」。
+2. **管道探测只连不写**（`probePipe`，`doctorDialTimeout` 250 ms）。立即 EOF 被服务端当作空负载，
+   不触发 update 回调，所以跑 doctor 不改变浮窗内容。
+3. **node 探测分 Missing / TimedOut**（`node --version`，限时 300 ms，子进程 `HideWindow`）。
+   「没装 Node」与「装了但没应答」对用户是两件相反的事。首跑偶发超时，实测重试即命中。
+
+已知边界：没有 `--doctor --json`（传 `--json` 会按未知参数 exit 2）；`version` 只能比体积不能比版本号，
+因此尺寸一致时仍是 `[warn]`；`runNodeVersion` 的真实 spawn 分支与 `probePipe` 的真实 Dial 分支没有单测
+（靠 `%TEMP%` 副本实跑取证）。强制失败验证：`LOCALAPPDATA=C:\definitely-not-a-real-dir-xyz` →
+`doctor: 5 ok, 2 warn, 2 fail`、exit 1。
+
+### 26.3 线协议规范与上报端可安装化
+
+- `docs/PROTOCOL.md` 388 行：§3.1 管道名派生（`sha256(home 小写、去尾分隔符)` 前 4 字节 → 8 hex，Go 与 JS 两侧
+  必须同源，`TestPipePathForUserMatchesReporterAlgorithm` 钉住）、§3.2 一行 JSON + 半关闭、§3.3 只认精确 `OK`、
+  §4 字段表与七状态、§5 九条脱敏、§7 auto-approve 的 `approvals/` 握手与 11 条 `DANGEROUS_PATTERNS`、
+  §8 约 20 行最小 reporter、§9 换语言的 12 条注意、§10 错误处理硬约束、§11 不兼容变更策略。
+- `reporters/package.json`（26 行）：`exports` 覆盖 6 个 `.js`，`private: true`，**刻意不写 `"type"`**——
+  5 个 hook 是 `require()` 的 CommonJS，`opencode.js` 是真 ESM；写 `module` 打断前者，写 `commonjs` 打断后者。
+  代价是首次 import `opencode.js` 时 Node 打印一条 `MODULE_TYPELESS_PACKAGE_JSON` 并重解析一次，属预期。
+
+### 26.4 CI 与构建可复现性
+
+`.github/workflows/ci.yml`（130 行）单 job：`windows-latest`、`gofmt -l` 有输出即挂、`go vet`、
+`go test -count=1 ./...`、两条生产构建、逐个 `node --check`、`verify.mjs`。
+
+两个**必须**遵守的细节：
+
+1. **构建命令一律带 `-buildvcs=false`**。VCS 戳记里含构建时的 commit 与工作区状态，
+   同一份源码在不同时间/机器上重建出的字节不同；不带它时 `pet-statusline.exe` 是 3,644,416 B，
+   带它是 3,643,392 B（差 1,024 B），`install.ps1 -VerifyOnly` 只要两侧构建方式不同就误报。
+   二进制不入库（`.gitignore` 忽略 `bin/`），所以「与仓库一致」实指「与你自己 `bin/` 里那份一致」。
+2. **`node --check` 必须逐文件循环**：`node --check a.js b.js` 只检查第一个参数（Node 24 实测：
+   第二个是坏文件也 exit 0）。CI、`AGENTS.md`、`PROTOCOL.md` 附录 B、README 中英两半用的都是
+   `for f in reporters/*.js; do node --check "$f"; done`。
+
+### 26.5 `install.ps1` 的三个开关
+
+582 行 / 27,372 B，纯 ASCII（PowerShell 5.1 读无 BOM 脚本按 ANSI 代码页，非 ASCII 会乱码）。
+
+- `-VerifyOnly`：只读。按**同一份 10 项制品清单**（overlay / statusline / protocol / bundle manifest 2 / bundle runtime 5）
+  逐项比对工作区与已部署侧的 SHA256，全对才 `install: verified - 10 file(s) match the repository` + exit 0。
+- `-Uninstall`：先 `Assert-SafeInstallDirectory`（拒绝盘根、拒绝目录名不是 `AI-Terminal-Pet`，`-Force` 也绕不过），
+  无 `-Force` 时要求手输 `yes`（无控制台则 exit 2），最多 20 次 `Stop-Process` + 最多 5 次删除重试；
+  只删指向被删目录的 `AITerminalPet` Run 值，并调用 `Remove-InstallDirectoryFromUserPath` 清掉 `-AddToPath`
+  写入的 PATH 条目（原值改备份到 `%TEMP%\ai-terminal-pet-path-backup-<yyyyMMdd-HHmmss>.txt`，失败只报 `[warn]`）。
+- `-AddToPath`：只写 `HKCU\Environment\Path`（绝不碰 `HKLM`），保留注册表值类型，写前把原值备份到
+  `<安装目录>\path-backup.txt`；已存在则不动。需要新开终端才生效。
+
+安装脚本自身仍沿用 v0.9.0 的原则：先停浮窗、等句柄释放、20 次重试拷贝、每个文件 SHA256 校验——
+因为 reporter 会按需拉起浮窗，纯覆盖拷贝会随机失败。
+
+### 26.6 可复现的验证命令
+
+```powershell
+gofmt -l .                                   # 必须无输出
+go vet ./...
+go test -count=1 ./...                       # 154 个 func Test
+for f in reporters/*.js; do node --check "$f"; done
+node integrations/deepseek-harness/verify.mjs
+go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
+go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
+.\install.ps1
+.\install.ps1 -VerifyOnly                     # 期望 10/10 [ok]
+& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 期望 0 fail，exit 0
+```
+
+### 26.7 已知残留（2026-11-10）
+
+- runbook 里 `--doctor` 的 `version` 永远只能给出 `[warn]`：只读地比对版本号不可行，尺寸一致时无法判定新旧。
+- `reporters/package.json` 无 `type` 字段导致的 typeless 提示是刻意的，不要为了消警告改成 `module`。
+- `install.ps1 -Uninstall` 期间若有 reporter 重新拉起浮窗，删除会失败并给出「关掉所有 hook 再试」的可见失败提示。
+- `docs/assets/render_assets.py` 仍需 Pillow；缺库时给安装提示并 exit 2，不尝试自动安装。
