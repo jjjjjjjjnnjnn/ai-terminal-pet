@@ -299,7 +299,7 @@
 - **仓库自己发布一份 format-1 插件索引**（`ef783ba`，新文件 `docs/market-index.json`）：
   <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>。
   因为索引格式允许「钉到 40 位 commit 的 git 源」，所以在 npm 发布被一次性密码挡住时，Discover 仍然可用；
-  条目只有 `dsh-ai-terminal-pet` `1.2.3`（索引随发版前移过三次：`cf1085d` 到 1.2.1 / `1e08b3e`，`fe62900` 到 1.2.2 / `694ff3f`，`b4474a6` + 一次索引提交到 1.2.3），`source` 为 `{type: git, url, commit: b4474a6da10a7bc3518362e910c66b9213be92e6,
+  条目只有 `dsh-ai-terminal-pet` `1.2.3`（索引随发版前移过三次：`cf1085d` 到 1.2.1 / `1e08b3e`，`fe62900` 到 1.2.2 / `694ff3f`，`fabb591` 到 1.2.3 / `b4474a6`——索引比发布提交晚一个，所以 `b4474a6` 上 CI 红），`source` 为 `{type: git, url, commit: b4474a6da10a7bc3518362e910c66b9213be92e6,
   path: packages/dsh-ai-terminal-pet}`，`engines.dsh` 取包里声明的 `>=0.1.0-rc.6`，图标钉在同一个 commit 的
   `icon.png`（4,386 B）。校验用的是宿主自带的 `parseMarketIndex`（`@deepseek-ai/dsh-plugin-market-index`），
   不是手抄一份形状检查：`format: 1`、`localizedText` 含 `en`、category/label 都引用已声明 id、

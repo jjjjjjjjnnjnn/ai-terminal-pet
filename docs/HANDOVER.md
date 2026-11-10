@@ -9,7 +9,8 @@
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
 - **版本**：`0.9.0`（`internal/app/app_windows.go:23` 的 `Version` 常量，`--doctor` 与文档刷新都没有改它）。
-  最新提交 `b4474a6`（2026-11-10 已推送，与 `origin/main` 同步）；插件包最新发布是 1.2.3（tag `dsh-plugin-v1.2.3`）。
+  最新提交 `12b90cc`（2026-11-10 已推送，与 `origin/main` 同步；其上依次为 `fabb591`、`b4474a6`、`7bd2cfa`）；
+  插件包最新发布是 1.2.3（tag `dsh-plugin-v1.2.3` → `b4474a6`）。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**154 个** `func Test`，
   由 `go test -list '.*' ./...` 计数）；六个上报端逐个 `node --check` 全过；
   `node integrations/deepseek-harness/verify.mjs` 输出 VERIFY PASSED；
@@ -48,7 +49,9 @@
   2026-11-10 移进 `scripts/`（§27.11），它读不到那两个正则的落点，也没用到任何抑制字段。
   npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，此前整场会话 E401），但**任何版本都还没发布到 npm**
   （`npm view` 仍 E404，且发布要求一次性密码，非交互 shell 里拿不到），所以按包名安装暂时不可达；
-  `docs/market-index.json` 是仓库自建的 format-1 索引，钉在 1.2.3 的发布 commit（`b4474a6`），可让 Discover 先按 git 源可用。
+  `docs/market-index.json` 是仓库自建的 format-1 索引，钉在 1.2.3 的发布 commit（`b4474a6`），可让 Discover 先按
+   git 源可用；索引本身由发布的下一个提交 `fabb591` 前移，而 `verify.mjs` 要求两者同版本，所以 `b4474a6` 那次 CI
+   是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
   细节与坑见 §27。
 - **接入**：OpenCode（`reporters/opencode.js` 插件）、Claude Code（`reporters/claude-hook.js` 7 事件）、
   Antigravity（`bin/pet-statusline.exe` + `reporters/antigravity-hook.js`）、DeepSeek Harness
