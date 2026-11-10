@@ -128,3 +128,17 @@ jobs:
       # fails on an unloadable manifest, a missing locale or a broken patch.
       - name: Verify the DeepSeek Harness bundle
         run: node integrations/deepseek-harness/verify.mjs
+
+      # The DSH plugin package ships a vendored copy of the overlay binary, because
+      # a marketplace install has no Go toolchain to build one. --check compares
+      # that copy against this checkout's bin/ so a stale vendor file fails here
+      # instead of silently shipping an old overlay to every installer.
+      - name: Check the vendored overlay is current
+        run: node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
+
+      # verify.mjs drives the plugin with a fake Cordis context, a temporary
+      # LOCALAPPDATA and a stub protocol module: state mapping, the approval
+      # waterfall, dispose-versus-exit, the bootstrap copy rules and the
+      # repository-root shim manifest. No network, no named pipe, no overlay.
+      - name: Verify the DSH plugin package
+        run: node packages/dsh-ai-terminal-pet/verify.mjs

@@ -286,11 +286,42 @@ async function caseManifest() {
   }
 }
 
+/**
+ * Case 5: the repository-root shim manifest.
+ *
+ * `dsh plugin add github:owner/repo` reads the manifest at the REPOSITORY root,
+ * not at packages/dsh-ai-terminal-pet. Without a root manifest that declares
+ * dsh.bundle the host registers nothing and the install is a no-op with a
+ * `declares no dsh.bundle` warning. The shim carries no code: it points at this
+ * package and limits its `files` list to the plugin subtree, so a tarball built
+ * from the root contains exactly what this package ships.
+ */
+async function caseRootManifest() {
+  const rootManifestPath = path.join(packageDir, '..', '..', 'package.json')
+  if (!existsSync(rootManifestPath)) {
+    check(false, 'the repository root has a package.json shim')
+    return
+  }
+  const rootManifest = JSON.parse(readFileSync(rootManifestPath, 'utf8'))
+  const manifest = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'))
+  check(rootManifest.name === manifest.name, 'the root shim reuses the package name')
+  check(rootManifest.version === manifest.version, 'the root shim tracks the package version')
+  check(rootManifest.private === true, 'the root shim is private so it never claims the npm name')
+  check(rootManifest.dsh?.bundle?.patch === './packages/dsh-ai-terminal-pet/cordis.patch.yml', 'the root shim points dsh.bundle.patch at this package')
+  check(JSON.stringify(rootManifest.dsh?.bundle?.platforms) === '["win32"]', 'the root shim keeps the Windows platform gate')
+  const patched = path.join(packageDir, '..', '..', rootManifest.dsh?.bundle?.patch ?? '')
+  check(rootManifest.dsh?.bundle?.patch !== undefined && existsSync(patched), 'the patch file the root shim names exists')
+  const entry = path.join(packageDir, '..', '..', rootManifest.main ?? '')
+  check(typeof rootManifest.main === 'string' && existsSync(entry), 'the root shim main entry exists')
+  check(JSON.stringify(rootManifest.files) === '["packages/dsh-ai-terminal-pet"]', 'a tarball built at the root contains only the plugin subtree')
+}
+
 try {
   await caseMapping()
   await caseBootstrap()
   await caseThrowingProtocol()
   await caseManifest()
+  await caseRootManifest()
 } finally {
   rmSync(root, { recursive: true, force: true })
 }
