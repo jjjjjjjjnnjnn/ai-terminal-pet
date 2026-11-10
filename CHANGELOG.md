@@ -124,7 +124,7 @@
     `DSH_PET_TEST=1` + `DSH_PET_PACKAGE_ROOT` 可替换包根。
   - `node verify.mjs`：rc=0、**54 ok**、末行 `VERIFY PASSED`；覆盖状态映射、waterfall `next()`、
     dispose 不发 `closed`、真 exit 发 `closed`、bootstrap 只补缺失不覆盖、protocol 抛异常时插件全静默。
-- **仓库根的 `package.json` 清单 shim**（`06d4cae`，1.2.1 口径 1,877 B / 59 行）：不含任何代码，只让
+- **仓库根的 `package.json` 清单 shim**（`06d4cae`，1.2.2 口径 1,877 B / 59 行）：不含任何代码，只让
   「按仓库 URL 安装」在仓库根就能读到 `dsh.bundle`、`main`、`exports`、`icon` 与 `engines`；
   `version` 与插件包同步（`verify.mjs` 断言两者相等，所以一次版本号变更不可能只落在一个清单里），
   并带上同一份 `dsh.catalog`。没有它时，只读仓库根的宿主把仓库当成 0.0.0 依赖、报 `declares no dsh.bundle`
@@ -194,12 +194,15 @@
   那两次 run 都停在步骤 9 `Build`：`42841664024`（15:13:06Z 起）于 15:25:40Z 被 cancelled（同分支新
   run 取代），`42844452013`（15:27:09Z 起）于 16:39:27Z success。同时 DSH 应用内 Market 真正加载的
   `https://awesome-dsh-plugin.com/plugins.json` 从 `count: 10119` / 0 命中变成 `count: 10230` 且已收录
-  本仓库——但它里面的 `install` 命令是按 yml 的 `tarball` 生成的，所以仍钉 1.2.0，换版本只能靠 PR —— 先是 #14063（指向 1.2.1），之后被 #14076（指向 1.2.2）取代。
+  本仓库——但它里面的 `install` 命令是按 yml 的 `tarball` 生成的，所以仍钉 1.2.0，换版本只能改那个 yml。
   结论修正为：「条目已合并，并且已经在列表与市场里可见；延迟来自上游站点重建，不是条目本身的问题」。
-  <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063>（fork 分支 `bump-tarball-1.2.1`，
-  head `116b0ee`，1 file `+1/−1`，只把那行 URL 换成 `dsh-plugin-v1.2.1/dsh-ai-terminal-pet-1.2.1.tgz`；
+  跟进 PR 换过一次版本：先开 #14063（fork 分支 `bump-tarball-1.2.1`，head `116b0ee`，1 file `+1/−1`）
+  指向 1.2.1，两项上游检查（`check` pass 24m59s、`Submission gate` pass）与 `mergeable: MERGEABLE` 都拿到了；
+  但 1.2.1 是在 `install.ps1` 还在仓库根时打的，`scripts/` 下沉改到 8 处 Go 注释后 `vendor/manifest.json`
+  的源码摘要变成 `cf647af1…`，于是 1.2.2 重打包、#14063 留言说明后关闭，改开 **#14076**
+  （<https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14076>，分支 `bump-tarball-1.2.2`，
+  commit `0863b4d`，仍只有 `+1/−1`）指向 1.2.2 的资产；两版都先用上游自己的门验过：
   `scripts/check-submission.mjs --only-list` → `checking 1 entry / ok / all checked entries pass`（该门需要 `GITHUB_TOKEN`）。
-  两项上游检查已跑完并通过：`check` pass（24m59s）与 `Submission gate` pass；`state: OPEN`、`mergeable: MERGEABLE`、`+1/−1`。
   **两处外部副作用已记录**：① 已发布的 `dsh-ai-terminal-pet-1.2.0.tgz` 里那份 `README.md` 是 1.2.0 打包时的旧文，仍写着「等人工评审、尚未列入」——
   Release 资产不可变，本仓库的改动不会回写进那份 1,914,566 B 的 tarball，所以才有下面那条 1.2.1 —— 只换文本，也只能换版本号。当时 `docs/market-index.json` 钉的同样是 `4d777e3` 那个 commit，也会把读者带到旧文；该文件后来在 `cf1085d` 前移到 `1e08b3e`。写文案时别拿包内 README 当现状。
   ② 已向市场仓库提了误报 issue <https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367>：
@@ -277,7 +280,7 @@
 - **仓库自己发布一份 format-1 插件索引**（`ef783ba`，新文件 `docs/market-index.json`）：
   <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>。
   因为索引格式允许「钉到 40 位 commit 的 git 源」，所以在 npm 发布被一次性密码挡住时，Discover 仍然可用；
-  条目只有 `dsh-ai-terminal-pet` `1.2.2`（`cf1085d` 时已从 1.2.0 / `4d777e3` 前移），`source` 为 `{type: git, url, commit: 1e08b3e7521d305d744c5ff515b29f6d16abebe1,
+  条目只有 `dsh-ai-terminal-pet` `1.2.2`（索引随发版前移过两次：`cf1085d` 到 1.2.1 / `1e08b3e`，`fe62900` 到 1.2.2 / `694ff3f`），`source` 为 `{type: git, url, commit: 694ff3f13740b1bb9fb4df04f5fd226064a559b2,
   path: packages/dsh-ai-terminal-pet}`，`engines.dsh` 取包里声明的 `>=0.1.0-rc.6`，图标钉在同一个 commit 的
   `icon.png`（4,386 B）。校验用的是宿主自带的 `parseMarketIndex`（`@deepseek-ai/dsh-plugin-market-index`），
   不是手抄一份形状检查：`format: 1`、`localizedText` 含 `en`、category/label 都引用已声明 id、
@@ -333,8 +336,9 @@
   （根清单带 `private: true`，npm 抬到的是根清单），从 `packages/dsh-ai-terminal-pet/` 发布则正常
   ——包清单没有 `private`。下一步是发 `1.2.2`；但这一步在本机非交互环境里结构上做不到：npm 的 `otplease`
   在 `process.stdin.isTTY` 为假时直接抛 EOTP，永不进入 web-OTP 分支，取到的浏览器授权链接 5–8 分钟就 404
-  作废，所以只能由人在本机交互终端里跑一次。仍未解锁的是 DSH 应用内 Plugins → Discover 索引
-  （只表达 npm 版本或钉 40 位 commit 的 git 源）；手工安装靠 git 源、Release tarball、仓库地址三条路。
+  作废（`npm trust github` 走可信发布者同样撞 EOTP），所以只能由人在本机交互终端里跑一次。
+  仍未解锁的是「按包名安装」与被 npm-only 目录收录；手工安装靠 git 源、Release tarball、仓库地址三条路，
+  而 Discover 由本仓库自建的 format-1 索引覆盖（`docs/market-index.json`，钉 40 位 commit 的 git 源）。
 
 ### Fixed
 
