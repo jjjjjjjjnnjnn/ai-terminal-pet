@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "title": {
+    "en": "AI Terminal Pet plugins",
+    "zh": "AI Terminal Pet 插件源"
+  },
+  "description": {
+    "en": "The DSH bundle for ai-terminal-pet, published straight from the repository so it needs no npm release.",
+    "zh": "ai-terminal-pet 的 DSH 插件包，直接从仓库发布，不依赖 npm 发版。"
+  },
+  "metadata": {
+    "categories": {
+      "tool": {
+        "title": {
+          "en": "Tool",
+          "zh": "工具"
+        }
+      }
+    },
+    "labels": {
+      "windows": {
+        "title": {
+          "en": "Windows",
+          "zh": "Windows"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-ai-terminal-pet",
+      "title": {
+        "en": "AI Terminal Pet",
+        "zh": "AI 终端宠物"
+      },
+      "description": {
+        "en": "A floating overlay for Windows: OpenCode, Claude Code, Antigravity and DeepSeek Harness sessions appear in one always-on-top panel, so you see which terminal waits without switching windows.",
+        "zh": "Windows 桌面浮窗：把 OpenCode、Claude Code、Antigravity 与 DeepSeek Harness 的会话状态汇总成一个常驻置顶面板，一眼看出哪个终端在等你，不必来回切窗口。"
+      },
+      "icon": "https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/4d777e32e0a9ef57bb7714287dccd7cae065346f/packages/dsh-ai-terminal-pet/icon.png",
+      "author": "jjjjjjjjnnjnn",
+      "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+      "repository": {
+        "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+        "directory": "packages/dsh-ai-terminal-pet"
+      },
+      "metadata": {
+        "category": "tool",
+        "keywords": [
+          "deepseek-harness",
+          "dsh",
+          "cordis",
+          "ai-terminal-pet",
+          "overlay",
+          "windows",
+          "dsh-plugin"
+        ],
+        "labels": [
+          "windows"
+        ]
+      },
+      "versions": [
+        {
+          "version": "1.2.0",
+          "publishTimestamp": 1794314844,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+            "commit": "4d777e32e0a9ef57bb7714287dccd7cae065346f",
+            "path": "packages/dsh-ai-terminal-pet"
+          },
+          "engines": {
+            "dsh": ">=0.1.0-rc.6"
+          }
+        }
+      ]
+    }
+  ]
+}
