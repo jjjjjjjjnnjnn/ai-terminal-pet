@@ -184,7 +184,18 @@
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
   收录门槛是 topics **同时**具备 `dsh-plugin` 与 `deepseek-harness`（两者都填，不是冗余）。
   另有 `cyber-moshen` 的 workshop 要求「已发布到 npm 的包 + 一个 PR」，属于最重的一条。
-  这也是根清单 shim 的第二重价值：它同时是「根清单采集」这条路径的准入条件。
+  补两条实测更正：`LivXue/dsh-plugin-shop` 发布的 26,351 条条目里**每一条都带 npm tarball 的 `integrity`、
+  `commit` 字段一条也没有**，所以它在包进 npm 之前不会收录纯 git 源——根清单 shim 只是「有资格被它读」
+  的前提，不是「会被它列出来」的保证。
+- **仓库自己发布一份 format-1 插件索引**（`ef783ba`，新文件 `docs/market-index.json`）：
+  <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>。
+  因为索引格式允许「钉到 40 位 commit 的 git 源」，所以在 npm 发布被一次性密码挡住时，Discover 仍然可用；
+  条目只有 `dsh-ai-terminal-pet` `1.2.0`，`source` 为 `{type: git, url, commit: 4d777e32e0a9ef57bb7714287dccd7cae065346f,
+  path: packages/dsh-ai-terminal-pet}`，`engines.dsh` 取包里声明的 `>=0.1.0-rc.6`，图标钉在同一个 commit 的
+  `icon.png`（4,386 B）。校验用的是宿主自带的 `parseMarketIndex`（`@deepseek-ai/dsh-plugin-market-index`），
+  不是手抄一份形状检查：`format: 1`、`localizedText` 含 `en`、category/label 都引用已声明 id、
+  `publishTimestamp` 为 Unix 秒、版本精确 SemVer。`marketInstallTarget` 产出的 spec 已实测安装成功
+  （`git+…#4d777e3…&path:/packages/dsh-ai-terminal-pet`，全新 `DSH_HOME` + 独立 profile，2.5 s）。
 
 ### Changed
 

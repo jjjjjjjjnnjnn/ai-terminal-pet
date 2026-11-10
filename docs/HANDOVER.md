@@ -1373,12 +1373,17 @@ shim 里没有任何代码，只做四件事：
 | 路径 | 要做什么 | 采集方 | 延迟 |
 |---|---|---|---|
 | 注册表评审 | 提一个 `data/plugins/<slug>.yml` 的 PR，等人工合并 | `awesome-dsh-plugin`（DSH 内置 Plugins → Market 的目录源） | 合并后下一轮构建，通常一天内 |
-| 根清单采集 | 什么都不做。要求仓库 **根** `package.json` 里有 `name` + `dsh.bundle`，市场钉默认分支的 commit | `LivXue/dsh-plugin-shop` | 每日构建 |
+| 根清单采集 | 什么都不做。要求仓库 **根** `package.json` 里有 `name` + `dsh.bundle`，市场钉默认分支的 commit；**但它的发布数据只有 npm 源**（26,351 条条目全部带 npm tarball 的 `integrity`，`commit` 字段 0 条），所以纯 git 源在进 npm 之前不会被它列出来 | `LivXue/dsh-plugin-shop` | 每日构建 |
 | 双 topic 采集 | 什么都不做。要求仓库 topics **同时**具备 `dsh-plugin` 与 `deepseek-harness` | `zasenjc/dsh-plugins-store` | 30 分钟同步 |
 | npm 包 + PR | 要一个已发布到 npm 的包，外加一个 PR | `cyber-moshen` 的 workshop | 人工 |
 
 这解释了 §27.8 那个根 shim 的第二重价值：它不只是让 `add github:owner/repo` 能装，它还是
 **「根清单采集」这条路径的准入条件**——没有根清单的市场只会看到一个 0.0.0 依赖。
+**一条实测更正**：`LivXue/dsh-plugin-shop` 的 `docs/schema.md` 写着「GitHub 仓库也能列」，但它的实际发布物
+推翻了这个说法——2026-11-10 那份 25,385,268 B 的分片里 26,351 条条目**全部**带 npm tarball 的 `integrity`，
+`commit` 字段一条也没有（`"source": "npm"` 为 0 也是同理：字段名是 `integrity`/`tarball` 而不是 `source`）。
+所以根清单 shim 只是「有资格被它读」的前提，不是「一定会被它列出来」的保证。写文档时别把条件满足写成已收录。
+
 也解释了为什么 `keywords` 与 topics 都要填 `dsh-plugin`：不同采集方读的是不同位置（有的读清单字段、
 有的读 GitHub topics），而双 topic 那一家还要求 `deepseek-harness` 同时存在。
 
@@ -1395,3 +1400,33 @@ CI runner 用 go 1.23.0、本地用 go1.27.0，两个工具链编出来的二进
   这样市场文案不会随文档改动而漂移，代价是用户必须点进 README 才看到限制（Windows only 等已由 `platforms` 表达）。
 - **`verify.mjs` 没有更强断言**：它验证了 `insert:` 能挂载，但没有断言「patch 文件里出现裸 `- id:` 就该失败」。
   这个坑现在只靠 `cordis.patch.yml` 的文件头注释防住，属于文档约束而非测试约束。
+
+### 27.10 自建 format-1 索引：让 Discover 在 npm 之前可用（2026-11-10）
+
+**动机**：npm 发布卡在一次性密码（注册表对 PUT 回 `401 You must provide a one-time pass`，
+`npm publish` 的 EOTP 链接被 npm 打码成 `***`，浏览器回写 token 在这个无终端环境里拿不到）。
+而 Discover 的索引格式允许「git 源 + 40 位 commit」，于是不必等 npm。
+
+**产物**：`docs/market-index.json`（`ef783ba`，已推送），公开 URL
+<https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>（实测 200）。
+条目只有一个：`dsh-ai-terminal-pet` `1.2.0`，
+`source: {type: git, url: https://github.com/jjjjjjjjnnjnn/ai-terminal-pet,
+commit: 4d777e32e0a9ef57bb7714287dccd7cae065346f, path: packages/dsh-ai-terminal-pet}`（与 tag 指向同一提交），
+`engines.dsh` 抄包里声明的 `>=0.1.0-rc.6`，图标钉在同一 commit 的 `packages/dsh-ai-terminal-pet/icon.png`（4,386 B），
+`publishTimestamp` 取 Release 的 `2026-11-10T12:47:24Z`（Unix 秒 1794314844）。
+
+**校验方式与时序**：不手抄一份形状检查，而是直接 `import` 宿主的
+`@deepseek-ai/dsh-plugin-market-index`（`parseMarketIndex` / `marketInstallTarget`）做真校验——
+`format: 1`、`localizedText` 必含 `en`、category 与 label 必须引用 `metadata` 里已声明的 id、
+`gitUrl` 必须 https 且至少两段 path、`commit` 必须小写 40 位 hex、版本精确 SemVer、
+`publishTimestamp` 必须是 [0, 10^11) 的整数秒。随后用 `marketInstallTarget` 产出的 spec 在
+全新 `DSH_HOME` + 独立 profile 里真装了一次：**rc=0 / 2.5 s / `+ dsh-ai-terminal-pet 1.2.0`**。
+
+**为什么这比只提 PR 更有效**：PR #13937 是「别人家的列表」，入列要人工评审；自建索引是「自己的列表」，
+用户只要在 Discover 里加一次 URL 就能看到并一键装。两份都可以留，不冲突。
+
+**边界（别夸大）**：索引不会自动进入任何人的 DSH——用户必须手动添加这个 URL；
+它也不改变 npm 上的状态（`npm view` 仍 E404）；格式 1 没有「一个版本同时挂 npm 与 git 两种源」的表达，
+所以等 npm 通了要发下一版时**新增一个版本条目**而不是改现有那条的来源类型。
+**同样是外部数据**：本地验证用的是宿主的 validator，但上游是否会采信我们的索引、以及
+各家第三方市场何时重建，都不由我们决定。

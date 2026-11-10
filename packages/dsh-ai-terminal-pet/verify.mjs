@@ -17,6 +17,7 @@
  *     only when missing, and never overwrites an existing file
  *   - a protocol module that throws on import leaves the plugin completely silent
  *   - vendor/manifest.json still describes the two files committed under vendor/
+ *   - docs/market-index.json still pins the packaged version to a commit
  */
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -354,6 +355,50 @@ async function caseVendorManifest() {
   }
 }
 
+/**
+ * Case 7: docs/market-index.json still points at this release.
+ *
+ * The repository publishes its own format-1 index so Discover works before npm
+ * does. That index names one exact version and pins it to a commit, so it drifts
+ * the moment either side changes: bump the package without touching the index and
+ * Discover keeps offering the old build; move the tag forward and the pinned
+ * commit installs a tree the manifests no longer describe. This case is the gate
+ * between the two.
+ */
+async function caseMarketIndex() {
+  const indexPath = path.join(packageDir, '..', '..', 'docs', 'market-index.json')
+  if (!existsSync(indexPath)) {
+    check(false, 'docs/market-index.json is committed')
+    return
+  }
+  let index
+  try {
+    index = JSON.parse(readFileSync(indexPath, 'utf8'))
+  } catch (error) {
+    check(false, 'docs/market-index.json is valid JSON (' + error.message + ')')
+    return
+  }
+  const manifest = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'))
+  check(index.format === 1, 'the market index declares format 1')
+  check(typeof index.title?.en === 'string' && index.title.en.length > 0, 'the market index has an English title')
+  check(Array.isArray(index.plugins) && index.plugins.length > 0, 'the market index lists at least one plugin')
+  const entry = index.plugins?.find((plugin) => plugin.name === manifest.name)
+  check(entry !== undefined, 'the market index lists ' + manifest.name)
+  if (entry === undefined) return
+  check(Array.isArray(entry.versions) && entry.versions.length > 0, 'the indexed plugin lists a version')
+  const newest = entry.versions?.[0]
+  check(newest?.version === manifest.version, 'the newest indexed version is the packaged version (' + manifest.version + ')')
+  check(typeof newest?.publishTimestamp === 'number' && Number.isInteger(newest.publishTimestamp) && newest.publishTimestamp >= 0, 'the indexed version carries a Unix-seconds publish timestamp')
+  const from = newest?.source ?? {}
+  check(from.type === 'git', 'the indexed version installs from git until npm has the package')
+  check(from.url === 'https://github.com/jjjjjjjjnnjnn/ai-terminal-pet', 'the indexed version names this repository as a canonical https URL')
+  check(typeof from.commit === 'string' && /^[0-9a-f]{40}$/.test(from.commit), 'the indexed version pins a lowercase 40-hex commit')
+  check(from.path === 'packages/dsh-ai-terminal-pet', 'the indexed version installs this package directory')
+  check(newest?.engines?.dsh === manifest.engines?.dsh, 'the indexed engines.dsh matches the packaged requirement')
+  const icon = typeof entry.icon === 'string' ? entry.icon : ''
+  check(icon.endsWith('/packages/dsh-ai-terminal-pet/icon.png'), 'the index icon points at this package icon')
+  check(icon.includes('/' + (from.commit ?? ' ') + '/'), 'the index icon is pinned to the same commit as the install source')
+}
 try {
   await caseMapping()
   await caseBootstrap()
@@ -361,6 +406,7 @@ try {
   await caseManifest()
   await caseRootManifest()
   await caseVendorManifest()
+  await caseMarketIndex()
 } finally {
   rmSync(root, { recursive: true, force: true })
 }

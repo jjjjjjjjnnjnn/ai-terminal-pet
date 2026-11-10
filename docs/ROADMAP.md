@@ -489,8 +489,9 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 v0.9.0 之后（2026-11-10，见 §1j）还多了一项**分发向**的扩展，它不在候选表里，单独把状态说清：
 **DSH 插件包分发** —— ✅ 包本体走到 1.2.0，三个 tag 都有对应 Release（`dsh-plugin-v1.0.0` / `dsh-plugin-v1.1.0` / `dsh-plugin-v1.2.0`，1.2.0 资产 1,914,566 B / sha256 `ccf9d531…`），tarball / Release 资产 URL / git 源钉 tag 三种安装实测成功（不写 `#ref` 的 `&path:` 形态会报 `repository ... not found`，与 `prepack` 无关）；
 ✅ 注册表条目 PR #13937 **已提交、CI 全绿、待人工评审**（既未合并也未收录，进 `main` 之后才会出现在列表与站点）；
-✅ 两条不用申请的自动采集路径（根清单采集 `LivXue/dsh-plugin-shop` 每日、双 topic 采集 `zasenjc/dsh-plugins-store` 30 分钟）已在仓库侧满足条件；
-⏳ **npm 尚未发布 1.2.0**（凭据问题已解、`npm whoami` 返回 `jjjjjjjjnnjnn`、`npm view` 仍 E404），因此 DSH 应用内 Plugins → Discover 索引仍不可达——它要的是 npm 版本或钉到 40 位 commit 的 git 源，而 Release 资产与 tag 都不满足。
+✅ 两条不用申请的自动采集路径（根清单采集 `LivXue/dsh-plugin-shop` 每日、双 topic 采集 `zasenjc/dsh-plugins-store` 30 分钟）已在仓库侧满足条件；但 `LivXue` 的发布分片实测只有 npm 源（26,351 条条目全带 npm tarball 的 `integrity`、`commit` 字段 0 条），所以「条件满足」≠「已被列出」；
+✅ **自建 format-1 索引**（`ef783ba`，`docs/market-index.json`）：Discovery 不必再等 npm——条目 `dsh-ai-terminal-pet` `1.2.0` 用钉到 `4d777e3` 的 git 源，URL <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>，用户加到 Discover 的索引源列表里即可看到并一键安装；校验走宿主自带的 `parseMarketIndex`，`marketInstallTarget` 产出的 spec 已实测 2.5 秒装通；
+⏳ **npm 尚未发布 1.2.0**（凭据问题已解、`npm whoami` 返回 `jjjjjjjjnnjnn`、`npm view` 仍 E404，publish 要一次性密码）。npm 只是「按包名安装」与「进 npm-only 目录」的前置，不再是 Discover 的前置。
 
 | 编号 | 功能 | 价值 | 复杂度 |
 |---|---|---|---|
