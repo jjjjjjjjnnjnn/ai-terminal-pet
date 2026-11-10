@@ -37,7 +37,7 @@
         "en": "A floating overlay for Windows: OpenCode, Claude Code, Antigravity and DeepSeek Harness sessions appear in one always-on-top panel, so you see which terminal waits without switching windows.",
         "zh": "Windows 桌面浮窗：把 OpenCode、Claude Code、Antigravity 与 DeepSeek Harness 的会话状态汇总成一个常驻置顶面板，一眼看出哪个终端在等你，不必来回切窗口。"
       },
-      "icon": "https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/4d777e32e0a9ef57bb7714287dccd7cae065346f/packages/dsh-ai-terminal-pet/icon.png",
+      "icon": "https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/1e08b3e7521d305d744c5ff515b29f6d16abebe1/packages/dsh-ai-terminal-pet/icon.png",
       "author": "jjjjjjjjnnjnn",
       "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
       "repository": {
@@ -61,12 +61,12 @@
       },
       "versions": [
         {
-          "version": "1.2.0",
-          "publishTimestamp": 1794314844,
+          "version": "1.2.1",
+          "publishTimestamp": 1794327304,
           "source": {
             "type": "git",
             "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
-            "commit": "4d777e32e0a9ef57bb7714287dccd7cae065346f",
+            "commit": "1e08b3e7521d305d744c5ff515b29f6d16abebe1",
             "path": "packages/dsh-ai-terminal-pet"
           },
           "engines": {
