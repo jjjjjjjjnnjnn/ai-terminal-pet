@@ -74,30 +74,46 @@
   里那句给用户照抄的 `plugin_manager` 目标原为 `C:\Users\<name>\...`，现改为
   `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge` 并补三行说明：该字符串是贴进
   Harness 插件管理器的路径，按用户解析才有意义，写死某个用户名在别人机器上必然不对。
-- **`.github/workflows/ci.yml`**（130 行）：`windows-latest` 上的单 job 门禁，任一失败即挂——
+- **`.github/workflows/ci.yml`**：`windows-latest` 上的单 job 门禁，任一失败即挂——
   `gofmt -l` 有任何输出、`go vet ./...` 有发现、`go test -count=1 ./...` 失败、两个
   `go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 失败、
-  `node integrations/deepseek-harness/verify.mjs` 失败。细节：`concurrency` 让同分支的新推送取消旧运行；
+  `node integrations/deepseek-harness/verify.mjs` 失败、`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`
+  失败、`node packages/dsh-ai-terminal-pet/verify.mjs` 失败。（不记行数：这份文件随门禁增删而变。）细节：`concurrency` 让同分支的新推送取消旧运行；
   `fetch-depth: 1`（只要树）；`go-version-file: go.mod` 让 `go.mod` 的 `go 1.23.0` 成为唯一工具链来源；
   Node 22（ESM 语法探测自 22.7.0 起默认开启）；`core.autocrlf` 显式关掉，避免 runner 检出 CRLF 让
   `gofmt` 误报。**`node --check` 是逐文件循环而不是 `node --check reporters/*.js`**：
   后者只检查第一个参数（Node 24 实测：第二个参数是坏文件也退出 0），循环是唯一真正覆盖全部文件的写法。
   live-desktop 探针测试在对应 `PET_*` 变量未设置时 `Skip`，所以不需要桌面会话或任何 secret。
-- **`packages/dsh-ai-terminal-pet` —— 把 Harness 桥接做成独立 DSH 插件包**（`7f476c9`）：npm 包名
-  `dsh-ai-terminal-pet`、version `1.0.0`、license MIT、`type: module`、`private` 未设（可发布）；
-  包内 17 个文件（含 vendor），主体是 `lib/index.js`（17,872 B / 571 行）、`verify.mjs`（14,583 B / 294 行）、
-  `scripts/vendor.mjs`（2,977 B / 77 行）、`package.json`（1,330 B / 60 行）、`README.md`（5,586 B / 112 行）、
+- **`packages/dsh-ai-terminal-pet` —— 把 Harness 桥接做成独立 DSH 插件包**（`7f476c9` 起，历经 1.0.0 →
+  1.1.0 → 1.2.0）：npm 包名 `dsh-ai-terminal-pet`、license MIT、`type: module`、`private` 未设（可发布）；
+  当前版本 **1.2.0**（`packages/dsh-ai-terminal-pet/package.json` 2,008 B / 74 行）：
+  包内 18 个文件（含 vendor，1.2.0 起多一个 `vendor/manifest.json`），主体是 `lib/index.js`（17,872 B / 570 行）、
+  `verify.mjs`（19,516 B / 369 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,008 B / 74 行）、
+  `README.md`（6,665 B / 129 行）、`vendor/manifest.json`（529 B / 19 行）、
   `cordis.patch.yml`（399 B / 10 行）、`locale/en.json`（210 B）/ `locale/zh.json`（217 B）、
   `icon.svg`（526 B）/ `icon.png`（4,386 B）、`LICENSE`（1,070 B）、`screenshots.json`（97 B）、
   `screenshots/compact.png`（4,459 B）/ `expanded.png`（11,335 B）/ `expanded-many.png`（17,697 B）、
   `vendor/protocol.js`（20,914 B）、`vendor/AI-Terminal-Pet.exe`（4,371,968 B）。
   `package.json` 用 `dsh.bundle { patch: './cordis.patch.yml', platforms: ['win32'] }` 声明自己是一个
   Cordis bundle，`engines` 为 `node: '^22.19 || >=24'`、`dsh: '>=0.1.0-rc.6'`，`files` 10 项。
+  **1.1.0 删掉 `prepack` 并新增 `vendor:check`**（`b280093`）：`scripts` 现在是
+  `verify` / `vendor` / `vendor:check`，没有任何生命周期钩子——pnpm 对 git 依赖会跑包的生命周期脚本，
+  未钉版本的源会因此撞上一条完全不提 AI Terminal Pet 的 `allowBuilds` 报错，删掉比解释更可靠。
+  `scripts/vendor.mjs` 随之变双模式（无参拷贝、`--check` 只校验 sha256，vendor 缺失或 0 字节即 exit 2），
+  `vendor/` 必须由发版人在打包前手工拷一次并提交，`npm pack` 不再替你重新生成它。
+  **1.2.0 增加 `dsh.catalog`**：`category: tool`、中英各一行摘要（190 / 104 字符）、五项自我声明的
+  `capabilities`（`windows-overlay` / `named-pipe` / `session-state` / `tray-icon` / `no-network`），
+  `keywords` 补上 `dsh-plugin`。这些 capabilities **只自我声明、不被强制**——dsh 不对插件做沙箱，
+  所以它是描述，不是权限授予；`keywords` 则是自动索引型市场采集的标签，于是多出第二条发现路径：
+  注册表评审（条目合并进 `main` 才上架）与 topic/关键词采集（无需提交申请）。版本必须跟着清单内容走，
+  否则已发布的不可变 tarball 会与仓库分叉——这正是本仓库一直在消除的漂移。
   行为：把 Harness 事件映射成浮窗状态（`approval/asked → waiting_permission`、`approval/decided → working`、
   `turn/start → working`、`turn/end → idle`、`tool/call → tool_use`、`tool/result(error) → error`、
   `command/done`、`working-directory/change → project`、`session/title`）；记住每个会话最后一次状态，
   只在状态变化或距上次 ≥60 s（`KEEP_ALIVE_MS = 60_000`）时才发一次，避免高频刷屏。
-  `npm pack` 产出 `dsh-ai-terminal-pet-1.0.0.tgz`：**1.9 MB packed / 4.5 MB unpacked / 15 files**。
+  `npm pack` 的 1.0.0 口径是 **1.9 MB packed / 4.5 MB unpacked / 15 files**；1.2.0 因为 `vendor/manifest.json`
+  成为随包文件，文件数变成 **16**，实测 **1,914,566 B / 16 files / packed 1.9 MB / unpacked 4,460,352 B（4.5 MB）**
+  （1.1.0 是 1,913,726 B / 15 files）。多出来的 840 B 就是那个 529 B 的清单加上打包开销。
   - **`cordis.patch.yml` 必须用 `insert:` 列表**（`- id: dsh-ai-terminal-pet` / `name: dsh-ai-terminal-pet`）。
     裸的 `- id:` 只会 patch 一行**已存在**的 loader 行，装完看着成功却什么都不挂载——这是踩过的坑，
     因此文件头的注释把原因写在了 YAML 里。
@@ -108,7 +124,19 @@
     `DSH_PET_TEST=1` + `DSH_PET_PACKAGE_ROOT` 可替换包根。
   - `node verify.mjs`：rc=0、**54 ok**、末行 `VERIFY PASSED`；覆盖状态映射、waterfall `next()`、
     dispose 不发 `closed`、真 exit 发 `closed`、bootstrap 只补缺失不覆盖、protocol 抛异常时插件全静默。
-- **GitHub Release `dsh-plugin-v1.0.0`**：资产 `dsh-ai-terminal-pet-1.0.0.tgz`（1,913,682 B，
+- **仓库根的 `package.json` 清单 shim**（`06d4cae`，1.2.0 口径 1,877 B / 59 行）：不含任何代码，只让
+  「按仓库 URL 安装」在仓库根就能读到 `dsh.bundle`、`main`、`exports`、`icon` 与 `engines`；
+  `version` 与插件包同步（`verify.mjs` 断言两者相等，所以一次版本号变更不可能只落在一个清单里），
+  并带上同一份 `dsh.catalog`。没有它时，只读仓库根的宿主把仓库当成 0.0.0 依赖、报 `declares no dsh.bundle`
+  并装出一个空包——症状是「装成功了，但浮窗永远不出现」，没有任何报错。标 `private: true` 是为了不占用 npm 名。
+- **`verify.mjs` 连根 shim 一起检查，并在 CI 里跑插件套件**（`d06001d`）：新增根清单一致性用例，
+  从 tag `dsh-plugin-v1.1.0` 的 300 行 / 55 个 `ok` 长到 1.1.0 批次的 331 行 / 63 个 `ok`、再随 1.2.0 到
+  369 行 / **77 个 `ok`**（均 `VERIFY PASSED`、rc 0）；
+  `.github/workflows/ci.yml` 增加两步：`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check` 与
+  `node packages/dsh-ai-terminal-pet/verify.mjs`。验证脚本自带 fake Cordis context + 临时 `LOCALAPPDATA` +
+  stub protocol 模块，所以 CI 上不需要网络、管道或真实浮窗。
+- **GitHub Release 线：1.0.0 → 1.1.0 → 1.2.0（历史按顺序记，当前版本是 1.2.0）**。
+  **1.0.0**（已作废）：tag `dsh-plugin-v1.0.0`，资产 `dsh-ai-terminal-pet-1.0.0.tgz`（1,913,682 B，
   sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`），
   下载地址 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz`。
   三种安装方式都实测成功：①本地 tarball `dsh plugin --profile <name> add <tgz 绝对路径>` →
@@ -119,6 +147,24 @@
   `add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz`
   → rc=0、32.6 s，vendor 内两个文件都在位。裸 git 源（不钉 commit/tag）会被 pnpm 的 `allowBuilds`
   门拦在 `prepack` 处失败，所以对外命令只给 tarball 与钉 tag 两种形态。
+  **1.1.0**：tag `dsh-plugin-v1.1.0`（annotated，指向 `b28009377e14840ee003ddaf114922e1d167ed0d`），资产
+  `dsh-ai-terminal-pet-1.1.0.tgz`（**1,913,726 B / 15 files / sha256 3b8f9186cca5142626f2e25175096f1c4fb59d86cc1cdff5879792950146cc78** /
+  shasum `19a2e544ab875c61fcf822e85a91c67273981725`），删掉 `prepack` 后不再有生命周期钩子，因此
+  多出第三种安装形态：**直接给仓库地址** `github:jjjjjjjjnnjnn/ai-terminal-pet`（靠仓库根的清单 shim 解析，
+  等价 `git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git`）。三种形态实测（计时取在 1.1.0 的资产上；
+  1.2.0 资产同位置就位、URL 只换 tag 与版本号）：Release 资产 1.8 s、git 钉 tag 3.4 s、仓库 URL 3.6 s，均 rc=0。仍会失败的是「不写 `#ref` 的 `git+...git&path:/packages/...`」：
+  pnpm 把两段拼进 URL 当仓库地址去 `ls-remote`，报 `repository ... not found`——**与 `prepack` 无关**。
+  **1.2.0**（当前）：tag `dsh-plugin-v1.2.0`（annotated，tagger 2026-11-10T13:46:52+0100，指向
+  `4d777e32e0a9ef57bb7714287dccd7cae065346f`，Release 于 2026-11-10T12:47:24Z 发布），资产
+  `dsh-ai-terminal-pet-1.2.0.tgz`（**1,914,566 B / 16 files / sha256
+  `ccf9d531267af681438010bc94c721e7822a0db3f4d14575953b1757a2ef65c9` / shasum
+  `dc65e0d4259be640c0de7ff1bc86675af5454546`**，实际下载后本地重算与 GitHub 记录的 digest 一致）；
+  内容新增 `dsh.catalog`、
+  `vendor/manifest.json` 随包（文件数 15 → 16）。1.1.0 保持已发布、不可变，由 1.2.0 取代——清单内容变了
+  就必须换版本号，否则仓库与那份不可变 tarball 分叉。1.2.0 发版前 `npm publish --dry-run` 给的是
+  **16 files / 1.9 MB packed / 4.5 MB unpacked / shasum `166c3043…**；但 dry-run 之后包内 `README.md`
+  又改了 13 B（6,652 → 6,665 B），所以**真正发出去的资产是 1,914,566 B / shasum `dc65e0d4…` /
+  sha256 `ccf9d531…`，不是 dry-run 那个摘要**——包里任何一个字节变过，dry-run 的摘要就作废。
 - **awesome-dsh-plugin 注册表条目（PR #13937，已提交、CI 全绿、待人工评审）**：市场 App `dshmarket` 只是前端，
   目录来自注册表仓库 `awesome-dsh-plugin/awesome-dsh-plugin`，投稿方式是只加一个
   `data/plugins/<slug>.yml`。本次条目为
@@ -132,8 +178,13 @@
   （fork 分支 `add-dsh-ai-terminal-pet`，commit `a1fef56`，基于上游 main `09cd105`）。
   **状态是「已提交、CI 已全绿、等人工评审」**：PR 上两个检查都已完成且 `conclusion: SUCCESS`
   （`PR check / check` 于 2026-11-10T10:37:54Z 结束、`Submission gate` 于 10:38:47Z 结束，
-  `mergeable: MERGEABLE`），但**既没有合并也没有收录**；收录进 `main` 之后才会出现在列表与站点上，
-  而 DSH 应用内的 Plugins → Discover 索引还需要一次 npm 发布（见 Changed 末条）。
+  `mergeable: MERGEABLE`），但**既没有合并也没有收录**；收录进 `main` 之后才会出现在列表与站点上。
+- **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
+  `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
+  `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
+  收录门槛是 topics **同时**具备 `dsh-plugin` 与 `deepseek-harness`（两者都填，不是冗余）。
+  另有 `cyber-moshen` 的 workshop 要求「已发布到 npm 的包 + 一个 PR」，属于最重的一条。
+  这也是根清单 shim 的第二重价值：它同时是「根清单采集」这条路径的准入条件。
 
 ### Changed
 
@@ -173,14 +224,27 @@
   并在装完后用 `--doctor` 自查；卸载与 Path 开关同样写进 README 的中英两半。
 - **`.gitattributes` 固定 `* text=auto eol=lf`**（`1330fbe`）：仓库本来就按 LF 存取，但 Windows 上
   `core.autocrlf=true` 会一直报规范化警告；钉进树里之后警告消失，Go 源码与 Markdown 在各次克隆间字节一致。
-- **npm 发布尚未完成，卡在凭据**：包本身已经满足发布条件（`private` 未设、`files` 显式列了 10 项、
-  `prepack` 会重新生成 vendor），但 `npm whoami` 返回 **E401**（token 已失效），所以**没有推任何版本到 npm**。
-  这条链是依次的：注册表条目进了 `main` 才会出现在列表/站点；而 DSH 应用里的 Plugins → Discover 索引
-  只表达 npm 版本（format 1），**必须先有 npm 发布**才可能被索引到。当前能装的三条路是
-  git 源、Release tarball、以及将来的 npm——前两条已实测成功。
+- **插件包版本 1.1.0 → 1.2.0**：清单内容变了（新增 `dsh.catalog`、`keywords` 补 `dsh-plugin`、根 shim
+  `version` 同步），所以必须换版本号。1.1.0 的 tarball 已发布且**不可变**，若让版本停在 1.1.0，仓库与那份
+  tarball 就会对不上——同一个版本号对应两份不同内容，正是本仓库这一轮一直在消除的漂移。因此
+  1.1.0 保留为历史发布、由 1.2.0 取代。
+- **npm 凭据问题已解决，但发布仍未发生**：整场会话里 `npm whoami` 一直是 **E401**；2026-11-10T12:20Z
+  换过 token 之后它返回 **`jjjjjjjjnnjnn`**（收尾复核时仍然有效）。`npm view dsh-ai-terminal-pet version`
+  仍旧报 **E404**，所以这个名字还空着、**一个版本都没发出去**。在包目录跑 `npm publish --dry-run`
+  通过（rc=0）：**16 files / 1.9 MB packed / 4.5 MB unpacked**。从**仓库根**发布会撞上 **EPRIVATE**
+  （根清单带 `private: true`，npm 抬到的是根清单），从 `packages/dsh-ai-terminal-pet/` 发布则正常
+  ——包清单没有 `private`。下一步是发 `1.2.0`。仍未解锁的是 DSH 应用内 Plugins → Discover 索引
+  （只表达 npm 版本或钉 40 位 commit 的 git 源）；手工安装靠 git 源、Release tarball、仓库地址三条路。
 
 ### Fixed
 
+- **CI 曾经变红在 `vendor:check`，根因不是代码错**（`d06001d` 之后）：`go.mod` 里的 `go 1.23.0` 是
+  **下限不是钉版本**，CI runner 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的二进制字节不同——
+  **跨工具链字节相等从来不可能达成**，那一步当时是拿一个达不到的条件当门禁。修法是把断言换成能达成的：
+  `vendor/manifest.json` 记录**源码摘要**（25 个非测试 `.go` 文件）与两个 vendor 文件自己的哈希，
+  `vendor:check` 校验这些；只有当**本地 Go 版本等于 manifest 里记录的 `go1.27.0`** 时才和 `bin/` 做字节比对。
+  于是 CI 校验「vendor 与源码摘要一致」、本地额外校验「vendor 与 `bin/` 字节一致」，两边都在验真实的东西。
+  这段历史不美化：CI 是先红后修的，不是一次就绿；也不是「go.mod 该钉工具链」。
 - **可移植性：`docs/assets/render_assets.py` 不再写死本机绝对路径**（`98 行`改动）。
   旧版把 `PREVIEW` 写成 `C:\Users\<本人>\AppData\Local\Temp\petpreview2`、`ASSETS` 写成
   `C:\Users\<本人>\Desktop\项目开发\ai-terminal-pet\docs\assets`，任何别人的克隆一跑就断。
