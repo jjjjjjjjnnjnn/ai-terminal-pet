@@ -188,6 +188,14 @@
   `https://awesome-dsh-plugin.com/plugins.json`（`count: 10119`、`updated: 2026-11-10`）里
   同样 0 命中——上游 `Build site from README` 工作流（run `42841664024`）自 15:13:06Z 起停在
   build 步骤没动，后面还排着两次重跑。所以现在的正确说法是「条目已合并、列表与市场待上游站点构建落地」。
+  **两处外部副作用已记录**：① 已发布的 `dsh-ai-terminal-pet-1.2.0.tgz` 里那份 `README.md` 是 1.2.0 打包时的旧文，
+  仍写着「等人工评审、尚未列入」——Release 资产不可变，本仓库的改动不会回写进那份 1,914,566 B 的 tarball，
+  所以**下一版（≥1.3.0）发版前必须重新打包**才能让包内说明与事实一致；`docs/market-index.json` 钉的也是
+  `4d777e3` 那个 commit，同样读到旧文。写文案时别拿包内 README 当现状。
+  ② 已向市场仓库提了误报 issue <https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367>：
+  `registry-run-key` 与 `remove-item-force-recurse` 两条旗标都是正则匹配到常量定义与提示文本，
+  `install.ps1` 从不新增 Run 值、递归删除只作用于一个经 `Assert-SafeInstallDirectory` 校验的目录；
+  该仓库没有抑制机制，是否接受由维护者决定。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
