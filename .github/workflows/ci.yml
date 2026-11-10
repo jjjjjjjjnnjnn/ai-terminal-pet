@@ -130,9 +130,19 @@ jobs:
         run: node integrations/deepseek-harness/verify.mjs
 
       # The DSH plugin package ships a vendored copy of the overlay binary, because
-      # a marketplace install has no Go toolchain to build one. --check compares
-      # that copy against this checkout's bin/ so a stale vendor file fails here
-      # instead of silently shipping an old overlay to every installer.
+      # a marketplace install has no Go toolchain to build one. A stale vendor copy
+      # would silently ship an old overlay to every installer, so this step fails
+      # here instead.
+      #
+      # It cannot be a byte comparison against this checkout's bin/: go.mod's
+      # `go 1.23.0` is a floor, not a pin, so this runner builds with go1.23.0 while
+      # the committed overlay was built with a newer local Go, and different
+      # releases compile identical sources to different bytes. The guard is
+      # vendor/manifest.json's source digest: one sha256 over every *.go file under
+      # cmd/ and internal/ that the committed binary was built from. If a source
+      # changed without re-vendoring, the digest no longer matches and this step
+      # exits 2. The raw byte comparison still runs, but only when the manifest
+      # names the same Go release as this runner.
       - name: Check the vendored overlay is current
         run: node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
 

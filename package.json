@@ -1,6 +1,6 @@
 {
   "name": "dsh-ai-terminal-pet",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Marketplace shim: the DSH plugin lives in packages/dsh-ai-terminal-pet, and this manifest lets a repository-URL install resolve to it.",
   "license": "MIT",
@@ -22,6 +22,20 @@
       "platforms": [
         "win32"
       ]
+    },
+    "catalog": {
+      "category": "tool",
+      "summary": {
+        "en": "A floating overlay for Windows: OpenCode, Claude Code, Antigravity and DeepSeek Harness sessions appear in one always-on-top panel, so you see which terminal waits without switching windows.",
+        "zh": "Windows 桌面浮窗：把 OpenCode、Claude Code、Antigravity 与 DeepSeek Harness 的会话状态汇总成一个常驻置顶面板，一眼看出哪个终端在等你，不必来回切窗口。"
+      },
+      "capabilities": [
+        "windows-overlay",
+        "named-pipe",
+        "session-state",
+        "tray-icon",
+        "no-network"
+      ]
     }
   },
   "repository": {
@@ -32,5 +46,14 @@
   "author": "jjjjjjjjnnjnn",
   "files": [
     "packages/dsh-ai-terminal-pet"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "ai-terminal-pet",
+    "overlay",
+    "windows"
   ]
 }

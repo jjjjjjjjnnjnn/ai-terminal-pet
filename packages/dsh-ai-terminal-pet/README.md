@@ -28,13 +28,24 @@ process exit means the conversation is over.
 
 ## Install
 
-The bundle has been submitted to the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+The bundle is submitted to the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)),
-which is the catalog the DSH plugin market reads. Both upstream checks are green;
-the entry is waiting on a human reviewer, so it is **not listed yet**. Once it
-reaches `main`, the market index picks it up on its next build (usually within a
-day) and the package appears under Plugins -> Market.
+which is the catalog behind DSH's own Plugins -> Market. Both upstream checks are
+green; the entry is waiting on a human reviewer, so it is **not listed there yet**.
+Once it reaches `main`, that index picks it up on its next build (usually within a
+day).
 
+The other route needs no application at all: third-party markets harvest GitHub
+repositories carrying the `dsh-plugin` topic (this repository has it) together with
+a root `package.json` that declares `name` and `dsh.bundle`. That is exactly why
+the repository root carries a shim manifest — `dsh plugin add github:owner/repo`
+reads the root manifest, and without one the install resolves to a 0.0.0
+dependency that mounts nothing.
+
+The package describes itself to those storefronts through `dsh.catalog`: a
+category, a one-line summary in both languages, and the capabilities it uses.
+Capabilities are self-declared and never checked — DSH does not sandbox plugins —
+so read them as a description, not a permission grant.
 The bundle is Windows only and declares `dsh.bundle.platforms: ["win32"]`, so
 other platforms show it as unsupported instead of installing it.
 
@@ -43,10 +54,10 @@ pin the release tag. Both are verified end to end:
 
 ```sh
 # release tarball: no clone, no Go toolchain
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.1.0/dsh-ai-terminal-pet-1.1.0.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.0/dsh-ai-terminal-pet-1.2.0.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.1.0&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.0&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Do not hand pnpm a bare repository URL. pnpm resolves a git dependency by
@@ -54,10 +65,14 @@ running the package's lifecycle scripts, and it blocks those for unpinned
 git sources until you copy the `allowBuilds` key it prints into your profile's
 `pnpm-workspace.yaml`; the failure message never mentions AI Terminal Pet. The
 package therefore ships no lifecycle hook, and its vendored overlay is a
-committed file rather than a build product.
+committed file rather than a build product. `vendor/manifest.json` records the
+SHA-256 of that file, the SHA-256 of the Go sources it was built from, and the
+Go version that produced it, so a stale or hand-edited vendor directory fails a
+check instead of shipping quietly.
 
-Installing by package name (`add dsh-ai-terminal-pet`) starts working only after
-the npm release, which is currently blocked on registry credentials.
+The GitHub paths above need no npm. Installing by package name
+(`add dsh-ai-terminal-pet`) starts working once the package is published to the
+npm registry; until then use one of the two commands above.
 
 `add` is the whole install: the profile records the dependency, and the bundle
 declares itself through `dsh.bundle.patch`, so no separate `enable` step exists.

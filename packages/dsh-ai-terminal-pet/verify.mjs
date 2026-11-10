@@ -16,6 +16,7 @@
  *   - bootstrap copies protocol.js then the exe into the fake LOCALAPPDATA,
  *     only when missing, and never overwrites an existing file
  *   - a protocol module that throws on import leaves the plugin completely silent
+ *   - vendor/manifest.json still describes the two files committed under vendor/
  */
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -316,12 +317,50 @@ async function caseRootManifest() {
   check(JSON.stringify(rootManifest.files) === '["packages/dsh-ai-terminal-pet"]', 'a tarball built at the root contains only the plugin subtree')
 }
 
+/**
+ * Case 6: vendor/manifest.json describes what is actually committed.
+ *
+ * The overlay cannot be compared byte-for-byte against a fresh CI build (the
+ * go.mod line is a floor, not a pin, and different Go releases emit different
+ * bytes), so scripts/vendor.mjs records a digest of the Go sources the binary
+ * was built from. This case only checks the manifest is present, parses, and
+ * still describes the two vendored files on disk; whether the sources have
+ * moved on since is scripts/vendor.mjs --check's job, in CI.
+ */
+async function caseVendorManifest() {
+  const vendorDir = path.join(packageDir, 'vendor')
+  const manifestPath = path.join(vendorDir, 'manifest.json')
+  check(existsSync(manifestPath), 'vendor/manifest.json is committed')
+  if (!existsSync(manifestPath)) return
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  } catch (error) {
+    check(false, 'vendor/manifest.json is valid JSON (' + error.message + ')')
+    return
+  }
+  check(manifest.schemaVersion === 1, 'vendor/manifest.json has schemaVersion 1')
+  check(manifest.generatedBy === 'scripts/vendor.mjs', 'vendor/manifest.json names the script that wrote it')
+  check(/^go1\.[0-9]+/.test(String(manifest.goVersion)), 'vendor/manifest.json records the Go release that built the overlay')
+  check(typeof manifest.source?.sha256 === 'string' && /^[0-9a-f]{64}$/.test(manifest.source.sha256), 'vendor/manifest.json carries a source digest')
+  check(typeof manifest.source?.files === 'number' && manifest.source.files > 0, 'vendor/manifest.json counts the Go files behind that digest')
+  for (const [kind, entry, fileName] of [['overlay', manifest.overlay, 'AI-Terminal-Pet.exe'], ['protocol', manifest.protocol, 'protocol.js']]) {
+    const file = path.join(vendorDir, fileName)
+    check(entry?.file === 'vendor/' + fileName, 'vendor/manifest.json names ' + entry?.file + ' as the ' + kind)
+    check(existsSync(file), 'the ' + kind + ' the manifest describes exists at vendor/' + fileName)
+    if (!existsSync(file)) continue
+    check(entry?.bytes === statSync(file).size, 'the ' + kind + ' size still matches the manifest')
+    check(entry?.sha256 === sha256(file), 'the ' + kind + ' sha256 still matches the manifest')
+  }
+}
+
 try {
   await caseMapping()
   await caseBootstrap()
   await caseThrowingProtocol()
   await caseManifest()
   await caseRootManifest()
+  await caseVendorManifest()
 } finally {
   rmSync(root, { recursive: true, force: true })
 }
