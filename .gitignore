@@ -30,3 +30,9 @@ harness-out.json
 
 # Generated panel preview (see README: "Seeing a layout change without a window")
 panel-preview.png
+
+# The DSH plugin package ships a prebuilt overlay so `dsh plugin add` needs no
+# Go toolchain. It is the one exception to the build-output rule above: it is
+# a release artifact, not a local build. Regenerate it with `npm run vendor`
+# (packages/dsh-ai-terminal-pet/scripts/vendor.mjs) after rebuilding bin/.
+!packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe

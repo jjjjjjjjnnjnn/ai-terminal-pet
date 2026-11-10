@@ -2,3 +2,8 @@
 # The project is Windows-only but every source file is authored in UTF-8/LF;
 # .ps1 scripts, Go sources and reporters all work with LF endings.
 * text=auto eol=lf
+
+# The DSH plugin package vendors a prebuilt overlay binary. It must be stored
+# byte-for-byte: a single re-encoded byte breaks the SHA-256 that
+# packages/dsh-ai-terminal-pet/scripts/vendor.mjs and -VerifyOnly rely on.
+*.exe binary
