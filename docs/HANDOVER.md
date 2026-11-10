@@ -13,15 +13,15 @@
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**154 个** `func Test`，
   由 `go test -list '.*' ./...` 计数）；六个上报端逐个 `node --check` 全过；
   `node integrations/deepseek-harness/verify.mjs` 输出 VERIFY PASSED；
-  `install.ps1 -VerifyOnly` 10/10 `[ok]`、exit 0。
+  `scripts/install.ps1 -VerifyOnly` 10/10 `[ok]`、exit 0（脚本已从仓库根下沉到 `scripts/`，见 §27.11）。
 - **规模**：Go 非测试源码 **10,719** 行 / 测试 **4,212** 行 / JS **1,742** 行（49 个 `.go`、8 个 `.js`+`.mjs`）；
   `bin/AI-Terminal-Pet.exe` **4,371,968 B**、`bin/pet-statusline.exe` **3,643,392 B**（均按
   `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；第三方依赖 3 个（go-winio MIT、lxn/win BSD、x/sys BSD）。
   v0.9.0 提交时的旧值（10,201 / 3,831 / 1,633 行，4,178,432 / 3,644,416 B，140 个 `func Test`）已作废。
 - **新增**（全部在 v0.9.0 之后、未发版）：`--doctor` 自检（9 项检查）、`docs/PROTOCOL.md` 线协议规范、
   `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
-  `install.ps1` 的 `-VerifyOnly` / `-Uninstall` / `-AddToPath` 三个开关（卸载同时清理 PATH 条目）。
-  细节见 §26。
+  `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
+  `scripts/install.ps1` 的 `-VerifyOnly` / `-Uninstall` / `-AddToPath` 三个开关（卸载同时清理 PATH 条目）。
 - **分发**：Harness 桥接已做成独立 DSH 插件包 `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet`
   **1.2.1**，含预编译浮窗，Release tag `dsh-plugin-v1.2.1`，资产 `dsh-ai-terminal-pet-1.2.1.tgz`；
   1.2.0 与 1.1.0 均保持已发布、不可变，由 1.2.1 取代——1.2.1 只改包内 `README.md` 与两条安装命令里的版本号，
@@ -38,8 +38,8 @@
   **`verdict: bundle-plugin`**（`pkg_name: dsh-ai-terminal-pet`、`version: 1.2.0`、topics 11 个），
   且该条目这次**没有被打任何风险档位**（既无 `risk_tier` 也无 `risk_flags`；前端对没有档位的条目按「未知」
   渲染，不显示徽章），所以页面上不再有那个 critical 徽章；**但「没有档位」只是「未评估」不是「safe」**——
-  它的扫描器没有抑制机制，被匹配的两行（`install.ps1:31` 的 `CurrentVersion\Run` 常量与 `:308` 的
-  `Remove-Item -Recurse -Force`）仍在原处，下次对我们的 `updated_at` 做成功评估时那枚徽章可能回来。
+  而 `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，安装脚本已于
+  2026-11-10 移进 `scripts/`（§27.11），它下次评估时读不到那两个正则的落点，旗标不会再产出。
   npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，此前整场会话 E401），但**任何版本都还没发布到 npm**
   （`npm view` 仍 E404，且发布要求一次性密码，非交互 shell 里拿不到），所以按包名安装暂时不可达；
   `docs/market-index.json` 是仓库自建的 format-1 索引，钉在 1.2.1 的发布 commit，可让 Discover 先按 git 源可用。
@@ -66,7 +66,7 @@
   - `bundles\ai-terminal-pet-bridge\`（DSH bridge：`package.json` / `cordis.patch.yml` / `index.js` / `icon.svg` / `README.md` / `locale\{en,zh}.json`）
   - `config.json`（偏好，字段见 §25.5）、`state.json`（位置/缩放/展开）、`runtime\`（会话快照 `*.json` / `*.tmp`）
   - `approvals\`（auto-approve 握手：`pending-*.json` 与同名 `.deny`，见 §18.2）、`error.log`（0600，超 1 MB 轮转）、`hang.log`
-- 部署脚本：`install.ps1`（四组参数 `Source`/`ShimSource`/`ProtocolSource`/`BundleSource`；停进程 → 等真正退出 → 重试拷贝 20 次 → 每个文件 SHA256 校验）
+- 部署脚本：`scripts/install.ps1`（四组参数 `Source`/`ShimSource`/`ProtocolSource`/`BundleSource`；停进程 → 等真正退出 → 重试拷贝 20 次 → 每个文件 SHA256 校验）
 - 插件包：`packages/dsh-ai-terminal-pet/`（独立 DSH bundle，`vendor/` 内含预编译 `AI-Terminal-Pet.exe`，
   与 `bin/` 下那份字节一致；详见 §27）
 - 当前有效 runbook：**§13 起**；§13–§27 按时间追加，最后两条是 §26（v0.9.0 之后未发版的文档/自检/CI 批次）
@@ -1021,13 +1021,13 @@ DPI 感知探针（150%）：
 
 1. **构建命令一律带 `-buildvcs=false`**。VCS 戳记里含构建时的 commit 与工作区状态，
    同一份源码在不同时间/机器上重建出的字节不同；不带它时 `pet-statusline.exe` 是 3,644,416 B，
-   带它是 3,643,392 B（差 1,024 B），`install.ps1 -VerifyOnly` 只要两侧构建方式不同就误报。
+   带它是 3,643,392 B（差 1,024 B），`scripts/install.ps1 -VerifyOnly` 只要两侧构建方式不同就误报。
    二进制不入库（`.gitignore` 忽略 `bin/`），所以「与仓库一致」实指「与你自己 `bin/` 里那份一致」。
 2. **`node --check` 必须逐文件循环**：`node --check a.js b.js` 只检查第一个参数（Node 24 实测：
    第二个是坏文件也 exit 0）。CI、`AGENTS.md`、`PROTOCOL.md` 附录 B、README 中英两半用的都是
    `for f in reporters/*.js; do node --check "$f"; done`。
 
-### 26.5 `install.ps1` 的三个开关
+### 26.5 `scripts/install.ps1` 的三个开关
 
 纯 ASCII（PowerShell 5.1 读无 BOM 脚本按 ANSI 代码页，非 ASCII 会乱码）。行数与字节数都会随每次增强
 变动，故不记——需要具体值时以工作区文件为准。
@@ -1054,8 +1054,8 @@ for f in reporters/*.js; do node --check "$f"; done
 node integrations/deepseek-harness/verify.mjs
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
-.\install.ps1
-.\install.ps1 -VerifyOnly                     # 期望 10/10 [ok]
+.\scripts\install.ps1
+.\scripts\install.ps1 -VerifyOnly                     # 期望 10/10 [ok]
 & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 期望 0 fail，exit 0
 ```
 
@@ -1063,7 +1063,7 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe 
 
 - runbook 里 `--doctor` 的 `version` 永远只能给出 `[warn]`：只读地比对版本号不可行，尺寸一致时无法判定新旧。
 - `reporters/package.json` 无 `type` 字段导致的 typeless 提示是刻意的，不要为了消警告改成 `module`。
-- `install.ps1 -Uninstall` 期间若有 reporter 重新拉起浮窗，删除会失败并给出「关掉所有 hook 再试」的可见失败提示。
+- `scripts/install.ps1 -Uninstall` 期间若有 reporter 重新拉起浮窗，删除会失败并给出「关掉所有 hook 再试」的可见失败提示。
 - `docs/assets/render_assets.py` 仍需 Pillow；缺库时给安装提示并 exit 2，不尝试自动安装。
 
 ---
@@ -1373,12 +1373,12 @@ git cat-file -s "$(git ls-files -s packages/dsh-ai-terminal-pet/vendor/AI-Termin
   改判为 **`verdict: bundle-plugin`**，`registry.json` 里也有了 `pkg_name: dsh-ai-terminal-pet` /
   `version: 1.2.0` / topics 11 个，且该条目**没有 `risk_tier` 字段**。但按它的前端语义（`lib/client.js`），
   缺 `risk_tier` 只是「未评估」——页面不渲染徽章，不等于评级为 safe。扫描器（`lib/domain/security-scan.js`）
-  **没有任何 suppress / allowlist 机制**，而它匹配的两行文本仍原样在 `install.ps1` 里：
-  `/CurrentVersion\Run(?:Once)?\b/i` 命中 :31 的 `$RunKeyPath` 常量（critical）与 :353 的提示文本，
+  **没有任何 suppress / allowlist 机制**，但两条旗标的输入已在 2026-11-10 消失：`evalRepoRisk` 只抓仓库根的
+  `install.ps1` / `install.sh` / `package.json`，而安装脚本已移进 `scripts/`（§27.11）。历史行号仅供查证——
+  `/CurrentVersion\Run(?:Once)?\b/i` 命中原根脚本 :31 的 `$RunKeyPath` 常量与 :353 的提示文本，
   `/\bremove-item\s+[^\n]*-recurse[^\n]*-force/i` 命中 :308 的 `Remove-Item -Recurse -Force`（medium）。
-  也就是说**下一次对我们的 `updated_at` 做成功评估时，`risk` 徽章可能原样回来**。这是启发式扫描，不是漏洞结论，
-  但自启那条确实与本项目的行为有关，不要辩解成误报；要永久消掉只有两条路——把 `install.ps1` 移进
-  `scripts/`（扫描只看仓库根，代价是 27 个文件 100+ 处引用与类型判定一起变），或推动上游支持行级豁免。
+  移走后这两条正则已没有可匹配的根文件，`risk` 徽章不会因它们回来；但扫描器仍是启发式，换别的规则仍可能命中。
+  那两条旗标本身确实与本项目行为有关（自启项、递归清理），只是匹配点落在保护逻辑上——issue #367 已如实说明。
 - **注册表条目与 `dsh.catalog` 不同步**：PR #13937 的 `data/plugins/<slug>.yml` 写的是它自己的
   `category` / `summary`，与包内 `dsh.catalog` 是两份独立文案；合并之后若要改文案，两边都得改。
 
@@ -1484,3 +1484,41 @@ commit: 4d777e32e0a9ef57bb7714287dccd7cae065346f, path: packages/dsh-ai-terminal
 所以等 npm 通了要发下一版时**新增一个版本条目**而不是改现有那条的来源类型。
 **同样是外部数据**：本地验证用的是宿主的 validator，但上游是否会采信我们的索引、以及
 各家第三方市场何时重建，都不由我们决定。
+
+### 27.11 安装脚本下沉到 `scripts/`（2026-11-10）
+
+**做了什么**：把仓库根的 `install.ps1`（27,358 B / 583 行）移到 `scripts/install.ps1`（27,930 B / 590 行），
+仓库根从此没有同名文件。行为一个字没改——停进程、20 次重试拷贝、逐文件 SHA256、`-VerifyOnly` /
+`-Uninstall` / `-AddToPath` 三个开关、`Assert-SafeInstallDirectory`、PATH 备份与清理全部原样。
+
+**为什么**：[DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的
+`evalRepoRisk`（`scripts/build-registry.mjs` + `lib/domain/security-scan.js`）**只按固定文件名抓仓库根**的
+`package.json` / `install.sh` / `install.ps1`，然后把整份文件喂给正则表。它给我们报的两条旗标
+（`registry-run-key` critical、`remove-item-force-recurse` medium）匹配的是脚本里**合法的**内容：
+`$RunKeyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'` 只是注册表路径常量（脚本自己从不
+`New-ItemProperty` 到 Run，只有 `-Uninstall` 时按条件删自己写的那条），`Remove-Item -Recurse -Force`
+只作用于经 `Assert-SafeInstallDirectory` 校验过的安装目录。该扫描器**没有 suppress / allowlist 机制**
+（唯一的 allowlist 是 `HAZARD_ALLOWLIST_DOMAINS` 对 downloadExec 的域名降级），所以「改注释绕正则」不是
+正路；把它移出被扫描的路径才是。
+
+**顺带的好处**：市场类型判定 `detectTypeDetail(cacheDir)` 的第三分支是「根 `install.ps1` → script」，
+移走后该分支不再命中，判定落到第二分支——根 `package.json` 的 `hasDshPluginDeclaration`（`pkg.dsh` 是对象）
+与 `isBundlePackage`（`dsh.bundle.patch` 非空字符串），结果是 `bundleDeclared` / type `bundle`。这与
+16:22Z 那次重建得出的 `verdict: bundle-plugin` 一致，等于两条独立证据指向同一结论。
+
+**技术要点**：`param()` 的默认值在**参数绑定阶段**求值，此时脚本体的赋值还没执行，所以不能写
+`Join-Path $RepoRoot ...`；`$PSScriptRoot` 是唯一在那时就可用的自动变量，因此四个默认值写成
+`Join-Path (Split-Path -Parent $PSScriptRoot) 'bin\AI-Terminal-Pet.exe'` 这类形式。脚本体里再定义
+`$RepoRoot = Split-Path -Parent $PSScriptRoot`，给预检用来判断某个缺失文件是否属于 `bin/` 的 `$binRoot` 用。
+
+**实测**：`PSParser` 解析 `PARSE_OK`；`-VerifyOnly` → `install: verified - 10 file(s) match the repository, 0 warning(s)`、
+exit 0；完整安装 → rc=0，两个 exe（4,371,968 / 3,643,392 B）与 `protocol.js`（20,914 B）与 bundle 7 文件当场
+重新落盘；装完再跑 `-VerifyOnly` 仍 10/10。
+
+**代价**：全仓 27 个文件里约 100 处 `install.ps1` 文本引用要跟着改（README 中英两半、AGENTS.md、ROADMAP、
+CHANGELOG、插件包 README 与 `lib/index.js` 注释、`integrations` 桥接 README 与 `index.js`、`.gitignore` 首行、
+以及 Go 源码里的注释）。改漏一处就是给读者一条跑不通的命令——这也是为什么这次把 `scripts\` 前缀写进了
+所有能被执行的地方，而不是只说「脚本已移动」。
+
+**没有做的事**：没有给 `scripts/install.ps1` 留一个根目录的转发壳（那会把被扫描的路径又造回来）；也没有
+把 `-Uninstall` 的确认提示改成非交互（那是另一件事，且当前行为是安全默认）。

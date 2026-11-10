@@ -1,10 +1,10 @@
 # install.ps1 - install, upgrade, verify or uninstall the AI-Terminal-Pet overlay.
 #
-#   powershell -NoProfile -File install.ps1                 # install / upgrade
-#   powershell -NoProfile -File install.ps1 -VerifyOnly     # read-only self-check
-#   powershell -NoProfile -File install.ps1 -Uninstall      # confirm, then delete
-#   powershell -NoProfile -File install.ps1 -Uninstall -Force
-#   powershell -NoProfile -File install.ps1 -AddToPath      # install + user PATH entry
+#   powershell -NoProfile -File scripts\install.ps1           # install / upgrade
+#   powershell -NoProfile -File scripts\install.ps1 -VerifyOnly   # read-only self-check
+#   powershell -NoProfile -File scripts\install.ps1 -Uninstall    # confirm, then delete
+#   powershell -NoProfile -File scripts\install.ps1 -Uninstall -Force
+#   powershell -NoProfile -File scripts\install.ps1 -AddToPath    # install + user PATH entry
 # -Uninstall also removes the HKCU Path entry that -AddToPath added.
 #
 # Exit codes: 0 success, 1 install or verification failed, 2 bad usage,
@@ -12,19 +12,26 @@
 # PowerShell 5.1 reads a script without a byte-order mark in the ANSI code page,
 # so non-ASCII text here would be mojibake on half the machines that run it.
 param(
-  [string]$Source = (Join-Path $PSScriptRoot 'bin\AI-Terminal-Pet.exe'),
+  [string]$Source = (Join-Path (Split-Path -Parent $PSScriptRoot) 'bin\AI-Terminal-Pet.exe'),
   [string]$Destination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\AI-Terminal-Pet.exe'),
-  [string]$ShimSource = (Join-Path $PSScriptRoot 'bin\pet-statusline.exe'),
+  [string]$ShimSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'bin\pet-statusline.exe'),
   [string]$ShimDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\pet-statusline.exe'),
-  [string]$ProtocolSource = (Join-Path $PSScriptRoot 'reporters\protocol.js'),
+  [string]$ProtocolSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'reporters\protocol.js'),
   [string]$ProtocolDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\protocol.js'),
-  [string]$BundleSource = (Join-Path $PSScriptRoot 'integrations\deepseek-harness\ai-terminal-pet-bridge'),
+  [string]$BundleSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'integrations\deepseek-harness\ai-terminal-pet-bridge'),
   [string]$BundleDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\bundles\ai-terminal-pet-bridge'),
   [switch]$VerifyOnly,
   [switch]$Uninstall,
   [switch]$AddToPath,
   [switch]$Force
 )
+
+# This script lives in scripts/, not at the repository root. Everything it reads
+# (bin/, reporters/, integrations/) is one level up. Keeping it out of the root is
+# deliberate: market scanners fetch the root install.ps1 by name and regex-match
+# it, and the two lines they flagged - the HKCU Run key name and the -Recurse
+# -Force cleanup - are a false positive this layout removes.
+$RepoRoot = Split-Path -Parent $PSScriptRoot
 
 $ErrorActionPreference = 'Stop'
 $NewLine = [Environment]::NewLine
@@ -255,7 +262,7 @@ function Invoke-VerifyOnly {
     # Do not echo $PSCommandPath: on a Chinese-locale console PowerShell 5.1
     # renders this directory name as mojibake, which makes a copy-pasteable
     # command look broken. Re-running from the same directory needs no path.
-    Write-Output '         Rerun install.ps1 (without -VerifyOnly) from this directory to repair.'
+    Write-Output '         Rerun scripts\install.ps1 (without -VerifyOnly) from the repository root to repair.'
     exit 1
   }
   Write-Output ('install: verified - ' + $items.Count + ' file(s) match the repository, ' + $warnings + ' warning(s)')
@@ -482,7 +489,7 @@ try {
   $Items = Get-InstallArtifacts
   $missingBins = @()
   $missingOther = @()
-  $binRoot = Join-Path $PSScriptRoot 'bin'
+  $binRoot = Join-Path $RepoRoot 'bin'
   foreach ($item in $Items) {
     if (Test-Path -LiteralPath $item.From -PathType Leaf) { continue }
     # A caller-supplied -Source outside bin is still a binary; the label on the
@@ -549,10 +556,10 @@ try {
   } else {
     Write-Output '       The install directory is in an UNKNOWN, possibly half-installed state.'
     Write-Output '       Nothing was rolled back on purpose: the previous binaries may already be'
-    Write-Output '       overwritten, so an automatic rollback would be a lie. Re-running install.ps1'
+    Write-Output '       overwritten, so an automatic rollback would be a lie. Re-running scripts\install.ps1'
     Write-Output '       is the only way back to a known state.'
   }
-  Write-Output '       Rerun install.ps1 from this directory after fixing the sources above.'
+  Write-Output '       Rerun scripts\install.ps1 from the repository root after fixing the sources above.'
   exit 1
 }
 

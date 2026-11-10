@@ -65,11 +65,11 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
 
 # 4. Install, then let the shipped binary prove the install
-.\install.ps1
-.\install.ps1 -VerifyOnly     # per-file SHA256; exit 0 only when everything matches
+.\scripts\install.ps1
+.\scripts\install.ps1 -VerifyOnly     # per-file SHA256; exit 0 only when everything matches
 & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 9 checks; exit 1 on any failure
-.\install.ps1 -AddToPath      # optional: adds the install dir to HKCU Path
-.\install.ps1 -Uninstall      # needs `yes` at the prompt, or -Force
+.\scripts\install.ps1 -AddToPath      # optional: adds the install dir to HKCU Path
+.\scripts\install.ps1 -Uninstall      # needs `yes` at the prompt, or -Force
 
 # 5. Optional UI Layout Preview (renders PNGs into PET_PREVIEW_DIR)
 $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
@@ -85,7 +85,7 @@ Two conventions in those commands are load-bearing, not style:
 
 - **`-buildvcs=false`** in both builds. The VCS stamp records the commit and the working-tree state at
   build time, so two builds of the same source differ across machines and dates. Without the flag
-  `pet-statusline.exe` is 3,644,416 B instead of 3,643,392 B and `install.ps1 -VerifyOnly` reports a
+  `pet-statusline.exe` is 3,644,416 B instead of 3,643,392 B and `scripts/install.ps1 -VerifyOnly` reports a
   false failure. The binaries are not committed (`.gitignore` ignores `bin/`), so "matches the
   repository" means "matches the copy in your working tree".
 - **`node --check` one file at a time.** `node --check a.js b.js` checks only the first argument and
@@ -123,7 +123,7 @@ Two conventions in those commands are load-bearing, not style:
      Windows system libraries (`user32.dll`, `gdi32.dll`, `shell32.dll`).
 4. **Encoding & Line Endings**:
    - Preserve UTF-8 encoding across all files. `.gitattributes` pins `* text=auto eol=lf`; do not
-     introduce CRLF. `install.ps1` must stay pure ASCII, because Windows PowerShell 5.1 reads a
+     introduce CRLF. `scripts/install.ps1` must stay pure ASCII, because Windows PowerShell 5.1 reads a
      BOM-less script as ANSI.
 5. **Cross-language protocol contract**:
    - The pipe name is the first 4 bytes of `sha256(home lowercased, trailing separators trimmed)`

@@ -40,7 +40,7 @@
 ### 1j. 2026-11-10（v0.9.0 之后，未发版）—— DSH 插件包与市场分发尝试
 
 **动机**：§1i 解决了「别人的机器能跑通」，但没有解决「别人怎么拿到」。Harness 的接法当时要求先 clone
-整个仓库、跑 `install.ps1`，再把安装目录里 bundle 的绝对路径贴进插件管理器——对外部用户不成立。
+整个仓库、跑 `scripts/install.ps1`，再把安装目录里 bundle 的绝对路径贴进插件管理器——对外部用户不成立。
 DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里一个 `data/plugins/<slug>.yml`，加上一个 npm 包。
 
 **交付**（`7f476c9` + `91719e5`，细节与坑见 HANDOVER §27）：
@@ -113,8 +113,8 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   换版本要靠 PR #14063。同一批里 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace)
   的 `build-registry`（run `42812806941`）也在 16:22:29Z 跑完：本仓库从 `verdict: script` 改判为 `bundle-plugin`，
   `registry.json` 里有了 `pkg_name` / `version: 1.2.0` 且**不带 `risk_tier`**——但那是「未评估」不是「安全」，
-  扫描器匹配的两行文本仍在 `install.ps1` 里，下次成功评估时 `risk` 徽章可能回来。
-
+  `registry.json` 里有了 `pkg_name` / `version: 1.2.0` 且**不带 `risk_tier`**——但那是「未评估」不是「安全」，「安全」要靠它下次真的扫过一遍才能得出。
+  安装脚本 2026-11-10T17:2xZ 已从仓库根移进 `scripts/`，而它只按文件名抓根目录的 `install.ps1`，所以那两条旗标失去了唯一的输入。
 **踩到的坑（值得写进路线图，因为它决定了 §4 里那几项的状态标记怎么写）**：`vendor/AI-Terminal-Pet.exe`
 一开始不在 git 树里（`.gitignore` 的 `*.exe` 把它吞了，`git add` 不会越过忽略规则）。后果不对称：
 `npm pack` 读工作区所以 tarball 装得上，`git clone` 读树所以 git 源装出的是个没浮窗的包，
@@ -138,8 +138,8 @@ CI 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的字节不同—�
 但那是上游站点构建的排队与耗时：run `42844452013` 于 16:39:27Z success 后条目页 200、`plugins.json` `count` 从 10119 涨到 10230 并收录本仓库。
 同时 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引在 16:22:29Z 重建完成，
 本仓库从 `verdict: script` 改判为 `bundle-plugin`、不再带 `risk_tier`——但那是「未评估」不是「safe」，
-扫描器匹配的两行仍留在 `install.ps1` 里，下次成功评估时 `risk` 徽章可能回来；1.2.1 的 tag 与 Release 资产已发布
-（annotated tag `dsh-plugin-v1.2.1` 指向 `1e08b3e`，资产 `dsh-ai-terminal-pet-1.2.1.tgz` 1,914,616 B /
+本仓库从 `verdict: script` 改判为 `bundle-plugin`、不再带 `risk_tier`——但那是「未评估」不是「safe」，
+安装脚本已移进 `scripts/`，它只抓根目录同名文件，两条旗标的输入随之下线；1.2.1 的 tag 与 Release 资产已发布
 sha256 `b9e6d203…`）；只剩 `lib/release-pins.json` 刻意留空，所以插件内「自动下载浮窗」
 回落仍是 no-op——安装时拷的是 `vendor/` 里那份（见 §27.7）。
 
@@ -477,7 +477,7 @@ IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法
 其中 `internal/app/doctor_windows.go` 占 22,932 字节源码——这是「可自查」换来的体积。
 **做法**：`-ldflags "-s -w"` 已用。**`-buildvcs=false` 已实测并入**：同样的 -s -w，
 加上它会去掉 VCS 戳记，`pet-statusline.exe` 由 3,644,416 B 降到 3,643,392 B（差 1,024 B），主程序两种写法同为
-4,371,968 B。现在 `install.ps1` 的缺失提示、`AGENTS.md` 与 CI 用的都是这条命令，所以**同一份源码在任何
+4,371,968 B。现在 `scripts/install.ps1` 的缺失提示、`AGENTS.md` 与 CI 用的都是这条命令，所以**同一份源码在任何
 机器、任何时间重建出的产物字节一致**（二进制不入库，`bin/` 被 `.gitignore` 忽略）；`-VerifyOnly` 拿已部署
 副本与工作区里的 `bin/` 逐项比对，两侧构建方式不同就会误报。继续可做：剥离 `net/http` 等未用包的反射元数据（本项目不用 http，
 但 `net` 被管道复用）、用 `-tags` 关掉不需要的 `crypto` 实现。
@@ -517,7 +517,7 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 ✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 已列出（`:8519`）；合并只写进了 `main`，可见性要等上游站点构建——16:16Z 条目页还是 404、`plugins.json` 0 命中，而 run `42844452013` 在 16:39:27Z success 之后条目页返回 200、`plugins.json` 的 `count` 从 10119 涨到 10230 并收录本仓库（目录里的 `install` 仍钉 1.2.0 资产，换版本靠 PR #14063）；
 **DSH 插件包分发** —— ✅ 包本体走到 1.2.1，四个 tag 都有对应 Release（`dsh-plugin-v1.0.0` / `dsh-plugin-v1.1.0` / `dsh-plugin-v1.2.0` / `dsh-plugin-v1.2.1`，当前资产 1,914,616 B / sha256 `b9e6d203…`），tarball / Release 资产 URL / git 源钉 tag 三种安装实测成功（不写 `#ref` 的 `&path:` 形态会报 `repository ... not found`，与 `prepack` 无关）；
 ✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 第 8,519 行已列出该条目；「合并进 `main`」与「在某个市场里可见」曾经是两件事，现在后者也成立：条目页在 16:16Z 是 404、站点构建 run `42844452013` 于 16:39:27Z success 后变 200，`plugins.json` 也从 10119 条增至 10230 条并收录本仓库——但目录里的 `tarball` 仍钉 1.2.0，改版本要另开 PR 改 yml（PR #14063 已开）；
-✅ [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引 2026-11-10T16:22:29Z 重建完成（run `42812806941`，schedule，12:05:32Z 起）：本仓库的 `verdict` 从 `script` 改判为 **`bundle-plugin`**，`registry.json` 条目补上了 `pkg_name: dsh-ai-terminal-pet` 与 `version: 1.2.0`、topics 11 个，并**不再带 `risk_tier` / `risk_flags`**。**但「没有档位」只是「未评估」不是 safe**：它的前端把缺字段渲染成未评估，扫描器没有抑制机制，被匹配的那两行（`install.ps1:31` 的 `CurrentVersion\Run`、`:308` 的 `Remove-Item -Recurse -Force`）仍在原处，下次成功评估时 `risk` 徽章可能回来——要永久消掉只能把 `install.ps1` 移出仓库根或推动上游做行级豁免；
+✅ [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引 2026-11-10T16:22:29Z 重建完成（run `42812806941`，schedule，12:05:32Z 起）：本仓库的 `verdict` 从 `script` 改判为 **`bundle-plugin`**，`registry.json` 条目补上了 `pkg_name: dsh-ai-terminal-pet` 与 `version: 1.2.0`、topics 11 个，并**不再带 `risk_tier` / `risk_flags`**。**但「没有档位」只是「未评估」不是 safe**：它的前端把缺字段渲染成未评估，扫描器也没有抑制机制。**不过那两条旗标的输入已经没了**：扫描器只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`（`evalRepoRisk`），而安装脚本 2026-11-10T17:2xZ 已移进 `scripts/`（`$RepoRoot = Split-Path -Parent $PSScriptRoot`，原样保留停进程、`-Recurse -Force` 清理与 `CurrentVersion\Run` 逻辑），所以它下次评估时根本读不到那两个正则的落点；
 ✅ 两条不用申请的自动采集路径（根清单采集 `LivXue/dsh-plugin-shop` 每日、双 topic 采集 `zasenjc/dsh-plugins-store` 30 分钟）已在仓库侧满足条件；但 `LivXue` 的发布分片实测只有 npm 源（26,351 条条目全带 npm tarball 的 `integrity`、`commit` 字段 0 条），所以「条件满足」≠「已被列出」；
 ✅ **自建 format-1 索引**（`ef783ba`，`docs/market-index.json`；`cf1085d` 前移到 1.2.1）：Discovery 不必再等 npm——条目 `dsh-ai-terminal-pet` `1.2.1` 用钉到 `1e08b3e` 的 git 源，URL <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>，用户加到 Discover 的索引源列表里即可看到并一键安装；校验走宿主自带的 `parseMarketIndex`，`marketInstallTarget` 产出的 spec 已实测 2.5 秒装通，且 `verify.mjs` 有 14 条断言把它钉在包版本上（发版忘改索引会让 CI 变红）；
 ⏳ **npm 尚未发布 1.2.1**（凭据问题已解、`npm whoami` 返回 `jjjjjjjjnnjnn`、`npm view` 仍 E404，publish 要一次性密码，而 npm 的 `otplease` 在无 TTY 时直接抛 EOTP，所以只能由人在交互终端里跑）。npm 只是「按包名安装」与「进 npm-only 目录」的前置，不再是 Discover 的前置（自建索引已覆盖后者）。
@@ -560,5 +560,5 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
   2026-11-10T14:33:04Z 合并、上游 README 已列出；站点页与 `plugins.json` 的延迟在 run `42844452013`（16:39:27Z
   success）之后消失，条目页 200 且 `plugins.json` 已收录本仓库——但目录里的 `install` 仍钉 1.2.0，要等 PR #14063。
   [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 16:22:29Z 的重建把本仓库从
-  `verdict: script` 改判为 `bundle-plugin` 且不再带 `risk_tier`——**「未评估」不等于安全**，扫描器匹配的两行仍在
-  `install.ps1` 里，下次成功评估时 `risk` 徽章可能回来。
+  `verdict: script` 改判为 `bundle-plugin` 且不再带 `risk_tier`——**「未评估」不等于安全**；安装脚本已从仓库根移进
+  `scripts/`，而该扫描器只按文件名抓根目录的 `install.ps1`，两条旗标从此没有输入。

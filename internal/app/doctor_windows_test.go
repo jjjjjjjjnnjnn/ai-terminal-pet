@@ -39,7 +39,7 @@ func newDoctorFixture(t *testing.T) *doctorFixture {
 	return fixture
 }
 
-// install lays down the deployment set install.ps1 produces.
+// install lays down the deployment set scripts/install.ps1 produces.
 func (f *doctorFixture) install(t *testing.T) string {
 	t.Helper()
 	directory := filepath.Join(f.root, installDirectoryName)
@@ -257,7 +257,7 @@ func TestDoctorReportsConfigValues(t *testing.T) {
 }
 
 // A Run value pointing at a deleted binary is the silent-at-logon failure
-// install.ps1's stop-before-copy can produce. It must be a failure.
+// scripts/install.ps1's stop-before-copy can produce. It must be a failure.
 func TestDoctorDanglingAutostartTargetFails(t *testing.T) {
 	fixture := newDoctorFixture(t)
 	fixture.install(t)

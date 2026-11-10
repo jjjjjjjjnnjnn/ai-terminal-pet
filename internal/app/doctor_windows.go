@@ -39,7 +39,7 @@ const (
 	doctorWarn = "warn"
 	doctorFail = "fail"
 
-	// These names mirror install.ps1's deployment set. They are literals
+	// These names mirror scripts/install.ps1's deployment set. They are literals
 	// rather than values derived from the running executable, because the
 	// whole point of the check is to notice when this process is not the
 	// thing that was installed.
@@ -58,7 +58,7 @@ const (
 	doctorNodeTimeout = 300 * time.Millisecond
 )
 
-// doctorInstallFiles is the set install.ps1 deploys into the install
+// doctorInstallFiles is the set scripts/install.ps1 deploys into the install
 // directory. Sight of any of them missing is reported as a failure because
 // the installer itself treats an incomplete deployment as one.
 var doctorInstallFiles = []string{doctorMainExe, doctorStatuslineExe, doctorProtocolFile}
@@ -508,7 +508,7 @@ func checkNode(env doctorEnv) DoctorCheck {
 	return DoctorCheck{Status: doctorOK, Detail: detail}
 }
 
-// checkAutoStart is one of the highest-value checks here: install.ps1 stops
+// checkAutoStart is one of the highest-value checks here: scripts/install.ps1 stops
 // the overlay before every upgrade, and if the Run value is not repaired the
 // entry points at a path that no longer exists and fails at logon without
 // saying anything.

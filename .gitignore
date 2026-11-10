@@ -1,4 +1,4 @@
-# Build outputs (rebuilt via install.ps1, never committed)
+# Build outputs (rebuilt by scripts/install.ps1, never committed)
 *.exe
 *.disabled
 bin/

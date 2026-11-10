@@ -300,7 +300,7 @@ func WriteFileAtomic(path string, data []byte) error {
 //
 // WriteFileAtomic cleans up after itself on every error path, but a hard kill
 // (taskkill /F, power loss) between CreateTemp and Rename cannot: the process
-// simply stops existing. That is not a rare case here - install.ps1 stops the
+// simply stops existing. That is not a rare case here - scripts/install.ps1 stops the
 // overlay with Stop-Process -Force before copying the new binary, so every
 // upgrade can orphan one. Nothing else revisits this directory, so without a
 // sweep those accumulate one per interrupted save.

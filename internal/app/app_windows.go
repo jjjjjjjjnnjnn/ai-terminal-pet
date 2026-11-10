@@ -58,7 +58,7 @@ func RunWith(openSettings bool) error {
 	// Reclaim atomic-write temporaries orphaned by a hard kill. Two minutes is
 	// already orders of magnitude longer than the write it guards, and the
 	// overlay is single-instance, so nothing else can hold one in flight.
-	// install.ps1 force-stops the overlay before every upgrade, so a longer
+	// scripts/install.ps1 force-stops the overlay before every upgrade, so a longer
 	// window would leave a visible orphan behind after each reinstall.
 	config.SweepTemporaryFiles(directory, 2*time.Minute)
 	runtimeDirectory := filepath.Join(directory, "runtime")

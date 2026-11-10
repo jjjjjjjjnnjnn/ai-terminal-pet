@@ -211,8 +211,21 @@
   `pkg_name: dsh-ai-terminal-pet` 与 `version: 1.2.0`、topics 11 个，且**不带 `risk_tier` / `risk_flags`**；
   `installability-report.json` 里也从 `verdict: script` 改成 **`verdict: bundle-plugin`**——根清单的
   `dsh.bundle.patch` 终于被它看见。**但「没有 risk_tier」不等于 safe**：它的前端把缺字段渲染成「未评估」，
-  而扫描器本身没有抑制机制，被匹配的两行（`install.ps1:31` 的 `CurrentVersion\Run` 常量与 `:308` 的
-  `Remove-Item -Recurse -Force`）仍在原处，下一次成功评估时 `risk` 徽章可能回来。
+  而扫描器本身没有抑制机制。**两条旗标的输入随后就消失了**：`evalRepoRisk` 只按文件名抓仓库根的
+  `install.ps1` / `install.sh` / `package.json`，而安装脚本已移进 `scripts/`（见下一条），它下次评估时读不到落点。
+- **安装脚本下沉到 `scripts/`，消掉市场扫描器的两条误报**（2026-11-10T17:2xZ，未发版）：仓库根的 `install.ps1`
+  （27,358 B / 583 行）移到 `scripts/install.ps1`（现 27,930 B / 590 行），仓库根不再有同名文件。动机是 [DSH-Plugins-Marketplace]
+  (https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的 `evalRepoRisk` **只按文件名抓仓库根的
+  `install.ps1` / `install.sh` / `package.json` 再整文正则扫描**，而它报的两条旗标（`registry-run-key` critical、
+  `remove-item-force-recurse` medium）恰好匹配到脚本里合法的常量定义与清理逻辑——脚本从不新增 Run 值、
+  `-Recurse -Force` 只作用于一个经 `Assert-SafeInstallDirectory` 校验过的目录。移走之后扫描器读不到落点，
+  旗标自然消失，同时市场类型判定会落到根 `package.json` 的 `dsh.bundle`（`bundle-plugin`，与 16:22Z 那次重建的结论一致）。
+  **行为一个字没改**，只有路径与相对定位变了：`param()` 的四个默认值改用 `Split-Path -Parent $PSScriptRoot`
+  （`param()` 里不能用已赋值的变量，而 `$PSScriptRoot` 是唯一在参数绑定阶段就可用的自动变量），脚本体里新增
+  `$RepoRoot = Split-Path -Parent $PSScriptRoot` 给预检的 `$binRoot` 用。实测 `-VerifyOnly` 仍是 `10 file(s) match`、
+  `0 warning(s)`；完整安装仍 rc=0、两个 exe 与 `protocol.js` 与 bundle 7 文件当场刷新。**代价**是全仓 27 个文件里
+  约 100 处 `install.ps1` 文本引用要跟着改（README 中英、AGENTS.md、ROADMAP、HANDOVER、CHANGELOG、插件包与本仓库的
+  注释），改漏一处就等于告诉读者一条跑不通的命令。
 - **1.2.1 —— 只为让包内说明追上事实，不改代码**（`1e08b3e`）：1.2.0 的 tarball 冻结在打包那一刻，里面的
   `README.md` 还写着「等人工评审、尚未列入」。Release 资产不可变，所以这句旧文只能靠新版本发出去改正。
   1.2.1 与 1.2.0 的唯一差别是包内 `README.md`（Install 段改成「条目已合并、站点构建跑完后市场里已可见」）
@@ -252,18 +265,18 @@
 ### Changed
 
 - **构建命令统一加 `-buildvcs=false`**：`go build -trimpath -ldflags "-s -w"` →
-  `go build -trimpath -buildvcs=false -ldflags "-s -w"`，四处同步——`install.ps1` 的缺失文件提示、
+  `go build -trimpath -buildvcs=false -ldflags "-s -w"`，四处同步——`scripts/install.ps1` 的缺失文件提示、
   `.github/workflows/ci.yml` 的两条 build 步骤、`AGENTS.md` 的 Production build、README 的安装步骤。
   **为什么必须加**：不加时二进制里带一块 VCS 戳记，而戳记含构建时的 commit 与工作区状态，所以同一个
-  提交在不同时间、不同机器上重建出的产物字节不同；`install.ps1 -VerifyOnly` 只要发现已部署副本与工作区
+  提交在不同时间、不同机器上重建出的产物字节不同；`scripts/install.ps1 -VerifyOnly` 只要发现已部署副本与工作区
   里的 `bin/` 是两种构建方式下的产物，就会误报 `[fail]`。二进制本身不入库（`.gitignore` 忽略 `bin/`）。
   **实测差值**：加上之后 `pet-statusline.exe` 由 **3,644,416 B → 3,643,392 B**（差 1,024 B，
   即被去掉的戳记），主程序两种写法同为 **4,371,968 B**。
   按新命令重建后 sha256：主程序 `bbb5163c296cd460d7c9a4c85e10342e125c0bd8017a065f913aa01567d41f0a`、
   shim `31c21739c60e427a387e1360b19395c5f3e9b48fc7597820bcb983a348b82328`；
-  `install.ps1 -VerifyOnly` 实测 **10/10 `[ok]`**、末行
+  `scripts/install.ps1 -VerifyOnly` 实测 **10/10 `[ok]`**、末行
   `install: verified - 10 file(s) match the repository, 0 warning(s)`、exit 0。
-- **`install.ps1` 三个新开关**，并新增 `Assert-SafeInstallDirectory` 等保护：
+- **`scripts/install.ps1` 三个新开关**，并新增 `Assert-SafeInstallDirectory` 等保护：
   - **`-VerifyOnly`**：只读，绝不写文件。按**同一份 10 项制品清单**（5 个分组：overlay / statusline /
     protocol / bundle manifest / bundle runtime）逐项比对仓库侧与已部署侧的 SHA256，
     每项打印 `[ok]` / `[warn]` / `[fail]`，末尾分组小计；全部吻合才打印

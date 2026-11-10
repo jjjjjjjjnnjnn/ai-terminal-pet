@@ -6,7 +6,7 @@
  * state set, snapshot layout or redaction rule on its own: all of that comes
  * from the single official protocol module installed at
  * %LOCALAPPDATA%\AI-Terminal-Pet\protocol.js (shipped and checksum-verified
- * by install.ps1). This file is only a field adapter.
+ * by scripts/install.ps1). This file is only a field adapter.
  *
  * Everything is fire-and-forget. No error is ever thrown back into Harness,
  * no process.exit, no blocking wait on the pet application.

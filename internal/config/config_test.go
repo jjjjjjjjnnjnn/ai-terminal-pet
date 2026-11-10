@@ -182,7 +182,7 @@ func TestSweepTemporaryFilesMissingDirectory(t *testing.T) {
 }
 
 // TestSweepTemporaryFilesReclaimsAfterReinstall pins the window the app
-// actually passes. install.ps1 stops the overlay with Stop-Process -Force
+// actually passes. scripts/install.ps1 stops the overlay with Stop-Process -Force
 // before copying the new binary, so a reinstall is the ordinary way to orphan
 // a temporary; with the one-hour window this used to sit in the install
 // directory long after the user had moved on.

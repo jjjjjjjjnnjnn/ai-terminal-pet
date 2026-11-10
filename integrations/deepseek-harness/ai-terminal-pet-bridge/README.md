@@ -21,7 +21,7 @@ transitions, and its one-click jump button targets the Harness window.
 
 This bundle contains **no** pipe-name, state-set or snapshot logic of its own.
 It loads the official protocol module from
-`%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js`, which `install.ps1` copies from
+`%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js`, which `scripts/install.ps1` copies from
 `reporters/protocol.js` and verifies by SHA256 on every install. All reports
 are fire-and-forget; a missing overlay never affects Harness.
 
@@ -44,7 +44,7 @@ That string is pasted into the in-app manager, so the environment variable form 
 %LOCALAPPDATA% resolves per user, and a hard-coded C:\Users\<name>\... would be wrong on
 every other machine. If the manager does not expand variables, substitute your own profile path.
 
-That directory is a copy of this package, refreshed by `install.ps1`.
+That directory is a copy of this package, refreshed by `scripts/install.ps1`.
 Installing links the local directory into the profile and applies
 `cordis.patch.yml`; restart Harness if the manager reports `restart-required`.
 Do not hand-edit the profile's `package.json` or `cordis.patch.yml`: the

@@ -346,7 +346,7 @@ node reporters/generic.js --source=mybot --stdin      # stdin 上给一个 JSON 
    `DisallowUnknownFields`），再改 JS，最后才让第三方使用。当前 `v1` 下没有"安全加字段"的空间——
    任何新字段都必须伴随一次服务端侧的前置放开。
 2. 版本号是`ai-terminal-pet.vN`，服务端**只接受一个**版本（`session.go:136-138`），
-   没有协商、没有降级。跨版本过渡只能靠发布说明和 `install.ps1` 一起升级。
+没有协商、没有降级。跨版本过渡只能靠发布说明和 `scripts/install.ps1` 一起升级。
 3. 升级顺序：**浮窗先、reporter 后**。老 reporter + 新浮窗（v1 继续被接受）安全；
    新 reporter + 老浮窗会被 `unsupported schema version` 顶回 `ERR`（上报静默丢失，但不影响宿主）。
 4. 破坏性变更要在 `CHANGELOG.md` 里显式标 `BREAKING`，并更新本文的版本表。

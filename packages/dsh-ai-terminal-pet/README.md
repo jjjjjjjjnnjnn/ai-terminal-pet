@@ -99,7 +99,7 @@ First use in a Harness process copies two files, and only when they are missing:
 
 Nothing is ever overwritten: an existing file, including one placed by the
 standalone installer, wins. Set DSH_PET_NO_BOOTSTRAP=1 to skip this step
-entirely (for example when the overlay is managed by install.ps1 already).
+entirely (for example when the overlay is managed by `scripts/install.ps1` already).
 
 Reports also write the overlay's normal runtime snapshot under the same
 directory, exactly like every other reporter.
@@ -116,7 +116,7 @@ keeps working without an overlay.
 ## The overlay itself is still standalone
 
 This bundle is a convenience. The overlay is a Go application that installs
-normally with install.ps1 from the repository, and every other reporter
+normally with `scripts/install.ps1` from the repository, and every other reporter
 (Claude Code, OpenCode, Antigravity, generic) talks to the same named pipe. A
 machine that only wants the overlay does not need this package; a machine that
 only wants the plugin gets one installed automatically.

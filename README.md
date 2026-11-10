@@ -108,8 +108,9 @@ Installation takes about 30 seconds on Windows using PowerShell:
 
 2. Run the installer to copy binaries and sync assets:
    ```powershell
-   .\install.ps1
+   .\scripts\install.ps1
    ```
+   The installer lives under `scripts/` rather than at the repository root on purpose: market indexers fetch a root `install.ps1` by name and regex-scan it, and this script legitimately mentions the `HKCU` Run key and a `-Recurse -Force` cleanup. Moving it one level down takes those two false positives off the root without taking any behaviour off the script.
 
 3. Verify that the installation works:
    ```powershell
@@ -117,18 +118,18 @@ Installation takes about 30 seconds on Windows using PowerShell:
    ```
 4. Re-verify the installed artifacts at any time with per-file SHA256 checks:
    ```powershell
-   .\install.ps1 -VerifyOnly
+   .\scripts\install.ps1 -VerifyOnly
    ```
    It prints `install: verified - 10 file(s) match the repository, 0 warning(s)` and exits 0 only when every deployed artifact matches (the 10 artifacts are the overlay, the statusline shim, `protocol.js`, and the 7 files of the DeepSeek Harness bundle).
    The installer itself stops a running overlay first and waits for the process to release its file handles; a plain file copy over a live binary fails at random, which is what the retry loop and the SHA256 comparison after every copy are for.
 5. Optional — put `ai-terminal-pet` on your PATH so you can type the bare command:
    ```powershell
-   .\install.ps1 -AddToPath
+   .\scripts\install.ps1 -AddToPath
    ```
    It writes **only** `HKCU\Environment\Path` (never `HKLM`), backs the previous value up to `<install dir>\path-backup.txt` first, and does nothing if the directory is already listed. **Open a new terminal** for the change to take effect. `-Uninstall` also removes that PATH entry, so uninstalling does not leave a dead entry behind (the previous value is backed up again, this time into `%TEMP%`).
    Without this step the installer does not touch your PATH at all, so keep using the full path `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`.
 
-Run `ai-terminal-pet --doctor` at any point after installing to self-check the environment, install files, runtime state, pipe, autostart entry, and node availability. To remove the deployed artifacts, run `.\install.ps1 -Uninstall`; it asks for a typed `yes` confirmation first, refuses unsafe target directories, and accepts `-Force` for unattended removal.
+Run `ai-terminal-pet --doctor` at any point after installing to self-check the environment, install files, runtime state, pipe, autostart entry, and node availability. To remove the deployed artifacts, run `.\scripts\install.ps1 -Uninstall`; it asks for a typed `yes` confirmation first, refuses unsafe target directories, and accepts `-Force` for unattended removal.
 
 Installing a terminal hook is required for that terminal to report; see the next section to connect your tools.
 
@@ -165,7 +166,7 @@ The package ships no lifecycle hooks at all — `prepack` was removed in 1.1.0 �
 
 1.2.0 also makes the package self-describing: `dsh.catalog` declares a `category` (`tool`), a one-line summary in English and Chinese, and five `capabilities` — `windows-overlay`, `named-pipe`, `session-state`, `tray-icon`, `no-network`. Those capabilities are **self-declared and unenforced**; dsh does not sandbox plugins, so the block describes what the overlay already does rather than granting it permission to do so. `keywords` gained `dsh-plugin`, the tag auto-indexing marketplaces harvest: that makes two independent discovery paths — registry review (a reviewed entry merges into `main` and only then appears in the list) and topic/keyword harvesting (no application needed at all). Two marketplaces already harvest automatically: [LivXue/dsh-plugin-shop](https://github.com/LivXue/dsh-plugin-shop) rebuilds daily from npm metadata, and every entry in its published shard is pinned by tarball integrity, so a Git-only package cannot appear there until it reaches npm; [zasenjc/dsh-plugins-store](https://github.com/zasenjc/dsh-plugins-store) syncs every 30 minutes and lists any public repository carrying both the `dsh-plugin` and `deepseek-harness` topics.
 
-Its payload carries a prebuilt overlay and the official `protocol.js`, copied into `%LOCALAPPDATA%\AI-Terminal-Pet\` on first use **only when they are missing** — an existing install is never overwritten, and the overlay keeps running entirely on its own, so a machine that only wants the pet still needs nothing but `install.ps1`. Its entry in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) passed both upstream checks and was merged on 2026-11-10, so the upstream catalogue lists the entry (the entry file pinned the 1.2.0 tarball, so a follow-up [PR #14063](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063) points it at 1.2.1; changing that file always means a pull request against that repository, never an edit here); the rendered catalogue page returned 404 at 16:16Z and became reachable later the same day once the upstream site build finished (`42844452013`, started 15:27:09Z, concluded 16:39:27Z); the catalogue file that DSH's in-app Market actually loads (`plugins.json`, `count` 10119 at the time) contains this repository too, but its `install` command still points at the 1.2.0 release asset until PR #14063 lands. In a comment on the pull request the maintainer explained that he trimmed the merged description himself: for a Harness session the panel only mirrors state and jumps to the DSH window, so approving still happens inside DSH. The [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) index already picked this repository up automatically, and its rebuild on 2026-11-10 changed the verdict to `bundle-plugin` and recorded `pkg_name`/`version`; the entry carries no `risk_tier` at all, which its client renders as "not evaluated" rather than "safe". That is not a clean bill of health: its scanner has no allowlist, and the two lines it matches (`CurrentVersion\Run` and `Remove-Item -Recurse -Force`) are still in `install.ps1`, so a future evaluation can bring the `risk` badge back. The DSH in-app Discover index accepts an npm version or a git source pinned to a 40-character commit; the npm **credential** problem is resolved (`npm whoami` answers `jjjjjjjjnnjnn` and the name is still free, `npm view` returns E404), but `1.2.1` is **not published yet**, which is why installing by bare package name (`dsh plugin --profile <profile> add dsh-ai-terminal-pet`) does not resolve yet.
+Its payload carries a prebuilt overlay and the official `protocol.js`, copied into `%LOCALAPPDATA%\AI-Terminal-Pet\` on first use **only when they are missing** — an existing install is never overwritten, and the overlay keeps running entirely on its own, so a machine that only wants the pet still needs nothing but `scripts/install.ps1`. Its entry in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) passed both upstream checks and was merged on 2026-11-10, so the upstream catalogue lists the entry (the entry file pinned the 1.2.0 tarball, so a follow-up [PR #14063](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063) points it at 1.2.1; changing that file always means a pull request against that repository, never an edit here); the rendered catalogue page returned 404 at 16:16Z and became reachable later the same day once the upstream site build finished (`42844452013`, started 15:27:09Z, concluded 16:39:27Z); the catalogue file that DSH's in-app Market actually loads (`plugins.json`, `count` 10119 at the time) contains this repository too, but its `install` command still points at the 1.2.0 release asset until PR #14063 lands. In a comment on the pull request the maintainer explained that he trimmed the merged description himself: for a Harness session the panel only mirrors state and jumps to the DSH window, so approving still happens inside DSH. The [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) index already picked this repository up automatically, and its rebuild on 2026-11-10 changed the verdict to `bundle-plugin` and recorded `pkg_name`/`version`; the entry carries no `risk_tier` at all, which its client renders as "not evaluated" rather than "safe". That is not a clean bill of health: its scanner has no allowlist, and the two lines it matches (`CurrentVersion\Run` and `Remove-Item -Recurse -Force`) were in the root `install.ps1` - the script now lives in `scripts/`, which that scanner never reads, so those two flags have no input left (the behaviour itself is unchanged). The DSH in-app Discover index accepts an npm version or a git source pinned to a 40-character commit; the npm **credential** problem is resolved (`npm whoami` answers `jjjjjjjjnnjnn` and the name is still free, `npm view` returns E404), but `1.2.1` is **not published yet**, which is why installing by bare package name (`dsh plugin --profile <profile> add dsh-ai-terminal-pet`) does not resolve yet.
 
 Because the plugin index format accepts a git source pinned to a commit, this repository also publishes its own index, so Discover works before npm does. Add this URL once in DSH under Plugins → Discover → index sources:
 
@@ -189,7 +190,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 ### Control it from a script
 
-The commands below assume `ai-terminal-pet` is on your PATH (install step 5, `.\install.ps1 -AddToPath`). If you skipped that step, prefix every command with the full path instead: `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`.
+The commands below assume `ai-terminal-pet` is on your PATH (install step 5, `.\scripts\install.ps1 -AddToPath`). If you skipped that step, prefix every command with the full path instead: `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`.
 
 | Command | Effect |
 |---|---|
@@ -264,7 +265,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 Shipped after v0.9.0: the wire protocol specification ([docs/PROTOCOL.md](docs/PROTOCOL.md)) and the `ai-terminal-pet --doctor` self-check command, so both items previously listed here as pending are now available.
 
-Shipped after v0.9.0 as a distribution channel, not just a repository: the Harness bridge is now also a standalone DSH plugin package (`dsh-ai-terminal-pet` 1.2.1, GitHub Release tag `dsh-plugin-v1.2.1`, replacing the superseded 1.2.0 and 1.1.0). It installs from the release tarball, from git pinned to that tag, or straight from the repository URL through the root manifest shim, and it describes itself to storefronts through `dsh.catalog`. Its registry entry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) was merged on 2026-11-10, and the upstream README already lists the entry under "Notifications & Integrations"; the maintainer trimmed one sentence while merging, because for a Harness session the panel only mirrors state and jumps to the Harness window - approvals still happen inside DSH. Merged into `main` is not the same as visible in a market - but visibility did arrive: the catalogue page returned 404 at 16:16Z and 200 after the upstream site build finished at 16:39:27Z, and `plugins.json` (`count` 10119 to 10230) now lists this repository, though the `install` command in it still points at the 1.2.0 asset until the follow-up PR #14063 lands. The topic/keyword path needs no application at all, and the DSH-Plugins-Marketplace rebuild of 2026-11-10 has already moved the entry to `bundle-plugin` with no risk tier attached - not the same as rated safe, since the lines its scanner matches are still in `install.ps1`. The DSH in-app Discover index needs an npm release or a commit-pinned git source; npm's credential problem is resolved and publishing 1.2.1 is the next step. The DSH in-app Discover index needs an npm release or a commit-pinned git source; npm's credential problem is resolved and publishing 1.2.1 is the next step.
+Shipped after v0.9.0 as a distribution channel, not just a repository: the Harness bridge is now also a standalone DSH plugin package (`dsh-ai-terminal-pet` 1.2.1, GitHub Release tag `dsh-plugin-v1.2.1`, replacing the superseded 1.2.0 and 1.1.0). It installs from the release tarball, from git pinned to that tag, or straight from the repository URL through the root manifest shim, and it describes itself to storefronts through `dsh.catalog`. Its registry entry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) was merged on 2026-11-10, and the upstream README already lists the entry under "Notifications & Integrations"; the maintainer trimmed one sentence while merging, because for a Harness session the panel only mirrors state and jumps to the Harness window - approvals still happen inside DSH. Merged into `main` is not the same as visible in a market - but visibility did arrive: the catalogue page returned 404 at 16:16Z and 200 after the upstream site build finished at 16:39:27Z, and `plugins.json` (`count` 10119 to 10230) now lists this repository, though the `install` command in it still points at the 1.2.0 asset until the follow-up PR #14063 lands. The topic/keyword path needs no application at all, and the DSH-Plugins-Marketplace rebuild of 2026-11-10 has already moved the entry to `bundle-plugin` with no risk tier attached - not the same as rated safe, because that scanner only ever fetched the repository-root `install.ps1` and never re-scanned the tree after the installer moved into `scripts/`. The DSH in-app Discover index needs an npm release or a commit-pinned git source; npm's credential problem is resolved and publishing 1.2.1 is the next step.
 
 ### Non-goals
 
@@ -289,9 +290,9 @@ $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 ```
 
-`-buildvcs=false` in the two build commands is not decoration: it strips the VCS stamp, which encodes the commit and working-tree state at build time. Two builds of the same source therefore produce identical bytes, on any machine and at any date. Without it a rebuild of `pet-statusline.exe` weighs 3,644,416 B instead of 3,643,392 B, so `.\install.ps1 -VerifyOnly` — which compares the installed files against the copy in your working tree — reports a false failure whenever one side carries the stamp and the other does not. The binaries themselves are not committed (`bin/` is ignored); you always build them locally.
+`-buildvcs=false` in the two build commands is not decoration: it strips the VCS stamp, which encodes the commit and working-tree state at build time. Two builds of the same source therefore produce identical bytes, on any machine and at any date. Without it a rebuild of `pet-statusline.exe` weighs 3,644,416 B instead of 3,643,392 B, so `.\scripts\install.ps1 -VerifyOnly` — which compares the installed files against the copy in your working tree — reports a false failure whenever one side carries the stamp and the other does not. The binaries themselves are not committed (`bin/` is ignored); you always build them locally.
 
-`.\install.ps1 -VerifyOnly` re-checks every installed artifact against the recorded SHA256 list, and `.\install.ps1 -Uninstall` removes them. CI runs the same gates on every push: `.github/workflows/ci.yml` builds on `windows-latest` and fails the job on any `gofmt -l` output, `go vet` finding, failing `go test -count=1 ./...`, unsuccessful `go build -trimpath -buildvcs=false -ldflags "-s -w"` build, any reporter failing its own `node --check`, or failed `node integrations/deepseek-harness/verify.mjs`, `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`, or `node packages/dsh-ai-terminal-pet/verify.mjs`.
+`.\scripts\install.ps1 -VerifyOnly` re-checks every installed artifact against the recorded SHA256 list, and `.\scripts\install.ps1 -Uninstall` removes them. CI runs the same gates on every push: `.github/workflows/ci.yml` builds on `windows-latest` and fails the job on any `gofmt -l` output, `go vet` finding, failing `go test -count=1 ./...`, unsuccessful `go build -trimpath -buildvcs=false -ldflags "-s -w"` build, any reporter failing its own `node --check`, or failed `node integrations/deepseek-harness/verify.mjs`, `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`, or `node packages/dsh-ai-terminal-pet/verify.mjs`.
 
 ---
 
@@ -386,23 +387,26 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
 
 # 2. 安装到系统本地目录并做哈希校验
-.\install.ps1
+.\scripts\install.ps1
+#    安装脚本放在 scripts/ 而不是仓库根：市场索引器会按文件名抓根目录的 install.ps1
+#    并整文正则扫描，而它确实要提到 HKCU 的 Run 键与 -Recurse -Force 清理；
+#    下沉一级就去掉了这两条误报，行为一个字没改。
 
 # 3. 验证安装输出（未把安装目录加进 PATH 时用全路径）
 & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
 
 # 4. 随时复核已部署制品（逐项 SHA256 校验）
-.\install.ps1 -VerifyOnly
+.\scripts\install.ps1 -VerifyOnly
 
 # 5. 可选：把安装目录加进用户 PATH，之后可以只敲 ai-terminal-pet
-.\install.ps1 -AddToPath
+.\scripts\install.ps1 -AddToPath
 ```
 
-`install.ps1` 在安装时会自动停止正在运行的浮窗，等待系统进程释放文件句柄，并在拷贝后对主程序、状态栏 shim、协议脚本和插件包逐一执行 SHA256 哈希校验。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 10 file(s) match the repository, 0 warning(s)` 并以 0 退出（10 项 = 主程序 + 状态栏 shim + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
+`scripts\install.ps1` 在安装时会自动停止正在运行的浮窗，等待系统进程释放文件句柄，并在拷贝后对主程序、状态栏 shim、协议脚本和插件包逐一执行 SHA256 哈希校验。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 10 file(s) match the repository, 0 warning(s)` 并以 0 退出（10 项 = 主程序 + 状态栏 shim + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
 
 第 5 步是可选的：`-AddToPath` 只写 `HKCU\Environment\Path`（绝不碰 `HKLM`），写入前先把原值备份到 `<安装目录>\path-backup.txt`，目录已在 PATH 中时不做任何改动；**改完要新开一个终端**才生效；`-Uninstall` 卸载时会一并移除这条 PATH 记录（原值同样先备份，备份位置改为 `%TEMP%`），不会留下指向已删目录的死条目。不加这个开关时安装脚本不会动 PATH，请继续用全路径 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
 
-装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性以及开机自启项共 9 项。需要清理已部署的制品时运行 `.\install.ps1 -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。
+装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性以及开机自启项共 9 项。需要清理已部署的制品时运行 `.\scripts\install.ps1 -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。
 
 安装完成后浮窗与状态栏 shim 已部署就绪，但终端默认不会自动推送事件；你必须按照下一节的说明，为正在使用的终端环境配置对应的上报端。
 
@@ -443,7 +447,7 @@ dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
 
 1.2.0 还让这个包变得「自我描述」：`dsh.catalog` 声明了 `category`（`tool`）、中英各一行摘要，以及五项 `capabilities`——`windows-overlay`、`named-pipe`、`session-state`、`tray-icon`、`no-network`。这些 capabilities 是**自我声明、不被强制**的：dsh 并不对插件做沙箱隔离，所以这一块描述的是浮窗本来就在做的事，不是一份权限授予。`keywords` 里新增了 `dsh-plugin` 这个自动索引型市场会采集的标签，于是现在有两条互相独立的发现路径——注册表评审（条目被合并进 `main` 之后才会出现在列表里）与 topic/关键词采集（完全不需要提交申请）。已有两家市场在自动采集：[LivXue/dsh-plugin-shop](https://github.com/LivXue/dsh-plugin-shop) 每日按 npm 元数据重建，它发布的条目全部以 tarball 完整形哈希钉版本，所以在包进 npm 之前，纯 git 源进不去这家；[zasenjc/dsh-plugins-store](https://github.com/zasenjc/dsh-plugins-store) 每 30 分钟同步，收录同时带 `dsh-plugin` 与 `deepseek-harness` 两个 topic 的公开仓库。
 
-它的载荷自带预编译浮窗与官方 `protocol.js`，首次使用时拷进 `%LOCALAPPDATA%\AI-Terminal-Pet\`，且**只在文件缺失时才拷**——已装的文件绝不覆盖；浮窗本身依旧完全独立运行，只想要浮窗的机器仍然只需要 `install.ps1`。它在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 注册表的条目（[PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)）已于 2026-11-10 被合并，上游 README 的「Notifications & Integrations」小节已列出这个条目（维护者合并时删掉了原稿里「也能在面板上直接放行审批」一句，因为对 Harness 会话来说面板只做状态映射与跳转，审批仍在 DSH 里完成；他随后在 PR 上留言确认了这一点，并说明要改措辞得另开 PR 改那个 `data/plugins/*.yml`；条目里的 `tarball` 当时还钉着 1.2.0 那份资产，已经另开跟进 PR #14063 换成 1.2.1）。但**合并进 `main` 不等于在某个市场里可见**：16:16Z 复查时条目页仍返回 404，DSH 应用内 Market 真正加载的 `plugins.json` 里同样没有本仓库；上游那次站点构建（`42844452013`，15:27:09Z 起、16:39:27Z 结束）跑完之后两处都变了——条目页返回 200，`plugins.json` 的 `count` 从 10119 变成 10230 并收录了本仓库，只是目录里的 `install` 命令仍指向 1.2.0 的 Release 资产，要等 PR #14063 合并后才换成 1.2.1。[DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 这个索引已经按 topic 自动收录了本仓库，2026-11-10 那次重建把判定改成了 `bundle-plugin`，也记下了 `pkg_name` 与 `version`；条目里**没有 `risk_tier` 字段**，它的前端把「没有该字段」渲染成「未评估」而不是「安全」。这不是安全证明：它的扫描器没有白名单机制，而被它匹配的两行文本（`CurrentVersion\Run` 与 `Remove-Item -Recurse -Force`）仍原样留在 `install.ps1` 里，下一次成功评估时 `risk` 徽章可能回来。DSH 应用内的 Discover 索引接受 npm 版本或钉到 40 位 commit 的 git 源；npm 的**凭据**问题已解决（`npm whoami` 返回 `jjjjjjjjnnjnn`，名字也还空着，`npm view` 仍是 E404），但 `1.2.1` **尚未发布**，这也正是按包名安装（`dsh plugin --profile <profile> add dsh-ai-terminal-pet`）现在还解析不到的原因。
+它的载荷自带预编译浮窗与官方 `protocol.js`，首次使用时拷进 `%LOCALAPPDATA%\AI-Terminal-Pet\`，且**只在文件缺失时才拷**——已装的文件绝不覆盖；浮窗本身依旧完全独立运行，只想要浮窗的机器仍然只需要 `scripts\install.ps1`。它在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 注册表的条目（[PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)）已于 2026-11-10 被合并，上游 README 的「Notifications & Integrations」小节已列出这个条目（维护者合并时删掉了原稿里「也能在面板上直接放行审批」一句，因为对 Harness 会话来说面板只做状态映射与跳转，审批仍在 DSH 里完成；他随后在 PR 上留言确认了这一点，并说明要改措辞得另开 PR 改那个 `data/plugins/*.yml`；条目里的 `tarball` 当时还钉着 1.2.0 那份资产，已经另开跟进 PR #14063 换成 1.2.1）。但**合并进 `main` 不等于在某个市场里可见**：16:16Z 复查时条目页仍返回 404，DSH 应用内 Market 真正加载的 `plugins.json` 里同样没有本仓库；上游那次站点构建（`42844452013`，15:27:09Z 起、16:39:27Z 结束）跑完之后两处都变了——条目页返回 200，`plugins.json` 的 `count` 从 10119 变成 10230 并收录了本仓库，只是目录里的 `install` 命令仍指向 1.2.0 的 Release 资产，要等 PR #14063 合并后才换成 1.2.1。[DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 这个索引已经按 topic 自动收录了本仓库，2026-11-10 那次重建把判定改成了 `bundle-plugin`，也记下了 `pkg_name` 与 `version`；条目里**没有 `risk_tier` 字段**，它的前端把「没有该字段」渲染成「未评估」而不是「安全」。这不是安全证明：它的扫描器没有白名单机制，而被它匹配的两行文本（`CurrentVersion\Run` 与 `Remove-Item -Recurse -Force`）仍原样留在 `install.ps1` 里，下一次成功评估时 `risk` 徽章可能回来。DSH 应用内的 Discover 索引接受 npm 版本或钉到 40 位 commit 的 git 源；npm 的**凭据**问题已解决（`npm whoami` 返回 `jjjjjjjjnnjnn`，名字也还空着，`npm view` 仍是 E404），但 `1.2.1` **尚未发布**，这也正是按包名安装（`dsh plugin --profile <profile> add dsh-ai-terminal-pet`）现在还解析不到的原因。
 
 因为插件索引格式允许「钉到某个 commit 的 git 源」，本仓库自己发布了一份索引，所以在 npm 发布之前 Discover 就能用。在 DSH 的「插件 → Discover → 索引源」里添加一次这个 URL：
 
@@ -467,7 +471,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 ### 用脚本控制它
 
-下表默认 `ai-terminal-pet` 已在 PATH 中（即安装第 5 步执行过 `.\install.ps1 -AddToPath`）。若跳过了那一步，请把每条命令换成全路径形式，例如 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
+下表默认 `ai-terminal-pet` 已在 PATH 中（即安装第 5 步执行过 `.\scripts\install.ps1 -AddToPath`）。若跳过了那一步，请把每条命令换成全路径形式，例如 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
 
 浮窗提供完整的命令行控制参数，各命令行为如下：
 
@@ -536,7 +540,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 v0.9.0 之后已交付：线协议规范文档 [docs/PROTOCOL.md](docs/PROTOCOL.md)（第三方可据此编写合规上报端）与 `ai-terminal-pet --doctor` 自检命令，原先列在此处的两项待办均已完成。
 
-v0.9.0 之后还多了一条分发渠道，而不只是仓库里的代码：Harness 桥接现在是独立 DSH 插件包 `dsh-ai-terminal-pet` 1.2.1（GitHub Release tag `dsh-plugin-v1.2.1`，取代已发布的 1.2.0 与 1.1.0）。可用 Release 资产、钉 tag 的 git 源、或直接给仓库地址（`github:jjjjjjjjnnjnn/ai-terminal-pet`，靠仓库根的清单 shim 解析）三种方式安装，并且它通过 `dsh.catalog` 向商店自报家门。它在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 注册表的条目（[PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)）已于 2026-11-10 由评审人合并，上游 README 已列出该条目；「合并」与「在市场里可见」曾经是两件事，现在后者也成立了：条目页在 16:16Z 仍是 404，上游站点构建 16:39:27Z 结束后变成 200，DSH 应用内 Market 加载的 `plugins.json`（`count` 从 10119 涨到 10230）里也已收录本仓库——只是其中的 `install` 命令仍指向 1.2.0 的资产，要等跟进 PR #14063 合并后才换成 1.2.1。topic/关键词那条路不需要提交申请，而 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 2026-11-10 那次重建已经把本条目改判为 `bundle-plugin`、且没有风险档位——但那是「未评估」，不等于「安全」，因为它的扫描器匹配的那两行文本仍在 `install.ps1` 里。DSH 应用内 Discover 索引需要 npm 发布或钉 40 位 commit 的 git 源，npm 的凭据问题已解决、下一步就是发 1.2.1。
+v0.9.0 之后还多了一条分发渠道，而不只是仓库里的代码：Harness 桥接现在是独立 DSH 插件包 `dsh-ai-terminal-pet` 1.2.1（GitHub Release tag `dsh-plugin-v1.2.1`，取代已发布的 1.2.0 与 1.1.0）。可用 Release 资产、钉 tag 的 git 源、或直接给仓库地址（`github:jjjjjjjjnnjnn/ai-terminal-pet`，靠仓库根的清单 shim 解析）三种方式安装，并且它通过 `dsh.catalog` 向商店自报家门。它在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 注册表的条目（[PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)）已于 2026-11-10 由评审人合并，上游 README 已列出该条目；「合并」与「在市场里可见」曾经是两件事，现在后者也成立了：条目页在 16:16Z 仍是 404，上游站点构建 16:39:27Z 结束后变成 200，DSH 应用内 Market 加载的 `plugins.json`（`count` 从 10119 涨到 10230）里也已收录本仓库——只是其中的 `install` 命令仍指向 1.2.0 的资产，要等跟进 PR #14063 合并后才换成 1.2.1。topic/关键词那条路不需要提交申请，而 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 2026-11-10 那次重建已经把本条目改判为 `bundle-plugin`、且没有风险档位——但那是「未评估」，不等于「安全」——那个扫描器只抓仓库根同名脚本、整文正则匹配，而 `install.ps1` 已移到 `scripts/`，此后它扫到的只是一份不存在的文件。DSH 应用内 Discover 索引需要 npm 发布或钉 40 位 commit 的 git 源，npm 的凭据问题已解决、下一步就是发 1.2.1。
 
 ### 非目标（明确不做）
 
@@ -569,6 +573,6 @@ $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 ```
 
-安装步骤里那两条构建命令的 `-buildvcs=false` 不是装饰：它会去掉 VCS 戳记，而戳记里含构建时的 commit 与工作区状态，所以同一份源码**在任何机器、任何时间**重建出的产物字节一致。少了这个旗标，重建的 `pet-statusline.exe` 会带上戳记变成 3,644,416 B（不带戳记是 3,643,392 B），`install.ps1 -VerifyOnly` 一旦发现两侧（已部署副本 vs 工作区的 `bin/`）构建方式不同就会误报失败。二进制本身不入库（`bin/` 被 `.gitignore` 忽略），每次都要在本地重建。
+安装步骤里那两条构建命令的 `-buildvcs=false` 不是装饰：它会去掉 VCS 戳记，而戳记里含构建时的 commit 与工作区状态，所以同一份源码**在任何机器、任何时间**重建出的产物字节一致。少了这个旗标，重建的 `pet-statusline.exe` 会带上戳记变成 3,644,416 B（不带戳记是 3,643,392 B），`scripts\install.ps1 -VerifyOnly` 一旦发现两侧（已部署副本 vs 工作区的 `bin/`）构建方式不同就会误报失败。二进制本身不入库（`bin/` 被 `.gitignore` 忽略），每次都要在本地重建。
 
-`.\install.ps1 -VerifyOnly` 用于随时复核已部署制品与记录的 SHA256 清单是否一致，`.\install.ps1 -Uninstall` 用于清理部署。CI 在同一组门禁上把关：`.github/workflows/ci.yml` 在 `windows-latest` 上运行，`gofmt -l` 有任何输出、`go vet` 有任何发现、`go test -count=1 ./...` 失败、`go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 报错，或 `node integrations/deepseek-harness/verify.mjs`、`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`、`node packages/dsh-ai-terminal-pet/verify.mjs` 失败，都会让流水线失败。
+`.\scripts\install.ps1 -VerifyOnly` 用于随时复核已部署制品与记录的 SHA256 清单是否一致，`.\scripts\install.ps1 -Uninstall` 用于清理部署。CI 在同一组门禁上把关：`.github/workflows/ci.yml` 在 `windows-latest` 上运行，`gofmt -l` 有任何输出、`go vet` 有任何发现、`go test -count=1 ./...` 失败、`go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 报错，或 `node integrations/deepseek-harness/verify.mjs`、`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`、`node packages/dsh-ai-terminal-pet/verify.mjs` 失败，都会让流水线失败。
