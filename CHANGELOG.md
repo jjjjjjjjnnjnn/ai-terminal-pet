@@ -86,10 +86,10 @@
   live-desktop 探针测试在对应 `PET_*` 变量未设置时 `Skip`，所以不需要桌面会话或任何 secret。
 - **`packages/dsh-ai-terminal-pet` —— 把 Harness 桥接做成独立 DSH 插件包**（`7f476c9` 起，历经 1.0.0 →
   1.1.0 → 1.2.0）：npm 包名 `dsh-ai-terminal-pet`、license MIT、`type: module`、`private` 未设（可发布）；
-  当前版本 **1.2.1**（`packages/dsh-ai-terminal-pet/package.json` 2,008 B / 74 行，版本号从 1.2.0 换到 1.2.1 时字节数不变）：
+  当前版本 **1.2.2**（`packages/dsh-ai-terminal-pet/package.json` 2,008 B / 74 行，1.2.1 → 1.2.2 只改版本字符串，字节数不变）：
   包内 18 个文件（含 vendor，1.2.0 起多一个 `vendor/manifest.json`），主体是 `lib/index.js`（17,872 B / 570 行）、
   `verify.mjs`（22,499 B / 415 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,008 B / 74 行）、
-  `README.md`（6,863 B / 130 行）、`vendor/manifest.json`（529 B / 19 行）、
+  `README.md`（7,175 B / 131 行）、`vendor/manifest.json`（529 B / 19 行）、
   `cordis.patch.yml`（399 B / 10 行）、`locale/en.json`（210 B）/ `locale/zh.json`（217 B）、
   `icon.svg`（526 B）/ `icon.png`（4,386 B）、`LICENSE`（1,070 B）、`screenshots.json`（97 B）、
   `screenshots/compact.png`（4,459 B）/ `expanded.png`（11,335 B）/ `expanded-many.png`（17,697 B）、
@@ -136,7 +136,7 @@
   `.github/workflows/ci.yml` 增加两步：`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check` 与
   `node packages/dsh-ai-terminal-pet/verify.mjs`。验证脚本自带 fake Cordis context + 临时 `LOCALAPPDATA` +
   stub protocol 模块，所以 CI 上不需要网络、管道或真实浮窗。
-- **GitHub Release 线：1.0.0 → 1.1.0 → 1.2.0 → 1.2.1（历史按顺序记，当前版本是 1.2.1）**。
+- **GitHub Release 线：1.0.0 → 1.1.0 → 1.2.0 → 1.2.1 → 1.2.2（历史按顺序记，当前版本是 1.2.2）**。
   **1.0.0**（已作废）：tag `dsh-plugin-v1.0.0`，资产 `dsh-ai-terminal-pet-1.0.0.tgz`（1,913,682 B，
   sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`），
   下载地址 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz`。
@@ -213,7 +213,7 @@
   `dsh.bundle.patch` 终于被它看见。**但「没有 risk_tier」不等于 safe**：它的前端把缺字段渲染成「未评估」，
   而扫描器本身没有抑制机制。**两条旗标的输入随后就消失了**：`evalRepoRisk` 只按文件名抓仓库根的
   `install.ps1` / `install.sh` / `package.json`，而安装脚本已移进 `scripts/`（见下一条），它下次评估时读不到落点。
-- **安装脚本下沉到 `scripts/`，消掉市场扫描器的两条误报**（2026-11-10T17:2xZ，未发版）：仓库根的 `install.ps1`
+- **安装脚本下沉到 `scripts/`，消掉市场扫描器的两条误报**（`bdc6c36`，2026-11-10T17:38:20Z 推送，未发版）：仓库根的 `install.ps1`
   （27,358 B / 583 行）移到 `scripts/install.ps1`（现 27,930 B / 590 行），仓库根不再有同名文件。动机是 [DSH-Plugins-Marketplace]
   (https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的 `evalRepoRisk` **只按文件名抓仓库根的
   `install.ps1` / `install.sh` / `package.json` 再整文正则扫描**，而它报的两条旗标（`registry-run-key` critical、
@@ -244,6 +244,18 @@
   - 同一批还改了仓库自己的插件索引：`docs/market-index.json`（`cf1085d`）把版本、`publishTimestamp`、
     安装源 commit 与图标 commit 全部从 `1.2.0` / `4d777e3…` 移到 `1.2.1` / `1e08b3e…`，否则索引会把读者带到
     那份写着旧文的 1.2.0 tarball。改完 `verify.mjs` 复跑 **93 行 / 0 fail / VERIFY PASSED**。
+- **1.2.2 —— 安装脚本下沉后必须重打包**（`bdc6c36` 之后的发版提交）：1.2.1 的包是在 `install.ps1` 还在仓库根的时候打的。
+  随后把脚本移进 `scripts/` 消掉了市场风险扫描器的两条误报输入，同时改到 8 处 Go 源码注释；而
+  `vendor/manifest.json` 记录的 `source.sha256` 正是「`cmd/` 与 `internal/` 下所有非测试 `.go` 文件」的摘要，
+  于是它从 `89eef0d6…` 变成 `cf647af1…`（25 个文件，`goVersion` 仍 `go1.27.0`）。已发布资产不可变，
+  所以包内那份 manifest 必须靠新版本发出去，否则按 1.2.1 装到的人拿到的是与源码对不上的摘要——
+  `vendor:check` 在干净 clone 里会打印「bin/ 不存在，以已提交的 vendor 为准」而通过，但在有 `bin/` 的机器上直接失败。
+  1.2.2 与 1.2.1 的差别只有三处：两份清单的 `version`、包内 `README.md`（两条命令与「跟进 PR 指向当前版本」的措辞）、
+  `vendor/manifest.json` 的新摘要；`lib/index.js`、两个 vendor 二进制、`cordis.patch.yml`、`dsh.catalog` 逐字节不变。
+  - 打包实测：`dsh-ai-terminal-pet-1.2.2.tgz` **1,914,751 B / 16 files / sha256
+    `02431e16dd58db166794d7c86608087446d4a3ed8ab51bcb4b0950b2a045307c` / shasum
+    `22b63b25c50d5f4d799bfcf00fd4f54986be63a8`**；连续两次 `npm pack` 逐字节相同（1.2.1 为 1,914,616 B，
+    差值 135 B 全部来自 manifest 摘要与 README 措辞，`files` 仍是 16 个）。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
@@ -255,7 +267,7 @@
 - **仓库自己发布一份 format-1 插件索引**（`ef783ba`，新文件 `docs/market-index.json`）：
   <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>。
   因为索引格式允许「钉到 40 位 commit 的 git 源」，所以在 npm 发布被一次性密码挡住时，Discover 仍然可用；
-  条目只有 `dsh-ai-terminal-pet` `1.2.1`（`cf1085d` 时已从 1.2.0 / `4d777e3` 前移），`source` 为 `{type: git, url, commit: 1e08b3e7521d305d744c5ff515b29f6d16abebe1,
+  条目只有 `dsh-ai-terminal-pet` `1.2.2`（`cf1085d` 时已从 1.2.0 / `4d777e3` 前移），`source` 为 `{type: git, url, commit: 1e08b3e7521d305d744c5ff515b29f6d16abebe1,
   path: packages/dsh-ai-terminal-pet}`，`engines.dsh` 取包里声明的 `>=0.1.0-rc.6`，图标钉在同一个 commit 的
   `icon.png`（4,386 B）。校验用的是宿主自带的 `parseMarketIndex`（`@deepseek-ai/dsh-plugin-market-index`），
   不是手抄一份形状检查：`format: 1`、`localizedText` 含 `en`、category/label 都引用已声明 id、
@@ -309,7 +321,7 @@
   仍旧报 **E404**，所以这个名字还空着、**一个版本都没发出去**。在包目录跑 `npm publish --dry-run`
   通过（rc=0）：**16 files / 1.9 MB packed / 4.5 MB unpacked**。从**仓库根**发布会撞上 **EPRIVATE**
   （根清单带 `private: true`，npm 抬到的是根清单），从 `packages/dsh-ai-terminal-pet/` 发布则正常
-  ——包清单没有 `private`。下一步是发 `1.2.1`；但这一步在本机非交互环境里结构上做不到：npm 的 `otplease`
+  ——包清单没有 `private`。下一步是发 `1.2.2`；但这一步在本机非交互环境里结构上做不到：npm 的 `otplease`
   在 `process.stdin.isTTY` 为假时直接抛 EOTP，永不进入 web-OTP 分支，取到的浏览器授权链接 5–8 分钟就 404
   作废，所以只能由人在本机交互终端里跑一次。仍未解锁的是 DSH 应用内 Plugins → Discover 索引
   （只表达 npm 版本或钉 40 位 commit 的 git 源）；手工安装靠 git 源、Release tarball、仓库地址三条路。

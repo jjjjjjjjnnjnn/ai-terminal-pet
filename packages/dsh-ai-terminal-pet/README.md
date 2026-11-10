@@ -34,8 +34,7 @@ file behind DSH's own Plugins -> Market did not contain this repository while th
 build was still queued. That build finished (run 42844452013, 16:39:27Z), the entry page now
 answers 200, and the catalog (`count` 10119 -> 10230) lists this repository - so it can be found
 in that market. The entry's `install` command, however, is generated from the pinned `tarball`
-and still points at the 1.2.0 asset; a follow-up PR
-([#14063](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063)) moves it to 1.2.1.
+and pointed at the 1.2.0 asset; a follow-up PR moves it to the current release, which is 1.2.2.
 Changing that file always means a pull request against that repository, never an edit here.
 
 The other route needs no application at all: third-party markets harvest GitHub
@@ -57,10 +56,10 @@ pin the release tag. Both are verified end to end:
 
 ```sh
 # release tarball: no clone, no Go toolchain
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.1/dsh-ai-terminal-pet-1.2.1.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.2/dsh-ai-terminal-pet-1.2.2.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.1&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.2&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Do not hand pnpm a bare repository URL. pnpm resolves a git dependency by

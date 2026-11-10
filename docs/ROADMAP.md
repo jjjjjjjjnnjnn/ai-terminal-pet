@@ -65,7 +65,7 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   shasum 是 `166c3043…`，之后包内 `README.md` 改了 13 B 使其作废，最终资产是 `dc65e0d4…`。
   清单内容变了就必须换版本号，
   否则仓库与那份不可变 tarball 分叉——这正是 1.2.0 存在的理由。
-  1.2.1（当前，只改文字、不改代码；tag `dsh-plugin-v1.2.1` annotated、指向
+  1.2.1（已由 1.2.2 取代，发布物本身不可变；tag `dsh-plugin-v1.2.1` annotated、指向
   `1e08b3e7521d305d744c5ff515b29f6d16abebe1`，tag 对象 sha `0ef1d60cb5c33517aa87d6eed75565c035d5830e`；
   Release 于 **2026-11-10T16:15:04Z** 发布，资产 `dsh-ai-terminal-pet-1.2.1.tgz`
   **1,914,616 B / 16 files / sha256 `b9e6d203…` / shasum `67955a65…`**，GitHub 记录的 digest 与本地重算一致）：
@@ -73,6 +73,9 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   Release 资产不可编辑，所以只修一句话也要耗一个版本号（同一版本号下换字节，正是本仓库一直在消除的漂移）。
   与 1.2.0 的差别只有包内 `README.md`（6,665 → **6,863 B**）与两条安装命令里的版本号；解包核对确认不含旧文，
   连续两次 `npm pack` 逐字节相同。
+  1.2.2（当前；差别只有三处：两份清单的 `version`、包内 `README.md` 的措辞、`vendor/manifest.json` 的源码摘要——
+  因为安装脚本下沉到 `scripts/` 改到了 8 处 Go 注释，那份摘要由 `89eef0d6…` 变成 `cf647af1…`；
+  打包结果 **1,914,751 B / 16 files / sha256 `02431e16…` / shasum `22b63b25…`**，连跑两次逐字节相同）。
 - **capabilities 只自我声明、不被强制**：dsh 不对插件做沙箱，所以那五项描述的是浮窗本来在做的事，
   不是权限授予。`keywords` 与 topics（`dsh-plugin` / `deepseek-harness`，另加 `cordis-plugin` 标生态）决定了两条
   不用申请的自动采集路径（见 HANDOVER §27.9）。
@@ -81,7 +84,7 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   `copyVerified` 走临时文件 + rename 并在 rename 前复查目标存在——**从不覆盖已装文件**。
 - **`cordis.patch.yml` 必须用 `insert:`**。裸 `- id:` 只 patch 既有 loader 行：装完看着成功，
   运行时什么都不挂载。原因写进了该 YAML 的文件头，不只写在文档里。
-- **仓库根的清单 shim**（`06d4cae`，1.2.1 口径 1,877 B / 59 行，不含代码）：`main` 指向插件包、
+- **仓库根的清单 shim**（`06d4cae`，1,877 B / 59 行，不含代码）：`main` 指向插件包、
   `dsh.bundle.patch` 指 `./packages/dsh-ai-terminal-pet/cordis.patch.yml`、`files` 只放行那个子树、
   `private: true` 不占 npm 名、`version` 跟包同步（`verify.mjs` 断言两者相等）。
   没有它，宿主读到的是 0.0.0 依赖并报 `declares no dsh.bundle`，装出空包。
@@ -137,10 +140,9 @@ CI 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的字节不同—�
 合并、上游 README 已列出；**「可见」这一条后来也成立**——16:16Z 时条目页还是 404、`plugins.json` 0 命中，
 但那是上游站点构建的排队与耗时：run `42844452013` 于 16:39:27Z success 后条目页 200、`plugins.json` `count` 从 10119 涨到 10230 并收录本仓库。
 同时 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引在 16:22:29Z 重建完成，
-本仓库从 `verdict: script` 改判为 `bundle-plugin`、不再带 `risk_tier`——但那是「未评估」不是「safe」，
-本仓库从 `verdict: script` 改判为 `bundle-plugin`、不再带 `risk_tier`——但那是「未评估」不是「safe」，
-安装脚本已移进 `scripts/`，它只抓根目录同名文件，两条旗标的输入随之下线；1.2.1 的 tag 与 Release 资产已发布
-sha256 `b9e6d203…`）；只剩 `lib/release-pins.json` 刻意留空，所以插件内「自动下载浮窗」
+本仓库从 `verdict: script` 改判为 `bundle-plugin`、不再带 `risk_tier`——但那是「未评估」不是「safe」；
+安装脚本已移进 `scripts/`，而该扫描器只按文件名抓仓库根的 `install.ps1`，所以那两条旗标的输入已下线。
+1.2.1 的 tag 与 Release 资产已发布（sha256 `b9e6d203…`），但 `lib/release-pins.json` 刻意留空，所以插件内「自动下载浮窗」
 回落仍是 no-op——安装时拷的是 `vendor/` 里那份（见 §27.7）。
 
 ### 1i. 2026-11-10（v0.9.0 之后，未发版）—— 可移植性、--doctor、线协议文档、CI

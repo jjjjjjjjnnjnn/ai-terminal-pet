@@ -20,12 +20,12 @@
   v0.9.0 提交时的旧值（10,201 / 3,831 / 1,633 行，4,178,432 / 3,644,416 B，140 个 `func Test`）已作废。
 - **新增**（全部在 v0.9.0 之后、未发版）：`--doctor` 自检（9 项检查）、`docs/PROTOCOL.md` 线协议规范、
   `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
-  `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
   `scripts/install.ps1` 的 `-VerifyOnly` / `-Uninstall` / `-AddToPath` 三个开关（卸载同时清理 PATH 条目）。
 - **分发**：Harness 桥接已做成独立 DSH 插件包 `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet`
-  **1.2.1**，含预编译浮窗，Release tag `dsh-plugin-v1.2.1`，资产 `dsh-ai-terminal-pet-1.2.1.tgz`；
-  1.2.0 与 1.1.0 均保持已发布、不可变，由 1.2.1 取代——1.2.1 只改包内 `README.md` 与两条安装命令里的版本号，
-  `lib/index.js`、两个 vendor 文件、`cordis.patch.yml`、`dsh.catalog` 逐字节不变）；仓库根的清单 shim 让它
+  **1.2.2**，含预编译浮窗，Release tag `dsh-plugin-v1.2.2`，资产 `dsh-ai-terminal-pet-1.2.2.tgz`；
+  1.2.1 / 1.2.0 / 1.1.0 均保持已发布、不可变，由 1.2.2 取代——1.2.2 只改三处：两份清单的 `version`、包内
+  `README.md` 的措辞、以及 `vendor/manifest.json` 的源码摘要（因为 `scripts/` 迁移改到了 Go 注释），
+  `lib/index.js`、两个 vendor 二进制、`cordis.patch.yml`、`dsh.catalog` 逐字节不变）；仓库根的清单 shim 让它
   也能按仓库 URL 安装，三种安装形态实测 rc=0。`dsh.catalog` 是自我声明的 category/摘要/capabilities（不被强制），
   `keywords` 里的 `dsh-plugin` 让自动索引型市场能按 topic 采集。
   awesome-dsh-plugin 注册表 PR #13937 已于 2026-11-10T14:33:04Z 被 `fkysly` 合并，上游 README 的
@@ -33,7 +33,7 @@
   放行审批」并提示改措辞要另开 PR）。**该市场现在已经真的可见**：上游那次卡住的站点构建后来跑完，
   条目页 <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/> 返回 200，
   DSH 应用内 Market 加载的 `plugins.json` 也收录了本仓库（`count` 由 10119 增到 10230）；但那份目录仍按条目
-  文件里的 `tarball` 生成安装命令，所以它给出的仍是 1.2.0 资产——跟进 PR #14063 正是要换成 1.2.1。
+  文件里的 `tarball` 生成安装命令，所以它给出的仍是 1.2.0 资产——跟进 PR #14063 正是要换成当前版本 1.2.2。
   DSH-Plugins-Marketplace 当日 16:22Z 那次索引重建也完成了：本仓库从 `verdict: script` 改判为
   **`verdict: bundle-plugin`**（`pkg_name: dsh-ai-terminal-pet`、`version: 1.2.0`、topics 11 个），
   且该条目这次**没有被打任何风险档位**（既无 `risk_tier` 也无 `risk_flags`；前端对没有档位的条目按「未知」
