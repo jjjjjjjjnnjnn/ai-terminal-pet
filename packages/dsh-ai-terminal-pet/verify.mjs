@@ -266,6 +266,14 @@ async function caseManifest() {
   check(manifest.files.includes('screenshots'), 'the screenshots themselves ship in the tarball')
   check(manifest.dsh?.bundle?.patch === './cordis.patch.yml', 'dsh.bundle.patch is declared')
   check(JSON.stringify(manifest.dsh?.bundle?.platforms) === '["win32"]', 'the bundle is Windows only')
+  // Third-party registries (YELEBAI/dsh-plugin-marketplace, and any other that
+  // reads the same convention) filter a plugin out unless install.profiles
+  // contains the profile the client is running. Without this declaration the
+  // registry falls back to [headless, web] and the desktop storefront hides the
+  // entry; DSH itself never reads this field.
+  check(JSON.stringify(manifest.dsh?.marketplace?.profiles) === '["desktop","headless","web"]', 'dsh.marketplace.profiles covers the desktop, headless and web profiles')
+  check(manifest.dsh.marketplace.requiresBuildApproval === false, 'the package ships prebuilt runtime files, so no build approval is needed')
+  check(manifest.dsh.marketplace.manualSteps === false, 'installing needs no manual step')
   check(manifest.engines?.node === '^22.19 || >=24', 'engines.node covers Node 22.19 and 24+')
   check(typeof manifest.engines?.dsh === 'string' && manifest.engines.dsh.length > 0, 'engines.dsh declares a dsh requirement')
   check(manifest.files.includes('vendor'), 'the vendored binary ships in the tarball')
@@ -311,6 +319,7 @@ async function caseRootManifest() {
   check(rootManifest.private === true, 'the root shim is private so it never claims the npm name')
   check(rootManifest.dsh?.bundle?.patch === './packages/dsh-ai-terminal-pet/cordis.patch.yml', 'the root shim points dsh.bundle.patch at this package')
   check(JSON.stringify(rootManifest.dsh?.bundle?.platforms) === '["win32"]', 'the root shim keeps the Windows platform gate')
+  check(JSON.stringify(rootManifest.dsh?.marketplace) === JSON.stringify(manifest.dsh?.marketplace), 'the root shim copies the marketplace declaration verbatim')
   const patched = path.join(packageDir, '..', '..', rootManifest.dsh?.bundle?.patch ?? '')
   check(rootManifest.dsh?.bundle?.patch !== undefined && existsSync(patched), 'the patch file the root shim names exists')
   const entry = path.join(packageDir, '..', '..', rootManifest.main ?? '')
