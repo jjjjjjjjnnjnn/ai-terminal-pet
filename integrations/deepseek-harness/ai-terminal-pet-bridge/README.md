@@ -37,8 +37,12 @@ Harness conversation, ask:
 
 ```
 Use plugin_manager with action install_bundle and target
-"C:\Users\rongj\AppData\Local\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge"
+"%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge"
 ```
+
+That string is pasted into the in-app manager, so the environment variable form is intended:
+%LOCALAPPDATA% resolves per user, and a hard-coded C:\Users\<name>\... would be wrong on
+every other machine. If the manager does not expand variables, substitute your own profile path.
 
 That directory is a copy of this package, refreshed by `install.ps1`.
 Installing links the local directory into the profile and applies

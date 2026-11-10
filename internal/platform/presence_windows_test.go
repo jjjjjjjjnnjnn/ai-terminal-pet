@@ -93,7 +93,7 @@ func TestPresenceDoesNotTrustSyntheticPID(t *testing.T) {
 func TestWindowIdentifiesSessionNeedsAnIdentityMatch(t *testing.T) {
 	target := FocusTarget{
 		Title:    "项目交接与后续计划",
-		Project:  `C:\Users\rongj\Desktop\项目开发\DSH-Addition`,
+		Project:  `C:\work\项目\DSH-Addition`,
 		Source:   "opencode",
 		Terminal: "opencode",
 	}
@@ -111,7 +111,7 @@ func TestWindowIdentifiesSessionNeedsAnIdentityMatch(t *testing.T) {
 	}
 	// But a tab that names the session's project is real evidence.
 	if !windowIdentifiesSession([]focusWindow{terminalWindow(1, 10, "agy · ai-terminal-pet")},
-		FocusTarget{Project: `C:\Users\rongj\Desktop\项目开发\ai-terminal-pet`}) {
+		FocusTarget{Project: `C:\work\项目\ai-terminal-pet`}) {
 		t.Fatal("a project name in the tab title should identify the session")
 	}
 	// A non-terminal window with a matching title is not evidence.
@@ -176,7 +176,7 @@ func TestPresenceDropsHistoricalAntigravityConversation(t *testing.T) {
 
 	historical := session.Session{
 		Source: "antigravity-statusline", SessionID: "8a06fc0f-old",
-		ParentPID: 999999, Title: "", Project: `C:/Users/rongj`,
+		ParentPID: 999999, Title: "", Project: `C:/Users/pet-test`,
 		PID: 760369550, State: session.StateIdle,
 	}
 	if presence.SessionAlive(historical) {
@@ -203,7 +203,7 @@ func TestPresenceReclaimsOrphansUnderALongLivedHost(t *testing.T) {
 		SchemaVersion: "ai-terminal-pet.v1",
 		Source:        "claude-ipc", SessionID: "old-conversation",
 		ParentPID: 2832, PID: 1701354615,
-		Project: `C:/Users/rongj/Desktop/项目开发/oh_my_3dlab`,
+		Project: `C:/work/项目/oh_my_3dlab`,
 		Title:   "opencode", State: session.StateWorking,
 	}
 
@@ -240,7 +240,7 @@ func TestPresenceTrustedPIDDeathEndsSession(t *testing.T) {
 	value := session.Session{
 		SchemaVersion: "ai-terminal-pet.v1", Source: "opencode",
 		SessionID: "ses_dead", PID: 5228, ParentPID: 2832,
-		Project: `C:/Users/rongj/Desktop/项目开发/DSH-Addition`,
+		Project: `C:/work/项目/DSH-Addition`,
 		Title:   "opencode", State: session.StateWorking,
 		UpdatedAt: clock,
 	}

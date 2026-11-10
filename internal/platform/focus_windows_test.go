@@ -102,8 +102,8 @@ func TestTerminalKeywordAndProjectBase(t *testing.T) {
 		}
 	}
 	baseCases := []struct{ in, want string }{
-		{`C:\Users\rongj\Desktop\项目开发\DSH-Addition`, "DSH-Addition"},
-		{"C:/Users/rongj/Desktop/ai-terminal-pet", "ai-terminal-pet"},
+		{`C:\work\项目\DSH-Addition`, "DSH-Addition"},
+		{"C:/work/项目/ai-terminal-pet", "ai-terminal-pet"},
 		{`C:\`, ""},
 		{"  ", ""},
 	}
@@ -124,7 +124,7 @@ func TestSelectFocusWindowPrefersMatchingTab(t *testing.T) {
 	depths := map[int]int{2832: 0, 2896: 1, 11492: 2, 5228: 1}
 	target := FocusTarget{
 		PID: 5228, ParentPID: 2832,
-		Title: "项目交接与后续计划", Project: `C:\Users\rongj\Desktop\项目开发\DSH-Addition`,
+		Title: "项目交接与后续计划", Project: `C:\work\项目\DSH-Addition`,
 		Source: "opencode", Terminal: "opencode",
 	}
 	got, ok := selectFocusWindow(windows, target, depths, 40788)
@@ -172,7 +172,7 @@ func TestResolveFocusWindowLive(t *testing.T) {
 	}
 	got, ok := resolveFocusWindow(FocusTarget{
 		Title:    "项目交接与后续计划",
-		Project:  `C:/Users/rongj/Desktop/项目开发/DSH-Addition`,
+		Project:  `C:/work/项目/DSH-Addition`,
 		Source:   "opencode",
 		Terminal: "opencode",
 	})
@@ -199,7 +199,7 @@ func TestResolveTargetDoesNotStealForeground(t *testing.T) {
 	before, _, _ := getForegroundWindowProc.Call()
 	ResolveTarget(FocusTarget{
 		Title: "项目交接与后续计划", Source: "opencode", Terminal: "opencode",
-		Project: `C:/Users/rongj/Desktop/项目开发/DSH-Addition`,
+		Project: `C:/work/项目/DSH-Addition`,
 	})
 	after, _, _ := getForegroundWindowProc.Call()
 	if before != after {

@@ -2,17 +2,76 @@
 
 Screenshots come from `go test ./internal/ui -run TestRenderPreview` with
 PET_PREVIEW_DIR set, so they can never drift from the shipped layout.
+
+Usage (from the repository root, after rendering the previews):
+
+    export PET_PREVIEW_DIR="$TEMP/petpreview"
+    go test ./internal/ui -run TestRenderPreview
+    go test ./internal/ui -run TestRenderSettingsPreview
+    python docs/assets/render_assets.py
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+# Console output stays readable when the script is piped or redirected on a
+# non-UTF-8 Windows code page; the repo is UTF-8 everywhere.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
-PREVIEW = Path(r"C:\Users\rongj\AppData\Local\Temp\petpreview2")
-ASSETS = Path(r"C:\Users\rongj\Desktop\项目开发\ai-terminal-pet\docs\assets")
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    print(
+        "缺少 Pillow 依赖，无法生成图片资源。\n"
+        "Missing Pillow: install it first, then rerun this script:\n"
+        "    pip install pillow",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+PREVIEW_ENV = "PET_PREVIEW_DIR"
+RENDER_HINT = (
+    "    export PET_PREVIEW_DIR=\"$TEMP/petpreview\"   # PowerShell: $env:PET_PREVIEW_DIR=\"$env:TEMP\\petpreview\"\n"
+    "    go test ./internal/ui -run TestRenderPreview\n"
+    "    go test ./internal/ui -run TestRenderSettingsPreview\n"
+    "    python docs/assets/render_assets.py"
+)
+
+# Assets live next to this script, so a fresh clone needs no local path edits.
+ASSETS = Path(__file__).resolve().parent
 PANEL_BG = (0x20, 0x22, 0x2b)
+
+
+def fail(message: str) -> None:
+    """Print an actionable message instead of a Python traceback, then exit 2."""
+    print(message, file=sys.stderr)
+    sys.exit(2)
+
+
+def preview_dir() -> Path:
+    raw = os.environ.get(PREVIEW_ENV, "").strip()
+    if not raw:
+        fail(
+            "尚未设置环境变量 PET_PREVIEW_DIR，没有面板截图可合成。\n"
+            "PET_PREVIEW_DIR is not set, so there are no rendered panels to compose.\n"
+            "先按下面的顺序跑两条 go test 生成截图，再运行本脚本：\n"
+            "Render the panels first, then rerun:\n"
+            + RENDER_HINT
+        )
+    path = Path(raw).expanduser()
+    if not path.is_dir():
+        fail(
+            "PET_PREVIEW_DIR 指向的目录不存在：%s\n"
+            "PET_PREVIEW_DIR does not point at an existing directory: %s\n"
+            "先按下面的顺序跑两条 go test 生成截图，再运行本脚本：\n"
+            "Render the panels first, then rerun:\n" % (raw, raw)
+            + RENDER_HINT
+        )
+    return path
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -41,16 +100,26 @@ def trim(img: Image.Image, bg: tuple[int, int, int], pad: int = 16) -> Image.Ima
                      min(w, box[2] + pad), min(h, box[3] + pad)))
 
 
-def flat_panels() -> dict[str, Image.Image]:
-    return {
-        "compact": trim(Image.open(PREVIEW / "compact-waiting.png"), PANEL_BG),
-        "compact-hover": trim(Image.open(PREVIEW / "compact-waiting-hover.png"), PANEL_BG),
-        "compact-en": trim(Image.open(PREVIEW / "compact-waiting-en.png"), PANEL_BG),
-        "expanded": trim(Image.open(PREVIEW / "expanded-waiting.png"), PANEL_BG),
-        "expanded-en": trim(Image.open(PREVIEW / "expanded-waiting-en.png"), PANEL_BG),
-        "expanded-many": trim(Image.open(PREVIEW / "expanded-many.png"), PANEL_BG),
-        "auto-approve": trim(Image.open(PREVIEW / "expanded-approve-zh.png"), PANEL_BG),
+def flat_panels(preview: Path) -> dict[str, Image.Image]:
+    sources = {
+        "compact": "compact-waiting.png",
+        "compact-hover": "compact-waiting-hover.png",
+        "compact-en": "compact-waiting-en.png",
+        "expanded": "expanded-waiting.png",
+        "expanded-en": "expanded-waiting-en.png",
+        "expanded-many": "expanded-many.png",
+        "auto-approve": "expanded-approve-zh.png",
     }
+    missing = [name for name in sources.values() if not (preview / name).is_file()]
+    if missing:
+        fail(
+            "PET_PREVIEW_DIR 里缺少渲染出的面板：%s\n"
+            "PET_PREVIEW_DIR is missing rendered panels: %s\n"
+            "先按下面的顺序跑两条 go test 生成截图，再运行本脚本：\n"
+            "Render the panels first, then rerun:\n" % (", ".join(missing), ", ".join(missing))
+            + RENDER_HINT
+        )
+    return {key: trim(Image.open(preview / name), PANEL_BG) for key, name in sources.items()}
 
 
 def hero(panels: dict[str, Image.Image]) -> Image.Image:
@@ -107,8 +176,9 @@ def hero(panels: dict[str, Image.Image]) -> Image.Image:
 
 
 def main() -> None:
+    preview = preview_dir()
     ASSETS.mkdir(parents=True, exist_ok=True)
-    panels = flat_panels()
+    panels = flat_panels(preview)
     for name, img in panels.items():
         img.save(ASSETS / f"overlay-{name}.png")
     hero(panels).save(ASSETS / "hero.png")

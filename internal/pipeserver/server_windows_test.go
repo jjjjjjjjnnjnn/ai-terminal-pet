@@ -2,6 +2,8 @@ package pipeserver
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net"
@@ -116,8 +118,12 @@ func TestReadRejectsInvalidPayload(t *testing.T) {
 }
 
 func TestPipePathForUserMatchesReporterAlgorithm(t *testing.T) {
-	t.Setenv("USERPROFILE", `C:\Users\rongj`)
-	want := PipePath + "-42ce7d78"
+	// Mixed case plus a trailing separator so the assertion still pins the shared
+	// Go/JS contract: lower-case the home dir, trim trailing separators, then hash.
+	// The expected suffix is derived here instead of hard-coding a machine literal.
+	t.Setenv("USERPROFILE", `C:\Users\Pet-Test\`)
+	home := sha256.Sum256([]byte(`c:\users\pet-test`))
+	want := PipePath + "-" + hex.EncodeToString(home[:4])
 	if got := PipePathForUser(); got != want {
 		t.Fatalf("pipe path mismatch: got %q want %q", got, want)
 	}
