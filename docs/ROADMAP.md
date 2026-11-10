@@ -4,7 +4,7 @@
 > 已交付批次、扩展计划、轻量化计划，以及一组实用功能候选与非目标。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
 >
-> 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§25；按版本发布的变更摘要在
+> 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§27；按版本发布的变更摘要在
 > [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 0. 现状基线
@@ -31,9 +31,48 @@
 | 持续集成 | `.github/workflows/ci.yml`（130 行）：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 两个 `-trimpath -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` |
 | 自检 | `ai-terminal-pet --doctor` 9 项（environment / install files / version / runtime / config / pipe / instance / node / autostart），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.0.0**，17 个文件含 vendor，包体 **1.9 MB** / 解包 **4.5 MB**）；Release tag `dsh-plugin-v1.0.0` |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图 |
 
 ## 1. 已交付批次（按时间倒序）
+
+### 1j. 2026-11-10（v0.9.0 之后，未发版）—— DSH 插件包与市场分发尝试
+
+**动机**：§1i 解决了「别人的机器能跑通」，但没有解决「别人怎么拿到」。Harness 的接法当时要求先 clone
+整个仓库、跑 `install.ps1`，再把安装目录里 bundle 的绝对路径贴进插件管理器——对外部用户不成立。
+DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里一个 `data/plugins/<slug>.yml`，加上一个 npm 包。
+
+**交付**（`7f476c9` + `91719e5`，细节与坑见 HANDOVER §27）：
+
+- `packages/dsh-ai-terminal-pet/` 独立 Cordis bundle 包（npm 名 `dsh-ai-terminal-pet` 1.0.0，MIT，
+  `type: module`，17 个文件含 vendor）。`dsh.bundle { patch: './cordis.patch.yml', platforms: ['win32'] }`，
+  `engines node ^22.19 || >=24` / `dsh >=0.1.0-rc.6`，`files` 显式 10 项，`prepack` 会重生成 vendor。
+- **包内自带预编译浮窗**：`vendor/AI-Terminal-Pet.exe`（4,371,968 B）与 `vendor/protocol.js`（20,914 B），
+  `runBootstrap()` 只在 `%LOCALAPPDATA%\AI-Terminal-Pet\` 里对应文件**缺失**时才拷，
+  `copyVerified` 走临时文件 + rename 并在 rename 前复查目标存在——**从不覆盖已装文件**。
+- **`cordis.patch.yml` 必须用 `insert:`**。裸 `- id:` 只 patch 既有 loader 行：装完看着成功，
+  运行时什么都不挂载。原因写进了该 YAML 的文件头，不只写在文档里。
+- `node verify.mjs`：rc=0 / **54 ok** / 末行 `VERIFY PASSED`；`npm pack` 产出 1.9 MB packed / 4.5 MB unpacked / 15 files。
+- **GitHub Release `dsh-plugin-v1.0.0`**：资产 `dsh-ai-terminal-pet-1.0.0.tgz`（1,913,682 B，
+  sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`）。
+- **三种安装路径都实测成功**：本地 tarball、Release 资产 URL（`.../releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz`，
+  rc=0、32.6 s）、git 源钉 tag（`...git#dsh-plugin-v1.0.0&path:/packages/dsh-ai-terminal-pet`，rc=0、3.4 s）；
+  `--dump-config` 末尾出现 `- id: dsh-ai-terminal-pet`。**裸 git 源（不钉 commit/tag）会被 pnpm 的
+  `allowBuilds` 门拦在 `prepack` 处失败**，所以对外命令只给 tarball 与钉 tag 两种形态。
+- **awesome-dsh-plugin 注册表 PR #13937 已提交、CI 全绿、等人工评审**（`category: notify`，带 `icon` 与
+  `tarball`；上游两道门本地先跑过：`entries read: 10120 / problems: 0`、`all checked entries pass`；
+  PR 上 `PR check / check`（10:37:54Z）与 `Submission gate`（10:38:47Z）均 `conclusion: SUCCESS`）。
+
+**踩到的坑（值得写进路线图，因为它决定了 §4 里那几项的状态标记怎么写）**：`vendor/AI-Terminal-Pet.exe`
+一开始不在 git 树里（`.gitignore` 的 `*.exe` 把它吞了，`git add` 不会越过忽略规则）。后果不对称：
+`npm pack` 读工作区所以 tarball 装得上，`git clone` 读树所以 git 源装出的是个没浮窗的包，
+而 `lib/release-pins.json` 还没建 → 回落 no-op → 浮窗静默不装。修法两行：`.gitignore` 加
+`!packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`，`.gitattributes` 加 `*.exe binary`
+（避免 Git 对 sha256 依赖的二进制做文本规范化）。
+
+**没做成什么**：npm 发布卡在失效凭据（`npm whoami` **E401**），所以 **Discover 索引不可达**
+（该索引 format 1 只表达 npm 版本，先有 npm 才有索引）；注册表条目的 CI 已全绿，现在只等人工评审，
+**未合并、未收录**。
 
 ### 1i. 2026-11-10（v0.9.0 之后，未发版）—— 可移植性、--doctor、线协议文档、CI
 
@@ -406,6 +445,11 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 ~~E2 线协议文档 `docs/PROTOCOL.md`~~、~~E6 `--doctor` 自检~~、~~安装脚本 `-VerifyOnly`/`-Uninstall`/`-AddToPath`~~、
 ~~CI 门禁 `.github/workflows/ci.yml`~~。
 
+v0.9.0 之后（2026-11-10，见 §1j）还多了一项**分发向**的扩展，它不在候选表里，单独把状态说清：
+**DSH 插件包分发** —— ✅ 包本体与 GitHub Release `dsh-plugin-v1.0.0` 已发布、tarball / Release 资产 URL / git 源钉 tag 三种安装实测成功（裸 git 源会被 pnpm 的 `allowBuilds` 门拦住）；
+✅ 注册表条目 PR #13937 **已提交、CI 全绿、待人工评审**（既未合并也未收录，进 `main` 之后才会出现在列表与站点）；
+⏳ **npm 发布待凭据**（`npm whoami` E401），因此 DSH 应用内 Plugins → Discover 索引仍不可达。
+
 | 编号 | 功能 | 价值 | 复杂度 |
 |---|---|---|---|
 | F8 | 会话行点击复制项目路径（托盘气泡回执，避免"点了没反应"） | 高 | 低 |
@@ -441,3 +485,5 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
 - 设置窗口不参与贴边收起、不跟随浮窗透明度（固定 255），关掉「窗口置顶」后它仍置顶（它是对话框）。
 - 安装目录可能残留上一轮的 `pet-statusline-core.exe` / `-old.exe` / `-v1-backup.exe` / `shim.js`（`install.ps1` 只覆盖不清理）。
+- DSH 插件包的 npm 发布卡在失效凭据（`npm whoami` E401），因此 **DSH 应用内 Discover 索引不可达**；
+  git 源与 Release tarball 两条安装路可用，注册表条目 PR #13937 仍待评审（未合并、未收录）。

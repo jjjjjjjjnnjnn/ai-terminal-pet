@@ -146,6 +146,20 @@ Writing your own reporter for a tool that is not listed here needs no source rea
 
 The Harness side is a host-only Cordis bundle: it holds no pipe-name, state-set or snapshot logic of its own, it loads the protocol from `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` and delegates everything to it.
 
+Since `dsh-ai-terminal-pet` `1.0.0` the Harness side has a second, self-contained option: a standalone DSH plugin package at [`packages/dsh-ai-terminal-pet`](packages/dsh-ai-terminal-pet), also shipped as the GitHub Release asset `dsh-ai-terminal-pet-1.0.0.tgz` under tag `dsh-plugin-v1.0.0`. Two install forms work today, both verified end to end:
+
+```powershell
+# from the release tarball: no git clone, no build step
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz
+
+# from git, pinned to the release tag
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.0.0&path:/packages/dsh-ai-terminal-pet"
+```
+
+Point at the tarball or pin the tag; do not hand pnpm the bare repository URL. The package regenerates its vendored overlay in a `prepack` step, and pnpm blocks that step for unpinned git sources until you copy the `allowBuilds` key it prints into your profile's `pnpm-workspace.yaml` — the install otherwise fails with a message that does not mention AI Terminal Pet at all.
+
+Its payload carries a prebuilt overlay and the official `protocol.js`, which are copied into `%LOCALAPPDATA%\AI-Terminal-Pet\` on first use **only when they are missing** — an existing install is never overwritten, and the overlay keeps running entirely on its own, so a machine that only wants the pet still needs nothing but `install.ps1`. Its entry in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) passed both upstream checks and is now waiting on a human reviewer, so it is not listed yet; the DSH in-app Discover index additionally needs an npm release, which is blocked on credentials, which is why installing by package name (`dsh plugin --profile <profile> add dsh-ai-terminal-pet`) does not resolve yet.
+
 Run `node reporters/generic.js` directly to report from any other CLI or script:
 
 ```powershell
@@ -234,6 +248,8 @@ Terminal hooks run inside your development environment, so their boundaries are 
 - **Binary size reduction**: Bring the main executable under 2.5 MiB (currently 4.17 MiB) by stripping reflection metadata and dropping unused packages, and replace the regexp-based redaction in pet-statusline with a hand-written scanner.
 
 Shipped after v0.9.0: the wire protocol specification ([docs/PROTOCOL.md](docs/PROTOCOL.md)) and the `ai-terminal-pet --doctor` self-check command, so both items previously listed here as pending are now available.
+
+Shipped after v0.9.0 as a distribution channel, not just a repository: the Harness bridge is now also a standalone DSH plugin package (`dsh-ai-terminal-pet` 1.0.0, GitHub Release `dsh-plugin-v1.0.0`, 1.9 MB packed / 4.5 MB unpacked over 15 files in the tarball). It installs today from the release tarball or from git pinned to that tag; its registry entry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) passed both upstream checks and is awaiting a human reviewer, and the DSH Discover index needs an npm release that is blocked on credentials.
 
 ### Non-goals
 
@@ -393,6 +409,20 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe 
 
 Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状态集与快照逻辑，它从 `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` 加载协议，全部委托给官方 protocol.js。
 
+自 `dsh-ai-terminal-pet` `1.0.0` 起，Harness 这一侧多了第二种自带电池的接法：独立 DSH 插件包 [`packages/dsh-ai-terminal-pet`](packages/dsh-ai-terminal-pet)，同时以 GitHub Release 资产 `dsh-ai-terminal-pet-1.0.0.tgz`（tag `dsh-plugin-v1.0.0`）对外分发。现在有两种装法，两种都端到端实测通过：
+
+```powershell
+# 用 Release 资产：不需要 clone，也不需要构建
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz
+
+# 用 git 源：钉住 Release 的那个 tag
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.0.0&path:/packages/dsh-ai-terminal-pet"
+```
+
+请用 tarball 或钉住 tag，不要把裸仓库地址直接交给 pnpm。包会在 `prepack` 阶段重新生成 vendor 里的预编译浮窗，而 pnpm 会拦下未钉版本的 git 源的这个 prepare 步骤，直到你把它打印出来的 `allowBuilds` 键抄进该 profile 的 `pnpm-workspace.yaml`——否则安装会失败，而报错里压根不会提到 AI Terminal Pet。
+
+它的载荷自带预编译浮窗与官方 `protocol.js`，首次使用时拷进 `%LOCALAPPDATA%\AI-Terminal-Pet\`，且**只在文件缺失时才拷**——已装的文件绝不覆盖；浮窗本身依旧完全独立运行，只想要浮窗的机器仍然只需要 `install.ps1`。它在 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 注册表的条目（[PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)）已通过上游两道检查，现等人工评审，因此**尚未出现在列表里**；DSH 应用内的 Discover 索引还需要一次 npm 发布，目前卡在凭据上，这也正是按包名安装（`dsh plugin --profile <profile> add dsh-ai-terminal-pet`）现在还解析不到的原因。
+
 针对 Antigravity CLI，推荐将状态栏命令直接指向编译好的原生二进制 `pet-statusline.exe`。在开启杀毒软件的机器上，原生 shim 能够消除频繁启动 Node 运行时的进程创建延迟。
 
 对于表格中未列出的其他终端或自动化脚本，可以使用 `reporters/generic.js` 进行一行接入：
@@ -475,6 +505,8 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 - **二进制体积压缩**：计划将主程序体积从现状 4.17 MiB 降至 2.5 MiB 以内。手段包括剥离无用反射元数据、去掉未用包，以及把 pet-statusline 里基于 regexp 的脱敏规则改成手写扫描器。
 
 v0.9.0 之后已交付：线协议规范文档 [docs/PROTOCOL.md](docs/PROTOCOL.md)（第三方可据此编写合规上报端）与 `ai-terminal-pet --doctor` 自检命令，原先列在此处的两项待办均已完成。
+
+v0.9.0 之后还多了一条分发渠道，而不只是仓库里的代码：Harness 桥接现在是独立 DSH 插件包 `dsh-ai-terminal-pet` 1.0.0（GitHub Release `dsh-plugin-v1.0.0`，tarball 1.9 MB packed / 4.5 MB unpacked / 15 files）。现在可从 Release 资产或钉住该 tag 的 git 源直接安装；它在 awesome-dsh-plugin 注册表的条目（[PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)）已通过上游检查、待人工评审，DSH 应用内 Discover 索引需要 npm 发布，当前卡在凭据。
 
 ### 非目标（明确不做）
 

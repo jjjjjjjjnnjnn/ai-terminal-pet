@@ -83,6 +83,57 @@
   `gofmt` 误报。**`node --check` 是逐文件循环而不是 `node --check reporters/*.js`**：
   后者只检查第一个参数（Node 24 实测：第二个参数是坏文件也退出 0），循环是唯一真正覆盖全部文件的写法。
   live-desktop 探针测试在对应 `PET_*` 变量未设置时 `Skip`，所以不需要桌面会话或任何 secret。
+- **`packages/dsh-ai-terminal-pet` —— 把 Harness 桥接做成独立 DSH 插件包**（`7f476c9`）：npm 包名
+  `dsh-ai-terminal-pet`、version `1.0.0`、license MIT、`type: module`、`private` 未设（可发布）；
+  包内 17 个文件（含 vendor），主体是 `lib/index.js`（17,872 B / 571 行）、`verify.mjs`（14,583 B / 294 行）、
+  `scripts/vendor.mjs`（2,977 B / 77 行）、`package.json`（1,330 B / 60 行）、`README.md`（5,586 B / 112 行）、
+  `cordis.patch.yml`（399 B / 10 行）、`locale/en.json`（210 B）/ `locale/zh.json`（217 B）、
+  `icon.svg`（526 B）/ `icon.png`（4,386 B）、`LICENSE`（1,070 B）、`screenshots.json`（97 B）、
+  `screenshots/compact.png`（4,459 B）/ `expanded.png`（11,335 B）/ `expanded-many.png`（17,697 B）、
+  `vendor/protocol.js`（20,914 B）、`vendor/AI-Terminal-Pet.exe`（4,371,968 B）。
+  `package.json` 用 `dsh.bundle { patch: './cordis.patch.yml', platforms: ['win32'] }` 声明自己是一个
+  Cordis bundle，`engines` 为 `node: '^22.19 || >=24'`、`dsh: '>=0.1.0-rc.6'`，`files` 10 项。
+  行为：把 Harness 事件映射成浮窗状态（`approval/asked → waiting_permission`、`approval/decided → working`、
+  `turn/start → working`、`turn/end → idle`、`tool/call → tool_use`、`tool/result(error) → error`、
+  `command/done`、`working-directory/change → project`、`session/title`）；记住每个会话最后一次状态，
+  只在状态变化或距上次 ≥60 s（`KEEP_ALIVE_MS = 60_000`）时才发一次，避免高频刷屏。
+  `npm pack` 产出 `dsh-ai-terminal-pet-1.0.0.tgz`：**1.9 MB packed / 4.5 MB unpacked / 15 files**。
+  - **`cordis.patch.yml` 必须用 `insert:` 列表**（`- id: dsh-ai-terminal-pet` / `name: dsh-ai-terminal-pet`）。
+    裸的 `- id:` 只会 patch 一行**已存在**的 loader 行，装完看着成功却什么都不挂载——这是踩过的坑，
+    因此文件头的注释把原因写在了 YAML 里。
+  - **vendor 预编译 + 引导安装只补缺失**（`runBootstrap()`）：仅当
+    `%LOCALAPPDATA%\AI-Terminal-Pet\AI-Terminal-Pet.exe` **缺失**时，才从包内 `vendor/` 拷
+    `protocol.js`（`0o600`）与 exe；`copyVerified` 走「临时文件 + rename、rename 前再查一次目标是否存在」，
+    **从不覆盖已有文件**。`DSH_PET_NO_BOOTSTRAP=1` 可整段关掉（测试缝），
+    `DSH_PET_TEST=1` + `DSH_PET_PACKAGE_ROOT` 可替换包根。
+  - `node verify.mjs`：rc=0、**54 ok**、末行 `VERIFY PASSED`；覆盖状态映射、waterfall `next()`、
+    dispose 不发 `closed`、真 exit 发 `closed`、bootstrap 只补缺失不覆盖、protocol 抛异常时插件全静默。
+- **GitHub Release `dsh-plugin-v1.0.0`**：资产 `dsh-ai-terminal-pet-1.0.0.tgz`（1,913,682 B，
+  sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`），
+  下载地址 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz`。
+  三种安装方式都实测成功：①本地 tarball `dsh plugin --profile <name> add <tgz 绝对路径>` →
+  `+ dsh-ai-terminal-pet 1.0.0`，`dsh --profile <name> --dump-config` 末尾出现 `- id: dsh-ai-terminal-pet`
+  （证明 `insert:` 真的挂上了）；②git 源
+  `dsh plugin --profile git-test add git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#91719e5a2c7c221ad163686f80eaab9c4eca4ea6&path:/packages/dsh-ai-terminal-pet`
+  → rc=0、10.2 s，装出的包里 `vendor/AI-Terminal-Pet.exe` 4,371,968 B 在位；③Release 资产 URL
+  `add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz`
+  → rc=0、32.6 s，vendor 内两个文件都在位。裸 git 源（不钉 commit/tag）会被 pnpm 的 `allowBuilds`
+  门拦在 `prepack` 处失败，所以对外命令只给 tarball 与钉 tag 两种形态。
+- **awesome-dsh-plugin 注册表条目（PR #13937，已提交、CI 全绿、待人工评审）**：市场 App `dshmarket` 只是前端，
+  目录来自注册表仓库 `awesome-dsh-plugin/awesome-dsh-plugin`，投稿方式是只加一个
+  `data/plugins/<slug>.yml`。本次条目为
+  `data/plugins/jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml`，
+  `category: notify`、`url` 指向 `.../tree/main/packages/dsh-ai-terminal-pet`、
+  `name: jjjjjjjjnnjnn/ai-terminal-pet#dsh-ai-terminal-pet`，并带上 `icon`（raw.githubusercontent 的 icon.png）
+  与 `tarball`（上面的 Release 资产）。本地先跑通上游两道门：条目模型校验
+  `entries read: 10120 / problems: 0`，`scripts/check-submission.mjs --only-list` →
+  `ok https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/tree/main/packages/dsh-ai-terminal-pet` /
+  `all checked entries pass`。PR 见 <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937>
+  （fork 分支 `add-dsh-ai-terminal-pet`，commit `a1fef56`，基于上游 main `09cd105`）。
+  **状态是「已提交、CI 已全绿、等人工评审」**：PR 上两个检查都已完成且 `conclusion: SUCCESS`
+  （`PR check / check` 于 2026-11-10T10:37:54Z 结束、`Submission gate` 于 10:38:47Z 结束，
+  `mergeable: MERGEABLE`），但**既没有合并也没有收录**；收录进 `main` 之后才会出现在列表与站点上，
+  而 DSH 应用内的 Plugins → Discover 索引还需要一次 npm 发布（见 Changed 末条）。
 
 ### Changed
 
@@ -122,6 +173,11 @@
   并在装完后用 `--doctor` 自查；卸载与 Path 开关同样写进 README 的中英两半。
 - **`.gitattributes` 固定 `* text=auto eol=lf`**（`1330fbe`）：仓库本来就按 LF 存取，但 Windows 上
   `core.autocrlf=true` 会一直报规范化警告；钉进树里之后警告消失，Go 源码与 Markdown 在各次克隆间字节一致。
+- **npm 发布尚未完成，卡在凭据**：包本身已经满足发布条件（`private` 未设、`files` 显式列了 10 项、
+  `prepack` 会重新生成 vendor），但 `npm whoami` 返回 **E401**（token 已失效），所以**没有推任何版本到 npm**。
+  这条链是依次的：注册表条目进了 `main` 才会出现在列表/站点；而 DSH 应用里的 Plugins → Discover 索引
+  只表达 npm 版本（format 1），**必须先有 npm 发布**才可能被索引到。当前能装的三条路是
+  git 源、Release tarball、以及将来的 npm——前两条已实测成功。
 
 ### Fixed
 
@@ -147,6 +203,16 @@
   行为不变，`gofmt` / `go vet` / `go test` 保持干净，没有为了消 warning 加 `//nolint` 或假引用。
   唯一保留的 staticcheck 发现是 `internal/ui/win32_api_windows.go` 里 `syscall.Syscall9` 的 SA1019，
   因为 `UpdateLayeredWindow` 的调用签名需要它。
+- **`vendor/AI-Terminal-Pet.exe` 一开始没进 git 树**（修于 `91719e5`）：`.gitignore` 里的 `*.exe` 把它一并忽略，
+  而 `git add` 不会自动越过忽略规则，于是这颗二进制只存在于工作区。后果不对称得很有欺骗性——
+  `npm pack` 读的是工作区，所以 **release tarball 装得上**；而 **git 源安装拿到的是一个 `vendor/` 里
+  只有 `protocol.js` 的包**，`runBootstrap()` 于是回落到下载分支，`lib/release-pins.json` 又还没建，
+  回落是 no-op，浮窗就静默地不装了。修法是两行：`.gitignore` 加例外
+  `!packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`；`.gitattributes` 加 `*.exe binary`，
+  免得 Git 对这颗 sha256 依赖的二进制做文本规范化。
+  同一次排障还改正了 Release 的 tag 落点：`dsh-plugin-v1.0.0` 最初打在 `7f476c9`（vendor 还在被忽略的那次提交），
+  于是从 tag 安装拿到的是一个 `vendor/` 里只有 `protocol.js` 的包。修完 `.gitignore` 后 tag 已强制移到 `91719e5`，
+  并用 `git+...#dsh-plugin-v1.0.0&path:/packages/dsh-ai-terminal-pet` 重装复验（rc=0、3.4 s、`vendor/AI-Terminal-Pet.exe` 4,371,968 B 在位）。
 
 ### Docs
 

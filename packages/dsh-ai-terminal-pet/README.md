@@ -28,19 +28,33 @@ process exit means the conversation is over.
 
 ## Install
 
-The bundle is listed in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
-registry, which is the catalog the DSH plugin market reads. Once the registry
-entry reaches `main`, the market index picks it up on its next build (usually
-within a day) and the package appears under Plugins -> Market.
+The bundle has been submitted to the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)),
+which is the catalog the DSH plugin market reads. Both upstream checks are green;
+the entry is waiting on a human reviewer, so it is **not listed yet**. Once it
+reaches `main`, the market index picks it up on its next build (usually within a
+day) and the package appears under Plugins -> Market.
 
 The bundle is Windows only and declares `dsh.bundle.platforms: ["win32"]`, so
 other platforms show it as unsupported instead of installing it.
 
-Manually, from a terminal, into a profile you own:
+Manually, from a terminal, into a profile you own — use the release tarball or
+pin the release tag. Both are verified end to end:
 
 ```sh
-dsh plugin --profile <profile> add dsh-ai-terminal-pet
+# release tarball: no clone, no Go toolchain
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz
+
+# git source, pinned to the release tag
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.0.0&path:/packages/dsh-ai-terminal-pet"
 ```
+
+Do not hand pnpm a bare repository URL. The package regenerates its vendored
+overlay in a `prepack` step, and pnpm blocks that step for unpinned git sources
+until you copy the `allowBuilds` key it prints into your profile's
+`pnpm-workspace.yaml`; the install fails with a message that never mentions AI
+Terminal Pet. Installing by package name (`add dsh-ai-terminal-pet`) starts
+working only after the npm release, which is currently blocked on credentials.
 
 `add` is the whole install: the profile records the dependency, and the bundle
 declares itself through `dsh.bundle.patch`, so no separate `enable` step exists.
