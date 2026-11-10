@@ -78,7 +78,7 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   `private: true` 不占 npm 名、`version` 跟包同步（`verify.mjs` 断言两者相等）。
   没有它，宿主读到的是 0.0.0 依赖并报 `declares no dsh.bundle`，装出空包。
   它同时是「根清单采集」那条市场路径的准入条件。
-- `node verify.mjs`：1.2.0 口径 **369 行 / 77 个 `ok` / 0 warn / 末行 `VERIFY PASSED` / rc 0**
+- `node verify.mjs`：1.2.0 口径 **415 行 / 91 个 `ok` / 0 warn / 末行 `VERIFY PASSED` / rc 0**
   （tag `dsh-plugin-v1.1.0` 时是 300 行 / 55 ok，1.1.0 批次 331 行 / 63 ok）。它自带 fake Cordis context、
   临时 `LOCALAPPDATA` 与 stub protocol，所以不碰管道、浮窗与网络；`d06001d` 起 CI 也跑这套。
 - **三种安装形态都实测成功**（每次都开全新 `DSH_HOME` 与独立 profile）：Release tarball（**1.8 s**）、

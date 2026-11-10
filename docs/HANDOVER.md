@@ -1087,7 +1087,7 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
 |---|---|---|---|
 | `package.json` | 2,008 | 74 | 包元数据 + `dsh.bundle` + `dsh.catalog` 声明（scripts 只剩 verify / vendor / vendor:check） |
 | `lib/index.js` | 17,872 | 571 | 事件映射、去抖、bootstrap、下载回落 |
-| `verify.mjs` | 19,516 | 369 | 自包含验证脚本（无测试框架）；tag `dsh-plugin-v1.1.0` 上是 15,117 B / 300 行 |
+| `verify.mjs` | 22,499 | 415 | 自包含验证脚本（无测试框架）；tag `dsh-plugin-v1.1.0` 上是 15,117 B / 300 行 |
 | `scripts/vendor.mjs` | 13,981 | 324 | 双模式：无参时从 `../../bin` 与 `../../reporters` 拷进 `vendor/` 并写 `manifest.json`；`--check` 只校验 sha256 |
 | `README.md` | 6,665 | 129 | 包自己的安装/限制说明（写明「本包不带任何生命周期钩子」与 `dsh.catalog` 的自我声明性质） |
 | `cordis.patch.yml` | 399 | 10 | loader patch 层（`insert:`） |
@@ -1273,7 +1273,7 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
 ```powershell
 # 包自身的断言（状态映射、waterfall next()、dispose 不发 closed、真 exit 发 closed、
 # bootstrap 只补缺失不覆盖、protocol 抛异常时插件全静默、根清单与包清单一致、dsh.catalog 形状）
-# 1.2.0 实测：rc=0、77 个 ok、0 warn、末行 VERIFY PASSED（1.1.0 是 63 个 ok，tag 上是 55 个）
+# 1.2.0 实测：rc=0、91 个 ok、0 warn、末行 VERIFY PASSED（1.1.0 是 63 个 ok，tag 上是 55 个）
 cd packages/dsh-ai-terminal-pet; node verify.mjs          # 期望 rc=0、末行 VERIFY PASSED
 
 # vendor 校验（只读）：重新算两个文件的 sha256，并与 vendor/manifest.json 比对
@@ -1364,7 +1364,7 @@ shim 里没有任何代码，只做四件事：
 这三类在本仓库都真实发生过或差一点发生。
 
 **口径提醒**：写这部分的任何数字前先确认是 tag 还是 HEAD。`dsh-plugin-v1.1.0` 上的 `verify.mjs` 是
-300 行 / 55 个 `ok`；1.2.0 的 HEAD 上是 369 行 / 77 个 `ok`。两个都不是错的，混在一句话里才是错的。
+300 行 / 55 个 `ok`；1.2.0 的 HEAD 上是 415 行 / 91 个 `ok`（其中 14 条是 `docs/market-index.json` 的漂移用例，见 §27.10）。两个都不是错的，混在一句话里才是错的。
 
 ### 27.9 三条发现路径，与一次 CI 变红的根因（2026-11-10）
 

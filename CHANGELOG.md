@@ -88,7 +88,7 @@
   1.1.0 → 1.2.0）：npm 包名 `dsh-ai-terminal-pet`、license MIT、`type: module`、`private` 未设（可发布）；
   当前版本 **1.2.0**（`packages/dsh-ai-terminal-pet/package.json` 2,008 B / 74 行）：
   包内 18 个文件（含 vendor，1.2.0 起多一个 `vendor/manifest.json`），主体是 `lib/index.js`（17,872 B / 570 行）、
-  `verify.mjs`（19,516 B / 369 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,008 B / 74 行）、
+  `verify.mjs`（22,499 B / 415 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,008 B / 74 行）、
   `README.md`（6,665 B / 129 行）、`vendor/manifest.json`（529 B / 19 行）、
   `cordis.patch.yml`（399 B / 10 行）、`locale/en.json`（210 B）/ `locale/zh.json`（217 B）、
   `icon.svg`（526 B）/ `icon.png`（4,386 B）、`LICENSE`（1,070 B）、`screenshots.json`（97 B）、
@@ -131,7 +131,7 @@
   并装出一个空包——症状是「装成功了，但浮窗永远不出现」，没有任何报错。标 `private: true` 是为了不占用 npm 名。
 - **`verify.mjs` 连根 shim 一起检查，并在 CI 里跑插件套件**（`d06001d`）：新增根清单一致性用例，
   从 tag `dsh-plugin-v1.1.0` 的 300 行 / 55 个 `ok` 长到 1.1.0 批次的 331 行 / 63 个 `ok`、再随 1.2.0 到
-  369 行 / **77 个 `ok`**（均 `VERIFY PASSED`、rc 0）；
+  415 行 / **91 个 `ok`**（均 `VERIFY PASSED`、rc 0；多出的 14 条是新增的索引漂移用例）；
   `.github/workflows/ci.yml` 增加两步：`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check` 与
   `node packages/dsh-ai-terminal-pet/verify.mjs`。验证脚本自带 fake Cordis context + 临时 `LOCALAPPDATA` +
   stub protocol 模块，所以 CI 上不需要网络、管道或真实浮窗。
