@@ -198,11 +198,10 @@
   结论修正为：「条目已合并，并且已经在列表与市场里可见；延迟来自上游站点重建，不是条目本身的问题」。
   <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063>（fork 分支 `bump-tarball-1.2.1`，
   head `116b0ee`，1 file `+1/−1`，只把那行 URL 换成 `dsh-plugin-v1.2.1/dsh-ai-terminal-pet-1.2.1.tgz`；
-  `scripts/check-submission.mjs --only-list` → `checking 1 entry / ok / all checked entries pass`；
-  `state: OPEN`、描述一字未改）。**两处外部副作用已记录**：① 已发布的 `dsh-ai-terminal-pet-1.2.0.tgz` 里那份 `README.md` 是 1.2.0 打包时的旧文，
-  仍写着「等人工评审、尚未列入」——Release 资产不可变，本仓库的改动不会回写进那份 1,914,566 B 的 tarball，
-  所以才有下面那条 1.2.1 —— 只换文本，也只能换版本号。当时 `docs/market-index.json` 钉的同样是
-  `4d777e3` 那个 commit，也会把读者带到旧文；该文件后来在 `cf1085d` 前移到 `1e08b3e`。写文案时别拿包内 README 当现状。
+  `scripts/check-submission.mjs --only-list` → `checking 1 entry / ok / all checked entries pass`（该门需要 `GITHUB_TOKEN`）。
+  两项上游检查已跑完并通过：`check` pass（24m59s）与 `Submission gate` pass；`state: OPEN`、`mergeable: MERGEABLE`、`+1/−1`。
+  **两处外部副作用已记录**：① 已发布的 `dsh-ai-terminal-pet-1.2.0.tgz` 里那份 `README.md` 是 1.2.0 打包时的旧文，仍写着「等人工评审、尚未列入」——
+  Release 资产不可变，本仓库的改动不会回写进那份 1,914,566 B 的 tarball，所以才有下面那条 1.2.1 —— 只换文本，也只能换版本号。当时 `docs/market-index.json` 钉的同样是 `4d777e3` 那个 commit，也会把读者带到旧文；该文件后来在 `cf1085d` 前移到 `1e08b3e`。写文案时别拿包内 README 当现状。
   ② 已向市场仓库提了误报 issue <https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367>：
   `registry-run-key` 与 `remove-item-force-recurse` 两条旗标都是正则匹配到常量定义与提示文本，
   `install.ps1` 从不新增 Run 值、递归删除只作用于一个经 `Assert-SafeInstallDirectory` 校验的目录；

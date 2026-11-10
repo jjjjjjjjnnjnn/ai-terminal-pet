@@ -1317,8 +1317,9 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
   描述一字未改。本地用上游自己的门先验过：`scripts/check-submission.mjs --only-list` → `checking 1 entry` /
   `ok https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/tree/main/packages/dsh-ai-terminal-pet` /
   `all checked entries pass`（该脚本需要 `GITHUB_TOKEN`，缺了会直接报 required）；两个 URL 的 HEAD 都是 200。
-  PR 状态：`state: OPEN`、`mergeable: UNKNOWN`、`changedFiles: 1`、`additions: 1`、`deletions: 1`；
-  刚建单时 `gh pr checks` 报 `no checks reported`（上游检查要等它自己的 workflow 排队）。
+  PR 状态（2026-11-10T17:0xZ 复查）：`state: OPEN`、`mergeable: MERGEABLE`、`changedFiles: 1`、`+1/−1`；
+  `gh pr checks` 显示两项已跑完并通过——`check` pass（24m59s）与 `Submission gate` pass；仍等维护者合并。
+
 ### 27.6 可复现的验证命令
 
 ```powershell
