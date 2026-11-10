@@ -28,12 +28,15 @@ process exit means the conversation is over.
 
 The bundle's entry in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) was
-merged on 2026-11-10, and that repository's README already lists it. Being merged
-is not the same as being visible in a market: the entry page still returned 404
-when checked later the same day, and the catalog file behind DSH's own
-Plugins -> Market did not contain this repository yet either, because the
-upstream site build was still running. Until that finishes, install the package
-by URL (the two commands below) rather than expecting to find it in the Market.
+merged on 2026-11-10, and that repository's README lists it. Being merged is not the same as
+being visible in a market, and initially it was not: the entry page answered 404 and the catalog
+file behind DSH's own Plugins -> Market did not contain this repository while the upstream site
+build was still queued. That build finished (run 42844452013, 16:39:27Z), the entry page now
+answers 200, and the catalog (`count` 10119 -> 10230) lists this repository - so it can be found
+in that market. The entry's `install` command, however, is generated from the pinned `tarball`
+and still points at the 1.2.0 asset; a follow-up PR
+([#14063](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063)) moves it to 1.2.1.
+Changing that file always means a pull request against that repository, never an edit here.
 
 The other route needs no application at all: third-party markets harvest GitHub
 repositories carrying the `dsh-plugin` topic (this repository has it) together with

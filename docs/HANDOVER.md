@@ -29,10 +29,17 @@
   也能按仓库 URL 安装，三种安装形态实测 rc=0。`dsh.catalog` 是自我声明的 category/摘要/capabilities（不被强制），
   `keywords` 里的 `dsh-plugin` 让自动索引型市场能按 topic 采集。
   awesome-dsh-plugin 注册表 PR #13937 已于 2026-11-10T14:33:04Z 被 `fkysly` 合并，上游 README 的
-  「Notifications & Integrations」小节已列出该条目（条目里的 `tarball` 仍钉 1.2.0，17:19Z 维护者在 PR 上
-  留言说明合并时删了一句「面板可直接放行审批」并提示改措辞要另开 PR）；但条目页与 DSH 应用内 Market
-  加载的 `plugins.json` 在 16:16Z 复查时仍查不到本仓库（上游站点构建卡在 build 步骤），所以**未在任何市场可见**；
-  DSH-Plugins-Marketplace 已按 topic 自动收录本仓库但当前数据仍是 `verdict: script` / `risk_tier: risk`；
+  「Notifications & Integrations」小节已列出该条目（17:19Z 维护者在 PR 上留言说明合并时删了一句「面板可直接
+  放行审批」并提示改措辞要另开 PR）。**该市场现在已经真的可见**：上游那次卡住的站点构建后来跑完，
+  条目页 <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/> 返回 200，
+  DSH 应用内 Market 加载的 `plugins.json` 也收录了本仓库（`count` 由 10119 增到 10230）；但那份目录仍按条目
+  文件里的 `tarball` 生成安装命令，所以它给出的仍是 1.2.0 资产——跟进 PR #14063 正是要换成 1.2.1。
+  DSH-Plugins-Marketplace 当日 16:22Z 那次索引重建也完成了：本仓库从 `verdict: script` 改判为
+  **`verdict: bundle-plugin`**（`pkg_name: dsh-ai-terminal-pet`、`version: 1.2.0`、topics 11 个），
+  且该条目这次**没有被打任何风险档位**（既无 `risk_tier` 也无 `risk_flags`；前端对没有档位的条目按「未知」
+  渲染，不显示徽章），所以页面上不再有那个 critical 徽章；**但「没有档位」只是「未评估」不是「safe」**——
+  它的扫描器没有抑制机制，被匹配的两行（`install.ps1:31` 的 `CurrentVersion\Run` 常量与 `:308` 的
+  `Remove-Item -Recurse -Force`）仍在原处，下次对我们的 `updated_at` 做成功评估时那枚徽章可能回来。
   npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，此前整场会话 E401），但**任何版本都还没发布到 npm**
   （`npm view` 仍 E404，且发布要求一次性密码，非交互 shell 里拿不到），所以按包名安装暂时不可达；
   `docs/market-index.json` 是仓库自建的 format-1 索引，钉在 1.2.1 的发布 commit，可让 Discover 先按 git 源可用。
@@ -1285,14 +1292,18 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
   审批仍在 DSH 里完成。条目已进入 `main` 的 `data/plugins/`，上游 `README.md` 第 8,519 行
   （`### Notifications & Integrations` 小节）已列出它。
 
-  **但「已合并」不等于「市场里可见」**，写文档时这两件事必须分开。合并后复查记录：
+  **「已合并」不等于「市场里可见」——而这次它后来真的可见了，两件事都要记。** 合并后的复查记录：
   - 条目页 <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/> 在
-    15:56Z、16:16Z 两次都是 **404**。
-  - DSH 应用内 Market 真正加载的 <https://awesome-dsh-plugin.com/plugins.json>（`count: 10119`、
-    静态 `updated: 2026-11-10`）同一时刻 **0 命中**。这两个是 npm 托管的静态产物，不是从 `main` 现算的。
-  - 上游 `Build site from README` 的 run `42841664024`（15:13:06Z 起）与后继 run `42844452013`（15:27:09Z 起）
-    都停在步骤 9 `Build`：steps 1-8 全部 success，之后 upload-pages-artifact / deploy-pages /
-    publish catalog to npm / publish update notes to npm 四步与所有 Post 步骤都还是 pending。
+    15:56Z、16:16Z 两次都是 **404**；上游站点构建跑完之后同一地址返回 **200**，页面标题是
+    `dsh-ai-terminal-pet — dsh plugin · Notifications & Integrations`。
+  - DSH 应用内 Market 真正加载的 <https://awesome-dsh-plugin.com/plugins.json> 在 16:16Z 时
+    `count: 10119` / **0 命中**；站点构建完成后 `count: 10230` 且已收录本仓库，条目里 `npm: null`、
+    `version: null`、`install` 命令直接是钉 1.2.0 的 Release 资产 URL（因为目录按 yml 里的 `tarball` 生成）。
+  - 这两件事的延迟来自上游 `Build site from README`：run `42841664024`（15:13:06Z 起）与后继
+    run `42844452013`（15:27:09Z 起）当时都停在步骤 9 `Build`（steps 1-8 全部 success，之后
+    upload-pages-artifact / deploy-pages / publish catalog to npm / publish update notes to npm 与所有
+    Post 步骤都还是 pending）；后来 `42841664024` 在 15:25:40Z 被 **cancelled**（同分支新 run 取代），
+    `42844452013` 于 16:39:27Z **success**。所以延迟是上游重建的排队与耗时，不是条目本身有问题。
 
   2026-11-10T17:19Z 维护者 `fkysly` 在 PR 上回了一条评论，说明合并时在 `main` 上做过微调——原文要点：
   「已合并。合并时按复验结果在 main 上微调了条目描述：『也能在面板上直接放行审批』不适用于 DeepSeek Harness
@@ -1300,7 +1311,6 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
   措辞如需调整，直接开 PR 改对应的 `data/plugins/*.yml` 即可，我们按最新的为准。」
   所以上游 `main` 上那份 yml 的 `description.en/zh` 现在带一句「approving is still done in DSH / 审批仍在 DSH 里完成」，
   与我们原来的稿子不同；**要改措辞只能提 PR 改那个 yml，本仓库的文档改动不会影响它**。
-
   同一天还开了跟进 PR <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063>（fork 分支
   `bump-tarball-1.2.1`，head `116b0ee`，1 file `+1/-1`）：只把条目里那行 `tarball` 从
   `dsh-plugin-v1.2.0/dsh-ai-terminal-pet-1.2.0.tgz` 换成 `dsh-plugin-v1.2.1/dsh-ai-terminal-pet-1.2.1.tgz`，
@@ -1357,13 +1367,17 @@ git cat-file -s "$(git ls-files -s packages/dsh-ai-terminal-pet/vendor/AI-Termin
   `README.md` 又改了 13 B（6,652 → 6,665 B），摘要随之作废。**教训：dry-run 的摘要只在包内容不再变时有效。**
 - **`lib/release-pins.json` 未建**：下载回落当前是 no-op。它不是「功能未完成」而是「刻意留空」——
   没有它就没有远端资产可信；填它之前必须先有稳定的 Release 与 SHA-256。
-- **市场判定有延迟**：DSH-Plugins-Marketplace 的 `installability-report.json` 与 `registry.json`
-  仍记 `verdict: script` / `risk_tier: risk`。根清单里的 `dsh.bundle.patch` 已满足它的 bundle 判定条件，
-  但要等它下一轮索引构建（该索引自述最长约 2 小时）才会变。**不能写成「市场已判定为 bundle」**。
-  `risk` 徽章的两条来源是 `registry-run-key`（critical，`install.ps1` 写
-  `HKCU\...\CurrentVersion\Run` 自启）与 `remove-item-force-recurse`（medium，
-  `Remove-Item -Recurse -Force`）；按它的规则 critical/high 即 `risk`。这是启发式扫描，不是漏洞结论，
-  但自启那条确实与本项目的行为有关，不要辩解成误报。
+- **市场条目已改判，但风险档位只是「未知」不是「安全」**：DSH-Plugins-Marketplace 的
+  `installability-report.json` 在 2026-11-10T16:22Z 那次重建后已把本仓库从 `verdict: script`
+  改判为 **`verdict: bundle-plugin`**，`registry.json` 里也有了 `pkg_name: dsh-ai-terminal-pet` /
+  `version: 1.2.0` / topics 11 个，且该条目**没有 `risk_tier` 字段**。但按它的前端语义（`lib/client.js`），
+  缺 `risk_tier` 只是「未评估」——页面不渲染徽章，不等于评级为 safe。扫描器（`lib/domain/security-scan.js`）
+  **没有任何 suppress / allowlist 机制**，而它匹配的两行文本仍原样在 `install.ps1` 里：
+  `/CurrentVersion\Run(?:Once)?\b/i` 命中 :31 的 `$RunKeyPath` 常量（critical）与 :353 的提示文本，
+  `/\bremove-item\s+[^\n]*-recurse[^\n]*-force/i` 命中 :308 的 `Remove-Item -Recurse -Force`（medium）。
+  也就是说**下一次对我们的 `updated_at` 做成功评估时，`risk` 徽章可能原样回来**。这是启发式扫描，不是漏洞结论，
+  但自启那条确实与本项目的行为有关，不要辩解成误报；要永久消掉只有两条路——把 `install.ps1` 移进
+  `scripts/`（扫描只看仓库根，代价是 27 个文件 100+ 处引用与类型判定一起变），或推动上游支持行级豁免。
 - **注册表条目与 `dsh.catalog` 不同步**：PR #13937 的 `data/plugins/<slug>.yml` 写的是它自己的
   `category` / `summary`，与包内 `dsh.catalog` 是两份独立文案；合并之后若要改文案，两边都得改。
 
@@ -1408,8 +1422,6 @@ shim 里没有任何代码，只做四件事：
 300 行 / 55 个 `ok`；1.2.0 / 1.2.1 的 HEAD 上是 415 行 / 91 个 `ok`（其中 14 条是 `docs/market-index.json` 的漂移用例，见 §27.10，1.2.1 只改包内 README，不影响这套断言）。两个都不是错的，混在一句话里才是错的。
 
 ### 27.9 三条发现路径，与一次 CI 变红的根因（2026-11-10）
-
-**三条路径，从「要申请」到「完全不要申请」**：
 
 | 路径 | 要做什么 | 采集方 | 延迟 |
 |---|---|---|---|

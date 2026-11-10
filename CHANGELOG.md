@@ -178,7 +178,7 @@
   `ok https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/tree/main/packages/dsh-ai-terminal-pet` /
   `all checked entries pass`。PR 见 <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937>
   （fork 分支 `add-dsh-ai-terminal-pet`，commit `a1fef56`，基于上游 main `09cd105`）。
-  **状态是「已合并、尚未在任何市场可见」**：PR 上两个检查都已完成且 `conclusion: SUCCESS`
+  **状态是「已合并、且随后真的在市场里可见」**：PR 上两个检查都已完成且 `conclusion: SUCCESS`
   （`PR check / check` 于 2026-11-10T10:37:54Z 结束、`Submission gate` 于 10:38:47Z 结束，
   `mergeable: MERGEABLE`），随后在 14:33:04Z 被 `fkysly` 合并。维护者合并时删掉了原稿里「也能在
   面板上直接放行审批」一句——对 DeepSeek Harness 会话而言，面板只做状态映射与跳转到 Harness 窗口，
@@ -187,13 +187,15 @@
   上那份 yml 的 `description.en/zh` 带的是他那句「approving is still done in DSH / 审批仍在 DSH 里完成」，
   与我们原来的稿子不同，而且**本仓库任何文档改动都影响不到它**。接入 `main` 的事实仍可验证：
   `awesome-dsh-plugin/awesome-dsh-plugin` 的 `README.md` 在「Notifications & Integrations」小节第 8,519 行
-  列着 `jjjjjjjjnnjnn/ai-terminal-pet#dsh-ai-terminal-pet`。但**合并进 `main` 不等于市场里可见**：
-  条目页 <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/>
-  在 15:56Z 与 16:16Z 两次复查都是 404，而 DSH 应用内 Market 真正加载的
-  `https://awesome-dsh-plugin.com/plugins.json`（`count: 10119`、`updated: 2026-11-10`）里
-  同样 0 命中——上游 `Build site from README` 工作流（run `42841664024`）自 15:13:06Z 起停在
-  build 步骤没动，后面还排着两次重跑。所以现在的正确说法是「条目已合并、列表与市场待上游站点构建落地」。
-  **条目里的 `tarball` 也钉在 1.2.0**，所以另开了跟进 PR
+  列着 `jjjjjjjjnnjnn/ai-terminal-pet#dsh-ai-terminal-pet`。但**合并进 `main` 不等于市场里可见**——
+  **这一条后来被证伪了一半**：条目页
+  <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/>
+  在 15:56Z 与 16:16Z 两次复查都是 404；它变成 200 是在上游 `Build site from README` 跑完之后。
+  那两次 run 都停在步骤 9 `Build`：`42841664024`（15:13:06Z 起）于 15:25:40Z 被 cancelled（同分支新
+  run 取代），`42844452013`（15:27:09Z 起）于 16:39:27Z success。同时 DSH 应用内 Market 真正加载的
+  `https://awesome-dsh-plugin.com/plugins.json` 从 `count: 10119` / 0 命中变成 `count: 10230` 且已收录
+  本仓库——但它里面的 `install` 命令是按 yml 的 `tarball` 生成的，所以仍钉 1.2.0，换版本只能靠 PR #14063。
+  结论修正为：「条目已合并，并且已经在列表与市场里可见；延迟来自上游站点重建，不是条目本身的问题」。
   <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063>（fork 分支 `bump-tarball-1.2.1`，
   head `116b0ee`，1 file `+1/−1`，只把那行 URL 换成 `dsh-plugin-v1.2.1/dsh-ai-terminal-pet-1.2.1.tgz`；
   `scripts/check-submission.mjs --only-list` → `checking 1 entry / ok / all checked entries pass`；
@@ -205,9 +207,16 @@
   `registry-run-key` 与 `remove-item-force-recurse` 两条旗标都是正则匹配到常量定义与提示文本，
   `install.ps1` 从不新增 Run 值、递归删除只作用于一个经 `Assert-SafeInstallDirectory` 校验的目录；
   该仓库没有抑制机制，是否接受由维护者决定。
+  同日 16:22Z 该仓库的 `build-registry`（run `42812806941`，schedule，12:05:32Z 起）跑完了：
+  `registry.json` 更新为 `generated_at 2026-11-10T14:14:03.842Z` / `count 26242`，本仓库条目有了
+  `pkg_name: dsh-ai-terminal-pet` 与 `version: 1.2.0`、topics 11 个，且**不带 `risk_tier` / `risk_flags`**；
+  `installability-report.json` 里也从 `verdict: script` 改成 **`verdict: bundle-plugin`**——根清单的
+  `dsh.bundle.patch` 终于被它看见。**但「没有 risk_tier」不等于 safe**：它的前端把缺字段渲染成「未评估」，
+  而扫描器本身没有抑制机制，被匹配的两行（`install.ps1:31` 的 `CurrentVersion\Run` 常量与 `:308` 的
+  `Remove-Item -Recurse -Force`）仍在原处，下一次成功评估时 `risk` 徽章可能回来。
 - **1.2.1 —— 只为让包内说明追上事实，不改代码**（`1e08b3e`）：1.2.0 的 tarball 冻结在打包那一刻，里面的
   `README.md` 还写着「等人工评审、尚未列入」。Release 资产不可变，所以这句旧文只能靠新版本发出去改正。
-  1.2.1 与 1.2.0 的唯一差别是包内 `README.md`（Install 段改成「条目已合并、市场可见性待上游站点构建」）
+  1.2.1 与 1.2.0 的唯一差别是包内 `README.md`（Install 段改成「条目已合并、站点构建跑完后市场里已可见」）
   与两条安装命令里的版本号；`lib/index.js`、`vendor/AI-Terminal-Pet.exe`、`vendor/protocol.js`、
   `cordis.patch.yml`、`dsh.catalog` 全部逐字节不变，所以浮窗、事件映射与线协议契约没有任何改动。
   **这类「只改文字」的发版也必须换版本号**：复用 1.2.0 的号会让 npm/registry 侧看到同一个版本两份不同内容，
