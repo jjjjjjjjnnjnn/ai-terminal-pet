@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "AI Terminal Pet",
+    "description": "Mirrors DeepSeek Harness session states onto the AI Terminal Pet desktop overlay: waiting for approval, tool use, errors and completion."
+  }
+}

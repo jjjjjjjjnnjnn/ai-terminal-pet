@@ -1,0 +1,9 @@
+# Loader patch layer for dsh-ai-terminal-pet.
+#
+# `insert:` is required. A bare `- id: ...` row in this file patches an
+# existing loader row by id; it would mount nothing while still looking
+# like the bundle installed itself. `insert:` appends a brand-new row,
+# which is the only shape that actually loads a plugin package.
+- insert:
+    - id: dsh-ai-terminal-pet
+      name: dsh-ai-terminal-pet

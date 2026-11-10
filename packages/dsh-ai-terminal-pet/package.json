@@ -1,0 +1,59 @@
+{
+  "name": "dsh-ai-terminal-pet",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness Cordis bundle that mirrors session state into the AI Terminal Pet desktop overlay (Windows).",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.png",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "vendor",
+    "locale",
+    "icon.svg",
+    "icon.png",
+    "screenshots",
+    "screenshots.json",
+    "README.md",
+    "LICENSE",
+    "cordis.patch.yml"
+  ],
+  "icon": "./icon.png",
+  "engines": {
+    "node": "^22.19 || >=24",
+    "dsh": ">=0.1.0-rc.6"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml",
+      "platforms": [
+        "win32"
+      ]
+    }
+  },
+  "scripts": {
+    "verify": "node verify.mjs",
+    "vendor": "node scripts/vendor.mjs",
+    "prepack": "node scripts/vendor.mjs"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "cordis",
+    "ai-terminal-pet",
+    "overlay",
+    "windows"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git",
+    "directory": "packages/dsh-ai-terminal-pet"
+  },
+  "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+  "author": "jjjjjjjjnnjnn"
+}

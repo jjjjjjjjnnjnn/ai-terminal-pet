@@ -1,0 +1,97 @@
+# dsh-ai-terminal-pet
+
+A DeepSeek Harness (DSH) Cordis bundle that mirrors Harness session state onto
+the [AI Terminal Pet](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet) desktop
+overlay: a small always-on-top Win32 pet that shows which sessions are working,
+which one is waiting for your approval, which failed, and which finished.
+
+The package ships the overlay binary and the official reporter protocol module
+inside the tarball, so a single market install is enough to get a pet on screen.
+No npm dependencies, no install scripts, no network calls at runtime (unless the
+maintainer pins a release in lib/release-pins.json, see below).
+
+## What it does
+
+| Harness event | Overlay state |
+| --- | --- |
+| turn/start, agent/inbox/claimed, agent/status running | working |
+| tool/call | tool_use |
+| approval/asked, approval/request | waiting_permission |
+| tool/result with error, command/done error, agent/error | error |
+| turn/end, command/done success | idle |
+| Harness process exit | closed |
+
+The overlay then plays an alert tone, shows a tray balloon on those transitions
+and its one-click jump button targets the Harness window. Plugin reload (HMR)
+disposes the listeners but deliberately does not close sessions: only a real
+process exit means the conversation is over.
+
+## Install
+
+The bundle is listed in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+registry, which is the catalog the DSH plugin market reads. Once the registry
+entry reaches `main`, the market index picks it up on its next build (usually
+within a day) and the package appears under Plugins -> Market.
+
+The bundle is Windows only and declares `dsh.bundle.platforms: ["win32"]`, so
+other platforms show it as unsupported instead of installing it.
+
+Manually, from a terminal, into a profile you own:
+
+```sh
+dsh plugin --profile <profile> add dsh-ai-terminal-pet
+```
+
+`add` is the whole install: the profile records the dependency, and the bundle
+declares itself through `dsh.bundle.patch`, so no separate `enable` step exists.
+The profile you add it to has to be the one Harness boots.
+
+Two profiles are special. The reserved `desktop` profile is rejected by the
+standalone `dsh` CLI (`profile "desktop" is managed exclusively by the Electron
+application`); the Desktop app's own bundled CLI does accept it, and the in-app
+plugin manager is the supported path there. Any other profile name is yours.
+
+If the app reports restart-required after enabling the bundle, restart Harness.
+
+## What it writes on disk
+
+First use in a Harness process copies two files, and only when they are missing:
+
+| File | Origin | Purpose |
+| --- | --- | --- |
+| %LOCALAPPDATA%\AI-Terminal-Pet\protocol.js | vendor/protocol.js | pipe name, state set, redaction, snapshot |
+| %LOCALAPPDATA%\AI-Terminal-Pet\AI-Terminal-Pet.exe | vendor/AI-Terminal-Pet.exe | the Win32 overlay |
+
+Nothing is ever overwritten: an existing file, including one placed by the
+standalone installer, wins. Set DSH_PET_NO_BOOTSTRAP=1 to skip this step
+entirely (for example when the overlay is managed by install.ps1 already).
+
+Reports also write the overlay's normal runtime snapshot under the same
+directory, exactly like every other reporter.
+
+### Optional download fallback
+
+lib/release-pins.json is absent from the published package by default. When the
+maintainer fills it in with pinned release asset URLs, sizes and SHA-256
+digests, a machine that has no vendored binary downloads the two assets over
+HTTPS with a 30 s timeout, verifies size and digest with node:crypto, and only
+then installs them. Any failure is silent apart from one warning; the plugin
+keeps working without an overlay.
+
+## The overlay itself is still standalone
+
+This bundle is a convenience. The overlay is a Go application that installs
+normally with install.ps1 from the repository, and every other reporter
+(Claude Code, OpenCode, Antigravity, generic) talks to the same named pipe. A
+machine that only wants the overlay does not need this package; a machine that
+only wants the plugin gets one installed automatically.
+
+## Requirements and limits
+
+- Windows only (named pipes plus a Win32 layered window).
+- Node 22.19+ or 24+ in the Harness runtime.
+- Nothing in this package can fail the host: every entry point is wrapped,
+  every report is fire-and-forget, and there is no process.exit.
+- Session id is the Harness session.header.id; pid is a synthetic per-session
+  id and parentPid is the real Harness process, which is how the overlay ties a
+  session to its terminal window.
