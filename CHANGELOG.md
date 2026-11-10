@@ -196,6 +196,12 @@
   `registry-run-key` 与 `remove-item-force-recurse` 两条旗标都是正则匹配到常量定义与提示文本，
   `install.ps1` 从不新增 Run 值、递归删除只作用于一个经 `Assert-SafeInstallDirectory` 校验的目录；
   该仓库没有抑制机制，是否接受由维护者决定。
+- **1.2.1 —— 只为让包内说明追上事实，不改代码**：1.2.0 的 tarball 冻结在打包那一刻，里面的
+  `README.md` 还写着「等人工评审、尚未列入」。Release 资产不可变，所以这句旧文只能靠新版本发出去改正。
+  1.2.1 与 1.2.0 的唯一差别是包内 `README.md`（Install 段改成「条目已合并、市场可见性待上游站点构建」）
+  与两条安装命令里的版本号；`lib/index.js`、`vendor/` 两个文件、`cordis.patch.yml`、`dsh.catalog` 全部逐字节不变，
+  所以浮窗与协议契约没有任何改动。**这类「只改文字」的发版也必须换版本号**：复用 1.2.0 的号会让 npm/registry
+  侧看到同一个版本两份不同内容，也让 `-VerifyOnly` 之外的任何 sha256 比对失去意义。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
