@@ -27,10 +27,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
 
-    # The repository is UTF-8 with LF (.gitattributes pins "* text=auto eol=lf").
-    # core.autocrlf would check the files out with CRLF on the Windows runner and
-    # make the diff under test differ from what developers run locally, so it is
-    # forced off for this checkout.
+    # The repository is UTF-8 with LF, and .gitattributes pins "* text=auto eol=lf",
+    # so this checkout is LF even though the Windows runner image sets
+    # core.autocrlf=true. Without that attribute the tree here would differ from
+    # what developers run locally and gofmt/git diffs would disagree with them.
     env:
       GOFLAGS: -mod=readonly
       GO111MODULE: on
