@@ -33,7 +33,9 @@
   放行审批」并提示改措辞要另开 PR）。**该市场现在已经真的可见**：上游那次卡住的站点构建后来跑完，
   条目页 <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/> 返回 200，
   DSH 应用内 Market 加载的 `plugins.json` 也收录了本仓库（`count` 由 10119 增到 10230）；但那份目录仍按条目
-  文件里的 `tarball` 生成安装命令，所以它给出的仍是 1.2.0 资产——跟进 PR #14063 正是要换成当前版本 1.2.2。
+  文件里的 `tarball` 生成安装命令，所以它给出的仍是 1.2.0 资产。跟进 PR #14063（指向 1.2.1）已被
+  评论说明后关闭，改由 **#14076**（分支 `bump-tarball-1.2.2`，只改一行 `tarball:`）指向 1.2.2 的资产，
+  等维护者合并；在那之前，目录里那条安装命令装到的仍是旧版本。
   DSH-Plugins-Marketplace 当日 16:22Z 那次索引重建也完成了：本仓库从 `verdict: script` 改判为
   **`verdict: bundle-plugin`**（`pkg_name: dsh-ai-terminal-pet`、`version: 1.2.0`、topics 11 个），
   且该条目这次**没有被打任何风险档位**（既无 `risk_tier` 也无 `risk_flags`；前端对没有档位的条目按「未知」
@@ -1246,18 +1248,35 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
     发版**之前**那次 `npm publish --dry-run` 的 shasum 是 `166c3043…`，但 dry-run 之后包内 `README.md`
     又改了 13 B（6,652 → 6,665 B），所以**最终发出去的资产号是 `dc65e0d4…`，不是 dry-run 那个**。
     1.1.0 的 tarball 已发布且不可变，由 1.2.0 取代——清单内容变了就必须换版本号。
-  - **1.2.1**（当前）：只为让包内说明追上事实，不改代码。tag `dsh-plugin-v1.2.1`（annotated，指向
+  - **1.2.1**（由 1.2.2 取代，发布物本身不可变）：只为让包内说明追上事实，不改代码。tag `dsh-plugin-v1.2.1`（annotated，指向
      `1e08b3e7521d305d744c5ff515b29f6d16abebe1`，tag 对象 sha `0ef1d60cb5c33517aa87d6eed75565c035d5830e`），
      GitHub Release 于 **2026-11-10T16:15:04Z** 发布，资产 `dsh-ai-terminal-pet-1.2.1.tgz`
      （**1,914,616 B / 16 files / sha256 `b9e6d20354b5b1543b55041aa0c45c38cd4fdfacc65ab1b13fef5ab0651d0075`
      / shasum `67955a65417b6b469c591d1d65fbd1893426628a`**，GitHub 记录的 digest 与本地重算一致）。
      与 1.2.0 的差别只有包内 `README.md`（6,665 B → **6,863 B**）与两条命令里的版本号；解包核对时
      `package/README.md` 里已不含 `waiting on a human reviewer` 那句旧文。连续两次 `npm pack` 逐字节相同。
+  - **1.2.2**（当前）：由「安装脚本下沉」引发的重打包。`bdc6c36` 把 `install.ps1` 从仓库根移进 `scripts/`，
+     这一批改到了 8 处 Go 源码注释；而 `vendor/manifest.json` 的 `source.sha256` 正是 `cmd/` 与 `internal/`
+     下全部非测试 `.go` 文件的摘要，于是从 `89eef0d6…` 变成 **`cf647af1…`**（25 个文件，`goVersion` 仍 `go1.27.0`）。
+     已发布资产不可变，所以只能靠新版本把新记账发出去——按 1.2.1 装到、且本机有 `bin/` 的人跑 `vendor:check`
+     会直接失败（干净 clone 里因 `bin/` 不存在而按「以已提交的 vendor 为准」通过，问题被掩盖）。
+     与 1.2.1 的差别只有三处：两份清单的 `version`、包内 `README.md` 的措辞、`vendor/manifest.json` 的新摘要；
+     `lib/index.js`、两个 vendor 二进制、`cordis.patch.yml`、`dsh.catalog` 逐字节不变。
+     发布提交 `694ff3f13740b1bb9fb4df04f5fd226064a559b2`（7 files, +48/−35），annotated tag `dsh-plugin-v1.2.2`
+     （tag 对象 sha `06d7795270d516ca7ced6707bf726bcf0337de99`），Release **2026-11-10T18:11:26Z**，资产
+     `dsh-ai-terminal-pet-1.2.2.tgz` **1,914,751 B / 16 files / sha256
+     `02431e16dd58db166794d7c86608087446d4a3ed8ab51bcb4b0950b2a045307c` / shasum `22b63b25c50d5f4d799bfcf00fd4f54986be63a8`**
+     （GitHub 记录的 digest 与本地重算一致，连跑两次逐字节相同）。随后 `fe62900` 把 `docs/market-index.json`
+     前移到这个 commit，`verify.mjs` 复跑 93 行 / 0 fail。
+  - **1.2.2 的端到端复验**：全新 `DSH_HOME` + 独立 profile `p122`，直接 `add` 1.2.2 的 Release 资产 URL →
+     rc=0 / **3,335 ms** / `+ dsh-ai-terminal-pet 1.2.2`；`--dump-config` 末尾出现 `- id: dsh-ai-terminal-pet`；
+     装出的 `vendor/manifest.json` 里 `source.sha256` 就是 `cf647af1…`——新版本把正确的记账带到了用户机器上。
   - 文件数与包目录的差：`npm pack` 走包内 `files` 白名单（10 项）外加 npm 必然带上的
     `package.json` / `README.md` / `LICENSE`，所以白名单外的 `scripts/vendor.mjs` 与 `verify.mjs`
     从不进 tarball——包目录数到 18 个文件，tarball 只有 16 个。
 - **三种安装形态都实测成功**（每次都开一个全新的 `DSH_HOME` 与独立 profile）：
-  计时是在 1.1.0 的资产上做的；1.2.0 与 1.2.1 的资产都在同一位置，URL 只换 tag 与版本号。
+  计时是在 1.1.0 的资产上做的；1.2.0 / 1.2.1 / 1.2.2 的资产都在同一位置，URL 只换 tag 与版本号
+  （1.2.2 那次单独复验过：3,335 ms）。
   1. **Release tarball**：`add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.1.0/dsh-ai-terminal-pet-1.1.0.tgz`
      → rc=0、**1.8 s**；装出的包里 `vendor/AI-Terminal-Pet.exe` 4,371,968 B 与 `vendor/protocol.js` 20,914 B 都在位。
   2. **git 源 + 钉 tag**：`git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.1.0&path:/packages/dsh-ai-terminal-pet`

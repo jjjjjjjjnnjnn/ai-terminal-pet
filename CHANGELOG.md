@@ -194,7 +194,7 @@
   那两次 run 都停在步骤 9 `Build`：`42841664024`（15:13:06Z 起）于 15:25:40Z 被 cancelled（同分支新
   run 取代），`42844452013`（15:27:09Z 起）于 16:39:27Z success。同时 DSH 应用内 Market 真正加载的
   `https://awesome-dsh-plugin.com/plugins.json` 从 `count: 10119` / 0 命中变成 `count: 10230` 且已收录
-  本仓库——但它里面的 `install` 命令是按 yml 的 `tarball` 生成的，所以仍钉 1.2.0，换版本只能靠 PR #14063。
+  本仓库——但它里面的 `install` 命令是按 yml 的 `tarball` 生成的，所以仍钉 1.2.0，换版本只能靠 PR —— 先是 #14063（指向 1.2.1），之后被 #14076（指向 1.2.2）取代。
   结论修正为：「条目已合并，并且已经在列表与市场里可见；延迟来自上游站点重建，不是条目本身的问题」。
   <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14063>（fork 分支 `bump-tarball-1.2.1`，
   head `116b0ee`，1 file `+1/−1`，只把那行 URL 换成 `dsh-plugin-v1.2.1/dsh-ai-terminal-pet-1.2.1.tgz`；
@@ -256,6 +256,16 @@
     `02431e16dd58db166794d7c86608087446d4a3ed8ab51bcb4b0950b2a045307c` / shasum
     `22b63b25c50d5f4d799bfcf00fd4f54986be63a8`**；连续两次 `npm pack` 逐字节相同（1.2.1 为 1,914,616 B，
     差值 135 B 全部来自 manifest 摘要与 README 措辞，`files` 仍是 16 个）。
+  - 发布物实测：提交 `694ff3f13740b1bb9fb4df04f5fd226064a559b2`（7 files, +48/−35），annotated tag
+    `dsh-plugin-v1.2.2` 指向它（tag 对象 sha `06d7795270d516ca7ced6707bf726bcf0337de99`）；GitHub Release
+    **2026-11-10T18:11:26Z** 发布，资产 digest 与本地重算一致（`sha256:02431e16…`）。
+  - 随后 `fe62900` 把 `docs/market-index.json` 前移到 1.2.2：`source.commit` 改成 `694ff3f…`、图标钉同一个 commit、
+    `publishTimestamp` 更新；改完 `verify.mjs` 复跑 **93 行 / 0 fail / VERIFY PASSED**。
+  - 端到端复验：全新 `DSH_HOME` + 独立 profile `p122`，`add <1.2.2 的 release 资产 URL>` → rc=0 / **3,335 ms** /
+    `+ dsh-ai-terminal-pet 1.2.2`，`--dump-config` 末尾出现 `- id: dsh-ai-terminal-pet`；装出的
+    `vendor/manifest.json` 里 `source.sha256` 正是新值 `cf647af1…`（证明新版本把正确的记账带到了用户机器上）。
+  - 上游 registry 的 tarball 跟进：原 PR #14063（指向 1.2.1）已评论说明并由 #14076 取代后关闭；#14076 只改一行
+    `tarball:` 指向 1.2.2 资产，开在 `bump-tarball-1.2.2` 分支上，等维护者合并。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
