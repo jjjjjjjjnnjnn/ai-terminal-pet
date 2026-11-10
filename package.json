@@ -1,0 +1,36 @@
+{
+  "name": "dsh-ai-terminal-pet",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Marketplace shim: the DSH plugin lives in packages/dsh-ai-terminal-pet, and this manifest lets a repository-URL install resolve to it.",
+  "license": "MIT",
+  "main": "./packages/dsh-ai-terminal-pet/lib/index.js",
+  "exports": {
+    ".": "./packages/dsh-ai-terminal-pet/lib/index.js",
+    "./locale/*.json": "./packages/dsh-ai-terminal-pet/locale/*.json",
+    "./icon": "./packages/dsh-ai-terminal-pet/icon.png",
+    "./package.json": "./package.json"
+  },
+  "icon": "./packages/dsh-ai-terminal-pet/icon.png",
+  "engines": {
+    "node": "^22.19 || >=24",
+    "dsh": ">=0.1.0-rc.6"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./packages/dsh-ai-terminal-pet/cordis.patch.yml",
+      "platforms": [
+        "win32"
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git"
+  },
+  "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+  "author": "jjjjjjjjnnjnn",
+  "files": [
+    "packages/dsh-ai-terminal-pet"
+  ]
+}
