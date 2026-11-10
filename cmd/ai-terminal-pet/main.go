@@ -40,11 +40,16 @@ usage:
   ai-terminal-pet --autostart     report the run-at-logon state
   ai-terminal-pet --autostart=on  run the overlay at logon
   ai-terminal-pet --autostart=off stop running the overlay at logon
+  ai-terminal-pet --doctor        check the install and print one line per item
   ai-terminal-pet --version       print the version
   ai-terminal-pet --help          print this message
 
 --json prints one line; add --pretty for indented output. It reads the
 reporter snapshots on disk, so it works whether or not the overlay is running.
+
+--doctor prints one [ok]/[warn]/[fail] line per check with the measured value,
+summarises as "doctor: N ok, M warn, K fail" and exits 1 if anything failed.
+A stopped overlay or a missing Node.js is a warning, not a failure.
 
 The overlay also exits on its own once no terminal session is reporting.
 `
@@ -54,6 +59,11 @@ The overlay also exits on its own once no terminal session is reporting.
 // a human who is watching, and error.log is for things that went wrong on
 // their own.
 var errUsage = errors.New("bad usage")
+
+// errDoctorFailed makes --doctor exit 1 without writing error.log. A failed
+// check is a diagnostic result the user asked for, not something that went
+// wrong on its own; filing it under error.log would bury real faults.
+var errDoctorFailed = errors.New("doctor reported failures")
 
 func main() {
 	debug.SetGCPercent(50)
@@ -67,6 +77,8 @@ func entry(args []string) int {
 		return 0
 	case errors.Is(err, errUsage):
 		return 2
+	case errors.Is(err, errDoctorFailed):
+		return 1
 	default:
 		writeError(err)
 		return 1
@@ -89,6 +101,8 @@ func run(args []string) error {
 		return printSnapshot(args[1:])
 	case command == "--autostart" || strings.HasPrefix(command, "--autostart="):
 		return controlAutoStart(command)
+	case command == "--doctor":
+		return controlDoctor(args[1:])
 	case command == "--show":
 		// Fall through to a normal start when nothing is running, so the
 		// command is safe to bind to a hotkey.
@@ -190,6 +204,25 @@ func controlAutoStart(command string) error {
 	default:
 		return usageError("--autostart takes on or off, got %q", action)
 	}
+}
+
+// controlDoctor prints the self-check and reports failure via the sentinel
+// entry maps to exit 1. The report goes to stdout because it is the command's
+// output, not a complaint about how it was invoked.
+//
+// There is no --json variant: the report is read by a human pasting it into an
+// issue, and every field it would expose is already on the line in a form that
+// is easier to read than to parse.
+func controlDoctor(extra []string) error {
+	for _, value := range extra {
+		return usageError("unknown argument %q for --doctor", value)
+	}
+	report := app.RunDoctor()
+	fmt.Print(report.Text())
+	if report.ExitCode() != 0 {
+		return errDoctorFailed
+	}
+	return nil
 }
 
 // usageError prints to stderr and returns the sentinel main maps to exit 2.
