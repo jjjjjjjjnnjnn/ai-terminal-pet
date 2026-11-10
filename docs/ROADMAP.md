@@ -89,10 +89,12 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   1.0.0 时期的三条旧记录（本地 tgz → Release URL 32.6 s → 钉 commit 10.2 s）保留在 CHANGELOG 历史条目里。
   仍会失败的一条：`git+https://...git&path:/packages/dsh-ai-terminal-pet` **不写 `#ref`**——pnpm 把
   `&path:` 拼进 URL 当作仓库地址去 `ls-remote`，报 `repository ... not found`；这条与 `prepack` 无关。
-- **awesome-dsh-plugin 注册表 PR #13937 已提交、CI 全绿、等人工评审**（`category: notify`，带 `icon` 与
-  `tarball`；上游两道门本地先跑过：`entries read: 10120 / problems: 0`、`all checked entries pass`；
-  PR 上 `PR check / check`（10:37:54Z）与 `Submission gate`（10:38:47Z）均 `conclusion: SUCCESS`，
-  `mergeable: MERGEABLE`，**既未合并也未收录**）。
+- **awesome-dsh-plugin 注册表条目 PR #13937 已于 2026-11-10T14:33:04Z 被 `fkysly` 合并**（`category: notify`，带
+  `icon` 与 `tarball`；上游两道门本地先跑过：`entries read: 10120 / problems: 0`、`all checked entries pass`；
+  PR 上 `PR check / check`（10:37:54Z）与 `Submission gate`（10:38:47Z）均 `conclusion: SUCCESS`）。合并时维护者
+  删掉了原稿里「也能在面板上直接放行审批」一句——对 Harness 会话，面板只做状态映射与跳转，审批仍在 DSH 里完成。
+  条目已进入 `main`，上游 `README.md` 第 8,519 行（`### Notifications & Integrations`）已列出它；**但条目页与
+  DSH 应用内 Market 仍看不到**（16:16Z 复查：条目页 404、`plugins.json` 0 命中，详见 §4 与 §6）。
 
 **踩到的坑（值得写进路线图，因为它决定了 §4 里那几项的状态标记怎么写）**：`vendor/AI-Terminal-Pet.exe`
 一开始不在 git 树里（`.gitignore` 的 `*.exe` 把它吞了，`git add` 不会越过忽略规则）。后果不对称：
@@ -110,7 +112,8 @@ CI 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的字节不同—�
 **没做成什么**：**npm 一个版本都还没发出去**——凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，
 此前整场会话都是 E401），`npm view dsh-ai-terminal-pet version` 仍是 E404，发布 1.2.0 是下一步；
 因此 **DSH 应用内 Discover 索引仍不可达**（该索引 format 1 只表达 npm 版本，或钉 40 位 commit 的 git 源），
-按包名 `add dsh-ai-terminal-pet` 还不能解析。注册表条目等人工评审，**未合并、未收录**；
+按包名 `add dsh-ai-terminal-pet` 还不能解析。注册表条目已于 2026-11-10T14:33:04Z 合并、上游 README 已列出，
+但条目页与 `plugins.json` 仍在等上游那次卡住的站点构建，所以**在任何市场里都还看不到**；
 `dsh-plugin-v1.2.0` 的 tag 与 Release 资产已发布（annotated tag 指向 `4d777e3`，资产 `dsh-ai-terminal-pet-1.2.0.tgz`
 1,914,566 B / sha256 `ccf9d531…`）；只剩 `lib/release-pins.json` 刻意留空，所以插件内「自动下载浮窗」
 回落仍是 no-op——安装时拷的是 `vendor/` 里那份（见 §27.7）。
@@ -486,9 +489,9 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 ~~E2 线协议文档 `docs/PROTOCOL.md`~~、~~E6 `--doctor` 自检~~、~~安装脚本 `-VerifyOnly`/`-Uninstall`/`-AddToPath`~~、
 ~~CI 门禁 `.github/workflows/ci.yml`~~。
 
-v0.9.0 之后（2026-11-10，见 §1j）还多了一项**分发向**的扩展，它不在候选表里，单独把状态说清：
+✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 已列出（`:8519`）；但条目页与 DSH 应用内 Market 加载的 `plugins.json` 在 16:16Z 复查时仍查不到本仓库——合并进 `main` 与「在某个市场里可见」是两件事；
 **DSH 插件包分发** —— ✅ 包本体走到 1.2.0，三个 tag 都有对应 Release（`dsh-plugin-v1.0.0` / `dsh-plugin-v1.1.0` / `dsh-plugin-v1.2.0`，1.2.0 资产 1,914,566 B / sha256 `ccf9d531…`），tarball / Release 资产 URL / git 源钉 tag 三种安装实测成功（不写 `#ref` 的 `&path:` 形态会报 `repository ... not found`，与 `prepack` 无关）；
-✅ 注册表条目 PR #13937 **已提交、CI 全绿、待人工评审**（既未合并也未收录，进 `main` 之后才会出现在列表与站点）；
+✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 第 8,519 行已列出该条目；但条目页与 DSH 应用内 Market 加载的 `plugins.json` 在 16:16Z 复查时仍查不到本仓库——「合并进 `main`」与「在某个市场里可见」是两件事，前者已成立、后者还要等上游那次卡住的站点构建；
 ✅ 两条不用申请的自动采集路径（根清单采集 `LivXue/dsh-plugin-shop` 每日、双 topic 采集 `zasenjc/dsh-plugins-store` 30 分钟）已在仓库侧满足条件；但 `LivXue` 的发布分片实测只有 npm 源（26,351 条条目全带 npm tarball 的 `integrity`、`commit` 字段 0 条），所以「条件满足」≠「已被列出」；
 ✅ **自建 format-1 索引**（`ef783ba`，`docs/market-index.json`）：Discovery 不必再等 npm——条目 `dsh-ai-terminal-pet` `1.2.0` 用钉到 `4d777e3` 的 git 源，URL <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>，用户加到 Discover 的索引源列表里即可看到并一键安装；校验走宿主自带的 `parseMarketIndex`，`marketInstallTarget` 产出的 spec 已实测 2.5 秒装通；
 ⏳ **npm 尚未发布 1.2.0**（凭据问题已解、`npm whoami` 返回 `jjjjjjjjnnjnn`、`npm view` 仍 E404，publish 要一次性密码）。npm 只是「按包名安装」与「进 npm-only 目录」的前置，不再是 Discover 的前置。
@@ -526,8 +529,6 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 - UI 无自动化视觉回归，靠 `--doctor`（E6，已交付但只覆盖环境/安装/运行期状态，**不做视觉比对**）+ 探针脚本 + `TestRenderPreview` / `TestRenderSettingsPreview` 光栅化 PNG 人工验证。
 - `go test -race` / `govulncheck` / `gosec` 因缺工具链（gcc 等）仍未跑（2026-11-09 复核仍然如此）。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
-- 设置窗口不参与贴边收起、不跟随浮窗透明度（固定 255），关掉「窗口置顶」后它仍置顶（它是对话框）。
-- 安装目录可能残留上一轮的 `pet-statusline-core.exe` / `-old.exe` / `-v1-backup.exe` / `shim.js`（`install.ps1` 只覆盖不清理）。
 - DSH 插件包的 npm 发布**尚未发生**（凭据问题已解、`npm view` 仍 E404），因此 **DSH 应用内 Discover 索引不可达**；
-  git 源、Release tarball、仓库地址三条安装路可用，注册表条目 PR #13937 仍待评审（未合并、未收录），
-  1.2.0 的 tag 与 GitHub Release 资产还需人工产出。
+  git 源、Release tarball、仓库地址三条安装路可用。注册表条目 PR #13937 已于 2026-11-10T14:33:04Z 合并、上游 README 已列出，
+  但站点页与 `plugins.json` 仍未更新（上游站点构建卡住），所以**在任何市场里都还看不到**；1.2.0 的 tag 与资产已发布。

@@ -27,7 +27,9 @@
   1.1.0 的 1,913,726 B / 15 files 那份保持已发布、不可变，由 1.2.0 取代）；仓库根的清单 shim 让它
   也能按仓库 URL 安装。三种安装形态实测 rc=0。1.2.0 新增 `dsh.catalog`（自我声明的 category/摘要/
   capabilities，不被强制），`keywords` 补 `dsh-plugin` 让自动索引型市场能按 topic 采集。
-  awesome-dsh-plugin 注册表 PR #13937 已提交、**CI 全绿、待人工评审**（未合并、未收录）；
+  awesome-dsh-plugin 注册表 PR #13937 已于 2026-11-10T14:33:04Z 被 `fkysly` 合并，上游 README 的
+  「Notifications & Integrations」小节已列出该条目；但条目页与 DSH 应用内 Market 加载的 `plugins.json`
+  在 16:16Z 复查时仍查不到本仓库（上游站点构建卡在 build 步骤），所以**未在任何市场可见**；
   DSH-Plugins-Marketplace 已按 topic 自动收录本仓库但当前数据仍是 `verdict: script` / `risk_tier: risk`；
   npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，此前整场会话 E401），但 **1.2.0 还没发布**
   （`npm view` 仍 E404），所以 Discover 索引里暂时没有它。细节与坑见 §27。
@@ -1263,11 +1265,19 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
   - `scripts/check-submission.mjs --only-list` → `ok https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/tree/main/packages/dsh-ai-terminal-pet`
     与 `all checked entries pass`。
 
-  CI 已完成且全绿：`check` 于 2026-11-10T10:37:54Z 结束（`conclusion: SUCCESS`，前 14 步与最后一步
+  CI 全绿后才合并：`check` 于 2026-11-10T10:37:54Z 结束（`conclusion: SUCCESS`，前 14 步与最后一步
   `Build (locale parity, date derivation, templates)` 全部通过），`Submission gate` 于 10:38:47Z 结束
-  （`SUCCESS`），PR 状态 `OPEN` / `mergeable: MERGEABLE`。**既未合并也未收录**；
-  收录进入 `main` 之后才会出现在列表与站点上。
+  （`SUCCESS`），随后 PR 在 **2026-11-10T14:33:04Z** 由评审人 `fkysly` 合并（`state: MERGED`）。维护者合并时
+  删掉了原稿里「也能在面板上直接放行审批」一句：对 Harness 会话，面板只做状态映射与跳转到 DSH 窗口，
+  审批仍在 DSH 里完成。条目已进入 `main` 的 `data/plugins/`，上游 `README.md` 第 8,519 行
+  （`### Notifications & Integrations` 小节）已列出它。
 
+  **但「已合并」不等于「市场里可见」**，写文档时这两件事必须分开：条目页
+  <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/> 在 15:56Z
+  与 16:16Z 两次复查都是 **404**；DSH 应用内 Market 真正加载的是
+  <https://awesome-dsh-plugin.com/plugins.json>（`count: 10119`、静态 `updated: 2026-11-10`），同一时刻
+  同样 **0 命中**。上游 `Build site from README` 工作流 run `42841664024` 自 15:13:06Z 起停在 build 步骤，
+  后面还排着两次重跑，这些产物要等它跑完才会更新。
 ### 27.6 可复现的验证命令
 
 ```powershell
@@ -1372,7 +1382,7 @@ shim 里没有任何代码，只做四件事：
 
 | 路径 | 要做什么 | 采集方 | 延迟 |
 |---|---|---|---|
-| 注册表评审 | 提一个 `data/plugins/<slug>.yml` 的 PR，等人工合并 | `awesome-dsh-plugin`（DSH 内置 Plugins → Market 的目录源） | 合并后下一轮构建，通常一天内 |
+| 注册表评审 | 提一个 `data/plugins/<slug>.yml` 的 PR，等人工合并。本条目已于 2026-11-10T14:33:04Z 由 `fkysly` 合并，上游 README 已列出 | `awesome-dsh-plugin`（DSH 内置 Plugins → Market 的目录源） | 合并只写进 `main`；列表、站点页与 `plugins.json` 要等站点构建跑完。16:16Z 复查：条目页 404、`plugins.json` 0 命中，那次 build（run `42841664024`）从 15:13:06Z 起一直卡在 build 步骤 |
 | 根清单采集 | 什么都不做。要求仓库 **根** `package.json` 里有 `name` + `dsh.bundle`，市场钉默认分支的 commit；**但它的发布数据只有 npm 源**（26,351 条条目全部带 npm tarball 的 `integrity`，`commit` 字段 0 条），所以纯 git 源在进 npm 之前不会被它列出来 | `LivXue/dsh-plugin-shop` | 每日构建 |
 | 双 topic 采集 | 什么都不做。要求仓库 topics **同时**具备 `dsh-plugin` 与 `deepseek-harness` | `zasenjc/dsh-plugins-store` | 30 分钟同步 |
 | npm 包 + PR | 要一个已发布到 npm 的包，外加一个 PR | `cyber-moshen` 的 workshop | 人工 |

@@ -165,7 +165,7 @@
   **16 files / 1.9 MB packed / 4.5 MB unpacked / shasum `166c3043…**；但 dry-run 之后包内 `README.md`
   又改了 13 B（6,652 → 6,665 B），所以**真正发出去的资产是 1,914,566 B / shasum `dc65e0d4…` /
   sha256 `ccf9d531…`，不是 dry-run 那个摘要**——包里任何一个字节变过，dry-run 的摘要就作废。
-- **awesome-dsh-plugin 注册表条目（PR #13937，已提交、CI 全绿、待人工评审）**：市场 App `dshmarket` 只是前端，
+- **awesome-dsh-plugin 注册表条目（PR #13937，2026-11-10T14:33:04Z 由评审人 `fkysly` 合并）**：市场 App `dshmarket` 只是前端，
   目录来自注册表仓库 `awesome-dsh-plugin/awesome-dsh-plugin`，投稿方式是只加一个
   `data/plugins/<slug>.yml`。本次条目为
   `data/plugins/jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml`，
@@ -176,9 +176,18 @@
   `ok https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/tree/main/packages/dsh-ai-terminal-pet` /
   `all checked entries pass`。PR 见 <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937>
   （fork 分支 `add-dsh-ai-terminal-pet`，commit `a1fef56`，基于上游 main `09cd105`）。
-  **状态是「已提交、CI 已全绿、等人工评审」**：PR 上两个检查都已完成且 `conclusion: SUCCESS`
+  **状态是「已合并、尚未在任何市场可见」**：PR 上两个检查都已完成且 `conclusion: SUCCESS`
   （`PR check / check` 于 2026-11-10T10:37:54Z 结束、`Submission gate` 于 10:38:47Z 结束，
-  `mergeable: MERGEABLE`），但**既没有合并也没有收录**；收录进 `main` 之后才会出现在列表与站点上。
+  `mergeable: MERGEABLE`），随后在 14:33:04Z 被 `fkysly` 合并。维护者合并时删掉了原稿里「也能在
+  面板上直接放行审批」一句——对 DeepSeek Harness 会话而言，面板只做状态映射与跳转到 Harness 窗口，
+  审批仍在 DSH 里完成；上游 README 因此把这一条写成了如实描述。接入 `main` 的事实已可验证：
+  `awesome-dsh-plugin/awesome-dsh-plugin` 的 `README.md` 在「Notifications & Integrations」小节第 8,519 行
+  列着 `jjjjjjjjnnjnn/ai-terminal-pet#dsh-ai-terminal-pet`。但**合并进 `main` 不等于市场里可见**：
+  条目页 <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/>
+  在 15:56Z 与 16:16Z 两次复查都是 404，而 DSH 应用内 Market 真正加载的
+  `https://awesome-dsh-plugin.com/plugins.json`（`count: 10119`、`updated: 2026-11-10`）里
+  同样 0 命中——上游 `Build site from README` 工作流（run `42841664024`）自 15:13:06Z 起停在
+  build 步骤没动，后面还排着两次重跑。所以现在的正确说法是「条目已合并、列表与市场待上游站点构建落地」。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，

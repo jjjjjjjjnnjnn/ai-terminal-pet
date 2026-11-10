@@ -26,14 +26,14 @@ and its one-click jump button targets the Harness window. Plugin reload (HMR)
 disposes the listeners but deliberately does not close sessions: only a real
 process exit means the conversation is over.
 
-## Install
-
-The bundle is submitted to the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
-registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)),
-which is the catalog behind DSH's own Plugins -> Market. Both upstream checks are
-green; the entry is waiting on a human reviewer, so it is **not listed there yet**.
-Once it reaches `main`, that index picks it up on its next build (usually within a
-day).
+The bundle's entry in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) was
+merged on 2026-11-10, and that repository's README already lists it. Being merged
+is not the same as being visible in a market: the entry page still returned 404
+when checked later the same day, and the catalog file behind DSH's own
+Plugins -> Market did not contain this repository yet either, because the
+upstream site build was still running. Until that finishes, install the package
+by URL (the two commands below) rather than expecting to find it in the Market.
 
 The other route needs no application at all: third-party markets harvest GitHub
 repositories carrying the `dsh-plugin` topic (this repository has it) together with
