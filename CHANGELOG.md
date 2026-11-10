@@ -86,10 +86,10 @@
   live-desktop 探针测试在对应 `PET_*` 变量未设置时 `Skip`，所以不需要桌面会话或任何 secret。
 - **`packages/dsh-ai-terminal-pet` —— 把 Harness 桥接做成独立 DSH 插件包**（`7f476c9` 起，历经 1.0.0 →
   1.1.0 → 1.2.0）：npm 包名 `dsh-ai-terminal-pet`、license MIT、`type: module`、`private` 未设（可发布）；
-  当前版本 **1.2.2**（`packages/dsh-ai-terminal-pet/package.json` 2,008 B / 74 行，1.2.1 → 1.2.2 只改版本字符串，字节数不变）：
+  当前版本 **1.2.3**（`packages/dsh-ai-terminal-pet/package.json` 2,183 B / 83 行，1.2.2 → 1.2.3 多了 `dsh.marketplace` 块）：
   包内 18 个文件（含 vendor，1.2.0 起多一个 `vendor/manifest.json`），主体是 `lib/index.js`（17,872 B / 570 行）、
-  `verify.mjs`（22,499 B / 415 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,008 B / 74 行）、
-  `README.md`（7,175 B / 131 行）、`vendor/manifest.json`（529 B / 19 行）、
+  `verify.mjs`（23,426 B / 424 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,008 B / 74 行）、
+  `README.md`（7,546 B / 137 行）、`vendor/manifest.json`（529 B / 19 行）、
   `cordis.patch.yml`（399 B / 10 行）、`locale/en.json`（210 B）/ `locale/zh.json`（217 B）、
   `icon.svg`（526 B）/ `icon.png`（4,386 B）、`LICENSE`（1,070 B）、`screenshots.json`（97 B）、
   `screenshots/compact.png`（4,459 B）/ `expanded.png`（11,335 B）/ `expanded-many.png`（17,697 B）、
@@ -124,19 +124,19 @@
     `DSH_PET_TEST=1` + `DSH_PET_PACKAGE_ROOT` 可替换包根。
   - `node verify.mjs`：rc=0、**54 ok**、末行 `VERIFY PASSED`；覆盖状态映射、waterfall `next()`、
     dispose 不发 `closed`、真 exit 发 `closed`、bootstrap 只补缺失不覆盖、protocol 抛异常时插件全静默。
-- **仓库根的 `package.json` 清单 shim**（`06d4cae`，1.2.2 口径 1,877 B / 59 行）：不含任何代码，只让
+- **仓库根的 `package.json` 清单 shim**（`06d4cae`，1.2.3 口径 2,052 B / 68 行——1.2.3 只多了 `dsh.marketplace` 九行）：不含任何代码，只让
   「按仓库 URL 安装」在仓库根就能读到 `dsh.bundle`、`main`、`exports`、`icon` 与 `engines`；
   `version` 与插件包同步（`verify.mjs` 断言两者相等，所以一次版本号变更不可能只落在一个清单里），
   并带上同一份 `dsh.catalog`。没有它时，只读仓库根的宿主把仓库当成 0.0.0 依赖、报 `declares no dsh.bundle`
   并装出一个空包——症状是「装成功了，但浮窗永远不出现」，没有任何报错。标 `private: true` 是为了不占用 npm 名。
 - **`verify.mjs` 连根 shim 一起检查，并在 CI 里跑插件套件**（`d06001d`）：新增根清单一致性用例，
   从 tag `dsh-plugin-v1.1.0` 的 300 行 / 55 个 `ok` 长到 1.1.0 批次的 331 行 / 63 个 `ok`，再随 1.2.0 的清单用例
-  到 77 个 `ok`、最后由 `e25842f` 的索引漂移用例长到 415 行 / **91 个 `ok`**（均 `VERIFY PASSED`、rc 0；那 14 条
+  到 77 个 `ok`、最后由 `e25842f` 的索引漂移用例长到 415 行 / 91 个 `ok`，1.2.3 又加四条 `dsh.marketplace` 断言到 **424 行 / 95 个 `ok`**（均 `VERIFY PASSED`、rc 0；那 14 条
   把 `docs/market-index.json` 钉在包版本与同一个 commit 上，发版忘改索引 CI 会红）；
   `.github/workflows/ci.yml` 增加两步：`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check` 与
   `node packages/dsh-ai-terminal-pet/verify.mjs`。验证脚本自带 fake Cordis context + 临时 `LOCALAPPDATA` +
   stub protocol 模块，所以 CI 上不需要网络、管道或真实浮窗。
-- **GitHub Release 线：1.0.0 → 1.1.0 → 1.2.0 → 1.2.1 → 1.2.2（历史按顺序记，当前版本是 1.2.2）**。
+- **GitHub Release 线：1.0.0 → 1.1.0 → 1.2.0 → 1.2.1 → 1.2.2 → 1.2.3（历史按顺序记，当前版本是 1.2.3）**。
   **1.0.0**（已作废）：tag `dsh-plugin-v1.0.0`，资产 `dsh-ai-terminal-pet-1.0.0.tgz`（1,913,682 B，
   sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`），
   下载地址 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.0.0/dsh-ai-terminal-pet-1.0.0.tgz`。
@@ -194,14 +194,16 @@
   那两次 run 都停在步骤 9 `Build`：`42841664024`（15:13:06Z 起）于 15:25:40Z 被 cancelled（同分支新
   run 取代），`42844452013`（15:27:09Z 起）于 16:39:27Z success。同时 DSH 应用内 Market 真正加载的
   `https://awesome-dsh-plugin.com/plugins.json` 从 `count: 10119` / 0 命中变成 `count: 10230` 且已收录
-  本仓库——但它里面的 `install` 命令是按 yml 的 `tarball` 生成的，所以仍钉 1.2.0，换版本只能改那个 yml。
+  本仓库——但它里面的 `install` 命令是按 yml 的 `tarball` 字段在构建时渲染的，所以合并之后读到的那份仍写着 1.2.0。
   结论修正为：「条目已合并，并且已经在列表与市场里可见；延迟来自上游站点重建，不是条目本身的问题」。
   跟进 PR 换过一次版本：先开 #14063（fork 分支 `bump-tarball-1.2.1`，head `116b0ee`，1 file `+1/−1`）
   指向 1.2.1，两项上游检查（`check` pass 24m59s、`Submission gate` pass）与 `mergeable: MERGEABLE` 都拿到了；
   但 1.2.1 是在 `install.ps1` 还在仓库根时打的，`scripts/` 下沉改到 8 处 Go 注释后 `vendor/manifest.json`
   的源码摘要变成 `cf647af1…`，于是 1.2.2 重打包、#14063 留言说明后关闭，改开 **#14076**
   （<https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14076>，分支 `bump-tarball-1.2.2`，
-  commit `0863b4d`，仍只有 `+1/−1`）指向 1.2.2 的资产；两版都先用上游自己的门验过：
+  commit `0863b4d`，仍只有 `+1/−1`）指向 1.2.2 的资产，**已于 2026-11-10T19:59:37Z 合并**（merge commit
+  `e5f2d26`）；1.2.3 发版后原样再跟一次：[PR #14089](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14089)
+  （分支 `bump-tarball-1.2.3`，commit `c5a1f5f`），仍在等合并。每一版都先用上游自己的门验过：
   `scripts/check-submission.mjs --only-list` → `checking 1 entry / ok / all checked entries pass`（该门需要 `GITHUB_TOKEN`）。
   **两处外部副作用已记录**：① 已发布的 `dsh-ai-terminal-pet-1.2.0.tgz` 里那份 `README.md` 是 1.2.0 打包时的旧文，仍写着「等人工评审、尚未列入」——
   Release 资产不可变，本仓库的改动不会回写进那份 1,914,566 B 的 tarball，所以才有下面那条 1.2.1 —— 只换文本，也只能换版本号。当时 `docs/market-index.json` 钉的同样是 `4d777e3` 那个 commit，也会把读者带到旧文；该文件后来在 `cf1085d` 前移到 `1e08b3e`。写文案时别拿包内 README 当现状。
@@ -269,8 +271,17 @@
   - 端到端复验：全新 `DSH_HOME` + 独立 profile `p122`，`add <1.2.2 的 release 资产 URL>` → rc=0 / **3,335 ms** /
     `+ dsh-ai-terminal-pet 1.2.2`，`--dump-config` 末尾出现 `- id: dsh-ai-terminal-pet`；装出的
     `vendor/manifest.json` 里 `source.sha256` 正是新值 `cf647af1…`（证明新版本把正确的记账带到了用户机器上）。
-  - 上游 registry 的 tarball 跟进：原 PR #14063（指向 1.2.1）已评论说明并由 #14076 取代后关闭；#14076 只改一行
-    `tarball:` 指向 1.2.2 资产，开在 `bump-tarball-1.2.2` 分支上，等维护者合并。
+  - 上游 registry 的 tarball 跟进：#14063（指向 1.2.1）已评论说明后关闭；#14076（`bump-tarball-1.2.2`）只改一行
+    `tarball:` 指向 1.2.2 资产，**已于 2026-11-10T19:59:37Z 合并**（merge commit `e5f2d26`，两项检查
+    `check` 21m21s 与 `Submission gate` 均 pass）；#14089（`bump-tarball-1.2.3`，commit `c5a1f5f`）把它再推到
+    1.2.3，开单时 `state: OPEN`、`mergeable: MERGEABLE`、`mergeStateStatus: UNSTABLE`（只因检查没跑完）。
+    注意**合并不会立刻改变任何人装到的版本**：目录里的 `install` 命令是构建时按 yml 的 `tarball` 渲染的，要等
+    上游下一次站点重建才更新（合并后读到的那份仍写着 1.2.0）。
+- **1.2.3 —— 让第三方商店知道这个包能跑在哪些 profile 里**（`b4474a6`）：DSH 自己无法表达「这个 host-only bundle 在任何 profile 都能跑」——它唯一与 profile 有关的字段是 `dsh.client`，而 client 只能是 `web`。于是按 `install.profiles` 过滤的第三方注册表只能退回 `[headless, web]` 猜测，桌面端商店因此把条目藏起来；`YELEBAI/dsh-plugin-marketplace` 就是这种实现，它此前已把本仓库记成 `profiles: [headless, web]`。
+  两份清单的 `dsh` 里因此多了 `marketplace`：`profiles: ["desktop", "headless", "web"]`、`requiresBuildApproval: false`、`manualSteps: false`。**DSH 本身从不读这个字段**——插件照旧经由 `dsh.bundle` 挂载，而且这个 bundle 只订阅 `session/event`，不依赖任何 profile 专属服务；读它的是商店侧。`verify.mjs` 加了四条断言钉住它（含根 shim 必须逐字复制同一块），两个清单不可能各写各的。
+  - 该注册表的分类器 `scripts/registry-core.mjs` 的 `classifyInstall` 被本地重放了一遍（把它的 `yaml` 依赖替换成空桩后直接 import 它自己的源码，不是手抄判定）：对当前这棵树得到 `profiles: [desktop, headless, web]`、`profileSource: "manifest"`、`runtimeArtifactsCommitted: true`、`reviewReasons: []`。
+  - 打包实测：`dsh-ai-terminal-pet-1.2.3.tgz` **1,915,013 B / 16 files / unpacked 4,461,408 B / sha256 `1172aa72c63482442ccf0c1dfc12446fa15e1b12220f921fbe06a56c4db87c35` / shasum `0508ff6b9159674ae4c7136cb00bf1870d44eb35`**。解包核对：`package/README.md` 与工作区那份逐字节相同（7,546 B）、`package/package.json` version 1.2.3、`dsh.marketplace` 块在位、`scripts.prepack` 仍为 `undefined`。
+  - 与 1.2.2 的 1,914,751 B 相比只多 262 B，全部来自两块 `dsh.marketplace` 与包内 README 的新增段落；`lib/index.js`、两份 vendor 二进制、`cordis.patch.yml`、`dsh.catalog`、`screenshots/` 逐字节不变。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
@@ -282,7 +293,7 @@
 - **仓库自己发布一份 format-1 插件索引**（`ef783ba`，新文件 `docs/market-index.json`）：
   <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>。
   因为索引格式允许「钉到 40 位 commit 的 git 源」，所以在 npm 发布被一次性密码挡住时，Discover 仍然可用；
-  条目只有 `dsh-ai-terminal-pet` `1.2.2`（索引随发版前移过两次：`cf1085d` 到 1.2.1 / `1e08b3e`，`fe62900` 到 1.2.2 / `694ff3f`），`source` 为 `{type: git, url, commit: 694ff3f13740b1bb9fb4df04f5fd226064a559b2,
+  条目只有 `dsh-ai-terminal-pet` `1.2.3`（索引随发版前移过三次：`cf1085d` 到 1.2.1 / `1e08b3e`，`fe62900` 到 1.2.2 / `694ff3f`，`b4474a6` + 一次索引提交到 1.2.3），`source` 为 `{type: git, url, commit: b4474a6da10a7bc3518362e910c66b9213be92e6,
   path: packages/dsh-ai-terminal-pet}`，`engines.dsh` 取包里声明的 `>=0.1.0-rc.6`，图标钉在同一个 commit 的
   `icon.png`（4,386 B）。校验用的是宿主自带的 `parseMarketIndex`（`@deepseek-ai/dsh-plugin-market-index`），
   不是手抄一份形状检查：`format: 1`、`localizedText` 含 `en`、category/label 都引用已声明 id、

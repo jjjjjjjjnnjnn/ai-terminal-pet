@@ -31,8 +31,8 @@
 | 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 两个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` |
 | 自检 | `ai-terminal-pet --doctor` 9 项（environment / install files / version / runtime / config / pipe / instance / node / autostart），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.2**，18 个文件含 vendor 与 `vendor/manifest.json`，tarball **16 files / 1,914,751 B / packed 1.9 MB / unpacked 4,460,862 B**）；release tag `dsh-plugin-v1.2.2`（2026-11-10T18:11:26Z，资产 sha256 `02431e16…` / shasum `22b63b25…`） |
-| 插件清单 | 仓库根 `package.json` 清单 shim（1,877 B / 59 行，无代码）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.3**，18 个文件含 vendor 与 `vendor/manifest.json`，tarball **16 files / 1,915,013 B / packed 1.9 MB / unpacked 4,461,408 B**）；release tag `dsh-plugin-v1.2.3`（2026-11-10T20:20:31Z，资产 sha256 `1172aa72…` / shasum `0508ff6b…`） |
+| 插件清单 | 仓库根 `package.json` 清单 shim（2,052 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图 |
 
 ## 1. 已交付批次（按时间倒序）
@@ -46,11 +46,11 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
 **交付**（`7f476c9` + `91719e5`，细节与坑见 HANDOVER §27）：
 
 - `packages/dsh-ai-terminal-pet/` 独立 Cordis bundle 包（npm 名 `dsh-ai-terminal-pet`，MIT，
-  `type: module`；1.2.2 口径 **18 个文件**含 vendor 与 `vendor/manifest.json`）。
+  `type: module`；1.2.3 口径 **18 个文件**含 vendor 与 `vendor/manifest.json`）。
   `dsh.bundle { patch: './cordis.patch.yml', platforms: ['win32'] }`，`engines node ^22.19 || >=24` /
   `dsh >=0.1.0-rc.6`，`files` 显式 10 项。**1.1.0 起没有任何生命周期钩子**（`prepack` 被删，
   因为 pnpm 对 git 依赖会执行它、未钉版本的源会撞上 `allowBuilds`）；`vendor/` 改为整体提交，只做校验。
-- **版本线 1.0.0 → 1.1.0 → 1.2.0 → 1.2.1 → 1.2.2：一版一个 tag，旧 tag 不删也不复用**。
+- **版本线 1.0.0 → 1.1.0 → 1.2.0 → 1.2.1 → 1.2.2 → 1.2.3：一版一个 tag，旧 tag 不删也不复用**。
   1.0.0（`7f476c9` + `91719e5`，资产 1,913,682 B / sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`；
   它的 `vendor/` 曾没进 git 树，tag 后来被强制挪到 `91719e5`，**已作废**）。
   1.1.0（`b280093`，tag `dsh-plugin-v1.1.0` 是 annotated tag，指向 `b28009377e14840ee003ddaf114922e1d167ed0d`，
@@ -65,7 +65,7 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   shasum 是 `166c3043…`，之后包内 `README.md` 改了 13 B 使其作废，最终资产是 `dc65e0d4…`。
   清单内容变了就必须换版本号，
   否则仓库与那份不可变 tarball 分叉——这正是 1.2.0 存在的理由。
-  1.2.1（已由 1.2.2 取代，发布物本身不可变；tag `dsh-plugin-v1.2.1` annotated、指向
+  1.2.1（已由 1.2.3 取代，发布物本身不可变；tag `dsh-plugin-v1.2.1` annotated、指向
   `1e08b3e7521d305d744c5ff515b29f6d16abebe1`，tag 对象 sha `0ef1d60cb5c33517aa87d6eed75565c035d5830e`；
   Release 于 **2026-11-10T16:15:04Z** 发布，资产 `dsh-ai-terminal-pet-1.2.1.tgz`
   **1,914,616 B / 16 files / sha256 `b9e6d203…` / shasum `67955a65…`**，GitHub 记录的 digest 与本地重算一致）：
@@ -73,9 +73,18 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   Release 资产不可编辑，所以只修一句话也要耗一个版本号（同一版本号下换字节，正是本仓库一直在消除的漂移）。
   与 1.2.0 的差别只有包内 `README.md`（6,665 → **6,863 B**）与两条安装命令里的版本号；解包核对确认不含旧文，
   连续两次 `npm pack` 逐字节相同。
-  1.2.2（当前；差别只有三处：两份清单的 `version`、包内 `README.md` 的措辞、`vendor/manifest.json` 的源码摘要——
+  1.2.2（已由 1.2.3 取代；差别是三处：两份清单的 `version`、包内 `README.md` 的措辞、`vendor/manifest.json` 的源码摘要——
   因为安装脚本下沉到 `scripts/` 改到了 8 处 Go 注释，那份摘要由 `89eef0d6…` 变成 `cf647af1…`；
   打包结果 **1,914,751 B / 16 files / sha256 `02431e16…` / shasum `22b63b25…`**，连跑两次逐字节相同）。
+  1.2.3（当前；只改两份清单，各加一个 `dsh.marketplace` 块：`profiles: ["desktop", "headless", "web"]`、
+  `requiresBuildApproval: false`、`manualSteps: false`。理由是 DSH 无法表达「host-only bundle 跑在任何 profile」——
+  它唯一与 profile 有关的字段 `dsh.client` 只能是 `web`，于是按 `install.profiles` 过滤的第三方商店
+  （`YELEBAI/dsh-plugin-marketplace` 就是这种实现）只能把本包猜成 `[headless, web]`，桌面端因此看不见条目。
+  **DSH 本身从不读这个字段**（插件照旧经 `dsh.bundle` 挂载，只订阅 `session/event`，不依赖任何 profile 专属服务）；
+  读它的是商店侧。该注册表的 `scripts/registry-core.mjs` 的 `classifyInstall` 被本地重放过（替换掉 `yaml` 依赖后
+  直接 import 它的源码），结果 `profiles: [desktop, headless, web]`、`profileSource: "manifest"`、`reviewReasons: []`。
+  打包结果 **1,915,013 B / 16 files / sha256 `1172aa72…` / shasum `0508ff6b…`**，与 1.2.2 只差 262 B；
+  `lib/index.js`、两份 vendor 二进制、`cordis.patch.yml`、`dsh.catalog`、`vendor/manifest.json` 逐字节不变）。
 - **capabilities 只自我声明、不被强制**：dsh 不对插件做沙箱，所以那五项描述的是浮窗本来在做的事，
   不是权限授予。`keywords` 与 topics（`dsh-plugin` / `deepseek-harness`，另加 `cordis-plugin` 标生态）决定了两条
   不用申请的自动采集路径（见 HANDOVER §27.9）。
@@ -89,13 +98,15 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   `private: true` 不占 npm 名、`version` 跟包同步（`verify.mjs` 断言两者相等）。
   没有它，宿主读到的是 0.0.0 依赖并报 `declares no dsh.bundle`，装出空包。
   它同时是「根清单采集」那条市场路径的准入条件。
-- `node verify.mjs`：1.2.2 口径 **415 行 / 91 个 `ok` / 0 warn / 末行 `VERIFY PASSED` / rc 0**
+- `node verify.mjs`：1.2.3 口径 **424 行 / 95 个 `ok` / 0 warn / 末行 `VERIFY PASSED` / rc 0**
   （tag `dsh-plugin-v1.1.0` 时是 300 行 / 55 ok，1.1.0 批次 331 行 / 63 ok）。它自带 fake Cordis context、
   临时 `LOCALAPPDATA` 与 stub protocol，所以不碰管道、浮窗与网络；`d06001d` 起 CI 也跑这套。
 - **三种安装形态都实测成功**（每次都开全新 `DSH_HOME` 与独立 profile）：Release tarball（**1.8 s**）、
   git 源钉 tag（**3.4 s**）、仓库地址 `add github:jjjjjjjjnnjnn/ai-terminal-pet`（**3.6 s**，等价写法
   `git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git` 不带 path 同样 3.6 s；三个计时是在 1.1.0 的资产上取的，
-  1.2.0 / 1.2.1 / 1.2.2 的资产都在同一位置、URL 只换 tag 与版本号；1.2.2 那次单独复验过：3,335 ms）；
+  1.2.0 / 1.2.1 / 1.2.2 / 1.2.3 的资产都在同一位置、URL 只换 tag 与版本号；1.2.2 那次单独复验过 3,335 ms，
+  1.2.3 的 Release 资产在全新 `DSH_HOME` 里装过一次：**2.4 s**，`plugin list` 显示 `1.2.3`、
+  `node_modules/dsh-ai-terminal-pet` 里 `dsh.marketplace` 块与 vendor 浮窗（4,371,968 B）都在位）；
   三种都用 `--dump-config` 验证过末尾出现 `- id: dsh-ai-terminal-pet`（证明 `insert:` 生效）。
   1.0.0 时期的三条旧记录（本地 tgz → Release URL 32.6 s → 钉 commit 10.2 s）保留在 CHANGELOG 历史条目里。
   仍会失败的一条：`git+https://...git&path:/packages/dsh-ai-terminal-pet` **不写 `#ref`**——pnpm 把
@@ -105,16 +116,18 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   PR 上 `PR check / check`（10:37:54Z）与 `Submission gate`（10:38:47Z）均 `conclusion: SUCCESS`）。合并时维护者
   删掉了原稿里「也能在面板上直接放行审批」一句——对 Harness 会话，面板只做状态映射与跳转，审批仍在 DSH 里完成；
   17:19Z 他在 PR 上留言确认了这一点，并说明要改措辞得另开 PR 改那个 `data/plugins/*.yml`（我们仓库里的文档改动
-  影响不到它），同时条目里的 `tarball` 仍钉着 `dsh-plugin-v1.2.0` 那份资产——跟进 PR 已换成 #14076
-  （fork 分支 `bump-tarball-1.2.2`、commit `0863b4d`、`1 file +1/−1`，只改 `tarball:` 一行到 1.2.2，描述不动；
-  前身 #14063 指向 1.2.1、head `116b0ee`，随 1.2.2 重打包已评论说明后关闭）；
+  影响不到它）。条目里的 `tarball` 决定它装哪个版本，只能靠 PR 改：跟进 PR **#14076**（分支 `bump-tarball-1.2.2`、
+  commit `0863b4d`、`1 file +1/−1`，只改 `tarball:` 一行到 1.2.2，描述不动）**已于 19:59:37Z 合并**；
+  1.2.3 发版后又开 **#14089**（`bump-tarball-1.2.3`、commit `c5a1f5f`，同样只改那一行）等合并
+  （前身 #14063 指向 1.2.1、head `116b0ee`，随 1.2.2 重打包已评论说明后关闭）；
   上游 `check-submission.mjs --only-list` 单条目通过，两个 URL 的 HEAD 均 200。
   条目已进入 `main`，上游 `README.md` 第 8,519 行（`### Notifications & Integrations`）已列出它；**条目页与
   DSH 应用内 Market 当时都还看不到**（16:16Z 复查：条目页 404、`plugins.json` 0 命中），但那只是
   上游站点构建的排队与耗时：`Build site from README` 的 run `42841664024` 在 15:25:40Z 被 cancelled（同分支新 run
   取代），`42844452013` 于 16:39:27Z success；此后条目页返回 200，`plugins.json` 从 `count 10119` 变成 `count 10230`
-  并收录本仓库。**「合并」与「可见」现在都成立了**，只是目录里的 `install` 命令按 yml 的 `tarball` 生成、仍钉 1.2.0，
-  换版本要靠 PR #14076。同一批里 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace)
+  并收录本仓库（合并后再读一次是 10,304 条）。**「合并」与「可见」都成立**，只是目录里的 `install` 命令是构建时
+  按 yml 的 `tarball` 渲染的，所以合并之后那版仍写着 1.2.0——#14076 已把字段换成 1.2.2，下一次重建才渲染出来，
+  #14089 再推到 1.2.3。同一批里 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace)
   的 `build-registry`（run `42812806941`）在 16:22:29Z 跑完：本仓库从 `verdict: script` 改判为 `bundle-plugin`，
   `registry.json` 里出现 `pkg_name`；到 18:08:44Z 那次重建（`risk_at` 17:09:14Z，是安装脚本移进 `scripts/` 后
   第一次真的扫到本仓库），条目已变成 `version: 1.2.1`、**`risk_tier: "safe"`、`risk_flags` 一条不剩**——
@@ -133,7 +146,7 @@ CI 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的字节不同—�
 **先红后修，不是一次就绿**（细节见 HANDOVER §27.9）。
 
 **没做成什么**：**npm 一个版本都还没发出去**——凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，
-此前整场会话都是 E401），`npm view dsh-ai-terminal-pet version` 仍是 E404，发布 1.2.2 是下一步；
+此前整场会话都是 E401），`npm view dsh-ai-terminal-pet version` 仍是 E404，一个版本都还没发出去；
 而且这一步在本机非交互环境里结构上做不到：npm 的 `otplease` 在没有 TTY 时直接抛 EOTP，永不进入 web-OTP 分支，
 取到的浏览器授权链接 5–8 分钟就 404 作废。**要发只能由人在本机交互终端里跑一次 `npm publish`**。
 因此 **DSH 应用内 Discover 索引仍不可达**（该索引 format 1 只表达 npm 版本，或钉 40 位 commit 的 git 源），
@@ -143,7 +156,7 @@ CI 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的字节不同—�
 同时 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引在 16:22:29Z 重建时把本仓库从
 `verdict: script` 改判为 `bundle-plugin`，18:08:44Z 那次重建又补上 `version: 1.2.1`、把 `risk_tier` 从「缺字段（未评估）」
 变成 **`safe`** 并把 `risk_flags` 清空（`risk_at` 17:09:14Z，是安装脚本移进 `scripts/` 后第一次真的扫过）。
-1.2.2 的 tag 与 Release 资产已发布（sha256 `02431e16…`），但 `lib/release-pins.json` 刻意留空，所以插件内「自动下载浮窗」
+1.2.3 的 tag 与 Release 资产已发布（sha256 `1172aa72…`），但 `lib/release-pins.json` 刻意留空，所以插件内「自动下载浮窗」
 回落仍是 no-op——安装时拷的是 `vendor/` 里那份（见 §27.7）。
 
 ### 1i. 2026-11-10（v0.9.0 之后，未发版）—— 可移植性、--doctor、线协议文档、CI
@@ -517,13 +530,13 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 ~~E2 线协议文档 `docs/PROTOCOL.md`~~、~~E6 `--doctor` 自检~~、~~安装脚本 `-VerifyOnly`/`-Uninstall`/`-AddToPath`~~、
 ~~CI 门禁 `.github/workflows/ci.yml`~~。
 
-✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 已列出（`:8519`）；合并只写进了 `main`，可见性要等上游站点构建——16:16Z 条目页还是 404、`plugins.json` 0 命中，而 run `42844452013` 在 16:39:27Z success 之后条目页返回 200、`plugins.json` 的 `count` 从 10119 涨到 10230 并收录本仓库（目录里的 `install` 仍钉 1.2.0 资产，换版本靠 PR #14076）；
-**DSH 插件包分发** —— ✅ 包本体走到 1.2.2，五个 tag 都有对应 Release（`dsh-plugin-v1.0.0` / `dsh-plugin-v1.1.0` / `dsh-plugin-v1.2.0` / `dsh-plugin-v1.2.1` / `dsh-plugin-v1.2.2`，当前资产 1,914,751 B / sha256 `02431e16…`），tarball / Release 资产 URL / git 源钉 tag 三种安装实测成功（不写 `#ref` 的 `&path:` 形态会报 `repository ... not found`，与 `prepack` 无关）；
-✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 第 8,519 行已列出该条目；「合并进 `main`」与「在某个市场里可见」曾经是两件事，现在后者也成立：条目页在 16:16Z 是 404、站点构建 run `42844452013` 于 16:39:27Z success 后变 200，`plugins.json` 也从 10119 条增至 10230 条并收录本仓库——但目录里的 `tarball` 仍钉 1.2.0，改版本要另开 PR 改 yml（PR #14076 已开，前身 #14063 已关闭）；
+✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 已列出（`:8519`）；合并只写进了 `main`，可见性要等上游站点构建——16:16Z 条目页还是 404、`plugins.json` 0 命中，而 run `42844452013` 在 16:39:27Z success 之后条目页返回 200、`plugins.json` 的 `count` 从 10119 涨到 10230 并收录本仓库（目录里的 `install` 按 yml 的 `tarball` 渲染，合并后那版仍是 1.2.0；#14076 已换成 1.2.2 并在 19:59:37Z 合并、#14089 再推到 1.2.3，都要等下一次站点重建才渲染出来）；
+**DSH 插件包分发** —— ✅ 包本体走到 1.2.3，六个 tag 都有对应 Release（`dsh-plugin-v1.0.0` / `dsh-plugin-v1.1.0` / `dsh-plugin-v1.2.0` / `dsh-plugin-v1.2.1` / `dsh-plugin-v1.2.2` / `dsh-plugin-v1.2.3`，当前资产 1,915,013 B / sha256 `1172aa72…`），tarball / Release 资产 URL / git 源钉 tag 三种安装实测成功（不写 `#ref` 的 `&path:` 形态会报 `repository ... not found`，与 `prepack` 无关）；
+✅ 注册表条目 PR #13937 **已于 2026-11-10T14:33:04Z 由 `fkysly` 合并**，上游 README 第 8,519 行已列出该条目；「合并进 `main`」与「在某个市场里可见」曾经是两件事，现在后者也成立：条目页在 16:16Z 是 404、站点构建 run `42844452013` 于 16:39:27Z success 后变 200，`plugins.json` 也从 10119 条增至 10230 条并收录本仓库——目录里的 `tarball` 决定安装版本、只能靠 PR 改：**#14076 已于 19:59:37Z 合并**（把字段换成 1.2.2）、**#14089 已开**（再推到 1.2.3），两者都要等下一次站点重建才反映到 `install` 字段（前身 #14063 已关闭）；
 ✅ [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引 2026-11-10T18:08:44Z 重建后，本仓库条目是 `pkg_name: dsh-ai-terminal-pet`、`version: 1.2.1`、topics 11 个、`verdict: bundle-plugin`，并且 **`risk_tier: "safe"`、`risk_flags` 一条不剩**（`risk_at` 17:09:14Z，是安装脚本移进 `scripts/` 后第一次真的扫到本仓库）。之前的 `verdict: script` 与 `risk` 徽章（`registry-run-key` critical + `remove-item-force-recurse` medium）从此消失，全程没有用到任何抑制字段——因为扫描器 `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，而脚本已移进 `scripts/`（`$RepoRoot = Split-Path -Parent $PSScriptRoot`，原样保留停进程、`-Recurse -Force` 与 `CurrentVersion\Run` 逻辑）。issue #367 已回帖说明，可关。
 ✅ 两条不用申请的自动采集路径（根清单采集 `LivXue/dsh-plugin-shop` 每日、双 topic 采集 `zasenjc/dsh-plugins-store` 30 分钟）已在仓库侧满足条件；但 `LivXue` 的发布分片实测只有 npm 源（26,351 条条目全带 npm tarball 的 `integrity`、`commit` 字段 0 条），所以「条件满足」≠「已被列出」；
-✅ **自建 format-1 索引**（`ef783ba`，`docs/market-index.json`；`fe62900` 前移到 1.2.2）：Discovery 不必再等 npm——条目 `dsh-ai-terminal-pet` `1.2.2` 用钉到 `694ff3f` 的 git 源，URL <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>，用户加到 Discover 的索引源列表里即可看到并一键安装；校验走宿主自带的 `parseMarketIndex`，`marketInstallTarget` 产出的 spec 已实测 2.5 秒装通，且 `verify.mjs` 有 14 条断言把它钉在包版本上（发版忘改索引会让 CI 变红）；
-⏳ **npm 尚未发布 1.2.2**（凭据问题已解、`npm whoami` 返回 `jjjjjjjjnnjnn`、`npm view` 仍 E404，publish 要一次性密码，而 npm 的 `otplease` 在无 TTY 时直接抛 EOTP，所以只能由人在交互终端里跑）。npm 只是「按包名安装」与「进 npm-only 目录」的前置，不再是 Discover 的前置（自建索引已覆盖后者）。
+✅ **自建 format-1 索引**（`ef783ba`，`docs/market-index.json`；`fe62900` 前移到 1.2.2、`b4474a6` 前移到 1.2.3）：Discovery 不必再等 npm——条目 `dsh-ai-terminal-pet` `1.2.3` 用钉到 `b4474a6` 的 git 源，URL <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>，用户加到 Discover 的索引源列表里即可看到并一键安装；校验走宿主自带的 `parseMarketIndex`，`marketInstallTarget` 产出的 spec 已实测 2.5 秒装通，且 `verify.mjs` 有 14 条断言把它钉在包版本上（发版忘改索引会让 CI 变红）；
+⏳ **npm 尚未发布任何版本**（凭据问题已解、`npm whoami` 返回 `jjjjjjjjnnjnn`、`npm view` 仍 E404，publish 要一次性密码，而 npm 的 `otplease` 在无 TTY 时直接抛 EOTP，所以只能由人在交互终端里跑）。npm 只是「按包名安装」与「进 npm-only 目录」的前置，不再是 Discover 的前置（自建索引已覆盖后者）。
 
 | 编号 | 功能 | 价值 | 复杂度 |
 |---|---|---|---|
@@ -559,9 +572,10 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 - `go test -race` / `govulncheck` / `gosec` 因缺工具链（gcc 等）仍未跑（2026-11-09 复核仍然如此）。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
 - DSH 插件包的 npm 发布**尚未发生**（凭据问题已解、`npm view` 仍 E404），因此**按包名安装**与 npm-only 目录仍不通；
-  git 源、Release tarball、仓库地址三条安装路可用，自建 format-1 索引也已钉到 1.2.2。注册表条目 PR #13937 已于
+  git 源、Release tarball、仓库地址三条安装路可用，自建 format-1 索引也已钉到 1.2.3。注册表条目 PR #13937 已于
   2026-11-10T14:33:04Z 合并、上游 README 已列出；站点页与 `plugins.json` 的延迟在 run `42844452013`（16:39:27Z
-  success）之后消失，条目页 200 且 `plugins.json` 已收录本仓库——但目录里的 `install` 仍钉 1.2.0，要等 PR #14076。
+  success）之后消失，条目页 200 且 `plugins.json` 已收录本仓库——但目录里的 `install` 是构建时按 `tarball` 渲染的，
+  合并后那版仍是 1.2.0；#14076 已换成 1.2.2（19:59:37Z 合并）、#14089 再推到 1.2.3，等下一次重建。
   [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 16:22:29Z 的重建把本仓库从
   `verdict: script` 改判为 `bundle-plugin`，18:08:44Z 那次重建（`risk_at` 17:09:14Z）给出 **`risk_tier: "safe"`** 且
   `risk_flags` 为空——安装脚本移进 `scripts/` 后扫描器读不到那两个正则的落点，issue #367 的两条旗标就此消失。
