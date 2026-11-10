@@ -1,0 +1,130 @@
+name: CI
+
+# This is the only workflow in the repository. It answers one question on every
+# push and pull request: does a clean checkout still build, test and load every
+# reporter on a stock Windows runner? Nothing here needs a desktop session or a
+# secret, because the live-desktop probes are opt-in tests that Skip when their
+# PET_* variable is unset (see the comment block further down).
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run obsolete. Cancelling it
+# frees the (limited) Windows runner pool instead of queueing old commits.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: build and verify
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    # The repository is UTF-8 with LF (.gitattributes pins "* text=auto eol=lf").
+    # core.autocrlf would check the files out with CRLF on the Windows runner and
+    # make the diff under test differ from what developers run locally, so it is
+    # forced off for this checkout.
+    env:
+      GOFLAGS: -mod=readonly
+      GO111MODULE: on
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # gofmt and go vet only need the tree; no history, no tags.
+          fetch-depth: 1
+
+      # go-version-file instead of a hard-coded "1.23.x": go.mod's "go 1.23.0"
+      # line is the single place the toolchain requirement is declared, and a
+      # dependency bumping it (e.g. to 1.24) must move CI in the same commit.
+      # setup-go still installs the newest 1.23 patch release, never a preview.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Node 22 rather than 20: the reporters and the Harness plugin are plain
+      # JavaScript with no dependencies, and 22 is the current LTS line. No
+      # "cache: npm" here on purpose - there is no lockfile to key it on (the
+      # Node artifacts in this repository are dependency-free).
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Show toolchain versions
+        shell: bash
+        run: |
+          go version
+          node --version
+
+      # gofmt -l prints one path per file that is not formatted. Any output at
+      # all fails the build: a formatting nit is cheapest to fix in the PR that
+      # introduced it. bash is used instead of the default pwsh so the exit-code
+      # handling is identical on every runner image.
+      - name: gofmt
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt: these files are not formatted (run gofmt -w <file>):"
+            echo "$unformatted"
+            exit 1
+          fi
+          echo "gofmt: clean"
+
+      - name: go vet
+        run: go vet ./...
+
+      # -count=1 defeats the test result cache, so a run always really executes
+      # the tests. The opt-in probes in internal/ui and internal/platform call
+      # t.Skip when PET_PREVIEW_DIR / PET_SOUND_PROBE / PET_FOCUS_PROBE /
+      # PET_DSH_PROBE / PET_PRESENCE_PROBE is unset, so a headless runner Skips
+      # them instead of failing on a missing window.
+      - name: go test
+        run: go test -count=1 ./...
+
+      # -trimpath keeps absolute build paths out of the binary, and -s -w strips
+      # the symbol/DWARF tables: these are distributed small and the crash log
+      # rotation in cmd/ai-terminal-pet does not need a symbol server.
+      - name: Build the overlay
+        run: go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
+
+      - name: Build the statusline shim
+        run: go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-statusline.exe ./cmd/pet-statusline
+
+      # node --check parses without executing. Every reporter under reporters/
+      # must stay loadable in the Node version the runner ships, because a
+      # syntax error there breaks the host CLI hook, not just this repository.
+      #
+      # The loop is not decoration: "node --check a.js b.js" checks ONLY the
+      # first argument and exits 0 even when the second file is broken (verified
+      # on Node 24: broken.js as the 2nd argument -> exit 0). A bare
+      # "node --check reporters/*.js" would therefore only ever guard the
+      # alphabetically first file. Checking each file in turn is the only form
+      # that actually covers all of them.
+      #
+      # opencode.js is ESM with no "type" in reporters/package.json, so Node
+      # detects the module syntax on parse. That detection is a default since
+      # Node 22.7.0, which is why the runner pins the 22 line rather than 20.
+      - name: Check reporter syntax
+        shell: bash
+        run: |
+          for file in reporters/*.js; do
+            node --check "$file"
+            echo "node --check: $file OK"
+          done
+
+      # verify.mjs loads the Harness bundle the way the Harness loader does and
+      # fails on an unloadable manifest, a missing locale or a broken patch.
+      - name: Verify the DeepSeek Harness bundle
+        run: node integrations/deepseek-harness/verify.mjs

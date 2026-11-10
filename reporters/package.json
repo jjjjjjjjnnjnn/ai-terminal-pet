@@ -1,0 +1,26 @@
+{
+  "name": "ai-terminal-pet-reporters",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Host CLI hooks that report session state to the AI-Terminal-Pet overlay. Intentionally private and NOT published to npm: this file exists only so the directory has explicit entry points instead of relying on Node's implicit resolution. There is deliberately NO \"type\" field. The default (CommonJS) is what protocol.js and the five require()-based hooks need; setting \"type\": \"module\" would break every one of them (ReferenceError: require is not defined in ES module scope), and setting \"type\": \"commonjs\" would break opencode.js, which is a genuine ESM file. Because the package is typeless, Node prints one MODULE_TYPELESS_PACKAGE_JSON notice the first time opencode.js is imported, then reparses it as ESM by syntax detection (a default since Node 22.7.0). That is expected and harmless: it costs one extra parse and changes nothing at runtime. Renaming opencode.js to .mjs was rejected because README and user configs reference the .js path. opencode.js is exported under an explicit \"import\" condition only, so a mistaken require() fails loudly instead of surfacing a confusing ERR_REQUIRE_ESM.",
+  "license": "MIT",
+  "exports": {
+    ".": "./protocol.js",
+    "./protocol": "./protocol.js",
+    "./protocol.js": "./protocol.js",
+    "./opencode": {
+      "import": "./opencode.js"
+    },
+    "./opencode.js": {
+      "import": "./opencode.js"
+    },
+    "./claude-hook": "./claude-hook.js",
+    "./claude-hook.js": "./claude-hook.js",
+    "./antigravity-hook": "./antigravity-hook.js",
+    "./antigravity-hook.js": "./antigravity-hook.js",
+    "./antigravity-statusline": "./antigravity-statusline.js",
+    "./antigravity-statusline.js": "./antigravity-statusline.js",
+    "./generic": "./generic.js",
+    "./generic.js": "./generic.js"
+  }
+}
