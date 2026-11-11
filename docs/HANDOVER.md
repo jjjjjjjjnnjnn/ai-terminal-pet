@@ -9,7 +9,8 @@
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
 - **版本**：`0.9.0`（`internal/app/app_windows.go:23` 的 `Version` 常量，`--doctor` 与文档刷新都没有改它）。
-  最新提交 `9b0df94`（2026-11-10 已推送，与 `origin/main` 同步；其上依次为 `12b90cc`、`fabb591`、`b4474a6`、`7bd2cfa`）；
+  最新提交 `4ee7f01`（2026-11-11 08:40 +0100 已推送，与 `origin/main` 同步；其上为 1.2.4 的发版提交
+  `ff7f6de` = tag `dsh-plugin-v1.2.4` 指向的对象，再往前依次是 `9b0df94`、`12b90cc`、`fabb591`、`b4474a6`）；
   **浮窗本体与 DSH 插件包是两条版本线**：浮窗停在 `0.9.0`，插件包已到 **1.2.4**（tag `dsh-plugin-v1.2.4`，
   只改文案、不动代码，见下文「分发」段与 §27.12）。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**154 个** `func Test`，
@@ -48,7 +49,10 @@
   1.2.0 资产。跟进 PR #14063（指向 1.2.1）已评论说明后关闭；**#14076**（分支 `bump-tarball-1.2.2`，只改一行
   `tarball:`）把它换成 1.2.2 并在 **19:59:37Z 合并**，下一次站点重建才会渲染出新命令；1.2.3 发版后又开了
   **#14089**（`bump-tarball-1.2.3`，commit `c5a1f5f`）把字段再推到 1.2.3，**已于 2026-11-10T21:10:15Z 合并**
-  （merge commit `95d7216913d54110a794514a6c0ea0196aa08ddc`）；1.2.4 还要再开一个同样的 `+1/−1` PR。
+  （merge commit `95d7216913d54110a794514a6c0ea0196aa08ddc`）；1.2.4 的跟进
+  [PR #14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243)（分支 `bump-tarball-1.2.4`，
+  commit `66ed01d`，`1 file +3/−3`：`tarball` 与 `icon` 换到 1.2.4，中英 description 各补一句 reporters 限定）
+  已于 2026-11-11 开出、等 check 与人工合并。
   另有两家目录同期已合并收录本仓库：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins)
   的 PR #902（2026-11-10T21:49:53Z，`catalog/plugins/*.json`；该店只从 npm 安装，所以在包发到 npm 之前以
   browse-only 列出，目录侧会自动发现新包、无需再开 PR）与
@@ -66,7 +70,7 @@
   （`npm view` 仍 E404，且发布要求一次性密码，非交互 shell 里拿不到），所以按包名安装暂时不可达；
   `docs/market-index.json` 是仓库自建的 format-1 索引，条目 `dsh-ai-terminal-pet` **1.2.4**（`publishTimestamp`
    1794379909 = 2026-11-11T06:51:49Z），可让 Discover 先按 git 源可用；版本与 `publishTimestamp` 已与包清单
-   同一批前移，`source.commit` 与图标钉点由紧随其后的提交补齐（沿 1.2.1 / 1.2.2 / 1.2.3 那三次的两步做法）。
+   同一批前移（那个提交是 A `ff7f6de`），`source.commit` 与图标钉点由紧随其后的 B `4ee7f01` 补成 A 的 sha）。
    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
    版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
   细节与坑见 §27。
@@ -1351,7 +1355,11 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
      `docs/market-index.json` 的 `versions[0].version` 与 `publishTimestamp`（1794379909 =
      2026-11-11T06:51:49Z）与两份清单**同一批**前移，`source.commit` 与图标钉点由紧随其后的提交补齐
      （沿用 1.2.1 / 1.2.2 / 1.2.3 那三次的两步做法，见 §27.10 与 AGENTS.md 第 6 条）。
-     **1.2.4 的端到端安装要到发版提交打 tag 之后才有资产可测**——发版前别把它写成「已装过一次」。
+     1.2.4 的资产就位后又逐个装过一遍（每次全新目录 + 纯 ASCII 路径）：Release 资产 URL **1.8 s**、git 源钉
+     tag `dsh-plugin-v1.2.4` **3.7 s**、`add github:jjjjjjjjnnjnn/ai-terminal-pet` **6.5 s**，三者 rc=0；
+     装出的包与 `git show ff7f6de:` 逐字节一致（`README.md` 8,187 B / `package.json` 2,246 B /
+     `lib/index.js` 17,872 B / `cordis.patch.yml` 399 B 四项 sha256 全 MATCH），vendor 两个文件也与
+     `vendor/manifest.json` 对得上。
   - 文件数与包目录的差：`npm pack` 走包内 `files` 白名单（10 项）外加 npm 必然带上的
     `package.json` / `README.md` / `LICENSE`，所以白名单外的 `scripts/vendor.mjs` 与 `verify.mjs`
     从不进 tarball——包目录数到 18 个文件，tarball 只有 16 个。
@@ -1681,22 +1689,51 @@ CHANGELOG、插件包 README 与 `lib/index.js` 注释、`integrations` 桥接 R
 - `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`：两个 vendor 文件仍 matches the source。
 - `gofmt -l .` 无输出、`go vet ./...` 干净、`go test -count=1 ./...` 9 个 internal 包全 ok。
 
-**索引的两步前移**（见 §27.10 与 AGENTS.md 第 6 条）：`docs/market-index.json` 的 `versions[0].version` 与
-`publishTimestamp`（**1794379909** = 2026-11-11T06:51:49Z）与两份清单**同一批**改；`source.commit` 与图标钉点
-先沿用上一版的发布提交，等发版提交本身有了 sha 再由紧随其后的提交补上——这是沿用 1.2.1 / 1.2.2 / 1.2.3 的
-既有做法，因为 git 无法在一个提交里引用它自己的 sha。
+**索引的两步前移，实际落成的两个提交**（见 §27.10 与 AGENTS.md 第 6 条）：
 
-**上游侧同步要做的两件事**（不在本仓库内，只能另开 PR）：
+- **A = `ff7f6de7d87a7a4d99c06e3a9a68e9a4b417b0a9`**（`Release 1.2.4 so the market copy stops promising other
+  terminals`，9 files +252/−67，2026-11-11 08:38:16 +0100）：版本号、包内 README、索引的 `versions[0].version`
+  与 `publishTimestamp`（**1794379909** = 2026-11-11T06:51:49Z）全在这一批。**tag `dsh-plugin-v1.2.4` 指向它**。
+- **B = `4ee7f01d74cdfc3bcf51745e29c1306b1a42501b`**（`Pin the market index to 1.2.4's release commit`，
+  `1 file +2/−2`，08:40:01 +0100）：把索引的 `source.commit` 与 `icon` 从 `b4474a6` 改成 A 的 sha。
+  之所以拆成两个提交，是因为 git 无法在一个提交里引用它自己的 sha。
 
-1. `awesome-dsh-plugin` 的 `data/plugins/jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml`：
-   `tarball:` 换到 `dsh-plugin-v1.2.4` 资产，`description` 的中英两段各补一句 reporters 限定。
+推送后 CI 只在 head 上起一次 run：**run `42981618507`（job `130393123402`）在 B 上 `conclusion: success`**
+（started 2026-11-11T07:43:54Z）。A 的 check-runs 数组是空的，所以另外用 `git worktree add --detach .local/wt-A ff7f6de`
+解出一份独立树跑了一遍 `node packages/dsh-ai-terminal-pet/verify.mjs`，同样 `VERIFY PASSED`，跑完
+`git worktree remove --force` 清掉。
+
+**tag 与 Release**：注释 tag `dsh-plugin-v1.2.4` 的 tag 对象 sha 是
+`86cc1c034b702d9066a30f590c707fe33369224c`；Release id **441376551**，
+<https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/dsh-plugin-v1.2.4>，published
+**2026-11-11T07:48:54Z**。资产 `dsh-ai-terminal-pet-1.2.4.tgz` 1,915,340 B，GitHub 侧 digest
+`sha256:d6b7f95a…`——从 `browser_download_url` 真下载一次再算 sha256 仍是同一个值（不是只看 API 字段）。
+
+**上游侧同步的两件事，也都已经开成 PR（都还没合并）**：
+
+1. [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243)：分支
+   `bump-tarball-1.2.4`、commit `66ed01d`、`1 file +3/−3`——`tarball` 与 `icon` 换到 1.2.4 资产，
+   中英 `description` 各补一句 reporters 限定；state `open` / `mergeable: true` / `mergeable_state: unstable`。
    该文件的 `install` 命令是站点构建时渲染的，所以「PR 合并」≠「立刻可见」，还要等一次重建。
-2. `imsai-sh/awesome-deepseek-harness-plugins` 的
-   `catalog/plugins/jjjjjjjjnnjnn--ai-terminal-pet--packages--dsh-ai-terminal-pet.json`：
-   目前只有 `description` 需要补同一句限定（它的 `install` 走 npm，包发到 npm 之前一直是 browse-only）。
-   该目录会**自动发现新包**，不必再为版本号开 PR。
+2. [imsai-sh/awesome-deepseek-harness-plugins#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912)：
+   分支 `entry-wording-1.2.4`、commit `1570316`、`1 file +3/−3`，只改 `description` 的中英两段
+   （en 701 / zh 288 字符，schema 上限各 1,000）。该仓库 CONTRIBUTING 规定「更新已存在条目永不自动合并」，
+   所以 `static-review` success、`merge` skipped，bot 留言 `maintainer review required`——等人工合并。
+   两个 fork 都先用 `POST /repos/<fork>/merge-upstream` fast-forward 过再动笔。
 
 **没做的事（明确边界）**：没有为了让文案更准确而改任何代码或 `lib/index.js`；没有把 reporters 打包进插件
 （那会在 Windows 上把 Node 依赖塞进一个宿主桥接包里，且 Claude Code / OpenCode 的钩子必须先被那个 CLI 自己
 接受，插件无法代劳）；`lib/release-pins.json` 仍刻意留空，所以插件内「自动下载浮窗」仍然回落为 no-op，
 安装时拷的始终是 `vendor/` 里那份（见 §27.7）。
+
+**发版之后的收尾（同日 08:55–09:10 +0100）**：仓库侧只剩文档在追这次出货——`README.md`（英中两半把安装计时从
+「取在 1.1.0 资产上」改成 1.2.4 实测的 1.8 / 3.7 / 6.5 秒，并把 #14243、#912 两个 PR 号写进去）、`CHANGELOG.md`
+（1.2.4 段补上 A/B 两个提交与 CI run `42981618507`，上游两条改成已开 PR）、`docs/ROADMAP.md`（发版前写的
+「资产要等打 tag 才有」与「1.2.4 需再开一个 PR」全部改成既成事实，索引条目改钉 `ff7f6de`）、本文件（§1 的最新提交
+前移到 `4ee7f01`、§27.5 的端到端待测改成实测、§27.12 的「上游要做的两件事」改成「已经开成 PR」）。
+四个文件合计 +71/−34，改完复跑 `node packages/dsh-ai-terminal-pet/verify.mjs` 仍 `VERIFY PASSED`、
+六个上报端 `node --check` 仍全过、`go test -count=1 ./...` 9 个 internal 包仍全 ok（仅文档改动，代码路径未动）。
+
+**仍未解决的三件外部事**：npm 发布被一次性密码挡在非交互 shell 外（只能由人在交互终端里跑
+`cd packages/dsh-ai-terminal-pet && npm publish`）；`awesome-dsh-plugin` 的 #14243 等 check 与人工合并、
+imsai 的 #912 等 maintainer 人工合并；radar #1255、dshopen #423、brade #367 三条仍挂在对方仓库。

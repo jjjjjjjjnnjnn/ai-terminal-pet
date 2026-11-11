@@ -206,9 +206,15 @@
   commit `0863b4d`，仍只有 `+1/−1`）指向 1.2.2 的资产，**已于 2026-11-10T19:59:37Z 合并**（merge commit
   `e5f2d26`）；1.2.3 发版后原样再跟一次：[PR #14089](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14089)
   （分支 `bump-tarball-1.2.3`，commit `c5a1f5f`），**已于 2026-11-10T21:10:15Z 合并**（merge commit
-  `95d7216913d54110a794514a6c0ea0196aa08ddc`）；1.2.4 发版后再开一个同样的 `+1/−1` PR 把 `tarball` 推到新 tag。
+  `95d7216913d54110a794514a6c0ea0196aa08ddc`）；1.2.4 的跟进是
+   [PR #14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243)（分支 `bump-tarball-1.2.4`，
+   commit `66ed01d`，`1 file +3/−3`，2026-11-11 开出、等 check 与人工合并）。
   1.2.4 这一版还顺手把「其他终端要不要另装东西」写进了上游两个条目的措辞里
-  （awesome 的 `data/plugins/*.yml` 与 imsai 的 `catalog/plugins/*.json` 各开一个只改 description 的 PR），
+  （awesome 的 `data/plugins/*.yml` 与 imsai 的 `catalog/plugins/*.json` 各开一个只改 description 的 PR：
+   前者是 #14243，后者是
+   [imsai-sh/awesome-deepseek-harness-plugins#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912)
+   （分支 `entry-wording-1.2.4`，commit `1570316`，`1 file +3/−3`；该仓库 CONTRIBUTING 规定「改已存在条目永不自动合并」，
+   所以 `static-review` success、`merge` skipped，等 maintainer 人工合并），
   因为那两处文案同样会让读者以为「装了就有全部终端」。每一版都先用上游自己的门验过：
   `scripts/check-submission.mjs --only-list` → `checking 1 entry / ok / all checked entries pass`（该门需要 `GITHUB_TOKEN`）。
   **两处外部副作用已记录**：① 已发布的 `dsh-ai-terminal-pet-1.2.0.tgz` 里那份 `README.md` 是 1.2.0 打包时的旧文，仍写着「等人工评审、尚未列入」——
@@ -283,7 +289,7 @@
     1.2.3，开单时 `state: OPEN`、`mergeable: MERGEABLE`、`mergeStateStatus: UNSTABLE`（只因检查没跑完），
     而后 **已于 2026-11-10T21:10:15Z 合并**（merge commit `95d7216913d54110a794514a6c0ea0196aa08ddc`）。
     注意**合并不会立刻改变任何人装到的版本**：目录里的 `install` 命令是构建时按 yml 的 `tarball` 渲染的，要等
-    上游下一次站点重建才更新（合并后读到的那份仍写着 1.2.0）。#14089 合并于 2026-11-10T21:10:15Z，1.2.4 需再开一个 PR。
+    上游下一次站点重建才更新（合并后读到的那份仍写着 1.2.0）。#14089 合并于 2026-11-10T21:10:15Z，1.2.4 的跟进 PR #14243 已于 2026-11-11 开出（等合并）。
     同一天还落地两家别的目录：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins)
     的 PR #902 于 2026-11-10T21:49:53Z 合并（`catalog/plugins/jjjjjjjjnnjnn--ai-terminal-pet--packages--dsh-ai-terminal-pet.json`，
     只从 npm 装，所以在 1.2.3 发到 npm 之前以 browse-only 列出）；
@@ -328,7 +334,10 @@
   - `docs/market-index.json` 同一批前移：`versions[0].version` → 1.2.4、`publishTimestamp` → 1794379909
     （2026-11-11T06:51:49Z）；`source.commit` 与图标钉点由紧随其后的提交补上（沿用 1.2.1 / 1.2.2 / 1.2.3
     那三次的两步做法）。改完 `node packages/dsh-ai-terminal-pet/verify.mjs` 仍是 **95 ok / 0 warn / 0 fail /
-    VERIFY PASSED / rc 0**。
+    VERIFY PASSED / rc 0**。两步实际落成：**A `ff7f6de`**（9 files +252/−67，tag `dsh-plugin-v1.2.4` 指向它）与
+    **B `4ee7f01`**（`1 file +2/−2`，把索引的 `source.commit` 与 `icon` 改成 A 的 sha），推送后 CI run
+    `42981618507` 在 B 上 success（同一个 push 只为 head 起一次 run，所以另外用 `git worktree add --detach` 解出
+    A 的树单独跑了一遍 `verify.mjs`，同样 `VERIFY PASSED`）。
 - **两条「不用申请」的自动采集路径**：仓库 topics 现为 `dsh-plugin` / `deepseek-harness` /
   `cordis-plugin`。`LivXue/dsh-plugin-shop` 每日构建，收录**根 `package.json` 里同时有 `name` 与
   `dsh.bundle`** 的 GitHub 仓库，并钉住默认分支的那个 commit；`zasenjc/dsh-plugins-store` 每 30 分钟同步，
@@ -340,7 +349,7 @@
 - **仓库自己发布一份 format-1 插件索引**（`ef783ba`，新文件 `docs/market-index.json`）：
   <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>。
   因为索引格式允许「钉到 40 位 commit 的 git 源」，所以在 npm 发布被一次性密码挡住时，Discover 仍然可用；
-  条目只有 `dsh-ai-terminal-pet` `1.2.4`（索引随发版前移过四次：`cf1085d` 到 1.2.1 / `1e08b3e`，`fe62900` 到 1.2.2 / `694ff3f`，`fabb591` 到 1.2.3 / `b4474a6`，1.2.4 那次与包清单同一批改——索引比发布提交晚一个，所以 `b4474a6` 上 CI 红，此后固定成「发版同一个提交里把索引一起前移」），`source` 为 `{type: git, url, commit: b4474a6da10a7bc3518362e910c66b9213be92e6,
+  条目只有 `dsh-ai-terminal-pet` `1.2.4`（索引随发版前移过四次：`cf1085d` 到 1.2.1 / `1e08b3e`，`fe62900` 到 1.2.2 / `694ff3f`，`fabb591` 到 1.2.3 / `b4474a6`，1.2.4 那次与包清单同一批改——索引比发布提交晚一个，所以 `b4474a6` 上 CI 红，此后固定成「发版同一个提交里把索引一起前移」；1.2.4 的 `commit` 由发版后的 `4ee7f01` 钉到 `ff7f6de`），`source` 为 `{type: git, url, commit: ff7f6de7d87a7a4d99c06e3a9a68e9a4b417b0a9,
   path: packages/dsh-ai-terminal-pet}`，`engines.dsh` 取包里声明的 `>=0.1.0-rc.6`，图标钉在同一个 commit 的
   `icon.png`（4,386 B）。校验用的是宿主自带的 `parseMarketIndex`（`@deepseek-ai/dsh-plugin-market-index`），
   不是手抄一份形状检查：`format: 1`、`localizedText` 含 `en`、category/label 都引用已声明 id、
