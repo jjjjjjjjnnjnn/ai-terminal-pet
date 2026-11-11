@@ -311,8 +311,15 @@ node reporters/generic.js --source=mybot --stdin      # stdin 上给一个 JSON 
 | 8 | 同一会话的 `sessionId` 必须稳定 | 它是 store 的键，抖动一次就多一条会话 |
 | 9 | 连不上管道时**照常写快照** | 浮窗未运行时这是唯一的传递通道（§6） |
 | 10 | 无论成败：不抛、不阻塞、exit 0 | 见 §10，这是硬约束 |
-| 11 | 没有真实 PID 的宿主（如某些 IDE 插件）可以用 FNV-1a 派生一个稳定正整数 | 参考 `stableProcessId()`（`protocol.js:72-80`） |
+| 11 | 没有真实 PID 的宿主（如某些 IDE 插件）可以用 FNV-1a 派生一个稳定正整数 | 参考 `stableProcessId()`（`protocol.js:72-80`）或 Go 侧 `internal/reporter` 的同名实现 |
 | 12 | 想自动批准就走 `approvals/` 握手，且自己实现危险命令拦截 | 只靠浮窗的 11 条模式不够，钩子侧也应有兜底（§7） |
+
+**不用 Node 也能实现**：`reporters/protocol.js` 是规范实现，但这条协议不是 JS 的专利。
+仓库里另有一份 Go 实现 `internal/reporter`（脱敏、id 截断、UTF-16 FNV-1a PID、
+时间戳钳制、快照落盘、管道投递、审批握手、hook 事件映射），`cmd/pet-hook`
+（`--mode=claude|antigravity`）就跑在它上面，`cmd/pet-statusline` 是那份实现的来源（尚未迁移过来）。
+两份实现由测试互相对齐，尤其是管道名：`TestPipePathForUserMatchesReporterAlgorithm`
+同时钉住了 Go 与 JS 的算法。第三条路是直接读这两份实现——它们比本文更细。
 
 ## 10. 错误处理契约（硬约束）
 
@@ -383,6 +390,8 @@ node reporters/generic.js --source=mybot --stdin      # stdin 上给一个 JSON 
 | JS 侧规范化行为 | `node integrations/deepseek-harness/verify.mjs`（含时钟偏移、幂等、UTC 等 14 条断言） |
 | 全部 reporter 语法 | 逐文件循环：`for f in reporters/*.js; do node --check "$f"; done`（`node --check a.js b.js` 只检查第一个参数，Node 24 实测） |
 | 手动打一发 | `node reporters/generic.js --source=ci --state=error --reason=test` |
+| 原生实现是否对齐 | `go test ./internal/reporter ./cmd/pet-hook`（33 个 `func Test`，含同 payload 下与 JS 一致的 PID / state） |
 | 浮窗是否收到 | `AI-Terminal-Pet.exe --json`（无会话时为空数组，有则含你刚发的 `sessionId`） |
 
-最后更新：2026-11（对应 v0.9.0，`reporters/protocol.js` 570 行 / 20,914 B）。
+最后更新：2026-11（对应 v0.9.0 与 DSH 插件包 1.2.4，`reporters/protocol.js` 570 行 / 20,914 B；
+新增 Go 参考实现 `internal/reporter` 与 `cmd/pet-hook`）。

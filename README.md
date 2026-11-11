@@ -100,10 +100,11 @@ AI-Terminal-Pet.exe (Go 1.23, single-instance mutex)
 
 Installation takes about 30 seconds on Windows using PowerShell:
 
-1. Build both executables:
+1. Build the executables:
    ```powershell
    go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
    go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
+   go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
    ```
 
 2. Run the installer to copy binaries and sync assets:
@@ -120,7 +121,7 @@ Installation takes about 30 seconds on Windows using PowerShell:
    ```powershell
    .\scripts\install.ps1 -VerifyOnly
    ```
-   It prints `install: verified - 10 file(s) match the repository, 0 warning(s)` and exits 0 only when every deployed artifact matches (the 10 artifacts are the overlay, the statusline shim, `protocol.js`, and the 7 files of the DeepSeek Harness bundle).
+   It prints `install: verified - 11 file(s) match the repository, 0 warning(s)` and exits 0 only when every deployed artifact matches (the 11 artifacts are the overlay, the statusline shim, the native hook `pet-hook.exe`, `protocol.js`, and the 7 files of the DeepSeek Harness bundle).
    The installer itself stops a running overlay first and waits for the process to release its file handles; a plain file copy over a live binary fails at random, which is what the retry loop and the SHA256 comparison after every copy are for.
 5. Optional — put `ai-terminal-pet` on your PATH so you can type the bare command:
    ```powershell
@@ -138,8 +139,8 @@ Installing a terminal hook is required for that terminal to report; see the next
 | Terminal | How to connect | What you get |
 |---|---|---|
 | OpenCode | Add `file:///C:/path/to/ai-terminal-pet/reporters/opencode.js` to `plugin` in `opencode.json` | Automatic session tracking for tool use, prompt handling, and task completion |
-| Claude Code | Add `node <repo>/reporters/claude-hook.js` for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and `Notification` in `settings.json` | Real-time status updates, tool execution tracking, and permission prompt alerts |
-| Antigravity | Set `statusLine.command` to `pet-statusline.exe` and configure `antigravity-hook.js` for agent and tool events | Fast statusline updates, agent state changes, and permission request forwarding |
+| Claude Code | Add `& "%LOCALAPPDATA%\AI-Terminal-Pet\pet-hook.exe" --mode=claude` for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and `Notification` in `settings.json`. `node <repo>/reporters/claude-hook.js` still works and is the fallback when you cannot run the `.exe`. | Real-time status updates, tool execution tracking, and permission prompt alerts |
+| Antigravity | Set `statusLine.command` to `pet-statusline.exe` and configure `pet-hook.exe --mode=antigravity` for agent and tool events (`antigravity-hook.js` is the fallback) | Fast statusline updates, agent state changes, and permission request forwarding |
 | DeepSeek Harness | Install the Cordis bundle from `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge\` via the plugin manager (`install_bundle`) | turn/start to working, tool/call to tool_use, approval/asked to waiting_permission, tool/result with an error to error, turn/end to idle, process exit to closed |
 | Anything else | Run `node reporters/generic.js` with `--source`, `--state`, and `--project` flags | Instant status reporting from any custom script or CLI tool |
 
@@ -245,7 +246,9 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 - **Windows only**: The overlay relies directly on Win32 layered windows and Windows named pipes; macOS and Linux are not supported.
 
-- **Process creation overhead**: Antivirus scanning hooks can make each Node.js process launch take roughly 1s; using the native `pet-statusline.exe` shim or adding an AV exclusion for the install folder reduces this latency. The delay comes from process scanning rather than application code.
+- **Process creation overhead**: Antivirus scanning hooks can make each Node.js process launch take roughly 1s; using the native `pet-hook.exe` / `pet-statusline.exe` binaries or adding an AV exclusion for the install folder reduces this latency. The delay comes from process scanning rather than application code.
+
+- **Low-integrity working directories**: If a whole directory tree carries a Low mandatory integrity label, executables inside it inherit that label, and a Low-integrity process cannot open the overlay's pipe (the overlay runs at Medium). Copy the binaries to the install directory or `%TEMP%` before testing from such a tree; the installed copies are unaffected.
 
 - **Named-pipe squatting**: Same-user pipe preemption is mitigated by acquiring a named mutex first, but it is not completely eliminated. A full challenge-response handshake remains documented for future hardening.
 
@@ -257,7 +260,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 ### Roadmap
 
-- **Native hook binary**: A unified `pet-hook.exe` executable to eliminate per-event Node.js spawns for Claude Code and Antigravity (planned).
+- **Native hook binary**: `pet-hook.exe` ships as the primary Claude Code and Antigravity reporter (`--mode=claude|antigravity`), and the JavaScript hooks remain as the reference implementation and fallback.
 
 - **Cross-platform support**: Extracting the UI layer behind a presenter interface with Unix domain socket transport for macOS and Linux (not started).
 
@@ -382,9 +385,10 @@ AI 编码终端 (Claude Code / OpenCode / Antigravity)
 本项目仅支持 Windows 平台。打开 PowerShell，按步骤执行构建与安装：
 
 ```powershell
-# 1. 编译主程序与原生状态栏 shim
+# 1. 编译主程序、原生状态栏 shim 与原生 hook
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
+go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
 
 # 2. 安装到系统本地目录并做哈希校验
 .\scripts\install.ps1
@@ -402,7 +406,7 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe 
 .\scripts\install.ps1 -AddToPath
 ```
 
-`scripts\install.ps1` 在安装时会自动停止正在运行的浮窗，等待系统进程释放文件句柄，并在拷贝后对主程序、状态栏 shim、协议脚本和插件包逐一执行 SHA256 哈希校验。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 10 file(s) match the repository, 0 warning(s)` 并以 0 退出（10 项 = 主程序 + 状态栏 shim + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
+`scripts\install.ps1` 在安装时会自动停止正在运行的浮窗，等待系统进程释放文件句柄，并在拷贝后对主程序、状态栏 shim、原生 hook（`pet-hook.exe`）、协议脚本和插件包逐一执行 SHA256 哈希校验。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 11 file(s) match the repository, 0 warning(s)` 并以 0 退出（11 项 = 主程序 + 状态栏 shim + `pet-hook.exe` + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
 
 第 5 步是可选的：`-AddToPath` 只写 `HKCU\Environment\Path`（绝不碰 `HKLM`），写入前先把原值备份到 `<安装目录>\path-backup.txt`，目录已在 PATH 中时不做任何改动；**改完要新开一个终端**才生效；`-Uninstall` 卸载时会一并移除这条 PATH 记录（原值同样先备份，备份位置改为 `%TEMP%`），不会留下指向已删目录的死条目。不加这个开关时安装脚本不会动 PATH，请继续用全路径 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
 
@@ -419,8 +423,8 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe 
 | 终端 | 怎么接 | 得到什么 |
 |---|---|---|
 | OpenCode | 在 `opencode.json` 的 `plugin` 列表中加入 `file:///C:/path/to/ai-terminal-pet/reporters/opencode.js`。修改配置后重启 OpenCode 即可生效。 | 执行中、工具调用、思考中等状态实时上报。 |
-| Claude Code | 在 `settings.json` 的 hooks 配置中，为 `SessionStart`、`PreToolUse`、`Stop`、`PermissionRequest` 等挂载 `node <repo>/reporters/claude-hook.js`。 | 权限确认拦截、工具执行状态与 5 秒否决倒计时。 |
-| Antigravity | 将 `statusLine.command` 指向 `pet-statusline.exe`，并在事件配置中注册 `antigravity-hook.js`。 | 亚秒级状态栏响应、Agent 思考与权限确认聚合。 |
+| Claude Code | 在 `settings.json` 的 hooks 配置中，为 `SessionStart`、`PreToolUse`、`Stop`、`PermissionRequest` 等挂载 `& "%LOCALAPPDATA%\AI-Terminal-Pet\pet-hook.exe" --mode=claude`；不能运行 `.exe` 的环境退回 `node <repo>/reporters/claude-hook.js`。 | 权限确认拦截、工具执行状态与 5 秒否决倒计时。 |
+| Antigravity | 将 `statusLine.command` 指向 `pet-statusline.exe`，并在事件配置中注册 `pet-hook.exe --mode=antigravity`（退回方案是 `antigravity-hook.js`）。 | 亚秒级状态栏响应、Agent 思考与权限确认聚合。 |
 | DeepSeek Harness | 在官方插件管理器中运行 `install_bundle`，传入 `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge\` 的绝对路径。 | 真实事件映射：turn/start→working、tool/call→tool_use、approval/asked→waiting_permission、tool/result 出错→error、turn/end→idle、进程退出→closed。 |
 | 其他任意 CLI | 在状态变化时调用 `reporters/generic.js`。支持通过命令行参数或标准输入管道传递状态。 | 一行脚本接入任意外部 CLI 或自定义脚本任务。 |
 
@@ -524,7 +528,8 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 ### 已知限制
 
 - **仅限 Windows**：仅基于 Win32 分层窗口与 Windows 命名管道构建，不支持 macOS 或 Linux。
-- **杀毒软件增加进程启动开销**：在部分开启杀毒软件钩子的机器上，频繁启动 Node 进程会导致可感知的延迟；建议使用原生状态栏 shim 并为安装目录配置杀毒排除项。
+- **杀毒软件增加进程启动开销**：在部分开启杀毒软件钩子的机器上，频繁启动 Node 进程会导致可感知的延迟；建议改用原生 `pet-hook.exe` / `pet-statusline.exe`，并为安装目录配置杀毒排除项。
+- **低完整性工作目录**：若整棵目录树带 Low 强制完整性标签，其中的可执行文件继承该标签，而 Low 完整性进程打不开浮窗的命名管道（浮窗跑在 Medium）。在这种目录里直接用 `bin\` 下的二进制测试会静默投递不到，请先复制到安装目录或 `%TEMP%` 再跑；安装后的副本不受影响。
 - **同用户管道抢占未根除**：通过互斥体优先排序缓解了同用户命名管道被抢占的风险，但尚未实现基于独占标志的彻底根除。
 - **倒计时时长修改需重启**：自动同意倒计时时长在程序启动时一次性载入，修改该配置项需要重启浮窗进程方可生效，其余配置项均支持热加载。
 - **缺少像素级视觉回归测试**：纯逻辑、几何计算与命中测试具备完整的单元测试覆盖，并提供了 PNG 预览渲染，但目前尚未接入像素级别的自动化视觉回归测试。
@@ -534,7 +539,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 以下为当前计划进行的改进项：
 
-- **上报端原生化**：计划开发统一的原生二进制 `pet-hook.exe`（支持 `--mode=claude|antigravity`），替代每次事件拉起 Node 运行时的开销。
+- **上报端已原生化**：`pet-hook.exe`（`--mode=claude|antigravity`）是 Claude Code 与 Antigravity 的正式上报端，JavaScript hook 保留为参照实现与降级路径。
 - **跨平台抽象探索**：计划将窗口渲染层抽象为通用接口，为后续探索基于 Unix 域套接字的平台移植奠定结构基础。
 - **二进制体积压缩**：计划将主程序体积从现状 4.17 MiB 降至 2.5 MiB 以内。手段包括剥离无用反射元数据、去掉未用包，以及把 pet-statusline 里基于 regexp 的脱敏规则改成手写扫描器。
 

@@ -1078,8 +1078,8 @@ DPI 感知探针（150%）：
 纯 ASCII（PowerShell 5.1 读无 BOM 脚本按 ANSI 代码页，非 ASCII 会乱码）。行数与字节数都会随每次增强
 变动，故不记——需要具体值时以工作区文件为准。
 
-- `-VerifyOnly`：只读。按**同一份 10 项制品清单**（overlay / statusline / protocol / bundle manifest 2 / bundle runtime 5）
-  逐项比对工作区与已部署侧的 SHA256，全对才 `install: verified - 10 file(s) match the repository` + exit 0。
+- `-VerifyOnly`：只读。按**同一份 11 项制品清单**（overlay / statusline / hook / protocol / bundle manifest 2 / bundle runtime 5）
+  逐项比对工作区与已部署侧的 SHA256，全对才 `install: verified - 11 file(s) match the repository` + exit 0。
 - `-Uninstall`：先 `Assert-SafeInstallDirectory`（拒绝盘根、拒绝目录名不是 `AI-Terminal-Pet`，`-Force` 也绕不过），
   无 `-Force` 时要求手输 `yes`（无控制台则 exit 2），最多 20 次 `Stop-Process` + 最多 5 次删除重试；
   只删指向被删目录的 `AITerminalPet` Run 值，并调用 `Remove-InstallDirectoryFromUserPath` 清掉 `-AddToPath`
@@ -1842,7 +1842,15 @@ git 无法在一个提交里引用它自己或它的后继，钉死的数字只�
 | awesome-dsh-plugin 站点 `plugins.json` | 条目已在，但 `install` 仍渲染 1.2.3 | 等站点重建 |
 
 判断「是否真的可见」看**对方的公开索引文件**（`plugins.json` / `registry.json` / `public/index.json`），
-不要只看 PR/issue 状态——这是这次交接里唯一新增的教训（dshopen 已收录，但线上索引仍是旧构建，854 条、0 条 git 源）。
+不要只看 PR/issue 状态——这是这次交接里唯一新增的教训（dshopen 已收录，但当时线上索引仍是旧构建，854 条、0 条 git 源）。
+
+**2026-11-11 追补（已复核）**：dshopen **已经渲染出来了**。`https://dshopen.org/index.json` 现在返回
+**1,207 条**，其中包含本包 `dsh-ai-terminal-pet` **1.2.4**，`source.type: git`、
+`source.commit: ff7f6de7d87a7a4d99c06e3a9a68e9a4b417b0a9`、`path: packages/dsh-ai-terminal-pet`、
+分类 `integrations`、标签 `verified` + `updated-recent`。上面那条「854 条」当时看的是仓库内的
+`raw.githubusercontent.com/polang233/dsh-plugin-index/main/public/index.json`，那个文件是**未重新构建的
+仓库副本**，与站点实际提供的索引**不是同一份**。教训再收紧一格：**要读对方站点域上的索引文件，
+不要读它仓库里的 `public/` 目录**——后者可能落后于一次构建。
 
 ### 28.4 npm：唯一必须由人做的一步
 
@@ -1879,7 +1887,7 @@ npm publish            # 需要一次性密码；发布 1.2.4，access public
 - **`integrations/deepseek-harness/ai-terminal-pet-bridge/`**（`index.js` 7,780 B、`package.json` 495 B、
   `cordis.patch.yml` 355 B、`icon.svg` 526 B、`locale/{en,zh}.json` 各 223 B、`README.md` 2,712 B）
   是**旧的 host-only 接法**，与新插件包并存是故意的：`scripts/install.ps1` 仍把它拷进
-  `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge`（10 项制品清单里占 7 项），
+  `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge`（11 项制品清单里占 7 项），
   `integrations/deepseek-harness/verify.mjs` 与 CI 仍校验它，README 的 connect 表仍把「已装了整仓」
   的用户指向它。删掉它 = 同时打断安装脚本的制品清单、CI 一步校验与一条用户路径。
   它与插件包的 `icon.svg` 恰好逐字节相同（同一次改版留下的），这也不是错。
@@ -1901,4 +1909,95 @@ scripts/install.ps1 -VerifyOnly                     -> 10 file(s) match the repo
 ```
 
 本次交接只改文档与 `.gitignore`，**没有碰任何代码、清单、包内 README 或索引**，
-所以不需要新 tag，也不需要重发 Release。
+所以不需要新 tag，也不需要重发 Release。（上表是 §28 当时的口径：那时还没有 `pet-hook.exe`，
+制品是 10 项、`internal` 是 9 个包；§29 交付原生 hook 之后变成 11 项 / 10 个包 + `cmd/pet-hook`。）
+
+## 29. 上报端原生化：`pet-hook.exe` 与 `internal/reporter`（2026-11-11）
+
+本节是 ROADMAP §E1 的施工记录。**不影响已发布的 1.2.4 包**：`packages/dsh-ai-terminal-pet/`
+目录内除 `scripts/vendor.mjs` 的摘要作用域外没有改动，`vendor/AI-Terminal-Pet.exe` 字节未变，
+`vendor/manifest.json` 也**没有**重新生成（摘要仍等于 `cf647af1aa1f45d1ed6f0df7b97e7e1439272f87064009e1989f1bfbd63db29a`）。
+
+### 29.1 为什么做，以及为什么是现在
+
+本机创建进程约 1 s（AV 钩挂），而 `claude-hook.js` / `antigravity-hook.js` 每一次宿主事件都要起一个
+`node`。`pet-statusline.exe` 已经是这条路的先例，直接把它的骨架（stdin 解析 → 事件映射 → 快照 →
+管道投递）提出来，加上 `--mode` 分派就够了。
+
+### 29.2 结构：为什么多了一个 `internal/reporter`
+
+```
+cmd/pet-hook/           --mode=claude|antigravity，读 stdin，写 {} 到 stdout
+      │
+      └──► internal/reporter/   ← 新增，共享内核
+             reporter.go   bounded id / 脱敏 / 稳定 PID / 时间戳钳制
+             payload.go    与 session.Session 对齐的 wire payload
+             send.go       快照落盘 → 拨号 → 写一行 → 只认 "OK"；启动浮窗
+             approval.go   审批握手（pending-*.json 轮询）
+             hook.go       hook 事件名 → session.State 的映射表
+```
+
+**关键决定**：`pet-statusline` 里那套 helper 不复制一份到 `pet-hook`。两处各写一遍意味着
+「与 `reporters/protocol.js` 保持一致」这条契约从此有两个可能各自漂移的实现；收进一个包之后，
+它可以被单元测试钉住，而不是靠人眼比对。17 个测试覆盖脱敏边界、id 截断、UTF-16 FNV-1a PID、
+时间戳钳制、审批决策树与投递语义。
+
+`cmd/pet-statusline` **本次没有迁移**到 `internal/reporter`。它工作正常、有独立测试，而在一个
+「加一条上报路径」的提交里顺手重构既有的那一条，会把两件事的回滚半径绑在一起。下次动它时再迁。
+
+### 29.3 一个真实缺陷：`Send` 对「永远打不开」也重试满预算
+
+原实现里任何一次拨号失败都会重试到 750 ms 预算用完。宿主是同步等上报进程结束的，所以当投递
+**不可能成功**时，这 750 ms 是纯加在开发者每一次事件上的延迟。现在 `retryableDialError` 只把
+`ENOENT` / `ERROR_FILE_NOT_FOUND`（还没监听）与 `ERROR_PIPE_BUSY`（实例占满）算可重试；
+`ERROR_ACCESS_DENIED` 立即返回，且不再触发启动浮窗（启动了也打不开）。
+
+### 29.4 为什么会遇到「Access is denied」——**不是产品缺陷**
+
+本机仓库目录 `C:\Users\rongj\Desktop\项目开发\ai-terminal-pet` 带 **Low 强制完整性标签**
+（`icacls <repo> /q` 显示 `Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)`；同级还有
+`DSH-Addition`、`oh_my_3Dcharacter`、`oh_my_3dlab`，`oh_my_3Dworld` 等则是正常的）。
+**从该目录里的文件启动的进程一律继承 Low IL**，而浮窗跑在 Medium IL、管道 DACL 只给
+`OWNER RIGHTS` + `SYSTEM`，Low IL 永远打不开。同样的字节复制到 `%TEMP%`、`C:\Users\rongj`
+或 `%LOCALAPPDATA%\AI-Terminal-Pet` 就落回 Medium IL 并正常投递（已用同 sha256 双份验证）。
+
+复现与判读：
+
+```powershell
+icacls . /q | Select-String 'Mandatory'      # 有 Low 行 → 从这里跑出来的进程投递不到
+icacls "$env:TEMP" /q | Select-String 'Mandatory'  # 无 → 放在这里的进程可以
+```
+
+因此：**从仓库里直接跑 `bin\pet-hook.exe` 或 `bin\pet-statusline.exe` 投递不到浮窗是预期行为**；
+安装到 `%LOCALAPPDATA%` 的副本不受影响，`scripts\install.ps1` 装的正是副本。
+管道 ACL `D:P(A;;GRGW;;;OW)(A;;GRGW;;;SY)` 因此**保持不变**——改它等于为了让一个环境标签生效
+而放宽全局安全边界。
+
+如果哪天要在一台「整棵工作区都被标成 Low IL」的机器上直接验证，把两个 exe 复制到
+`%TEMP%` 再跑，不要改代码。
+
+### 29.5 安装器与 CI 的改动
+
+- `scripts/install.ps1`：新增 `$HookSource` / `$HookDestination`，制品清单从「五类」变「六类」
+  （新增 `hook` 分组），`-Destination` 演练会把 `-HookDestination` 一起带走，
+  `-VerifyOnly` 的分组顺序里加了 `hook`，卸载时的进程列表加了 `pet-hook`。
+  演练实测：安装 **11 file(s)** → `-VerifyOnly` 11/11 匹配、0 warning → `-Uninstall -Force` 干净。
+  脚本仍是**纯 ASCII**（0 个非 ASCII 字节，PowerShell 5.1 会按 ANSI 读 BOM-less 脚本）。
+- `.github/workflows/ci.yml`：新增 `Build the hook binary` 步骤。
+- `packages/dsh-ai-terminal-pet/scripts/vendor.mjs`：`NON_OVERLAY_PACKAGES =
+  ['cmd/pet-hook/', 'internal/reporter/']`。摘要原本扫 `cmd/` + `internal/` 下全部非测试 `.go`，
+  但这两个包根本不进浮窗二进制；不排除就会为一个「不可能改变浮窗一个字节」的改动逼着重新 vendor
+  1.2.4 的清单。`cmd/pet-statusline` **故意不排除**：它自 1.0.0 起就在每一份 manifest 里。
+  改完之后 `vendor.mjs --check` 由 exit 2 回到 **exit 0**。
+
+### 29.6 实测数字（同 payload、同机器）
+
+| 路径 | 首跑 | 稳态 |
+|---|---|---|
+| `pet-hook.exe`（native） | 513 ms | **51–73 ms** |
+| `node reporters/claude-hook.js` | 584 ms | **93–157 ms** |
+| `pet-hook.exe` 低完整性（被拒，修复前） | — | 829–862 ms |
+| `pet-hook.exe` 低完整性（被拒，修复后） | — | **89–119 ms** |
+
+两侧都从 `%TEMP%` 启动以排除 §29.4 的完整性差异。测量工具是一次性的 Go harness
+（直接 `exec.Command`，不经 `cmd /c`），用完即删。

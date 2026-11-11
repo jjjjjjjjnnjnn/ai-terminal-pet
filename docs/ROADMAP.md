@@ -457,13 +457,38 @@ hook 建 `pending-<source>-<session>-<pid>-<epochMs>.json` 后每 100 ms 轮询�
 `perSourceColor`（按 source 指定强调色）、`hidden`（启动即隐藏到托盘）。
 `internal/config` 的「缺字段用默认」解码方式未变，加字段仍不会破坏旧文件。
 
-### E1 — 把 Node 上报端全部原生化（收益最高）⏳ 未开工
+### E1 — 把 Node 上报端全部原生化（收益最高）✅ 已交付（2026-11-11）
 **动机**：本机每创建一个进程约 **1 s**（AV 钩挂），而 `claude-hook.js` / `antigravity-hook.js`
 每次事件都要起一个 `node`（实测 `node -e exit` 0.9–1.2 s）。`pet-statusline.exe` 已经是这条路的先例：
 Go 原生 shim 稳态 0.5–0.9 s，比 node 路径的 13–17 s（经 runner）低一个数量级。
-**做法**：在 `cmd/` 下加 `pet-hook.exe`，复用 `pet-statusline` 的 stdin 解析 + 状态映射 + 管道投递骨架，
-用 `--mode=claude|antigravity` 区分事件映射。三个 JS hook 保留为参照实现与降级路径。
-**验收**：同 payload 下原生与 JS 输出同一 session PID（FNV-1a UTF-16 已对齐）与同一 state。
+**做法**：`cmd/pet-hook`（`--mode=claude|antigravity`）承接 Claude Code 与 Antigravity 的事件映射。
+解析、脱敏、id 截断、FNV-1a PID、时间戳钳制、快照落盘、管道投递与审批握手全部下沉到新包
+`internal/reporter`，`pet-statusline` 与 `pet-hook` 共用同一份实现，避免与 `reporters/protocol.js` 三方漂移。
+三个 JS hook 保留为参照实现与降级路径。CI 增加 `Build the hook binary`，
+`scripts/install.ps1` 增加 `hook` 分组（第 6 类产物），`vendor.mjs` 的源码摘要改为排除
+`cmd/pet-hook/` 与 `internal/reporter/`：这两个包不进浮窗二进制，改它们不该逼着 1.2.4 的
+`vendor/manifest.json` 重新生成。
+
+**验收（已满足）**：同 payload 下原生与 JS 输出同一 session PID（FNV-1a UTF-16 已对齐）与同一 state，
+`internal/reporter` 17 个单测 + `cmd/pet-hook` 13 个单测全绿。
+
+**实测（同 payload、同机器、皆从 `%TEMP%` 启动以排除下面那条完整性问题）**：
+`pet-hook.exe` 稳态 **51–73 ms**，`claude-hook.js` **93–157 ms**；首跑分别是 513 ms 与 584 ms（冷启动）。
+
+**顺带修掉一个真实缺陷**：`Send` 原来对所有拨号错误一视同仁地重试满 750 ms 预算。
+当进程**永远**打不开管道时（见下），这 750 ms 是纯加在宿主每次事件上的延迟。
+现在 `send.go` 用 `retryableDialError` 只把 `ENOENT`/`ERROR_FILE_NOT_FOUND`（还没监听）与
+`ERROR_PIPE_BUSY`（实例占满）当作可重试，`ERROR_ACCESS_DENIED` 立即返回且不再触发启动浮窗。
+低完整性场景下 `pet-hook` 从 **829–862 ms** 降到 **89–119 ms**。
+
+**一个必须记下来的环境事实**：本机的仓库目录
+`C:\Users\rongj\Desktop\项目开发\ai-terminal-pet` 带着 **Low 强制完整性标签**
+（`icacls` 显示 `Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)`），同级的 `DSH-Addition`、
+`oh_my_3Dcharacter`、`oh_my_3dlab` 也一样。**从该目录里的文件启动的进程一律继承 Low IL**，
+而浮窗跑在 Medium IL，其管道 DACL 只给 `OWNER RIGHTS` + `SYSTEM`——Low IL 进程永远打不开。
+同样的字节复制到 `%TEMP%` 或安装目录就落回 Medium IL 并正常投递（已用同 sha256 双份验证）。
+所以：**从仓库里直接跑 `bin\pet-hook.exe` 投递不到浮窗是预期的**，不是产品缺陷；
+管道 ACL 保持 `D:P(A;;GRGW;;;OW)(A;;GRGW;;;SY)` 不变，真机安装到 `%LOCALAPPDATA%` 不受影响。
 
 ### E2 — 通用接入成为一等公民 ✅ 已交付（2026-11-10，见 §1i）
 

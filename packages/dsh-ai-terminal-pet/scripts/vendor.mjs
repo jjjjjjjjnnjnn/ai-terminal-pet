@@ -82,7 +82,7 @@ const CHECK_HINT = [
 ].join('\n')
 
 const STALE_HINT = [
-  'scripts/vendor.mjs --check: the vendored overlay predates a change under cmd/ or internal/.',
+  'scripts/vendor.mjs --check: the vendored overlay predates a change to a Go file it is built from.',
   'Refresh it with `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs` (copy mode) and commit the regenerated vendor/manifest.json.',
   '',
 ].join('\n')
@@ -125,12 +125,34 @@ function walkGoSources(dir, found) {
  * `<slash path>\0<sha256 of the file>\n` folded into a single sha256. Sorting
  * makes the digest independent of directory order, and hashing the path as well
  * as the bytes means a rename or a move between packages counts as a change.
+ *
+ * NON_OVERLAY_PACKAGES is what keeps that question honest as the repository
+ * grows. The sweep below covers cmd/ and internal/, but not all of it is linked
+ * into AI-Terminal-Pet.exe: cmd/pet-hook and internal/reporter are a separate
+ * binary. Without this list, adding a hook that the overlay never imports would
+ * change the digest, force a re-vendor, and leave the released package's
+ * manifest describing a tree it was not built from - for a change that cannot
+ * possibly affect one byte of the overlay.
+ *
+ * cmd/pet-statusline is deliberately NOT in the list even though it is equally
+ * unlinked. It has been part of every manifest since 1.0.0, so listing it here
+ * would rewrite a released manifest's digest without any build-related reason.
+ * Add new non-overlay packages; leave the historical set alone.
  */
+const NON_OVERLAY_PACKAGES = ['cmd/pet-hook/', 'internal/reporter/']
+
+function isOverlaySource(relative) {
+  return !NON_OVERLAY_PACKAGES.some((prefix) => relative.startsWith(prefix))
+}
+
 function sourceDigest() {
   const found = []
   for (const root of SOURCE_ROOTS) {
     const dir = path.join(repoDir, root)
-    if (existsSync(dir)) walkGoSources(dir, found)
+    if (!existsSync(dir)) continue
+    const collected = []
+    walkGoSources(dir, collected)
+    for (const relative of collected) if (isOverlaySource(relative)) found.push(relative)
   }
   found.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
   const fold = createHash('sha256')

@@ -29,6 +29,13 @@ reporters/*.js  ──[named pipe / JSON-lines]──►  cmd/ai-terminal-pet (G
   rotation, bootstrap.
 - `cmd/pet-statusline/`: high-performance native statusline shim (avoids the Node.js startup penalty
   under Windows AV hooks).
+- `cmd/pet-hook/`: native hook reporter, `--mode=claude|antigravity`. Reads one hook payload on stdin
+  and reports it without spawning Node. The JavaScript hooks in `reporters/` remain the reference
+  implementation and the fallback.
+- `internal/reporter/`: the reporter core shared by `cmd/pet-hook` (and, eventually, `cmd/pet-statusline`):
+  redaction, bounded ids, stable PID (FNV-1a over UTF-16), timestamp clamps, snapshot write, pipe
+  delivery, approval handshake, hook-event→state mapping. Anything that must match
+  `reporters/protocol.js` belongs here so it can be unit-tested instead of eyeballed.
 - `internal/ui/`: Win32 layered overlay — GDI canvas rasterization (`CreateDIBSection` +
   `UpdateLayeredWindow`, **no GDI+**), panel layout, tray icon, click/drag/wheel gestures, three-tab
   settings window, synthesized alert tones, per-session alerts, auto-approve countdown, jump-to-terminal.
@@ -51,7 +58,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (154 func Test across 9 internal packages)
+# 1. Static analysis and all unit tests (184 func Test across 10 internal packages + cmd/pet-hook)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -63,6 +70,7 @@ node integrations/deepseek-harness/verify.mjs
 # 3. Production build
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
+go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
 
 # 4. Install, then let the shipped binary prove the install
 .\scripts\install.ps1

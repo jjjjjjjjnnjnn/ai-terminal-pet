@@ -37,12 +37,14 @@
 
 ---
 
-## [Unreleased] — 2026-11-10
+## [Unreleased] — 2026-11-10 / 2026-11-11
 
 这一批不发新版本号（`internal/app/app_windows.go` 里的 `Version` 仍是 `0.9.0`），
 目的是让这个仓库在**别人的机器上**也能跑通、自查、接入与持续验证：可移植性、`--doctor` 自检、
 正式线协议文档、安装脚本的只读/卸载/Path 开关，以及 GitHub Actions 门禁。详细 runbook 见
 [docs/HANDOVER.md](docs/HANDOVER.md) §1（当前状态）与 [docs/ROADMAP.md](docs/ROADMAP.md) §1i。
+2026-11-11 追加的这一批把上报端原生化（ROADMAP §E1）：新增 `cmd/pet-hook` 与 `internal/reporter`，
+施工记录见 HANDOVER §29。浮窗本体仍是 0.9.0，安装器制品由 10 项变 11 项。
 
 ### Added
 
@@ -378,9 +380,33 @@
   `publishTimestamp` 为 Unix 秒、版本精确 SemVer。`marketInstallTarget` 产出的 spec 已实测安装成功
   （`git+…#<commit>&path:/packages/dsh-ai-terminal-pet` 这一形态，全新 `DSH_HOME` + 独立 profile，2.5 s）。
 
+- **`cmd/pet-hook`：原生 hook 二进制**（`--mode=claude|antigravity`）——取代每次事件拉起
+  一个 `node` 的开销，是 ROADMAP §E1 的交付物。`reporters/claude-hook.js` 与
+  `reporters/antigravity-hook.js` 保留为参照实现与降级路径：两者对同一 payload 必须产出同一
+  session PID（FNV-1a over UTF-16）与同一 `state`。
+  实测（同 payload、同机器、双方都从 `%TEMP%` 启动）：`pet-hook.exe` 稳态 **51–73 ms**，
+  `claude-hook.js` **93–157 ms**；首跑 513 ms vs 584 ms。构建产物 3,696,128 B。
+- **`internal/reporter`：上报端共享内核**（`reporter.go` / `payload.go` / `send.go` /
+  `approval.go` / `hook.go` + 两个测试文件，17 个 `func Test`）。把脱敏、id 截断、稳定 PID、
+  时间戳钳制、快照落盘、管道投递、审批握手与 hook 事件到状态的映射收进一个包，让
+  `pet-statusline` 与 `pet-hook` 不可能各自漂移，也让「与 `reporters/protocol.js` 保持一致」
+  变成可测的断言而不只是约定。
+- **`scripts/install.ps1` 增加第 6 类产物 `hook`**：`pet-hook.exe` 现在与主程序、状态栏 shim、
+  `protocol.js` 和 bundle 一起被安装、被 `-VerifyOnly` 逐文件校验、被 `-Uninstall` 清理。
+  `-Destination` 演练目录也会带着 `-HookDestination` 一起走，不会出现「一个文件落进演练目录、
+  其余的落进真实安装目录」。脚本仍是纯 ASCII（0 个非 ASCII 字节）。
+- **CI 增加 `Build the hook binary` 步骤**：`pet-hook.exe` 编不出来就等于 Claude Code /
+  Antigravity 每次事件都失败，所以它必须和另外两个二进制一起被构建门禁覆盖。
+
 ### Changed
 
-- **构建命令统一加 `-buildvcs=false`**：`go build -trimpath -ldflags "-s -w"` →
+- **`vendor.mjs` 的源码摘要改为排除非浮窗包**（`NON_OVERLAY_PACKAGES = ['cmd/pet-hook/',
+  'internal/reporter/']`）：摘要原本扫 `cmd/` + `internal/` 下全部非测试 `.go`，但这两个包根本
+  不进 `AI-Terminal-Pet.exe`。不排除的话，加一个浮窗用不到的 hook 就会让 1.2.4 的
+  `vendor/manifest.json` 摘要失配，逼着为一个「不可能改变浮窗一个字节」的改动重新 vendor。
+  `cmd/pet-statusline` **故意不在排除名单里**：它自 1.0.0 起就出现在每一份 manifest 里，
+  现在把它排除等于无端重写一份已发布清单的摘要。
+：`go build -trimpath -ldflags "-s -w"` →
   `go build -trimpath -buildvcs=false -ldflags "-s -w"`，四处同步——`scripts/install.ps1` 的缺失文件提示、
   `.github/workflows/ci.yml` 的两条 build 步骤、`AGENTS.md` 的 Production build、README 的安装步骤。
   **为什么必须加**：不加时二进制里带一块 VCS 戳记，而戳记含构建时的 commit 与工作区状态，所以同一个
@@ -433,7 +459,20 @@
 
 ### Fixed
 
-- **CI 曾经变红在 `vendor:check`，根因不是代码错**（`d06001d` 之后）：`go.mod` 里的 `go 1.23.0` 是
+- **上报端在「永远打不开管道」时要白等满整个重试预算**：`Send` 原来把所有拨号错误一视同仁，
+  失败就重试到 750 ms 预算用完。宿主是同步等上报进程结束的，所以当投递**不可能成功**时，
+  这 750 ms 是纯加在开发者每一次事件上的延迟。现在 `internal/reporter/send.go` 用
+  `retryableDialError` 分类：只有 `ENOENT`/`ERROR_FILE_NOT_FOUND`（浮窗还没监听）与
+  `ERROR_PIPE_BUSY`（实例占满）算可重试，`ERROR_ACCESS_DENIED` 立即返回、且不再触发启动浮窗
+  （启动了也打不开）。低完整性场景下实测 `pet-hook` 由 **829–862 ms** 降到 **89–119 ms**。
+  新增两个测试：错误分类表，以及一个 DACL 只给 SYSTEM 的真实管道——后者断言 `Send` 在
+  300 ms 内返回而不是耗满 750 ms。
+  **触发这条路径的真实原因不是产品缺陷**：本机仓库目录带着 Low 强制完整性标签
+  （`icacls` 显示 `Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)`），从该目录里的文件启动的
+  进程一律是 Low IL，而浮窗跑在 Medium IL、管道 DACL 只给 `OWNER RIGHTS` + `SYSTEM`。
+  同 sha256 的副本放到 `%TEMP%` 或安装目录就落回 Medium IL 并正常投递。管道 ACL 因此保持不变，
+  详见 [docs/ROADMAP.md](docs/ROADMAP.md) §E1。
+（`d06001d` 之后）：`go.mod` 里的 `go 1.23.0` 是
   **下限不是钉版本**，CI runner 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的二进制字节不同——
   **跨工具链字节相等从来不可能达成**，那一步当时是拿一个达不到的条件当门禁。修法是把断言换成能达成的：
   `vendor/manifest.json` 记录**源码摘要**（25 个非测试 `.go` 文件）与两个 vendor 文件自己的哈希，

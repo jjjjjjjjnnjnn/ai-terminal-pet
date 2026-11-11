@@ -16,6 +16,8 @@ param(
   [string]$Destination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\AI-Terminal-Pet.exe'),
   [string]$ShimSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'bin\pet-statusline.exe'),
   [string]$ShimDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\pet-statusline.exe'),
+  [string]$HookSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'bin\pet-hook.exe'),
+  [string]$HookDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\pet-hook.exe'),
   [string]$ProtocolSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'reporters\protocol.js'),
   [string]$ProtocolDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\protocol.js'),
   [string]$BundleSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'integrations\deepseek-harness\ai-terminal-pet-bridge'),
@@ -46,13 +48,16 @@ $InstallDirectory = Split-Path -Parent $Destination
 if ($InstallDirectory) { $InstallDirectory = [System.IO.Path]::GetFullPath($InstallDirectory) }
 
 # -Destination is the documented escape hatch for rehearsing against a scratch
-# directory, so the three sibling destinations must follow it. Without this an
+# directory, so the four sibling destinations must follow it. Without this an
 # explicit -Destination would copy one exe into the scratch directory and the
-# other nine files into the live install - which is worse than not offering the
+# rest of the files into the live install - which is worse than not offering the
 # override at all.
 if ($PSBoundParameters.ContainsKey('Destination')) {
   if (-not $PSBoundParameters.ContainsKey('ShimDestination')) {
     $ShimDestination = Join-Path $InstallDirectory 'pet-statusline.exe'
+  }
+  if (-not $PSBoundParameters.ContainsKey('HookDestination')) {
+    $HookDestination = Join-Path $InstallDirectory 'pet-hook.exe'
   }
   if (-not $PSBoundParameters.ContainsKey('ProtocolDestination')) {
     $ProtocolDestination = Join-Path $InstallDirectory 'protocol.js'
@@ -95,7 +100,7 @@ function Copy-InstalledBinary {
   )
   $parent = Split-Path -Parent $To
   New-Item -ItemType Directory -Path $parent -Force | Out-Null
-  $names = @('AI-Terminal-Pet', 'pet-statusline')
+  $names = @('AI-Terminal-Pet', 'pet-statusline', 'pet-hook')
   for ($attempt = 1; $attempt -le 20; $attempt++) {
     $running = Get-Process -Name $names -ErrorAction SilentlyContinue
     if ($running) {
@@ -112,7 +117,7 @@ function Copy-InstalledBinary {
   }
 }
 
-# The install is five classes of files. Keeping them in one list means the
+# The install is six classes of files. Keeping them in one list means the
 # installer, the verifier and the uninstaller can never disagree about what
 # "installed" means - and a verifier that checks a different set than the
 # installer writes is exactly how a stale protocol.js survived an upgrade in
@@ -125,6 +130,7 @@ function Get-InstallArtifacts {
   $items = @(
     @{ Group = 'overlay'; Label = 'AI-Terminal-Pet.exe'; From = $Source; To = $Destination; Binary = $true },
     @{ Group = 'statusline'; Label = 'pet-statusline.exe'; From = $ShimSource; To = $ShimDestination; Binary = $true },
+    @{ Group = 'hook'; Label = 'pet-hook.exe'; From = $HookSource; To = $HookDestination; Binary = $true },
     @{ Group = 'protocol'; Label = 'protocol.js'; From = $ProtocolSource; To = $ProtocolDestination; Binary = $false }
   )
   foreach ($relative in $bundleFiles) {
@@ -198,7 +204,7 @@ function Assert-SafeInstallDirectory {
 # intact instead of taking the installer's word for it.
 function Invoke-VerifyOnly {
   $items = Get-InstallArtifacts
-  $groupOrder = @('overlay', 'statusline', 'protocol', 'bundle manifest', 'bundle runtime')
+  $groupOrder = @('overlay', 'statusline', 'hook', 'protocol', 'bundle manifest', 'bundle runtime')
   $stats = @{}
   foreach ($group in $groupOrder) { $stats[$group] = @{ Files = 0; Failed = 0; Warned = 0 } }
   $failures = 0
@@ -274,7 +280,7 @@ function Invoke-VerifyOnly {
 # holding the directory so Remove-Item can actually succeed. Reporters relaunch
 # the overlay, so a single Stop-Process can lose the race.
 function Stop-InstalledProcesses {
-  $names = @('AI-Terminal-Pet', 'pet-statusline')
+  $names = @('AI-Terminal-Pet', 'pet-statusline', 'pet-hook')
   for ($attempt = 1; $attempt -le 20; $attempt++) {
     $running = Get-Process -Name $names -ErrorAction SilentlyContinue
     if (-not $running) { return $true }
@@ -508,6 +514,7 @@ try {
       $message = $message + $NewLine + 'Build the binaries first, from the repository root (copy-paste):' + $NewLine
       $message = $message + '  go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe .\cmd\ai-terminal-pet' + $NewLine
       $message = $message + '  go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe .\cmd\pet-statusline' + $NewLine
+      $message = $message + '  go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe .\cmd\pet-hook' + $NewLine
     }
     if ($missingOther.Count -gt 0) {
       $message = $message + $NewLine + 'The reporter protocol or the Harness bundle is missing from the checkout; restore it with:' + $NewLine
@@ -583,7 +590,8 @@ if ($AddToPath) {
 Write-Output ''
 Write-Output ('install: ok - ' + $Items.Count + ' file(s) copied and hash-verified into ' + $InstallDirectory)
 
-Get-Item -LiteralPath $Destination, $ShimDestination, $ProtocolDestination | Select-Object FullName, Length, LastWriteTime
+Get-Item -LiteralPath $Destination, $ShimDestination, $HookDestination, $ProtocolDestination | Select-Object FullName, Length, LastWriteTime
 Get-Item -LiteralPath $BundleDestination | Select-Object FullName, LastWriteTime
 
 if ($PathFailed) { exit 1 }
+
