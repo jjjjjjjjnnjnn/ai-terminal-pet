@@ -30,13 +30,10 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-未发布版本：见下方两个 `[Unreleased]` 段——2026-11-10/11 在 v0.9.0 之上完成的文档、自检工具、安装脚本与 CI 改动，
-以及 2026-11-11 的宣传准备批（便携 zip、`install.cmd` 入口、仓库门面），版本常量仍是 `0.9.0`，尚未发版。
-**注意浮窗本体与 DSH 插件包是两条版本线**：浮窗本体停在 `0.9.0`，
-插件包（
-`packages/dsh-ai-terminal-pet/`）走自己的 `1.x` 与 `dsh-plugin-v1.x.y` tag，当前 **1.2.5**。
-
----
+未发布版本：**已全部发版**。浮窗本体是 **1.0.0**（tag `pet-v1.0.0`），插件包是 **1.2.6**
+（tag `dsh-plugin-v1.2.6`）；下面两个 `[Unreleased]` 段保留为那两批工作的记录。
+**注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
+原先写在这一段的「浮窗停在 0.9.0、插件包 1.2.5」是当时的事实，现在是历史。
 
 ## [Unreleased] — 2026-11-11（宣传准备批）
 
@@ -737,6 +734,65 @@
   等人工、radar #1255 与 brade #367 仍 open、dshbase/dsh.so/dsh-plugin.org/alldsh/dshmarketplace.dev 全部无回应、
   YELEBAI 仍记 1.2.3（`verifiedCommit 9b0df94`，`install.profiles` 已含 desktop）。
 ---
+
+## [1.0.0] — 2026-11-11
+
+浮窗本体的**第一个 1.0**，与插件包 `dsh-ai-terminal-pet` **1.2.6** 同批发布。这一版的意义是「号码
+不再自相矛盾」：在此之前浮窗说自己 0.9.0、npm 上是 1.2.5、便携包按浮窗那条线命名、插件包按自己那条线
+命名，四个数字在同一页文档里并存。
+
+### Added
+
+- **`pet-setup.exe`：自解压单文件安装器**（`cmd/pet-setup`，ROADMAP 的 I1-γ）。它 `//go:embed`
+  打包时暂存的载荷，**先**用自带的 `SHA256SUMS.txt` 逐文件校验，全部吻合才动手，解到临时目录，
+  再调用内嵌的 `scripts/install.ps1`。`--verify` / `--uninstall` / `--add-to-path` 逐个转发到
+  `install.ps1` 的同名开关。**安装逻辑仍然只有一份**：`install.ps1` 是唯一实现，`pet-setup` 只负责
+  「知道自己是不是为发布而构建」「校验自己带的字节」「转发参数」。
+  它比 zip 多出来的那件事恰好是 zip 做不到的：下载被截断时，zip 用户要等到装完才发现，自解压 exe
+  在写第一个字节之前就发现。三道实测出来的坑都写进了代码注释：`//go:embed payload` 会**跳过点开头的
+  文件**（`.staged` 因此没进二进制，每次发布都会走「拒绝运行」分支，必须 `all:payload`）；
+  `Copy-Item -LiteralPath '…\*'` **不做通配**，结果一个文件都没拷、但 exe 照样构建成功（载荷只有 2 个
+  文件），现在用「载荷必须 > 1 MB」把它钉住；载荷不能照抄 zip 的整棵暂存树，否则
+  `README.install.txt` 与根 `install.cmd` 会以「未被 SHA256SUMS.txt 列出」的名义让**每一次**安装失败。
+- **`scripts/package.ps1` 同时产出两个包**：`ai-terminal-pet-<版本>-win-x64.zip` 与 `pet-setup.exe`，
+  并在打包前后校验载荷字节数、`--version` 输出与 zip 的交叉一致性。
+- **20 个 `cmd/pet-setup` 单测**：默认拒绝安装（exit 3）、`--version`/`--help` 不需要载荷、
+  未知参数走 exit 2 而不是把 PowerShell 的错误甩给用户、四个开关的转发表、`SHA256SUMS.txt` 的解析
+  与四种失败（哈希不符 / 缺文件 / 多文件 / 畸形行）、以及 `..` 逃逸路径被拒。
+- **CI**：`Build the setup stub`（证明 `go build ./cmd/pet-setup` 在裸检出里也能编）、打包步骤改名为
+  `Package the portable zip and the setup exe`，artifact 同时收 zip 与 exe。
+
+### Changed
+
+- **`Version` 0.9.0 → 1.0.0**（`internal/app/app_windows.go`）。三个二进制按同一组旗标重建，
+  `vendor/AI-Terminal-Pet.exe` 随之更新，`vendor/manifest.json` 的源码摘要由 `39685c79…` 变为
+  `edd584c6…`，文件数从 24 变回 24（`cmd/pet-setup` 已加入 `vendor.mjs` 的排除表——它是独立二进制，
+  改它一个字都动不了浮窗）。
+- **`tests/fresh-machine.mjs` 不再钉 `0.9.0`**：那条断言本来只是「`--version` 有输出」，用宽松匹配
+  钉死后会变成版本冻结，现在锚定「是一个已发布的 1.x」。
+- README 中英两段：版本徽章、`--version` 表项、安装路径 B（两个成品包）、market-index 条目、
+  插件安装命令全部前移到 1.0.0 / 1.2.6；「独立安装包」从路线图移入「已交付」，剩下的只有签名与 MSI。
+
+### Published
+
+| 资产 | 字节 | sha256 |
+|---|---|---|
+| `ai-terminal-pet-1.0.0-win-x64.zip` | 4,983,903 | `70D992B1…` |
+| `pet-setup.exe` | 14,125,568 | `87D5E60B…` |
+| `dsh-ai-terminal-pet-1.2.6.tgz` | 1,917,331 | `671CDC95…` |
+
+三个资产都从公开 URL 下载回来复验过：`pet-setup.exe --version` 打印 `pet-setup 1.0.0`，在自带
+`LOCALAPPDATA`/`USERPROFILE` 的沙箱里 install → 11 件哈希全对 → `--verify` 11 件全对 →
+`--uninstall`（输入 yes）目录归零；zip 解出 17 个文件；npm `npm pack dsh-ai-terminal-pet@1.2.6`
+取回的 tarball sha256 与 Release 资产一致。`dist-tags.latest` = **1.2.6**。
+
+## [1.2.6] — 2026-11-11（插件包）
+
+只因为**载荷字节变了**：浮窗升到 1.0.0，`vendor/AI-Terminal-Pet.exe` 必须重新记账，
+`vendor/manifest.json` 的源码摘要跟着变。`lib/index.js` 与 `vendor/protocol.js` 与 1.2.5 逐字节相同，
+`verify.mjs` 未改。Release 资产不可变，所以这是新版本号而不是编辑——与 1.2.1、1.2.4 同一条理由。
+
+tarball **17 files / 1,917,331 B / sha256 `671cdc9503c3875960182616ca83bc9fe158d17778925b069d08af53e4ff5cd4`**。
 
 ## [1.2.5] — 2026-11-11
 插件包的第五个发布。**这一版第一次真正「装上就能用」**：前几版里有两个缺陷会让插件在没装过浮窗的
