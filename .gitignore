@@ -31,6 +31,10 @@ harness-out.json
 # Generated panel preview (see README: "Seeing a layout change without a window")
 panel-preview.png
 
+# Machine-local scratch: upstream registry snapshots, draft release notes, `npm pack`
+# output and one-off probe scripts. Not project source; safe to delete at any time.
+.local/
+
 # The DSH plugin package ships a prebuilt overlay so `dsh plugin add` needs no
 # Go toolchain. It is the one exception to the build-output rule above: it is
 # a release artifact, not a local build. Regenerate it with `npm run vendor`

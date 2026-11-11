@@ -90,7 +90,7 @@
   1.1.0 → 1.2.0）：npm 包名 `dsh-ai-terminal-pet`、license MIT、`type: module`、`private` 未设（可发布）；
   当前版本 **1.2.4**（`packages/dsh-ai-terminal-pet/package.json` 2,246 B / 83 行，1.2.3 → 1.2.4 只改 `dsh.catalog` 摘要、1.2.2 → 1.2.3 多了 `dsh.marketplace` 块）：
   包内 18 个文件（含 vendor，1.2.0 起多一个 `vendor/manifest.json`），主体是 `lib/index.js`（17,872 B / 570 行）、
-  `verify.mjs`（23,426 B / 424 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,008 B / 74 行）、
+  `verify.mjs`（23,426 B / 424 行）、`scripts/vendor.mjs`（13,981 B / 324 行）、`package.json`（2,246 B / 83 行）、
   `README.md`（8,187 B / 146 行）、`vendor/manifest.json`（529 B / 19 行）、
   `cordis.patch.yml`（399 B / 10 行）、`locale/en.json`（210 B）/ `locale/zh.json`（217 B）、
   `icon.svg`（526 B）/ `icon.png`（4,386 B）、`LICENSE`（1,070 B）、`screenshots.json`（97 B）、
@@ -341,7 +341,11 @@
   - 同一轮复读到的外部状态：`awesome-dsh-plugin` 的 #14243 仍 open，`mergeable_state` 从 `unstable` 变回
     `clean`（check 已跑完）；imsai #912 仍 open，但 `mergeable_state` 从 `unknown` 变成 `clean`（仍等 maintainer
     人工合并）；站点 `plugins.json`（12,570,153 B）里的条目仍渲染 1.2.3 资产；dshopen #423 的正文已由我们 PATCH 到
-    1.2.4（body 3,047 字符，updated 2026-11-11T08:14:43Z）并追加了一条评论；`YELEBAI/dsh-plugin-marketplace` 的
+    1.2.4（body 3,047 字符，updated 2026-11-11T08:14:43Z）并追加了一条评论，**随后该 issue 于
+    2026-11-11T08:32:39Z 以 `state_reason: completed` 关闭**——它的 `data/sources.json`（1,213 条）第 1204 条已收录
+    本包（`version` 1.2.4、`source.commit` `ff7f6de`、`path` 子目录、中英摘要都写了「其他终端需各自安装 reporter」），
+    但线上 `public/index.json` 仍是旧构建（854 条、0 条 git 源），所以目录页要等它下一次构建才看得到；
+    `YELEBAI/dsh-plugin-marketplace` 的
     `registry/plugins.json`（generatedAt 2026-11-11T02:19:42.600Z、18,385 条）仍记 `version: "1.2.3"` 与
     `verifiedCommit: 9b0df94…`，但 `install.profiles` 已经是 **["desktop","headless","web"]**——1.2.3 声明的
     `dsh.marketplace` 真的被它读到了，桌面端不再隐藏条目；下一步扫描会把 version 推到 1.2.4。

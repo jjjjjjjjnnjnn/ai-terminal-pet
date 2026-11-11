@@ -101,6 +101,7 @@ Two conventions in those commands are load-bearing, not style:
 | What changed in which version? | [CHANGELOG.md](CHANGELOG.md) |
 | What is planned, and why? | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | How did we get here? (runbooks §13–§27) | [docs/HANDOVER.md](docs/HANDOVER.md) |
+| I am picking this up from someone else. What is pending, what must not be edited, what looks redundant but is not? | [docs/HANDOVER.md](docs/HANDOVER.md) §28 (handover checklist) |
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |

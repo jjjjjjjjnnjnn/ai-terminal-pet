@@ -106,7 +106,7 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
   `copyVerified` 走临时文件 + rename 并在 rename 前复查目标存在——**从不覆盖已装文件**。
 - **`cordis.patch.yml` 必须用 `insert:`**。裸 `- id:` 只 patch 既有 loader 行：装完看着成功，
   运行时什么都不挂载。原因写进了该 YAML 的文件头，不只写在文档里。
-- **仓库根的清单 shim**（`06d4cae`，1,877 B / 59 行，不含代码）：`main` 指向插件包、
+- **仓库根的清单 shim**（`06d4cae` 建档时 1,877 B / 59 行，1.2.4 起 **2,115 B / 68 行**，不含代码）：`main` 指向插件包、
   `dsh.bundle.patch` 指 `./packages/dsh-ai-terminal-pet/cordis.patch.yml`、`files` 只放行那个子树、
   `private: true` 不占 npm 名、`version` 跟包同步（`verify.mjs` 断言两者相等）。
   没有它，宿主读到的是 0.0.0 依赖并报 `declares no dsh.bundle`，装出空包。
@@ -601,7 +601,12 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
   [dsh-plugin.org #735](https://github.com/dshplugin/dsh-plugin-hub/issues/735)、[AllDSH #2](https://github.com/alldsh/submissions/issues/2)
   （走 `POST /api/submit`）与 [dshmarketplace.dev](https://dshmarketplace.dev)（走 `POST /api/v1/submissions`，
   inspect 报 `alreadyListed:false` / `hasDshTopic:true`，submit 报 `{"ok":true,"duplicate":false}`）。
-  五条 issue 目前都是 open / 0 评论。dshmarketplace.dev 的公开接口 `/api/v1/plugins?q=ai-terminal-pet` 仍回
+  五条 issue 目前都是 open / 0 评论。**另有 [dshopen #423](https://github.com/polang233/dsh-plugin-index/issues/423)
+  已于 2026-11-11T08:32:39Z 以 `state_reason: completed` 关闭**：那是评审制目录里第一条真·收录，其
+  `data/sources.json` 第 1204 条记的是本包 1.2.4（`source.commit` `ff7f6de`、`path` 子目录），中英摘要都带上了
+  「其他终端需各自安装 reporter」那句；但它的线上 `public/index.json` 仍是旧构建（854 条、全是 npm 源、
+  0 条带 `source` 字段），要等下一次构建才在目录页可见——「收录」与「渲染」是两件事，判断可见性看公开索引文件。
+  dshmarketplace.dev 的公开接口 `/api/v1/plugins?q=ai-terminal-pet` 仍回
   `{"total":0}`、`DshMarketPlace/awesome-dsh-plugin` 的 `data/curated.yml` 里也没有本仓库；不投的两家是
   `WOOK98/awesome-deepseek-harness-plugins`（imsai 的 fork、已停更）与 `ydhrdh/dsh-marketplace`（7 条、0 stars）。
   [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 16:22:29Z 的重建把本仓库从
