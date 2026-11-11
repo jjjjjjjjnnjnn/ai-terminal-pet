@@ -41,6 +41,11 @@ reporters/*.js  ──[named pipe / JSON-lines]──►  cmd/ai-terminal-pet (G
 - `internal/ui/`: Win32 layered overlay — GDI canvas rasterization (`CreateDIBSection` +
   `UpdateLayeredWindow`, **no GDI+**), panel layout, tray icon, click/drag/wheel gestures, three-tab
   settings window, synthesized alert tones, per-session alerts, auto-approve countdown, jump-to-terminal.
+- `cmd/pet-setup/`: the single-file installer (`pet-setup.exe`) the release ships. It embeds the
+  staged payload, verifies it against `SHA256SUMS.txt` **before** writing anything, then runs the
+  `scripts/install.ps1` that ships inside it — so `install.ps1` stays the only implementation of
+  what an install is. `payload/` holds only `.gitkeep`; the real files are staged by
+  `scripts/package.ps1` and deleted again before it returns.
 - `internal/pipeserver/`: named pipe server (`\\.\pipe\ai-terminal-pet-v1-<8hex>`) with `OK`/`ERR` replies
   and a per-user DACL.
 - `internal/store/`: in-memory state store with tombstone cleanup plus snapshot-file fallback under

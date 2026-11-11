@@ -114,16 +114,19 @@ dsh plugin add dsh-ai-terminal-pet
 
 The package carries a prebuilt overlay and the official `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.5), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
 
-**B. Everyone else — download the portable zip, no Go toolchain**
+**B. Everyone else — download a package, no Go toolchain**
 
-1. Download [`ai-terminal-pet-0.9.0-win-x64.zip`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v0.9.0) (4.98 MB, 17 files).
-2. Unzip it anywhere, then double-click `install.cmd` (or run it from a terminal: `.\install.cmd -AddToPath` also puts the commands on your PATH).
-3. Verify that the installation works:
+Two packages are published for this release: a self-extracting `pet-setup.exe` and a portable zip. Both install the same 11 artifacts into the same directory; the zip additionally lets you look inside before running anything.
+
+1. Download one of them from the [`pet-v0.9.0` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v0.9.0):
+   - **`pet-setup.exe`** (13.5 MB): double-click it. It verifies its own payload against `SHA256SUMS.txt` **before** writing anything, then runs the installer inside itself. `pet-setup.exe --verify` re-checks the installed files at any time, `--uninstall` removes them, `--add-to-path` puts the commands on your PATH.
+   - **`ai-terminal-pet-0.9.0-win-x64.zip`** (4.98 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
+2. Verify that the installation works:
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
    ```
 
-The zip carries the three binaries, `protocol.js`, the Harness bundle, the installer and a `SHA256SUMS.txt`, so the only thing on Windows is one download and one double-click. The release is **not code-signed yet**, so the first run shows SmartScreen's "unknown publisher" prompt:
+The zip and the setup exe carry the three binaries, `protocol.js`, the Harness bundle, the installer and a `SHA256SUMS.txt`, so the only thing on Windows is one download and one double-click. Neither needs Go, Node, or an installer framework. The release is **not code-signed yet**, so the first run shows SmartScreen's "unknown publisher" prompt:
 
 ![SmartScreen on an unsigned build](docs/assets/smartscreen-unsigned.png)
 *What an unsigned build produces on a machine that has never seen it: click **More info**, then **Run anyway**. This image is a reconstruction of the documented dialog, not a capture - see [docs/assets/README.md](docs/assets/README.md).*
@@ -326,7 +329,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 - **Low-integrity working directories**: If a whole directory tree carries a Low mandatory integrity label, executables inside it inherit that label, and a Low-integrity process cannot open the overlay's pipe (the overlay runs at Medium). Copy the binaries to the install directory or `%TEMP%` before testing from such a tree; the installed copies are unaffected.
 
-- **Not code-signed**: there is a portable zip for a Windows user who does not use the DeepSeek Harness (`scripts/package.ps1` builds it; a GitHub Release ships it), but no `.msi` and no signature. The first run shows SmartScreen's "unknown publisher" prompt, and the honest provenance is the per-file SHA256 list inside the zip rather than a certificate. A signed single-file installer is on the roadmap.
+- **Not code-signed**: there is a portable zip **and** a self-extracting `pet-setup.exe` for a Windows user who does not use the DeepSeek Harness (`scripts/package.ps1` builds both; a GitHub Release ships them), but no `.msi` and no signature. The first run shows SmartScreen's "unknown publisher" prompt, and the honest provenance is the per-file SHA256 list inside each package rather than a certificate. A signed installer is on the roadmap.
 
 - **Named-pipe squatting**: Same-user pipe preemption is mitigated by acquiring a named mutex first, but it is not completely eliminated. A full challenge-response handshake remains documented for future hardening.
 
@@ -340,7 +343,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 - **Native hook binary**: `pet-hook.exe` ships as the primary Claude Code and Antigravity reporter (`--mode=claude|antigravity`), and the JavaScript hooks remain as the reference implementation and fallback.
 
-- **Standalone installer**: a signed single-file `.exe`/`.msi` so a Windows user who does not use the DeepSeek Harness installs without even unzipping (today the portable zip plus one double-click on `install.cmd` is that path). The zip exists and is not signed; see Install path B.
+- **Standalone installer**: a *signed* `pet-setup.exe` / `.msi`. The unsigned single-file installer already ships (`pet-setup.exe`, built from `cmd/pet-setup`); what is missing is the certificate, and MSI packaging for enterprise distribution.
 
 - **Cross-platform support**: Extracting the UI layer behind a presenter interface with Unix domain socket transport for macOS and Linux (not started).
 
@@ -489,17 +492,20 @@ dsh plugin add dsh-ai-terminal-pet
 想从 GitHub Release 的 tarball、钉 tag 的 git 源或仓库地址装也一样（`dsh plugin add <路径或 git 地址>`），
 跑的都是同一套 bootstrap。
 
-**B. 其他用户 —— 下载便携 zip，同样不需要 Go 工具链**
+**B. 其他用户 —— 下载成品包，同样不需要 Go 工具链**
 
-1. 从 [Releases](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases) 下载 `ai-terminal-pet-0.9.0-win-x64.zip`。
-2. 解压到任意目录，双击 `install.cmd`（或从终端跑 `.\install.cmd -AddToPath`，顺手把命令加进 PATH）。
-3. 验证安装输出：
+这一版发布两个包：自解压的 `pet-setup.exe` 与便携 zip。两者装的是**同一份 11 件制品、同一个目录**；zip 的额外好处是你可以在运行前先拆开看。
+
+1. 从 [`pet-v0.9.0` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v0.9.0) 下载其中一个：
+   - **`pet-setup.exe`**（13.5 MB）：双击即可。它会先拿自带的 `SHA256SUMS.txt` 校验自己的载荷，**全部吻合才动手**，然后调用内嵌的安装脚本。`pet-setup.exe --verify` 随时复核已装文件，`--uninstall` 卸载，`--add-to-path` 加进 PATH。
+   - **`ai-terminal-pet-0.9.0-win-x64.zip`**（4.98 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
+2. 验证安装输出：
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
    ```
 
-zip 里带齐三个二进制、`protocol.js`、Harness 桥接包、安装脚本与 `SHA256SUMS.txt`，所以 Windows 上只需要
-一次下载加一次双击。**这一版还没有代码签名**，首次运行会撞 SmartScreen 的「未知发布者」提示：
+两个包都带齐三个二进制、`protocol.js`、Harness 桥接包、安装脚本与 `SHA256SUMS.txt`，所以 Windows 上只需要
+一次下载加一次双击，既不要 Go 也不要 Node，更不需要安装器框架。**这一版还没有代码签名**，首次运行会撞 SmartScreen 的「未知发布者」提示：
 
 ![未签名构建的 SmartScreen](docs/assets/smartscreen-unsigned.png)
 *一台没见过这个项目的机器上，未签名构建会看到这个：点「更多信息」，再点「仍要运行」。这张图是按官方对话框文字重建的示意图，不是截图——说明见 [docs/assets/README.md](docs/assets/README.md)。*
@@ -708,7 +714,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 - **仅限 Windows**：仅基于 Win32 分层窗口与 Windows 命名管道构建，不支持 macOS 或 Linux。
 - **杀毒软件增加进程启动开销**：在部分开启杀毒软件钩子的机器上，频繁启动 Node 进程会导致可感知的延迟；建议改用原生 `pet-hook.exe` / `pet-statusline.exe`，并为安装目录配置杀毒排除项。
 - **低完整性工作目录**：若整棵目录树带 Low 强制完整性标签，其中的可执行文件继承该标签，而 Low 完整性进程打不开浮窗的命名管道（浮窗跑在 Medium）。在这种目录里直接用 `bin\` 下的二进制测试会静默投递不到，请先复制到安装目录或 `%TEMP%` 再跑；安装后的副本不受影响。
-- **还没有代码签名**：不使用 DeepSeek Harness 的 Windows 用户现在有便携 zip 可下（由 `scripts/package.ps1` 打出、随 GitHub Release 发布），但既没有 `.msi` 也没有代码签名。首次运行会撞 SmartScreen 的「未知发布者」提示；在签名到位之前，`SHA256SUMS.txt` 里那份逐文件 SHA256 才是诚实的来源证明。签名过的单文件安装包在路线图上。
+- **还没有代码签名**：不使用 DeepSeek Harness 的 Windows 用户现在有**两个**成品包可下——自解压的 `pet-setup.exe` 与便携 zip，都由 `scripts/package.ps1` 打出、随 GitHub Release 发布——但既没有 `.msi` 也没有代码签名。首次运行会撞 SmartScreen 的「未知发布者」提示；在签名到位之前，每个包里那份逐文件 `SHA256SUMS.txt` 才是诚实的来源证明。签名过的单文件安装包在路线图上。
 - **同用户管道抢占未根除**：通过互斥体优先排序缓解了同用户命名管道被抢占的风险，但尚未实现基于独占标志的彻底根除。
 - **倒计时时长修改需重启**：自动同意倒计时时长在程序启动时一次性载入，修改该配置项需要重启浮窗进程方可生效，其余配置项均支持热加载。
 - **缺少像素级视觉回归测试**：纯逻辑、几何计算与命中测试具备完整的单元测试覆盖，并提供了 PNG 预览渲染，但目前尚未接入像素级别的自动化视觉回归测试。
@@ -719,7 +725,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 以下为当前计划进行的改进项：
 
 - **上报端已原生化**：`pet-hook.exe`（`--mode=claude|antigravity`）是 Claude Code 与 Antigravity 的正式上报端，JavaScript hook 保留为参照实现与降级路径。
-- **独立安装包**：做一个签名过的单文件 `.exe` / `.msi`，让不使用 DeepSeek Harness 的 Windows 用户连 zip 都不用解压（目前是下载 zip 后双击 `install.cmd`）。
+- **独立安装包**：做一个**签名过的** `pet-setup.exe` / `.msi`。未签名的单文件安装器**已经交付**（`pet-setup.exe`，`cmd/pet-setup`），现在缺的只有签名，以及企业分发需要的 MSI 打包。
 - **跨平台抽象探索**：计划将窗口渲染层抽象为通用接口，为后续探索基于 Unix 域套接字的平台移植奠定结构基础。
 - **二进制体积压缩**：计划将主程序体积从现状 4.17 MiB 降至 2.5 MiB 以内。手段包括剥离无用反射元数据、去掉未用包，以及把 pet-statusline 里基于 regexp 的脱敏规则改成手写扫描器。
 

@@ -272,6 +272,79 @@ try {
   Set-Content -LiteralPath (Join-Path $stage 'install.cmd') -Value $rootForwarder -Encoding ASCII -NoNewline:$false
   Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Value $sums -Encoding ASCII -NoNewline:$false
 
+  # --- the self-extracting setup exe ---------------------------------------
+  #
+  # cmd/pet-setup embeds exactly this staged tree and then runs the installer
+  # inside it, so the two artifacts can never disagree about what an install is:
+  # both call scripts\install.ps1. The payload is staged from the same $stage
+  # directory the zip is built from, and it is removed again before this script
+  # returns, because committing 5 MB of binaries twice is the drift this
+  # repository keeps removing.
+  #
+  # The .staged marker is written last. cmd/pet-setup uses its presence to tell
+  # "packaged for release" from "somebody ran go build over a checkout", and a
+  # marker written first would make a half-copied payload look complete.
+  $payloadDir = Join-Path $RepoRoot 'cmd\pet-setup\payload'
+  try {
+    # payload/.gitkeep is committed and must survive staging and cleanup: it is
+    # what makes `go build ./cmd/pet-setup` work in a fresh checkout, and it is
+    # also the only file the payload may contain that SHA256SUMS.txt does not
+    # name (it is dropped from the embedded tree by the .gitkeep filter below).
+    Get-ChildItem -LiteralPath $payloadDir -Force -ErrorAction Stop | Where-Object { $_.Name -ne '.gitkeep' } | ForEach-Object {
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force
+    }
+    # The payload is exactly the artifacts scripts\install.ps1 reads, plus the
+    # summary it is verified against - not the zip's whole staging tree. The zip
+    # additionally carries README.install.txt and a root install.cmd because a
+    # user double-clicks those; pet-setup never reads them and they are not in
+    # SHA256SUMS.txt, so staging them here would make every install fail its
+    # own "no unlisted files" check.
+    foreach ($entry in $manifestEntries) {
+      $from = Join-Path $stage $entry.Target
+      $to = Join-Path $payloadDir $entry.Target
+      $parent = Split-Path -Parent $to
+      New-Item -ItemType Directory -Path $parent -Force | Out-Null
+      Copy-Item -LiteralPath $from -Destination $to -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Destination (Join-Path $payloadDir 'SHA256SUMS.txt') -Force
+    Set-Content -LiteralPath (Join-Path $payloadDir '.staged') -Value ('staged ' + [DateTime]::UtcNow.ToString('o')) -Encoding ASCII
+
+    $setupPath = Join-Path $OutputDirectory 'pet-setup.exe'
+    $payloadFiles = @(Get-ChildItem -LiteralPath $payloadDir -Recurse -File -Force)
+    $payloadBytes = ($payloadFiles | Measure-Object -Property Length -Sum).Sum
+    Write-Output ('build: pet-setup.exe (payload ' + $payloadFiles.Count + ' file(s), ' + $payloadBytes + ' bytes)')
+    & go build -trimpath -buildvcs=false -ldflags ('-s -w -X main.buildVersion=' + $Version) -o $setupPath ./cmd/pet-setup
+    if ($LASTEXITCODE -ne 0) {
+      throw ('go build failed for ./cmd/pet-setup (exit ' + $LASTEXITCODE + ')')
+    }
+
+    # A setup exe that cannot even report its own version is not a release
+    # asset. Running it also proves the -X stamp landed instead of silently
+    # leaving "dev" in the binary, and the payload byte count in the log above
+    # is the only visible evidence that the embed actually captured the files -
+    # a 2-file payload still builds and still runs, which is how the first
+    # version of this block shipped a broken installer without failing.
+    $reported = (& $setupPath --version | Out-String).Trim()
+    if ($reported -ne ('pet-setup ' + $Version)) {
+      throw ('pet-setup.exe --version printed "' + $reported + '", expected "pet-setup ' + $Version + '"')
+    }
+    if ($payloadBytes -lt 1MB) {
+      throw ('the staged payload is only ' + $payloadBytes + ' bytes; the overlay alone is 4.17 MiB, so the copy did not land')
+    }
+    $setupHash = Get-FileSha256 -Path $setupPath
+    $setupBytes = (Get-Item -LiteralPath $setupPath).Length
+    Write-Output ('       ' + $setupBytes + ' bytes, sha256 ' + $setupHash)
+  } finally {
+    # Clean up unconditionally: a failed build must not leave a staged payload
+    # in the working tree, where the next `git status` would show 5 MB of
+    # untracked release binaries. Re-walking the directory is what removes the
+    # subtrees Copy-Item -Recurse created; remembering each path as it was
+    # created would miss the directories themselves.
+    Get-ChildItem -LiteralPath $payloadDir -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne '.gitkeep' } | ForEach-Object {
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
   if (Test-Path -LiteralPath $archivePath) { Remove-Item -LiteralPath $archivePath -Force }
   # The archive is written entry by entry, not with Compress-Archive or even
   # ZipFile.CreateFromDirectory, for two reasons that both matter to the user:
@@ -376,6 +449,8 @@ try {
   Write-Output ('         ' + $bytes + ' bytes, ' + $files.Count + ' files, ' + ($entries.Count - $files.Count) + ' directory entries')
   Write-Output ('         sha256 ' + $hash)
   Write-Output ('         staged at ' + $stage)
+  Write-Output ('package: ok - pet-setup.exe')
+  Write-Output ('         ' + $setupBytes + ' bytes, sha256 ' + $setupHash)
 } catch {
   Write-Output ''
   Write-Output ('[fail] package: ' + $_.Exception.Message)

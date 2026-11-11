@@ -117,6 +117,14 @@ jobs:
       - name: Build the hook binary
         run: go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-hook.exe ./cmd/pet-hook
 
+      # The single-file installer builds from a checkout with a placeholder
+      # payload, on purpose: `go build ./cmd/pet-setup` must work here and the
+      # binary must refuse to install anything. `go test ./...` covers the
+      # refusal; this step covers the compile, because a payload stub that stops
+      # embedding is a packaging failure nobody notices until the day it ships.
+      - name: Build the setup stub
+        run: go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-setup.exe ./cmd/pet-setup
+
       # node --check parses without executing. Every reporter under reporters/
       # must stay loadable in the Node version the runner ships, because a
       # syntax error there breaks the host CLI hook, not just this repository.
@@ -195,12 +203,11 @@ jobs:
       - name: Check documentation links
         run: python tools/check_docs_links.py
 
-      # The portable zip is what a Windows user who does not use the DeepSeek
-      # Harness actually downloads, so a packaging script that cannot produce it
-      # is a broken release, not a broken build. This step builds it from the
-      # binaries the previous steps produced (no second `go build`), checks that
-      # the archive contains exactly the artifacts scripts\install.ps1 looks for,
-      # and prints the SHA256 that goes into the release notes.
+      # The portable zip and the self-extracting setup exe are what a Windows
+      # user who does not use the DeepSeek Harness actually downloads, so a
+      # packaging script that cannot produce them is a broken release, not a
+      # broken build. This step stages the payload, builds pet-setup.exe around
+      # it, then removes the staged files again (nothing 5 MB stays untracked).
       #
       # The overlay/vendor cross-check inside package.ps1 is why this is safe to
       # run here: it compares bin\AI-Terminal-Pet.exe against the committed
@@ -210,16 +217,18 @@ jobs:
       # Go, and different releases produce different bytes from identical
       # sources. The cross-check is therefore skipped here and left to the
       # machine that cuts the release, which is the only one that can be right.
-      - name: Package the portable zip
+      - name: Package the portable zip and the setup exe
         shell: pwsh
         run: ./scripts/package.ps1
         env:
           PET_PACKAGE_SKIP_VENDOR_CHECK: '1'
 
-      - name: Upload the portable zip
+      - name: Upload the portable zip and the setup exe
         uses: actions/upload-artifact@v4
         with:
           name: ai-terminal-pet-win-x64
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.exe
           if-no-files-found: error
           retention-days: 7
