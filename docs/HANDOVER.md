@@ -2541,15 +2541,29 @@ scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
 - ⏳ **只剩 I1-δ（签名 + MSI）**：`signtool.exe` 在本机已找到，**证书没有**；WiX/NSIS 都没装。
   这一段需要外部输入（买证书或 Azure Trusted Signing），代码侧只需把 `signtool sign /fd sha256
   /tr <时间戳> /td sha256` 挂进 `scripts/package.ps1`，并保留「未签名也能构建」的分支。
-- ⏳ **上游 PR #14439**：`MERGEABLE`，等 `check` 与人工合并；合并后站点重建才会把 1.2.6 渲染出来。
-  上一次 #14385 合并后仓库里的 yml 立刻更新，但站点 `plugins.json` 直到本轮复查仍是 1.2.3——
-  **「合并」与「渲染」始终是两件事**（§32.6 有三处对照表与复读命令）。
+- ✅ **上游 PR #14439 已合并**（2026-11-11T20:12:31Z，merge commit `475a48e`）：仓库里
+  `data/plugins/jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml` 的 `tarball`
+  已是 **1.2.6**。**但站点 `plugins.json`（`count` 10,578）仍渲染 1.2.5**，`dshopen.org/index.json`
+  （1,207 条）仍是 **1.2.4**——「合并」与「渲染」始终是两件事（§32.6 有复读命令与三处对照表）。
+- ✅ **DSH 官方 Discussions 已发帖**：[#13001](https://github.com/deepseek-ai/deepseek-harness/discussions/13001)
+  （`Show Your Plugins!`，2026-11-11T20:50:40Z，upvote 1 / 0 评论）。这是受众最准的一条渠道。
+  发帖前过了一轮 `agy` 评审，改掉三处会直接导致删帖的问题，记录在 [docs/LAUNCH.md](LAUNCH.md) §1.2：
+  四终端并列（触犯「禁止无关推广/报菜名」）、把自家 `protocol.js` 写成「官方 protocol 模块」、
+  以及 `**_> …_**` 渲染不出引用块（"非官方"声明会变成一串星号）。
+- ✅ **两家市场是自动采集、不用申请**：`YELEBAI/dsh-plugin-marketplace` 的 `registry/plugins.json`
+  第 8,729 条（`version: 1.2.5`、`verifiedCommit: 584bc2f`、`profiles: [desktop, headless, web]`）、
+  `bradeGithub/DSH-Plugins-Marketplace` 的 `registry.json` 第 13,128 条（`pkg_name` +
+  `npm_pkg_name` 都在、`version: 1.2.4`）。加上 awesome-dsh-plugin 与 imsai，**已收录四家**；
+  dshbase / dsh.so / dsh-plugin.org / AllDSH 四家人工目录仍是 open / 0 评论（详见 §28.3）。
 
 **宣传素材（已完成）**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环）、`desktop-scene.png`
 （两个终端 + 浮窗同框）、`smartscreen-unsigned.png`（**标着 MOCKUP 的示意图**，不是真机截图）、
 `doctor-green.png`（程序自己的 stdout，用户名替换为 `<you>`）。四张都已从 README 中英两段引用。
 
-**文案**：对外可见的一切（X 中英双线程、Show HN 标题与正文、市场摘要、三份 issue 回复模板）已按
-AGENTS.md 第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对，成品在
-[docs/LAUNCH.md](LAUNCH.md)。该轮评审至少纠正了一条会真出问题的事实表述：初稿把浮窗写成像是对
-Claude Code / OpenCode / Antigravity 开箱即用，而实际只有 DeepSeek Harness 无需配置。
+**文案**：对外可见的一切（X 中英双线程、Show HN 标题与正文、DSH Discussions 帖、市场摘要、三份 issue
+回复模板）已按 AGENTS.md 第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对，
+成品在 [docs/LAUNCH.md](LAUNCH.md)。该轮评审至少纠正了一条会真出问题的事实表述：初稿把浮窗写成
+像是对 Claude Code / OpenCode / Antigravity 开箱即用，而实际只有 DeepSeek Harness 无需配置。
+同一份评审在 DSH 论坛帖上又抓出三处：四终端并列触犯该区的「禁止无关推广」、把自家 `protocol.js`
+说成「官方 protocol 模块」、以及 `**_> …_**` 在 Markdown 里渲染不出引用块（"非官方"声明会变成
+一串星号）。三处都是会让人删帖的那种，不是措辞偏好。
