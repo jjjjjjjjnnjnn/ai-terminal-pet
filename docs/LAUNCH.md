@@ -137,25 +137,39 @@ entry.
 字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 132。
 中文帖比英文帖短得多，这是**故意的**：中文读者更愿意点进去看长图，而不是在时间线上读长句。
 
-## 6. DSH 市场条目描述（两版，入库前必须与实际条目一致）
+## 6. DSH 市场条目描述
 
-市场列表只显示摘要，所以它必须是**事实**而不是卖点。
+市场列表只显示摘要，所以它必须是**事实**而不是卖点，而且**它已经存在，不能直接换**：
+`docs/market-index.json` 的 `plugins[0].description`、`packages/dsh-ai-terminal-pet/package.json`
+的 `dsh.catalog.summary`、以及仓库根 `package.json` 的同一块，三处是**逐字相同的一段文字**
+（`verify.mjs` 有断言钉住它们），并且它属于已发布 1.2.5 tarball 的字节。
 
-**English（211 字符，≤220）**
+**当前线上用的（225 字符英文 / 114 字符中文，已在 1.2.5 里）**
+
+```text
+A floating overlay for Windows. DeepSeek Harness sessions show up as soon as you install this bundle; OpenCode, Claude Code and Antigravity sessions join the same panel once each of those terminals has its reporter installed.
+```
+
+```text
+Windows 桌面浮窗。装上本插件后 DeepSeek Harness 的会话立刻出现在置顶面板里；OpenCode、Claude Code 与 Antigravity 的会话要先各自装好该终端的上报端，才会汇总进同一个面板。
+```
+
+它已经说清了「开箱即用只有 Harness」，所以 **1.2.6 不必为文案而发**。
+
+**下一版（1.2.6）的候选措辞**（agy 起草，211 / 114 字符，更短、更像条目摘要）：
 
 ```text
 Windows only. Native floating overlay tracking DeepSeek Harness session states out of the box. Other terminals (Claude Code, OpenCode, Antigravity) require their own reporter wired. Zero telemetry, MIT licensed.
 ```
 
-**中文（114 字符，≤120）**
-
 ```text
 仅限 Windows。原生桌面悬浮窗，安装后直接显示 DeepSeek Harness 会话状态；接入 Claude Code、OpenCode 或 Antigravity 需单独配置各自的上报器。零网络遥测，MIT 开源协议。
 ```
 
-这条摘要与 `docs/market-index.json` 的 `plugins[0].description`、
-`packages/dsh-ai-terminal-pet/package.json` 的 `dsh.catalog`（以及仓库根 shim 的那份）
-**必须是同一份文字**——`verify.mjs` 有断言把它们钉在一起。
+**用哪一段取决于 1.2.6 那天**：如果那时没有别的东西要发，保持现有文字、跳过这次改号更划算
+——纯文案改动的代价是 tag + Release + npm + 一个上游 PR（1.2.1 与 1.2.4 都是这么来的）。
+真正改的时候，上面这份候选要同时落进三处清单与 `docs/market-index.json` 的同一段，
+再跑 `node packages/dsh-ai-terminal-pet/verify.mjs`。
 
 ## 7. Issue / PR 回复模板
 
