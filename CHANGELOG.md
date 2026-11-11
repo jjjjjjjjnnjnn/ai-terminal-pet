@@ -327,6 +327,24 @@
     （4,371,968 B / sha256 `bbb5163c…`）、`vendor/protocol.js`（20,914 B / sha256 `5e197db6…`）、
     `cordis.patch.yml`、`icon.svg` / `icon.png`、`locale/en.json` / `locale/zh.json`、`screenshots/` 三张、
     `vendor/manifest.json`（源码摘要仍 `cf647af1…`——1.2.4 没碰任何 `.go` 源码）。
+  - 发版之后（同日 09:1x–09:5x +0100）又向外投了五家目录，全部走「public repo + `dsh-plugin` topic + 人工复核」这套：
+    [dshbase](https://github.com/ylwl1997/dshbase/issues/322)（`[收录] ai-terminal-pet`；POST 时带 `labels` 会 403
+    `You do not have permission to create labels on this repository.`，去掉 labels 才成功）、
+    [dsh.so](https://github.com/dsh-so/dsh-plugin-submissions/issues/24)（按 #21/#23 的既有格式写，末尾附建议的
+    registry entry JSON）、[dsh-plugin.org](https://github.com/dshplugin/dsh-plugin-hub/issues/735)（该站固定模板六段 +
+    提交前自查七项；它明说没有 npm 包的仓库照常收录、只是不进「插件中心」）、
+    [AllDSH](https://github.com/alldsh/submissions/issues/2)（走 `POST https://www.alldsh.com/api/submit`，
+    返回 `201 {"ok":true,"issue":".../issues/2"}`）与 [dshmarketplace.dev](https://dshmarketplace.dev)
+    （走 `POST /api/v1/submissions`，先 `action:"inspect"` 得到 `alreadyListed:false`/`hasDshTopic:true`，
+    再 `action:"submit"` 得到 `{"ok":true,"duplicate":false}`）。五条 issue 现在都是 open / 0 评论，
+    人工复核通常在几天到一周。
+  - 同一轮复读到的外部状态：`awesome-dsh-plugin` 的 #14243 仍 open，`mergeable_state` 从 `unstable` 变回
+    `clean`（check 已跑完）；imsai #912 仍 open，但 `mergeable_state` 从 `unknown` 变成 `clean`（仍等 maintainer
+    人工合并）；站点 `plugins.json`（12,570,153 B）里的条目仍渲染 1.2.3 资产；dshopen #423 的正文已由我们 PATCH 到
+    1.2.4（body 3,047 字符，updated 2026-11-11T08:14:43Z）并追加了一条评论；`YELEBAI/dsh-plugin-marketplace` 的
+    `registry/plugins.json`（generatedAt 2026-11-11T02:19:42.600Z、18,385 条）仍记 `version: "1.2.3"` 与
+    `verifiedCommit: 9b0df94…`，但 `install.profiles` 已经是 **["desktop","headless","web"]**——1.2.3 声明的
+    `dsh.marketplace` 真的被它读到了，桌面端不再隐藏条目；下一步扫描会把 version 推到 1.2.4。
   - 打包实测：`dsh-ai-terminal-pet-1.2.4.tgz` **1,915,340 B / 16 files / unpacked 4,462,112 B /
     sha256 `d6b7f95a5a3a71c4a9367699e9ad9b8f7d5db522271782e8ffe29a73e45c6708` / shasum
     `dafb81998efbae8e906a36773e9737117aa482d9`**；连续两次 `npm pack` 逐字节相同（`cmp` 无差异）。

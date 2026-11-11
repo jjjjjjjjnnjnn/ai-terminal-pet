@@ -35,6 +35,9 @@
   `dsh.marketplace` 块（`profiles: ["desktop","headless","web"]`、`requiresBuildApproval: false`、
   `manualSteps: false`），因为按 `install.profiles` 过滤的第三方商店（如 YELEBAI/dsh-plugin-marketplace）
   此前只能把 host-only bundle 猜成 `[headless, web]`，桌面端于是看不见条目；DSH 本身从不读该字段。
+  这条声明**已经生效了**：该仓库 2026-11-11T02:19:42.600Z 那次扫描（18,385 条）里，本仓库的
+  `install.profiles` 已是 `["desktop","headless","web"]`（`verifiedCommit` 仍 `9b0df94`、`version` 仍 `1.2.3`，
+  要等下一轮才推到 1.2.4）。
   `lib/index.js`（570 行 / 17,872 B）、两个 vendor 二进制（4,371,968 B / 20,914 B）、`cordis.patch.yml`、
   `vendor/manifest.json`（源码摘要仍 `cf647af1…`）逐字节不变——1.2.4 没碰任何 `.go` 源码
   （上一版 `1.2.2` 才是字节改动：`scripts/` 迁移改到 Go 注释、`vendor/manifest.json` 的源码摘要随之变）；
@@ -1737,3 +1740,38 @@ CHANGELOG、插件包 README 与 `lib/index.js` 注释、`integrations` 桥接 R
 **仍未解决的三件外部事**：npm 发布被一次性密码挡在非交互 shell 外（只能由人在交互终端里跑
 `cd packages/dsh-ai-terminal-pet && npm publish`）；`awesome-dsh-plugin` 的 #14243 等 check 与人工合并、
 imsai 的 #912 等 maintainer 人工合并；radar #1255、dshopen #423、brade #367 三条仍挂在对方仓库。
+
+**发版之后再投的五家目录（同日 09:1x–09:5x +0100）**：这条路已经走到边际——能投的公开目录基本都投过了，
+剩下的要么只收 npm 包（`LivXue/dsh-plugin-shop` 的 26,351 条条目每条都带 npm tarball 的 `integrity`，
+`commit` 字段一条也没有）、要么只发布过 Linux 沙箱验证的仓库（`zasenjc/dsh-plugins-store`，我们的 vendor
+是 PE，跑不过）、要么要求先在插件仓库根提交 `dsh-plugin.naming.json`（`oh-my-dsh/dsh-plugin-registry`，
+成本最高的一条）。这一轮投出去的五条：
+
+| 目录 | 提交入口 | 结果 |
+|---|---|---|
+| [dshbase](https://github.com/ylwl1997/dshbase) | GitHub issue 表单（六字段） | [#322](https://github.com/ylwl1997/dshbase/issues/322) open / 0 评论 |
+| [dsh.so](https://github.com/dsh-so/dsh-plugin-submissions) | GitHub issue | [#24](https://github.com/dsh-so/dsh-plugin-submissions/issues/24) open / 0 评论 |
+| [dsh-plugin.org](https://github.com/dshplugin/dsh-plugin-hub) | GitHub issue 固定模板 | [#735](https://github.com/dshplugin/dsh-plugin-hub/issues/735) open / 0 评论 |
+| [AllDSH](https://www.alldsh.com) | `POST /api/submit`（JSON） | `201 {"ok":true,"issue":"https://github.com/alldsh/submissions/issues/2"}` |
+| [DSH Marketplace](https://dshmarketplace.dev) | `POST /api/v1/submissions` | 先 `action:"inspect"`（`alreadyListed:false`、`hasDshTopic:true`），再 `action:"submit"` → `{"ok":true,"duplicate":false}` |
+
+- **dshbase 的 403 坑**：提交 issue 时带 `labels: ["plugin-submission"]` 会返回
+  `403 "You do not have permission to create labels on this repository."`；去掉 `labels` 即可（issue 的 labels 为空）。
+- **dsh.so 的格式**来自它自己的既有投稿（#21 brickhu、#23 hxlog）：仓库/子目录/版本/「npm 未发布」/简介/
+  「一个安装覆盖哪些会话」限定段/DSH 依据/无副作用/自建索引/topics/安装实测，末尾附建议的 registry entry JSON。
+  该站的公开数据接口是 `cdn.dsh.so/plugins-index.json`（14,553,328 B）、`plugins-index.delta.json`（678,517 B）、
+  `cdn.dsh.so/market/index.json`（format 1、11,119 条），三处目前都没有本仓库。
+- **dsh-plugin.org** 的模板六段（仓库地址/一句话价值/能力分类/安装命令/兼容与运行要求/许可证/截图/补充说明/
+  提交前自查）与它自己的「收录要求」一致：没有 npm 包的仓库照常收录、只是不进它站内的「插件中心」——
+  这与 imsai 的 browse-only 是同一套口径。它的插件索引契约是 `dsh-plugin-registry/v2` 系列之外的
+  `/directory/zh/*.json` 分片。
+- **AllDSH** 的接口说明直接由 `GET /api/submit` 返回（字段含 `repo`/`tagline`/`install`/`kind`/`categories`/
+  `notes`/`listing`/`contact`/`agent`，外加蜜罐字段 `website` 必须为空）；它的目录分类枚举是
+  `agent / knowledge / interface / dev / integration / workflow / tools / model / session / fun / memory`，
+  我们按 `interface` + `session` 报（上限 3 个）。
+- **DSH Marketplace** 的页面写着「本站同步 `dsh-plugin` topic」，但复读 `data/marketplace-cache.json`
+  （`total: 9909`、缓存 63 条）与 `GET /api/v1/plugins?q=ai-terminal-pet`（`{"total":0}`）都没有本仓库，
+  所以它确实需要走一次提交；社区精选库是 `DshMarketPlace/awesome-dsh-plugin` 的 `data/curated.yml`（4 stars、
+  15 open issues、pushed 2026-10-04），目前也没有我们的条目。
+- **不投的两家**：`WOOK98/awesome-deepseek-harness-plugins` 是 `imsai-sh` 的 fork 且已停更（pushed 2026-08-15），
+  活的上游是 imsai（我们已有 #912）；`ydhrdh/dsh-marketplace` 只有 7 个条目、0 stars，schema 允许 git 源但价值太低。

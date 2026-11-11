@@ -596,6 +596,14 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
   2026-11-10T14:33:04Z 合并、上游 README 已列出；站点页与 `plugins.json` 的延迟在 run `42844452013`（16:39:27Z
   success）之后消失，条目页 200 且 `plugins.json` 已收录本仓库——但目录里的 `install` 是构建时按 `tarball` 渲染的，
   合并后那版仍是 1.2.0；#14076 已换成 1.2.2（19:59:37Z 合并）、#14089 再推到 1.2.3（2026-11-10T21:10:15Z 合并），1.2.4 的 #14243 已开；另有两家目录已合并收录本仓库：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins) PR #902（2026-11-10T21:49:53Z，只从 npm 装，故在此之前是 browse-only）与 [zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) PR #97（2026-11-11T05:06:32Z）；1024 Store 详情页已返回 200（8,753 B）。
+  发版之后又投了五家（都是「public repo + `dsh-plugin` topic + 人工复核」）：
+  [dshbase #322](https://github.com/ylwl1997/dshbase/issues/322)、[dsh.so #24](https://github.com/dsh-so/dsh-plugin-submissions/issues/24)、
+  [dsh-plugin.org #735](https://github.com/dshplugin/dsh-plugin-hub/issues/735)、[AllDSH #2](https://github.com/alldsh/submissions/issues/2)
+  （走 `POST /api/submit`）与 [dshmarketplace.dev](https://dshmarketplace.dev)（走 `POST /api/v1/submissions`，
+  inspect 报 `alreadyListed:false` / `hasDshTopic:true`，submit 报 `{"ok":true,"duplicate":false}`）。
+  五条 issue 目前都是 open / 0 评论。dshmarketplace.dev 的公开接口 `/api/v1/plugins?q=ai-terminal-pet` 仍回
+  `{"total":0}`、`DshMarketPlace/awesome-dsh-plugin` 的 `data/curated.yml` 里也没有本仓库；不投的两家是
+  `WOOK98/awesome-deepseek-harness-plugins`（imsai 的 fork、已停更）与 `ydhrdh/dsh-marketplace`（7 条、0 stars）。
   [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 16:22:29Z 的重建把本仓库从
   `verdict: script` 改判为 `bundle-plugin`，18:08:44Z 那次重建（`risk_at` 17:09:14Z）给出 **`risk_tier: "safe"`** 且
   `risk_flags` 为空——安装脚本移进 `scripts/` 后扫描器读不到那两个正则的落点，issue #367 的两条旗标就此消失。
