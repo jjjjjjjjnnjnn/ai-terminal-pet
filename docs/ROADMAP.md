@@ -605,13 +605,18 @@ I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三�
 
 | 段 | 内容 | 状态 |
 |---|---|---|
-| **I1-α** | **便携 zip**：`scripts/package.ps1` 打出 `dist\ai-terminal-pet-0.9.0-win-x64.zip`（17 个文件，仓库原有布局的子集 + 根转发器 + `SHA256SUMS.txt`），配 `scripts/install.cmd` 承接 RemoteSigned，CI 增加打包门禁与 artifact 上传 | ✅ **已交付**（零版本号代价：不动 `.go`，`vendor/manifest.json` 摘要不变） |
-| **I1-γ** | **自解压单文件 `.exe`**：把 11 件制品 `//go:embed` 进一个 Go 安装器，`--verify`/`--uninstall` 对齐现有语义，未签名发行 | ⏳ 未开工（3–5 天） |
-| **I1-β** | **换版本号**：`Version` → 1.0.0，重建三二进制 → vendor 重算 → 插件 1.2.6 → 双清单 + 索引同提交 → 双 tag + Release → npm → 上游 PR | ⏳ 排在文案定型之后，一次付清 |
+| **I1-α** | **便携 zip**：`scripts/package.ps1` 打出 `dist\ai-terminal-pet-<版本>-win-x64.zip`（17 个文件，仓库原有布局的子集 + 根转发器 + `SHA256SUMS.txt`），配 `scripts/install.cmd` 承接 RemoteSigned，CI 增加打包门禁与 artifact 上传 | ✅ **已交付**（2026-11-11，零版本号代价） |
+| **I1-γ** | **自解压单文件 `.exe`**：`cmd/pet-setup`，`//go:embed` 阶段载荷 → **先**按 `SHA256SUMS.txt` 逐文件校验 → 解到临时目录 → 调用内嵌的 `install.ps1`；`--verify` / `--uninstall` / `--add-to-path` 转发到同名开关；未签名发行。20 个单测 + 沙箱端到端实测 | ✅ **已交付**（2026-11-11，`pet-v1.0.0` 资产的 `pet-setup.exe`） |
+| **I1-β** | **换版本号**：`Version` → 1.0.0，重建三二进制 → vendor 重算（源码摘要 `edd584c6…`）→ 插件 **1.2.6** → 双清单 + 索引同提交（A 提交 `df4fcf6`）→ 双 tag + Release → npm → B 提交钉 `source.commit`（`6496ba6`）→ 上游 PR #14439 | ✅ **已交付**（2026-11-11） |
+| **I1-δ** | **签名 + MSI**：证书（买 OV/EV 或 Azure Trusted Signing）+ `signtool sign /fd sha256 /tr <时间戳> /td sha256`；MSI 需先装 WiX。**这是 I1 里唯一需要外部输入而不是代码的一段** | ⏳ 未开工 |
 
-**为什么必须先有 α 再做 γ**：α 让漏斗今天就通（下载即双击即用），而 γ 只是少一步解压；
-反过来先做 γ 会让「新机器能不能装上」这条承诺晚三天，而且 γ 的验收要复用 α 已经固定的制品清单
-与 `SHA256SUMS.txt` 语义——从清单倒推实现比从实现推清单便宜。
+**I1-γ 的三道坑（都产出了一个「能构建、能运行、看起来正常」的包，必须记住）**：
+
+| 坑 | 表现 | 修法 |
+|---|---|---|
+| `//go:embed payload` | 点开头的文件被**静默跳过**，`.staged` 没进二进制，每次发布都走「拒绝运行」 | `//go:embed all:payload` |
+| `Copy-Item -LiteralPath '…\*'` | `-LiteralPath` 不做通配，**一个文件都没拷**，exe 却照旧构建成功（载荷 2 个文件） | 改为逐条目复制 + 断言载荷 > 1 MB |
+| 载荷照抄 zip 整棵暂存树 | `README.install.txt` 与根 `install.cmd` 不在 `SHA256SUMS.txt` 里，于是**每次安装都失败**在自己的「无未列文件」检查上 | 只暂存 `install.ps1` 的那份制品清单 + 摘要 |
 
 **已知约束（2026-11-11 本机实测，不要重新调研）**：
 
@@ -620,23 +625,21 @@ I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三�
 | `signtool.exe` | **有**：`C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe` |
 | 代码签名证书 | **没有**：`Cert:\CurrentUser\My` 与 `Cert:\LocalMachine\My` 的 `-CodeSigningCert` 都是空。**决策：先出未签名包，接受 SmartScreen，签名作为独立事项** |
 | WiX / NSIS | **没装**：`candle.exe`、`wix`、`makensis` 都不在 PATH，也不在 Windows Kits 里 |
-| PowerShell 默认策略 | **`RemoteSigned`**（CurrentUser）。这正是 α 里 `install.cmd` 存在的唯一理由 |
-| 已有安装能力 | `scripts/install.ps1`（11 件制品、逐件 SHA256、PATH/Run 键、`-Uninstall`）、`scripts/install.cmd`、`scripts/package.ps1`、`verify.mjs`、`tests/fresh-machine.mjs`（**162** 项端到端） |
-
-**γ 的验收**：在一台**没装过 Go、没装过本项目**的机器上双击后浮窗出现、`--doctor` 全绿，
-且沙箱里（`tests/fresh-machine.mjs` 的模型）落盘字节与 zip 版一致。签名留空壳位：
-`signtool sign /fd sha256 /tr <时间戳> /td sha256` 挂进发布脚本，并保留「未签名也能构建」的 CI 分支。
+| PowerShell 默认策略 | **`RemoteSigned`**（CurrentUser）。这正是 `install.cmd` 存在的唯一理由 |
+| 已有安装能力 | `scripts/install.ps1`（11 件制品、逐件 SHA256、PATH/Run 键、`-Uninstall`）、`scripts/install.cmd`、`scripts/package.ps1`、`cmd/pet-setup`、`verify.mjs`、`tests/fresh-machine.mjs`（**162** 项端到端） |
 
 **不要**为了「看起来专业」给安装器引入运行时依赖：安装器自身必须自包含（Go 或 PowerShell 都行），
 理由与 AGENTS.md 第 3 条「零外部运行时依赖」是同一条。
 
-### 对外宣传的顺序约束（2026-11-11 定）
+### 对外宣传的顺序约束（2026-11-11 定，同日已解除）
 
-**正式发声排在 β 之后**，不要在 0.9.0 上先宣传再改号——评论区第一条就会是
-「README 说 1.2.5、npm 是 1.2.5、exe 却是 0.9.0」。α 与 γ 可以静默上线，让先到的人先装上。
-宣传素材里的每一个数字都必须是当场跑出来的（190 个 `func Test` / 162 项新机检查 / 4.17 MiB /
-7 个 `func Test` 之外的三条测量），不要写「全量安全扫描」——`-race`、`govulncheck`、`gosec`
-仍缺 gcc，§6 已记录。
+**β 已交付**（浮窗 1.0.0 / 插件 1.2.6，`pet-v1.0.0` 与 `dsh-plugin-v1.2.6` 双 Release，npm `latest` = 1.2.6），
+所以那条「正式发声排在 β 之后」的约束**已经满足**：现在可以发声，而且四个数字终于一致。
+宣传素材里的每一个数字都必须是当场跑出来的（190 个 `func Test` / 162 项新机检查 / 4.17 MiB），
+不要写「全量安全扫描」——`-race`、`govulncheck`、`gosec` 仍缺 gcc，§6 已记录。
+
+**下一次改版本号之前请先读这一段**：`pet-v0.9.0` 与 `pet-v1.0.0` 两份资产都已发布且**不可变**；
+插件线的八个 tag 同理。1.0.0 → 1.0.1 会是新的 tag 与新资产，不要替换任何已发布的那份。
 
 F8、F9 都是「一个下午」的量级，且不触碰渲染核心，适合作为下一次迭代的起点。
 F1 现在价值下降：展开态已经能列出 6 行带项目名、状态、来源和相对时间的明细，

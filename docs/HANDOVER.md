@@ -4,40 +4,37 @@
 > 下一位 AI 直接从 §1「当前状态」开始读，然后按 §13–§27 的时间序读 runbook，不必回溯长上下文。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（v0.9.0 之后，2026-11-11，未发版；含 DSH 插件包 1.2.5）
+## 1. 当前状态（2026-11-11 晚；浮窗 **1.0.0**、插件包 **1.2.6**、两个成品包已发布）
 
 > 接手请先读本节与文末 §28「交接清单」，那两节给出「现在在哪、下一步做什么」；§27 是插件包分发的完整 runbook。
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：`0.9.0`（`internal/app/app_windows.go:23` 的 `Version` 常量，`--doctor` 与文档刷新都没有改它）。
-  交接整理是 `bb00e58`（「五家目录」那批）之后的一串**纯文档提交**，2026-11-11 上午推送、CI 每次全绿；
-  全貌用 `git log --oneline bb00e58..HEAD` 查，当前 CI 用 `gh run list --limit 1` 查——**这两个数字刻意不写死**，
-  因为 git 无法在一个提交里引用它自己或它的后继；
-  发版对象是 `ff7f6de`（= tag `dsh-plugin-v1.2.4` 指向的提交），其后依次 `4ee7f01`、`ef1d9d1`、`bb00e58`。
-  **浮窗本体与 DSH 插件包是两条版本线**：浮窗停在 `0.9.0`，插件包已到 **1.2.4**（tag `dsh-plugin-v1.2.4`，
-  只改文案、不动代码，见下文「分发」段与 §27.12）。
+- **版本**：浮窗 **`1.0.0`**（`internal/app/app_windows.go:23`），插件包 **`1.2.6`**。两条版本线各有 tag：
+  `pet-v1.0.0` 与 `dsh-plugin-v1.2.6`。**原先的「浮窗停 0.9.0、插件 1.2.5」是 2026-11-11 下午的事实，
+  已被本轮替换**——写在这里是因为 §32/§33 的历史段落仍会引用那两个数字。
+  查当前 CI 用 `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个
+  提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**190 个** `func Test`，
-  由 `go test -list '.*' ./...` 计数）；六个上报端逐个 `node --check` 全过；
-  `node integrations/deepseek-harness/verify.mjs` 输出 VERIFY PASSED；
-  `scripts/install.ps1 -VerifyOnly` 11/11 `[ok]`、exit 0（脚本已从仓库根下沉到 `scripts/`，见 §27.11）。
-- **规模**：Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**、JS **12 文件 / 3,650 行**；
+  11 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
+  `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` 11 份文档全解；
+  `scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；`--doctor` **9 ok / 0 warn / 0 fail**。
+- **规模**：Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**（190 个 `func Test`，
+  外加 `cmd/pet-setup` 的 20 个）、JS **12 文件 / 4,346 行**；
   `bin/AI-Terminal-Pet.exe` **4,371,968 B**、`bin/pet-statusline.exe` **3,664,896 B**、
-  `bin/pet-hook.exe` **3,697,152 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
-  第三方依赖 3 个（go-winio MIT、lxn/win BSD、x/sys BSD）。
-  v0.9.0 提交时的旧值（10,201 / 3,831 / 1,633 行，4,178,432 / 3,644,416 B，140 个 `func Test`）已作废。
-- **新增**（全部在 v0.9.0 之后、未发版）：`--doctor` 自检（9 项检查）、`docs/PROTOCOL.md` 线协议规范、
-  `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
-  `scripts/install.ps1` 的 `-VerifyOnly` / `-Uninstall` / `-AddToPath` 三个开关（卸载同时清理 PATH 条目）。
-- **分发**：Harness 桥接已做成独立 DSH 插件包 `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet`
-  **1.2.5**，含预编译浮窗，Release tag `dsh-plugin-v1.2.5`，资产 `dsh-ai-terminal-pet-1.2.5.tgz`
-  1,917,342 B / sha256 `dfa89a1e…` / shasum `1f6d5340…`，2026-11-11T14:54:28Z 上传）。
-  1.2.4 及更早均保持已发布、不可变，由 1.2.5 取代。
-  **1.2.5 是第一次「装上就真的能用」**：包内只有三个文件与 1.2.4 不同——`lib/index.js`（会话头适配 +
-  去重签名）、`verify.mjs`（新增 `caseVendoredProtocolLoads` 与三条会话头断言）、新增
-  `vendor/package.json`（`{"type":"commonjs"}`，§30.2）；两个 vendor 二进制字节未变，
-  `vendor/manifest.json` 也不再改动（源码摘要在 1.2.4 那轮已是 `39685c79…`，§29.5）。tarball
-  **17 files**（1.2.4 是 16），npm 与 Release 资产互为逐字节相同的一份。
+  `bin/pet-hook.exe` **3,697,152 B**、`dist/pet-setup.exe` **14,125,568 B**
+  （均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；第三方依赖 3 个。
+- **分发（两条线各四个入口）**：
+  - 插件线：npm `latest` = **1.2.6**；`dsh-plugin-v1.2.6` 的 Release 资产
+    `dsh-ai-terminal-pet-1.2.6.tgz` **1,917,331 B / sha256 `671cdc95…`**；钉 tag 的 git 源；
+    仓库根的清单 shim。
+  - 浮窗线：`pet-v1.0.0` 的 Release 带两个资产——`ai-terminal-pet-1.0.0-win-x64.zip`
+    **4,983,903 B / sha256 `70D992B1…`** 与 `pet-setup.exe` **14,125,568 B / sha256 `87D5E60B…`**；
+    `pet-v0.9.0` 仍在（不可变，已被取代）。
+  - 三个资产都**从公网 URL 下载回来复验过**：`pet-setup.exe --version` 打印 `pet-setup 1.0.0`；
+    沙箱（自带 `LOCALAPPDATA`/`USERPROFILE`）里 install → 11 件哈希全对 → `--verify` 11 件全对 →
+    `--uninstall`（输 yes）目录归零；zip 解出 17 个文件；`npm pack dsh-ai-terminal-pet@1.2.6`
+    取回的 tarball 与 Release 资产逐字节相同。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
@@ -2276,9 +2273,9 @@ readonly parentSession?: SessionId // The session this one was forked from
 
 ### 32.1 现在的事实（一句话）
 
-代码、测试、发布、分发四条线**都是绿的**，1.2.5 已上 npm 且 tag / Release / 自建索引三处一致，
-剩下的第一优先级只有一件：**ROADMAP §4 的 I1 独立安装包**。它卡在签名（本机没有代码签名证书），
-不卡在代码。
+代码、测试、发布、分发四条线**都是绿的**，浮窗本体已到 **1.0.0**（`pet-v1.0.0`），插件包已到 **1.2.6**
+（`dsh-plugin-v1.2.6`，npm `latest` = 1.2.6），两个成品包（便携 zip 与自解压 `pet-setup.exe`）都已发布
+并从公网下载回来实测过。**I1 只剩 I1-δ（签名与 MSI）**，而它卡在证书，不卡在代码。下一个动作是发声。
 
 ### 32.2 交接口令（按顺序跑，先证明起点干净）
 
@@ -2298,9 +2295,9 @@ node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 
 
 ### 32.3 I1 的开工顺序（照 ROADMAP §4 那张表，不要重新调研）
 
-> **2026-11-11 更新**：I1 已拆成 I1-α / I1-γ / I1-β 三段，**α 已交付**（见 §33）。
-> 下面第 1 条（定签名）已有结论：**先出未签名包，接受 SmartScreen**，签名作为独立事项。
-> 第 2 条（自解压单文件）现在是 I1-γ，它的验收要复用 α 已经固定的制品清单与 `SHA256SUMS.txt` 语义。
+> **2026-11-11 晚更新：I1-α / γ / β 全部已交付。** 浮窗 1.0.0、插件 1.2.6、`pet-v1.0.0` 的
+> 便携 zip 与 `pet-setup.exe` 都在线上，npm `latest` = 1.2.6，上游 PR #14439 已开。
+> **只剩 I1-δ（签名 + MSI），它需要证书这个外部输入。** 下面四条保留为当时的开工顺序。
 
 1. **先定签名**：有没有证书，决定做「未签名但可用」还是「签名发行」。没有证书不要假装能签名。
 2. **做自解压单文件 `.exe`**：内嵌 `AI-Terminal-Pet.exe`、`pet-statusline.exe`、`pet-hook.exe`、
@@ -2529,25 +2526,30 @@ scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
 ——那三次来自 README 的安装路径 B，说明「文档一改就有人装」，也让「先修漏斗、后发声」这个顺序
 有了第一个正向证据。
 
-### 33.7 还没做完的（下一轮直接接着做）
+### 33.7 I1-γ / β 已交付，还剩什么（2026-11-11 晚更新）
 
-- **I1-γ 自解压单文件 `.exe`**：`cmd/pet-setup`，`//go:embed` 11 件制品，`--verify` / `--uninstall`
-  对齐现有语义。验收复用 `tests/fresh-machine.mjs` 的沙箱模型。
-- **I1-β 换版本号**：`Version` → 1.0.0 与插件 1.2.6 的一次性雪崩，排在文案定型之后。
-  注意 `pet-v0.9.0` 的 Release 资产已经发布且**不可变**——0.9.0 的 zip 是既成事实，
-  1.0.0 会是新的 `pet-v1.0.0` 资产，不要试图替换 0.9.0 那份。
-- **便携 zip 已上线**（`pet-v0.9.0`，2026-11-11）：资产 `ai-terminal-pet-0.9.0-win-x64.zip`
-  4,983,915 B / sha256 `EF0FC0D0…`，从公开 URL 下载回来解压、`install` → `-VerifyOnly`
-  （11 件全对）→ `-Uninstall -Force`（rc=0）都实测过。它是**静默上线**：README 已指向它，
-  但对外发声仍排在 β 之后（§33.5 的排程约束）。
-- **宣传素材已完成两项、还缺一项**：`docs/assets/demo.gif`（25 帧 / 5.38 秒 / 342,606 B）
-  与 `docs/assets/desktop-scene.png`（1500x860 / 59,029 B）已由
-  `docs/assets/make_launch_assets.py` 从同一份光栅器输出合成，README 中英两段都已引用。
-  **还缺 SmartScreen 截图**：它没有自动化替代品——需要在没见过本项目的机器上从 Release
-  下载 zip、解压、双击 `install.cmd`，截下提示与两次点击。未签名版本若不先放这张图，
-  帖子第一条评论一定是这件事。
-- **文案**：外部可见的一切（README 对外声明段、X / Hacker News 帖、市场条目描述）已按 AGENTS.md
-  第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对，成品落在
-  [docs/LAUNCH.md](LAUNCH.md)。该轮评审至少纠正了一条会真出问题的事实表述：
-  初稿把浮窗写成像是对 Claude Code / OpenCode / Antigravity 开箱即用，而实际只有
-  DeepSeek Harness 无需配置。
+**这一小节原先列的「还没做完」两项已经做完**，保留在这里是因为它们的坑值得回看：
+
+- ✅ **I1-γ 自解压单文件 `.exe`**：`cmd/pet-setup` 已交付。三处「能构建、能运行、看起来正常」的坑写在
+  ROADMAP §4 与 CHANGELOG 的 `[1.0.0]` 条目里：`//go:embed payload` 静默跳过点开头文件；
+  `Copy-Item -LiteralPath '…\*'` 不做通配（载荷 2 个文件也照样构建成功）；
+  载荷不能照抄 zip 整棵暂存树（`README.install.txt` 与根 `install.cmd` 不在摘要里，每次安装都会失败）。
+- ✅ **I1-β 换版本号**：浮窗 1.0.0 + 插件 1.2.6，A 提交 `df4fcf6`（版本、索引 `version` 与
+  `publishTimestamp`、两份 README 的安装命令、版本徽章）、B 提交 `6496ba6`（索引 `source.commit` 与
+  `icon` 钉到 `df4fcf60…`）。两个 tag、两个 Release、npm `latest` = 1.2.6、上游 PR **#14439** 已开。
+  **`pet-v0.9.0` 与 `pet-v1.0.0` 都是既成事实且不可变**，下一次是新的 tag 与新资产。
+- ⏳ **只剩 I1-δ（签名 + MSI）**：`signtool.exe` 在本机已找到，**证书没有**；WiX/NSIS 都没装。
+  这一段需要外部输入（买证书或 Azure Trusted Signing），代码侧只需把 `signtool sign /fd sha256
+  /tr <时间戳> /td sha256` 挂进 `scripts/package.ps1`，并保留「未签名也能构建」的分支。
+- ⏳ **上游 PR #14439**：`MERGEABLE`，等 `check` 与人工合并；合并后站点重建才会把 1.2.6 渲染出来。
+  上一次 #14385 合并后仓库里的 yml 立刻更新，但站点 `plugins.json` 直到本轮复查仍是 1.2.3——
+  **「合并」与「渲染」始终是两件事**（§32.6 有三处对照表与复读命令）。
+
+**宣传素材（已完成）**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环）、`desktop-scene.png`
+（两个终端 + 浮窗同框）、`smartscreen-unsigned.png`（**标着 MOCKUP 的示意图**，不是真机截图）、
+`doctor-green.png`（程序自己的 stdout，用户名替换为 `<you>`）。四张都已从 README 中英两段引用。
+
+**文案**：对外可见的一切（X 中英双线程、Show HN 标题与正文、市场摘要、三份 issue 回复模板）已按
+AGENTS.md 第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对，成品在
+[docs/LAUNCH.md](LAUNCH.md)。该轮评审至少纠正了一条会真出问题的事实表述：初稿把浮窗写成像是对
+Claude Code / OpenCode / Antigravity 开箱即用，而实际只有 DeepSeek Harness 无需配置。

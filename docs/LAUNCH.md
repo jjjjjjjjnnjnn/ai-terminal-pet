@@ -5,15 +5,19 @@
 > （AGENTS.md 第 8 条）。**每个数字都以 [HANDOVER §33.6](HANDOVER.md) 那张基线表为准**，
 > 改动数字前先跑一遍那里的命令，不要凭记忆写。
 
-## 0. 发布顺序（不要打乱）
+## 0. 发布顺序（**已全部就绪**）
 
 ```
-P0/I1-α 已交付 ──► I1-γ 自解压 exe（可选，静默上线） ──► I1-β 版本号一次性付清 ──► P4 正式发声
+P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（1.0.0 / 1.2.6）──► ✅ 现在可以发声
 ```
 
-**正式发声排在 I1-β 之后。** 在 0.9.0 上先宣传再改号，评论区第一条就会是
-「README 说 1.2.5、npm 是 1.2.5、exe 却是 0.9.0」。已经存在的分发路径（市场条目、topic 采集）
-可以先静默更新，那不算发声。
+**前提条件全部满足，可以发了。** 浮窗 1.0.0、插件 1.2.6、npm `latest` = 1.2.6、`pet-v1.0.0` 的
+zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，四个数字终于一致。
+发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.0` 这个链接。
+
+**唯一还需要人做的一步**：`docs/assets/smartscreen-unsigned.png` 是**示意图**（图左下角写着 MOCKUP）。
+真机截图只有一台「从没构建过本项目」的机器才拍得到；如果能在发帖前补一张真的，更好；补不到就用示意图，
+**但帖子的说明里必须写明它是重建的**，不要冒充截图。
 
 ## 1. 渠道优先级
 
@@ -51,8 +55,10 @@ P0/I1-α 已交付 ──► I1-γ 自解压 exe（可选，静默上线） ─�
 
 ## 2. 发布前必须就位的东西
 
-- [x] `ai-terminal-pet-0.9.0-win-x64.zip`（`scripts/package.ps1`，17 文件，SHA256 已算）
-- [x] 独立的 `pet-v0.9.0` tag + Release：资产 `ai-terminal-pet-0.9.0-win-x64.zip`，4,983,915 B，sha256 `EF0FC0D0…`。已从公开 URL 下载回来、解压、`install` → `-VerifyOnly`（11 件全对）→ `-Uninstall -Force`（rc=0）各跑过一遍。
+- [x] `ai-terminal-pet-1.0.0-win-x64.zip`（`scripts/package.ps1`，17 文件 / 4,983,903 B / sha256 `70D992B1…`）
+- [x] **`pet-setup.exe`**（14,125,568 B / sha256 `87D5E60B…`）：自解压单文件，双击即装；**先**校验载荷再动手
+- [x] 独立的 `pet-v1.0.0` tag + Release（两个资产都已从公开 URL 下载回来实测：`--version` → `pet-setup 1.0.0`，沙箱里 install → `--verify` 11/11 → `--uninstall` 归零）
+- [x] 插件包 `dsh-ai-terminal-pet` **1.2.6**（npm `latest`、`dsh-plugin-v1.2.6` Release、tarball sha256 `671CDC95…`）
 - [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 342,606 B），三段真实动作
       —— 等待呼吸 → 悬停展开 → 点击等待行。循环时长 5.4 秒而不是 15 秒：GIF 是循环播放的，
       15 秒的循环第一遍没人看完，5 秒刚好一遍读完三句话。由 `docs/assets/make_launch_assets.py`
