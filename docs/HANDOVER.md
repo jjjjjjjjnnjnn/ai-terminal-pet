@@ -1103,16 +1103,24 @@ DPI 感知探针（150%）：
 
 ```powershell
 gofmt -l .                                   # 必须无输出
-go vet ./...
-go test -count=1 ./...                       # 154 个 func Test
+go vet ./...                                 # 必须无输出
+go test -count=1 ./...                       # 190 个 func Test，11 个包全 ok
 for f in reporters/*.js; do node --check "$f"; done
 node integrations/deepseek-harness/verify.mjs
+node packages/dsh-ai-terminal-pet/verify.mjs
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
-.\scripts\install.ps1
-.\scripts\install.ps1 -VerifyOnly                     # 期望 10/10 [ok]
+go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
+node tests/fresh-machine.mjs --no-overlay   # 162 项
+.\scripts\package.ps1                       # 便携 zip
+.\scripts\install.cmd                       # 装（cmd 包装，绕开 RemoteSigned）
+.\scripts\install.cmd -VerifyOnly           # 期望 11/11 [ok]
 & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 期望 0 fail，exit 0
 ```
+
+**这一段的数字是 2026-11-11 复读的**：更早版本里的 154 / 10 件制品 / 两处 `install.ps1` 都已是历史——§29
+之后多了 `cmd/pet-hook` 与 `internal/reporter`（154 → 190），§30 之后多了 `tests/fresh-machine.mjs` 作为
+独立门禁，§33 之后制品 10 → 11 并把文档入口换成 `install.cmd`。**引用前请重跑，别照抄本节。**
 
 ### 26.7 已知残留（2026-11-10）
 

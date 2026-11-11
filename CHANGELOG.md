@@ -75,24 +75,49 @@
 - **`tests/fresh-machine.mjs` 增到 162 项（S5b）**：用 `cmd.exe` 跑 `scripts\install.cmd`
   的两种形态，断言参数转发（`-VerifyOnly` 打印 `11 file(s) ... 0 warning`）与退出码转发
   （`-VerifyOnly -Uninstall` 仍是 2）。走 `-Destination` 指向沙箱，所以不碰本机的真实安装目录。
+- **`docs/assets/` 四个新素材**：`demo.gif`（25 帧 / 5.38 秒 / 342,606 B，等待呼吸 → 悬停展开 →
+  点击等待行）、`desktop-scene.png`（1500x860，「两个终端 + 浮窗同框」）、
+  `doctor-green.png`（1,798x358，真机 `--doctor` 输出 + 着色，用户名换成 `<you>`）、
+  `smartscreen-unsigned.png`（1320x560，**按官方对话框文字重建的示意图**，图左下角标 MOCKUP）。
+  前两张由 `make_launch_assets.py` 从同一份光栅器输出合成；后两张分别由 `make_doctor_card.py`
+  与 `make_smartscreen_notice.py` 产出。**真机 SmartScreen 截图需要一台"从没构建过本项目"的机器**，
+  而且会带上别人的桌面与机器名——示意图把"你会看到什么、点哪里"说清楚，并且不假装自己是截图。
 - **仓库门面**：`CONTRIBUTING.md`（含六条硬规则、发布不可变文件清单、`--doctor` 作为报障前置）、
   `CODE_OF_CONDUCT.md`（Contributor Covenant 2.1）、`.github/ISSUE_TEMPLATE/` 三份表单
   （bug 强制附 `--doctor` 全文、terminal 接入请求、feature 并列出两条非目标）、
-  `pull_request_template.md`（门禁清单 + 是否触碰发布不可变文件的显式勾选）。
+  `pull_request_template.md`（门禁清单 + 是否触碰发布不可变文件的显式勾选）、
+  `ISSUE_TEMPLATE/config.yml`（关掉空 issue：bug 表单第一个必填项就是 `--doctor` 全文，
+  空表单正好是绕开它的捷径；另挂三条 contact link）。
   仓库 description / homepage / topics 同时更新，topics 从 11 个补到 15 个（`opencode`、
-  `antigravity`、`ai-agents`、`coding-agents`）——社区健康度此前只有 42%，缺的正是这些。
+  `antigravity`、`ai-agents`、`coding-agents`）——社区健康度此前只有 42%。
+  **注意上限是 85%**：GitHub 只把单个 `.github/ISSUE_TEMPLATE.md` 算作 `issue_template`，
+  目录形式的表单不计分，所以五项 guidance 文件齐了之后分数就停在那里。
+  **这套表单第一版是坏的**：`bug.yml` 里 `description: \`winver\` output ...` 的反引号让 YAML
+  标量提前结束，文件扫不过，GitHub 会静默拒收——坏掉的恰好是唯一强制要 `--doctor` 全文的那张表。
+  修法是改成引号标量，并且**先跑一个 YAML 解析器再信它**。
 
 ### Changed
 
 - **README 三个安装路径并列**：A（Harness 用户，npm 裸包名）、B（下载便携 zip 双击 `install.cmd`，
   零 Go 工具链）、C（开发者从源码构建）。英文段与中文段同步。
   **首次运行会撞 SmartScreen「未知发布者」**，两段都提前写明点「更多信息 → 仍要运行」，
-  并说明 `SHA256SUMS.txt` 是签名到位之前诚实的来源证明——这一版刻意不签，因为没有证书。
+  并挂上 `docs/assets/smartscreen-unsigned.png`（示意图）与 `docs/assets/doctor-green.png`，
+  说明 `SHA256SUMS.txt` 是签名到位之前诚实的来源证明——这一版刻意不签，因为没有证书。
 - **README 事实修正**：插件版本 1.2.4 → **1.2.5**、npm 已发布（`dist-tags.latest` 1.2.5，
   17 个文件，tarball 与 Release 资产逐字节相同）、market-index 钉到 `34aa1f7`、
   徽章 `tests-154` → `tests-190` 并加 npm 徽章、"No standalone installer yet" 改为
   "Not code-signed"、CI 门禁列表补上 `package.ps1`。
 - **`.gitignore` 增加 `dist/`**：打包产物是 5 MB 二进制，随每个 release 重建，不入库。
+- **`docs/LAUNCH.md` 成为对外文案的唯一存放处**：Show HN 标题与正文（61 字符 / 259 词）、
+  作者首楼技术补充、X 中英各 5 条线程（字数逐条实测 ≤270）、DSH 市场摘要两版、
+  三份 issue 回复模板，以及「发布顺序」「渠道优先级」「发完之后看什么」三张表。
+  文案按 AGENTS.md 第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草，
+  再逐条按本仓库实测事实核对。**该轮评审至少纠正了一条会真出问题的事实表述**：
+  初稿把浮窗写成像是对 Claude Code / OpenCode / Antigravity 开箱即用，而实际只有
+  DeepSeek Harness 无需配置。
+- **`pet-v0.9.0` 独立 Release**：资产 `ai-terminal-pet-0.9.0-win-x64.zip`（4,983,915 B /
+  sha256 `EF0FC0D0…`），与插件线 `dsh-plugin-v*` 是两条互不干扰的 tag 线。已从公开 URL
+  下载回来、解压、`install` → `-VerifyOnly`（11 件全对）→ `-Uninstall -Force`（rc=0）实测。
 
 ### Fixed
 
