@@ -3,6 +3,12 @@
 *.disabled
 bin/
 
+# The portable release zip and its staging tree (scripts/package.ps1). These are
+# release artifacts uploaded to GitHub, not source: the zip is ~5 MB of binaries
+# that are rebuilt from the same source anyway, so committing it would only make
+# the repository grow on every release.
+dist/
+
 # Runtime / logs (machine-local state)
 error.log
 hang.log

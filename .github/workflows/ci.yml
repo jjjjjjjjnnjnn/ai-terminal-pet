@@ -172,5 +172,39 @@ jobs:
       # own LOCALAPPDATA, USERPROFILE and pipe. --no-overlay skips the two
       # scenarios that spawn a window, which a headless runner should not do.
       # It needs the three binaries, so it runs after the build steps.
+      #
+      # It also asserts the documented entry point is scripts\install.cmd, not a
+      # bare install.ps1: a stock Windows install runs PowerShell at RemoteSigned,
+      # which refuses a .ps1 that still carries the "downloaded from the internet"
+      # zone marker - the exact shape of a file a user unzips from a release.
       - name: Fresh-machine end-to-end suite
         run: node tests/fresh-machine.mjs --no-overlay
+
+      # The portable zip is what a Windows user who does not use the DeepSeek
+      # Harness actually downloads, so a packaging script that cannot produce it
+      # is a broken release, not a broken build. This step builds it from the
+      # binaries the previous steps produced (no second `go build`), checks that
+      # the archive contains exactly the artifacts scripts\install.ps1 looks for,
+      # and prints the SHA256 that goes into the release notes.
+      #
+      # The overlay/vendor cross-check inside package.ps1 is why this is safe to
+      # run here: it compares bin\AI-Terminal-Pet.exe against the committed
+      # vendor copy and refuses when they diverge. On this runner they always
+      # diverge - `go 1.23.0` in go.mod is a floor, so the runner compiles with
+      # go1.23.0 while the committed vendor binary was built with a newer local
+      # Go, and different releases produce different bytes from identical
+      # sources. The cross-check is therefore skipped here and left to the
+      # machine that cuts the release, which is the only one that can be right.
+      - name: Package the portable zip
+        shell: pwsh
+        run: ./scripts/package.ps1
+        env:
+          PET_PACKAGE_SKIP_VENDOR_CHECK: '1'
+
+      - name: Upload the portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-terminal-pet-win-x64
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 7

@@ -126,6 +126,23 @@ function runPowerShell(scriptArgs, timeout = 300000) {
   })
 }
 
+/**
+ * Run one cmd.exe line, the way a user's own shell would.
+ *
+ * This is what asserts `scripts\install.cmd`: the wrapper only exists to get
+ * past RemoteSigned, so it has to be exercised through cmd.exe itself. The
+ * path is deliberately relative and the working directory is the repository
+ * root, because that is the exact spelling the README prints - a quoted
+ * absolute path through `cmd /c` goes through a different quoting path.
+ */
+function runCmd(scriptArgs, cwd, timeout = 300000) {
+  return spawnSync(process.env.ComSpec || 'cmd.exe', scriptArgs, {
+    encoding: 'utf8',
+    timeout,
+    cwd,
+  })
+}
+
 /** rmSync with retries: Windows keeps handles for a moment after an exit. */
 function removeWithRetry(target) {
   for (let attempt = 0; attempt < 12; attempt++) {
@@ -851,6 +868,37 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
   }
   check('install.ps1 succeeds', install.status === 0, install.stdout + install.stderr)
   check('installer reports 11 artifacts', /install: ok - 11 file/.test(install.stdout || ''), install.stdout)
+
+  // S5b: the documented entry point is scripts\install.cmd, not the bare .ps1.
+  // On a stock Windows install the effective execution policy is RemoteSigned,
+  // and a .ps1 carrying the "downloaded from the internet" zone marker is
+  // refused outright there - which is what a user who unzips the release gets.
+  // This asserts the wrapper forwards arguments, the exit code and the result,
+  // so the README's install step is exercised in the form the README prints.
+  //
+  // -Destination keeps this hermetic: without it the wrapper defaults to the
+  // machine's real %LOCALAPPDATA% install, so the check would pass on a
+  // developer machine that happens to have one and fail on a clean CI runner
+  // for a reason that has nothing to do with the wrapper.
+  const verifyThroughWrapper = runCmd(
+    ['/c', 'scripts\\install.cmd', '-Destination', destination, '-VerifyOnly'],
+    repoDir,
+  )
+  check(
+    'install.cmd -VerifyOnly forwards to the installer',
+    verifyThroughWrapper.status === 0 &&
+      /install: verified - 11 file\(s\) match the repository, 0 warning/.test(verifyThroughWrapper.stdout || ''),
+    String(verifyThroughWrapper.stdout || '') + String(verifyThroughWrapper.stderr || ''),
+  )
+  const usageThroughWrapper = runCmd(
+    ['/c', 'scripts\\install.cmd', '-Destination', destination, '-VerifyOnly', '-Uninstall'],
+    repoDir,
+  )
+  check(
+    'install.cmd propagates a usage exit code (2)',
+    usageThroughWrapper.status === 2 && /mutually exclusive/.test(usageThroughWrapper.stdout || ''),
+    'status=' + usageThroughWrapper.status,
+  )
 
   for (const name of ['AI-Terminal-Pet.exe', 'pet-statusline.exe', 'pet-hook.exe', 'protocol.js']) {
     check('installed ' + name, existsSync(path.join(sandbox.petDir, name)))
