@@ -144,7 +144,7 @@ function walkGoSources(dir, found) {
  * rather than an import-closure walk because an explicit list fails loudly: a
  * new package shows up as a digest change and a reviewer adds it deliberately.
  */
-const NON_OVERLAY_PACKAGES = ['cmd/pet-hook/', 'cmd/pet-statusline/', 'internal/reporter/']
+const NON_OVERLAY_PACKAGES = ['cmd/pet-hook/', 'cmd/pet-setup/', 'cmd/pet-statusline/', 'internal/reporter/']
 
 function isOverlaySource(relative) {
   return !NON_OVERLAY_PACKAGES.some((prefix) => relative.startsWith(prefix))

@@ -20,7 +20,12 @@ import (
 )
 
 // Version is reported by `ai-terminal-pet --version`.
-const Version = "0.9.0"
+//
+// 1.0.0 rather than 0.9.0: this release ships three install paths (one command,
+// two downloads, source), a self-checking installer, a single-file setup and a
+// cross-checked documentation set. The number also stops being the fourth
+// different one in circulation - the overlay said 0.9.0 while npm said 1.2.5.
+const Version = "1.0.0"
 
 func Run() error {
 	return RunWith(false)

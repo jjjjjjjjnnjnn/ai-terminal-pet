@@ -493,7 +493,10 @@ function scenarioFreshMachine(sandbox, overlayExe) {
   equal('--pretty is accepted too', runExe(overlayExe, ['--json', '--pretty'], sandbox.env, 15000).status, 0)
 
   const version = runExe(overlayExe, ['--version'], sandbox.env, 15000)
-  check('--version works before install', /0\.9\.0/.test(version.stdout || ''), version.stdout)
+  // Anchored rather than matched anywhere: the check is that the binary reports
+  // a version at all, and that it is a released 1.x like the installer expects.
+  // Pinning 0.9.0 here was how this test silently became a version freeze.
+  check('--version works before install', /^ai-terminal-pet 1\.\d+\.\d+\b|^1\.\d+\.\d+\b/.test((version.stdout || '').trim()), version.stdout)
 }
 
 /** S2: pack the repository package and unpack it the way an installer would. */
