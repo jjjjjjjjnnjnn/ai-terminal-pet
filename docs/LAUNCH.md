@@ -33,24 +33,32 @@ zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，�
 **不要投的**：`WOOK98/awesome-deepseek-harness-plugins`（imsai 的 fork、已停更）、
 `ydhrdh/dsh-marketplace`（7 条、0 stars）。详见 HANDOVER §28.3。
 
-### 1.1 已经投出去的那批，现在的真实状态（2026-11-11T18:20Z 复查）
+### 1.1 已经投出去的那批，现在的真实状态（2026-11-11T21:05Z 复查）
 
-**「投了」不等于「有人看」**，下面五条是同一批提交，状态差别很大：
+**「投了」不等于「有人看」**，下面这批是同一轮提交，状态差别很大（四家已收录，四家仍在排队）：
 
 | 目标 | 状态 | 说明 |
 |---|---|---|
-| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | ✅ **已合并并已是 1.2.5**（PR #14385，17:20:15Z，merge commit `70581cc`） | 仓库里 yml 已是 1.2.5、描述也带 reporters 那句；**站点 `plugins.json` 仍渲染 1.2.3**，等它重建 |
-| [dshopen](https://github.com/polang233/dsh-plugin-index/issues/423) | ✅ **已收录并已渲染** | `dshopen.org/index.json` 1,207 条含本包 **1.2.4**，`labels: verified + updated-recent`；1.2.5 要等它下一次构建 |
+| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | ✅ **两次合并都完成**：#14385（17:20:15Z，`70581cc`）→ 1.2.5；**#14439（20:12:31Z，`475a48e`）→ 1.2.6** | 仓库里 `data/plugins/*.yml` 的 `tarball` 已是 **1.2.6**；**站点 `plugins.json`（`count` 10,578）仍渲染 1.2.5**，等它下一次构建 |
+| [dshopen](https://github.com/polang233/dsh-plugin-index/issues/423) | ✅ **已收录并已渲染** | `dshopen.org/index.json` **1,207 条**含本包 **1.2.4**（commit `ff7f6de`），`labels: verified + updated-recent`；**落后两个版本**，要等它下一次构建 |
+| [YELEBAI/dsh-plugin-marketplace](https://github.com/YELEBAI/dsh-plugin-marketplace) | ✅ **自动采集，已收录** | `registry/plugins.json` 第 8,729 条：`version: 1.2.5`、`verifiedCommit: 584bc2f`、`install.spec` = `github:jjjjjjjjnnjnn/ai-terminal-pet#584bc2f`、`profiles: [desktop, headless, web]`、`verifiedAt` 17:54:34Z。**无需申请**，它按 topic 自动扫 |
+| [bradeGithub/DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) | ✅ **自动采集，已收录** | `registry.json` 第 13,128 条：`pkg_name`/`npm_pkg_name` = `dsh-ai-terminal-pet`、`version: 1.2.4`、topics 15 个、`stars_delta_30d` 也在记。issue #367 只是留证，可关 |
 | [dshbase #322](https://github.com/ylwl1997/dshbase/issues/322) | ⏳ open / **0 评论** | 08:35Z 提交，至今无人回应 |
 | [dsh.so #24](https://github.com/dsh-so/dsh-plugin-submissions/issues/24) | ⏳ open / **0 评论** | 08:36Z |
 | [dsh-plugin.org #735](https://github.com/dshplugin/dsh-plugin-hub/issues/735) | ⏳ open / **0 评论** | 08:46Z；这个库的 `Submission gate` 若会回应通常几分钟内就有，0 评论意味着没进队列 |
 | [AllDSH #2](https://github.com/alldsh/submissions/issues/2) | ⏳ open / **0 评论** | 08:44Z |
-| [brade #367](https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367) | ⏳ open / 3 评论（都是我们自己的） | 它的自动扫描已把本仓库判成 `bundle-plugin` + `risk_tier: safe`，issue 只是留证，可关 |
-| [imsai #912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | ⏳ open | 该库对已有条目的改动永不自动合并 |
+| [imsai #912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | ✅ **已合并并已收录** | 目录里 `catalog/plugins/jjjjjjjjnnjnn--ai-terminal-pet--packages--dsh-ai-terminal-pet.json` 在，`category: notify`，中英摘要齐全；README 也列了。它是「目录文件」而不是「版本钉」，所以没有版本滞后问题 |
 | [radar #1255](https://github.com/AdamPlatin123/dsh-plugin-radar/pull/1255) | ⏳ open / 零 check | 无回应 |
 
-**结论（也是发给人的那句）**：这一轮 DSH 生态里**唯一可主动推动的只剩「等站点重建」**，
-其余全是等对方。发帖时不要把「已提交五家」写成「已被五家收录」——那是两件事。
+**结论（也是发给人的那句）**：**已收录的有四家**——awesome-dsh-plugin（仓库侧已 1.2.6）、
+imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 topic 自动采的，不用申请）。
+**两家的版本号还落后**：awesome-dsh-plugin 的站点 `plugins.json` 仍渲染 1.2.5，dshopen 仍是 1.2.4——
+「合并」与「渲染」、以及「采到了」与「渲染成最新版」，始终是两件事。
+四家人工提交的目录（dshbase / dsh.so / dsh-plugin.org / AllDSH）截至 21:05Z 仍是 **open、0 评论**，
+`dshmarketplace.dev` 的公开搜索仍回 `{"total":0}`。
+
+**发帖时的措辞边界**：可以说「已在 X 个 DSH 目录里」，`X` 用**上面四家**的数；不要把「已提交」
+写成「已被收录」，也不要把「收录」写成「市场推荐」——后两者在这几家都是别人的判断，不是我们能声明的。
 
 
 ## 2. 发布前必须就位的东西
@@ -109,7 +117,7 @@ three need their reporter wired once (one line per terminal, table in the README
 code-signed, so first run shows SmartScreen.
 
 Three native executables, nothing to install first: a 4.17 MiB overlay, a statusline shim,
-a hook binary. No account, no network, no telemetry, MIT. 190 Go tests plus a 162-check
+a hook binary. No account, no network, no telemetry, MIT. 201 Go tests plus a 162-check
 suite that installs into a throwaway sandbox.
 
 https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
@@ -141,7 +149,7 @@ entry.
 
 4/5 Three native exes, no runtime at install: the 4.17 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
 
-5/5 Windows only. MIT, no account, no network, no telemetry. 190 Go tests plus a 162-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 Windows only. MIT, no account, no network, no telemetry. 201 Go tests plus a 162-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 213。
@@ -164,7 +172,7 @@ entry.
 
 4/5 三个原生 exe，装完不需要任何运行时：4.17 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
 
-5/5 仅 Windows。MIT，无账号、不联网、无遥测。190 个 Go 单测 + 162 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 仅 Windows。MIT，无账号、不联网、无遥测。201 个 Go 单测 + 162 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 132。

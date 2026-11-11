@@ -5,7 +5,7 @@ Stop glancing across terminal windows to track agent states. It costs one small 
 ![ai-terminal-pet](docs/assets/hero.png)
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Go](https://img.shields.io/badge/go-1.23-00ADD8) ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green) ![Size](https://img.shields.io/badge/size-4.17%20MiB-blue) ![Dependencies](https://img.shields.io/badge/dependencies-3-informational) ![Tests](https://img.shields.io/badge/tests-190-brightgreen) ![npm](https://img.shields.io/npm/v/dsh-ai-terminal-pet?label=dsh%20plugin)
+![License](https://img.shields.io/badge/license-MIT-green) ![Size](https://img.shields.io/badge/size-4.17%20MiB-blue) ![Dependencies](https://img.shields.io/badge/dependencies-3-informational) ![Tests](https://img.shields.io/badge/tests-201-brightgreen) ![npm](https://img.shields.io/npm/v/dsh-ai-terminal-pet?label=dsh%20plugin)
 
 > 🇬🇧 [English](#english) &nbsp;·&nbsp; 🇨🇳 [中文](#中文)
 

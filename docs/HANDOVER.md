@@ -15,11 +15,11 @@
   已被本轮替换**——写在这里是因为 §32/§33 的历史段落仍会引用那两个数字。
   查当前 CI 用 `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个
   提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**190 个** `func Test`，
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**201 个** `func Test`，
   11 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` 11 份文档全解；
   `scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；`--doctor` **9 ok / 0 warn / 0 fail**。
-- **规模**：Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**（190 个 `func Test`，
+- **规模**：Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**（201 个 `func Test`，
   外加 `cmd/pet-setup` 的 20 个）、JS **12 文件 / 4,346 行**；
   `bin/AI-Terminal-Pet.exe` **4,371,968 B**、`bin/pet-statusline.exe` **3,664,896 B**、
   `bin/pet-hook.exe` **3,697,152 B**、`dist/pet-setup.exe` **14,125,568 B**
@@ -1101,7 +1101,7 @@ DPI 感知探针（150%）：
 ```powershell
 gofmt -l .                                   # 必须无输出
 go vet ./...                                 # 必须无输出
-go test -count=1 ./...                       # 190 个 func Test，11 个包全 ok
+go test -count=1 ./...                       # 201 个 func Test，12 个包全 ok
 for f in reporters/*.js; do node --check "$f"; done
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
@@ -1955,7 +1955,7 @@ integrity `sha512-2sEFAf0k…`、**17 files**、`npm pack dsh-ai-terminal-pet@1.
 node packages/dsh-ai-terminal-pet/verify.mjs        -> VERIFY PASSED (rc 0)
 node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check  -> 两个 vendor 文件均 matches the source
 node integrations/deepseek-harness/verify.mjs       -> VERIFY PASSED
-gofmt -l . / go vet ./... / go test -count=1 ./...  -> 干净 / 0 / 11 个包全 ok（190 个 func Test）
+gofmt -l . / go vet ./... / go test -count=1 ./...  -> 干净 / 0 / 11 个包全 ok（201 个 func Test）
 六个 reporters 逐个 node --check                     -> 全过（Node 24 只查第一个参数，必须逐个跑）
 node tests/fresh-machine.mjs --no-overlay           -> PASS: 160/160
 scripts/install.ps1 -VerifyOnly                     -> 11 file(s) match the repository, 0 warning(s)
@@ -2285,7 +2285,7 @@ git log --oneline -3                     # 顶上是 c8ad006 之后的文档提�
 npm view dsh-ai-terminal-pet version     # 1.2.5
 gh run list --limit 1                    # success
 gofmt -l . ; go vet ./...                # 干净 / 0
-go test -count=1 ./...                   # 11 个包全 ok（190 个 func Test）
+go test -count=1 ./...                   # 11 个包全 ok（201 个 func Test）
 node packages/dsh-ai-terminal-pet/verify.mjs
 node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
 node integrations/deepseek-harness/verify.mjs
@@ -2499,7 +2499,7 @@ npm view dsh-ai-terminal-pet version             1.2.5
 gh run list --limit 1                            success（43052732146, 1m41s）
 go version                                       go1.27.0 windows/amd64
 gofmt -l . / go vet ./...                        干净 / 0
-go test -count=1 ./...                           11 个包全 ok，190 个 func Test
+go test -count=1 ./...                           12 个包全 ok，201 个 func Test
 node packages/dsh-ai-terminal-pet/verify.mjs     VERIFY PASSED
 node .../scripts/vendor.mjs --check              两个 vendor 文件 matches the source
 node integrations/deepseek-harness/verify.mjs    VERIFY PASSED
