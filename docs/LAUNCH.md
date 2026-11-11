@@ -23,15 +23,39 @@ zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，�
 
 | 渠道 | 权重 | 形态 | 备注 |
 |---|---|---|---|
-| **Show HN** | 高 | 一条 URL 提交 + 作者首楼技术补充 | 周一–周四 08:00–10:00 ET；周五与周日几乎必沉 |
-| **X（英文线程）** | 高 | 5 条，链接放最后一条 | 不做「RT/关注」诱导；GIF 挂在第 1 条 |
-| **X（中文线程）** | 中高 | 5 条，同一批事实，中文原生表达 | 与英文线程**同一天内**发，不要隔周 |
-| **DSH 生态（GitHub）** | 中但最确定 | 注册表条目跟进 PR、topic 采集、自建索引 | 实测证据：`v1.2.3` 的 tarball 被下载 **47** 次，`v1.2.4`/`v1.2.5` 只有 4/5 次——**把已有条目推到最新版比发帖更有效** |
-| r/ClaudeAI / r/ChatGPTCoding | 中 | 英文帖改写为问答体 | HN 之后 4 小时再发，避免同一批人重复看到 |
-| V2EX / 掘金 / 少数派 | 中 | 中文长文（带 GIF） | 第三日再发，不要与 X 同日 |
+| **DSH 官方 Discussions** | **最高（受众最准）** | 「Show Your Plugins!」专区的单帖 | ✅ **已发：[#13001](https://github.com/deepseek-ai/deepseek-harness/discussions/13001)**（2026-11-11T20:50:40Z）。受众全部是 DSH 用户，且该区有 1.2 万帖的活跃度；规则见 §1.2 |
+| **Show HN** | 高 | 一条 URL 提交 + 作者首楼技术补充 | ✅ 你已发布。周一–周四 08:00–10:00 ET；周五与周日几乎必沉 |
+| **X（英文线程）** | 高 | 5 条，链接放最后一条 | ✅ 你已发布。不做「RT/关注」诱导；GIF 挂在第 1 条 |
+| **X（中文线程）** | 中高 | 5 条，同一批事实，中文原生表达 | ✅ 你已发布。与英文线程**同一天内**发，不要隔周 |
+| **DSH 生态（GitHub 目录）** | 中但最确定 | 注册表条目跟进 PR、topic 采集、自建索引 | 实测证据：`v1.2.3` 的 tarball 被下载 **47** 次，而 `v1.2.4`/`v1.2.5` 只有 4/5 次——**把已有条目推到最新版比发帖更有效**。现状见 §1.1 |
+| r/ClaudeAI / r/ChatGPTCoding | 中 | 英文帖改写为问答体 | 你已说明不发 |
+| V2EX / 掘金 / 少数派 | 中 | 中文长文（带 GIF） | 你已说明不发 |
 
 **不要投的**：`WOOK98/awesome-deepseek-harness-plugins`（imsai 的 fork、已停更）、
 `ydhrdh/dsh-marketplace`（7 条、0 stars）。详见 HANDOVER §28.3。
+
+### 1.2 DSH 官方 Discussions 的发帖规则与我们的合规情况
+
+该区置顶了两帖：`#2004 Plugin Category Guidelines` 与 `#1797 Welcome`。六条规则逐条对照：
+
+| 规则 | 我们怎么满足的 |
+|---|---|
+| 1. 一贴一项目 | 一帖只讲 ai-terminal-pet |
+| 2. 必须与 DSH 真实集成，禁止无关推广与报菜名 | 标题与正文都以 DSH 为主体；OpenCode/Claude Code/Antigravity 被降级为「可选能力」，且写明「这是可选能力，不是对 Harness 的前提」 |
+| 3. 标题格式 `DSH \| 项目名 \| 一句话` | `DSH \| ai-terminal-pet \| Windows 置顶状态带：一眼看出哪个 DSH 会话在等审批`（55 字符） |
+| 4. 正文含项目地址、简介、截图、与 DSH 的集成方式 | 四项齐备；集成方式给了**事件→状态映射表**，并说明 `approval/request` 是无条件 `next()` 透传 |
+| 5. 显著标注非官方 | 首行 blockquote 加粗：「非官方项目…与 DeepSeek 官方没有隶属关系」 |
+| 6. 建议模板 | 按模板顺序：非官方声明 → 项目地址 → 简介 → 集成方式 → 截图 |
+
+**评审改了三处才会过门**（`agy --model gemini-3.8-flash-high --effort high` 逐条挑出来的，都是真的）：
+
+1. **原稿把四个终端并列**，在 DSH 自己的插件区会被读成「借 DSH 流量推广竞品」——规则 2 明确禁止。
+   改成 DSH 为主线，其余三个是可选聚合。
+2. **「官方 protocol 模块」这个说法是错的**，在那个论坛里「官方」默认指 DeepSeek。`protocol.js`
+   是本项目自己的模块，已改成「ai-terminal-pet 的统一协议模块」。
+3. **`**_> …_**` 这种写法在 Markdown 里渲染不出引用块**，改成标准 `> **_…_**`。
+
+另外两处补充是评审加的、也确实该有：`56×156`（原稿只写了 56）、以及 Release 直链。
 
 ### 1.1 已经投出去的那批，现在的真实状态（2026-11-11T21:05Z 复查）
 
@@ -246,12 +270,13 @@ files alone does not wire it. The connect table in the README has one line per t
 
 没有遥测，所以只能看代理指标：
 
-| 指标 | 怎么读 | 基线（2026-11-11） |
+| 指标 | 怎么读 | 基线（2026-11-11 21:10Z） |
 |---|---|---|
-| Release 下载数 | `gh api repos/.../releases` | `v1.2.3` = **47** / `v1.2.4` = 4 / `v1.2.5` = 5 / `pet-v0.9.0` = 3 |
-| 仓库浏览 | `gh api .../traffic/views` | 30 天 7 views / 2 uniques |
+| Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.0` = **4**（zip 2 + setup 2）／`pet-v0.9.0` = 3／`v1.2.6` = 1／`v1.2.5` = 13／`v1.2.4` = 4 |
+| 仓库浏览 | `gh api .../traffic/views` | 30 天 7 views / 2 uniques（发帖前，尚未刷新） |
 | star / fork | `gh repo view` | 1 / 0 |
-| npm | `npm view dsh-ai-terminal-pet version` | 1.2.5 |
+| npm | `npm view dsh-ai-terminal-pet version` | **1.2.6**（`dist-tags.latest`） |
+| DSH Discussions | 帖子 #13001 的 upvote 与回复数 | 0 / 0（刚发） |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条 |
 
