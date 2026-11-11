@@ -1,0 +1,20 @@
+# Issue template picker configuration.
+#
+# `blank_issues_enabled: false` is deliberate: the bug form's first required
+# field is the whole `--doctor` report, and a blank issue skips exactly that.
+# Nine out of ten "the pet does not appear" reports are answered by one line of
+# that report, so the form is the shortest path for the reporter as well.
+blank_issues_enabled: false
+
+contact_links:
+  - name: The overlay is not showing up at all
+    url: https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/blob/main/CONTRIBUTING.md#before-you-report-the-pet-does-not-appear
+    about: Two environment problems look exactly like product bugs. Check these two first (Low-integrity directories, and --json not being a liveness probe).
+
+  - name: How do I connect my terminal
+    url: https://github.com/jjjjjjjjnnjnn/ai-terminal-pet#connect-your-terminal
+    about: Installing the files does not wire a terminal. The connect table has one line per terminal, native .exe preferred over the Node hook.
+
+  - name: I want to write a reporter for a terminal that is not listed
+    url: https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/blob/main/docs/PROTOCOL.md
+    about: The wire protocol contract - fields, state semantics, pipe-name derivation, the OK/ERR reply, redaction rules. No source reading required.
