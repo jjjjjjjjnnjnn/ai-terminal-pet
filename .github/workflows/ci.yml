@@ -61,6 +61,14 @@ jobs:
         with:
           node-version: '22'
 
+      # Only for tools/check_docs_links.py, which is stdlib-only. Pinning the
+      # interpreter is cheaper than discovering that the runner image's Python
+      # moved a version and the script's f-strings changed behaviour.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Show toolchain versions
         shell: bash
         run: |
@@ -179,6 +187,13 @@ jobs:
       # zone marker - the exact shape of a file a user unzips from a release.
       - name: Fresh-machine end-to-end suite
         run: node tests/fresh-machine.mjs --no-overlay
+
+      # Every relative link and in-document anchor in the docs we wrote. GitHub
+      # renders a broken one without a warning, and a launch post is the worst
+      # possible time to discover that "see the connect table" points at a
+      # heading that was renamed. Cheap, deterministic, no dependencies.
+      - name: Check documentation links
+        run: python tools/check_docs_links.py
 
       # The portable zip is what a Windows user who does not use the DeepSeek
       # Harness actually downloads, so a packaging script that cannot produce it
