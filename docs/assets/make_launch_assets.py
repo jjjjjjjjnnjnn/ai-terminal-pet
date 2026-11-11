@@ -103,6 +103,15 @@ def load(preview: Path, name: str) -> Image.Image:
     return Image.open(path).convert("RGBA")
 
 
+# trim() is deliberately not used for the two launch assets.
+#
+# The preview PNG is exactly the panel's canvas - 168x468 for a 56x156 strip at
+# scale 3 - so the rounded frame already touches all four edges. Trimming to the
+# non-backdrop bounding box crops the antialiased corner pixels away and leaves
+# a panel whose corners look sliced off, which is what the first version of
+# desktop-scene.png looked like. The backdrop is only visible at the corners,
+# and it is the overlay's own composite colour, so the honest fix is to place
+# the whole frame on that same colour.
 def trim(img: Image.Image, bg=DESKTOP, pad: int = 10) -> Image.Image:
     """Crop the flat backdrop so the panel can be pasted flush anywhere."""
     rgb = img.convert("RGB")
@@ -153,9 +162,9 @@ def breathe(panel: Image.Image, opacity: float) -> Image.Image:
 
 
 def demo_gif(preview: Path) -> Path:
-    compact = trim(load(preview, "compact-waiting-en.png"), pad=0)
-    hovered = trim(load(preview, "compact-waiting-hover.png"), pad=0)
-    expanded = trim(load(preview, "expanded-waiting-en.png"), pad=0)
+    compact = load(preview, "compact-waiting-en.png")
+    hovered = load(preview, "compact-waiting-hover.png")
+    expanded = load(preview, "expanded-waiting-en.png")
 
     # One logical pixel is 3 preview pixels (scale 3) for compact and 2 for
     # expanded, so normalising by panel height keeps the two sizes in the same
@@ -280,7 +289,7 @@ def desktop_scene(preview: Path) -> Path:
     for y in range(height):
         shade = int(10 * (y / height))
         draw.line([(0, y), (width, y)], fill=(0x0E + shade, 0x10 + shade, 0x16 + shade))
-    compact = trim(load(preview, "compact-waiting-en.png"), pad=0)
+    compact = load(preview, "compact-waiting-en.png")
     compact = at_height(compact, 420)
 
     def terminal(x: int, y: int, w: int, h: int, title: str, lines: list[tuple[str, tuple[int, int, int]]], focused: bool) -> None:
@@ -319,12 +328,14 @@ def desktop_scene(preview: Path) -> Path:
     # Pasting through a rounded mask, not the panel's own alpha: the preview PNG
     # is flattened onto the backdrop, so its alpha is opaque everywhere. The
     # mask reproduces what the layered window really does - everything outside
-    # the rounded frame is fully transparent, and the desktop shows through.
-    radius = max(10, int(compact.width * 0.1))
+    # the rounded frame is fully transparent, and the desktop shows through -
+    # and its radius is the rasterizer's own min(width/2, 24) logical units.
+    radius = corner_radius(compact, 56)
     mask = Image.new("L", compact.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, compact.width - 1, compact.height - 1],
-                                           radius=radius, fill=255)
-    base.paste(compact, (width - compact.width - 40, 190), mask)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, compact.width - 1, compact.height - 1], radius=radius, fill=255
+    )
+    base.paste(compact, (width - compact.width - 56, 190), mask)
 
     draw.text((64, 812), "panel: rendered by the real Win32 rasterizer. terminals: illustration.",
               font=font(16), fill=(0x59, 0x60, 0x6E))
