@@ -2479,8 +2479,12 @@ scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
   4,983,915 B / sha256 `EF0FC0D0…`，从公开 URL 下载回来解压、`install` → `-VerifyOnly`
   （11 件全对）→ `-Uninstall -Force`（rc=0）都实测过。它是**静默上线**：README 已指向它，
   但对外发声仍排在 β 之后（§33.5 的排程约束）。
-- **宣传素材**：15 秒 GIF（等待脉冲 → 展开看到项目名与"等了 3 分钟" → 点击跳回终端）比 5 张静态
-  PNG 更有说服力；现有图都是纯面板，缺一张「两个终端 + 浮窗同框」的实景图。
+- **宣传素材已完成两项、还缺一项**：`docs/assets/demo.gif`（25 帧 / 5.38 秒 / 342,606 B）
+  与 `docs/assets/desktop-scene.png`（1500x860 / 59,029 B）已由
+  `docs/assets/make_launch_assets.py` 从同一份光栅器输出合成，README 中英两段都已引用。
+  **还缺 SmartScreen 截图**：它没有自动化替代品——需要在没见过本项目的机器上从 Release
+  下载 zip、解压、双击 `install.cmd`，截下提示与两次点击。未签名版本若不先放这张图，
+  帖子第一条评论一定是这件事。
 - **文案**：外部可见的一切（README 对外声明段、X / Hacker News 帖、市场条目描述）已按 AGENTS.md
   第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对，成品落在
   [docs/LAUNCH.md](LAUNCH.md)。该轮评审至少纠正了一条会真出问题的事实表述：
