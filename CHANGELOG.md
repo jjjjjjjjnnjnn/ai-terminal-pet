@@ -504,6 +504,19 @@
 
 ### Fixed
 
+- **DSH 插件的项目路径、上级会话和会话起始时间全都没读对**（深度适配的核心一条）：
+  Harness 的会话头 `session.header` 是唯一声明 `cwd` / `parentSession` / `createdAt` 的地方，
+  而插件原来用 `process.cwd()` 当项目路径、`parentSessionId` 恒为空、`startedAt` 取「第一次见到
+  这个会话的时间」。桌面版 Harness 是从安装目录启动的，所以**每一条会话都会被标成同一个错误路径**；
+  子代理会话也不会挂在父会话下面；面板上的「已运行时长」从用户打开面板那刻才开始算。
+  现在 `reportFor()` 统一读会话头：`cwd` → `project`，`parentSession` → `parentSessionId`，
+  `createdAt` → `startedAt`。`sessionIdOf`/`headerOf` 同时兼容 `session/event` 直接给出的会话对象
+  和 `agent/*` 事件给出的 `{ agent: { session } }` 包装。
+  **同时核对过真实的 `SessionEventMap`**（`@deepseek-ai/dsh-session/lib/types/types.d.ts`）：
+  主机端的持久会话事件只有 `turn/start`、`turn/end`、`step/start`、`step/end`、`user/message`、
+  `assistant/chunk`、`assistant/message`、`tool/call`、`tool/result`、`todo/write`、`request/header`、
+  `request/context`、`session/end-seed`。`working-directory/change` **根本不存在**，
+  `session/title` 只是客户端事件——这两条分支保留为前向兼容，但项目与血缘改由会话头提供。
 - **插件自带的 `vendor/protocol.js` 从来没被加载成功过**（1.2.4 及以前）：包清单声明了
   `"type": "module"`，所以包内任何 `.js` 都按 ESM 解释；插件用 `createRequire()` 去
   `require()` 那个文件，Node 24 的 `require(ESM)` 会**成功返回一个模块命名空间**，但里面没有

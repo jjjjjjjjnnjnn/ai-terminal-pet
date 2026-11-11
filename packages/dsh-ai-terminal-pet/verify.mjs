@@ -116,8 +116,11 @@ async function caseMapping() {
     return handler(...args)
   }
 
-  const session = { header: { id: 'ses_abc' }, id: 'ses_abc' }
-  const agent = { session: { header: { id: 'ses_abc' }, id: 'ses_abc' } }
+  const session = {
+    header: { id: 'ses_abc', cwd: 'C:\\work\\demo', parentSession: 'ses_parent', createdAt: 1763000000000 },
+    id: 'ses_abc',
+  }
+  const agent = { session: { header: { id: 'ses_abc', cwd: 'C:\\work\\demo', parentSession: 'ses_parent', createdAt: 1763000000000 }, id: 'ses_abc' } }
 
   fire('session/event', session, { type: 'turn/start', data: {} })
   fire('session/event', session, { type: 'tool/call', data: { name: 'Bash' } })
@@ -134,20 +137,11 @@ async function caseMapping() {
   const afterCleanup = stub.calls.length
 
   const states = stub.calls.map((item) => item.state)
-  // 'error' appears twice on purpose: working-directory/change carries no state,
-  // so a report is emitted only because the project changed. De-duplicating on
-  // state alone used to swallow that event and leave the panel showing the old
-  // directory until something else moved the state.
-  const expected = [
-    'working',
-    'tool_use',
-    'waiting_permission',
-    'idle',
-    'error',
-    'error',
-    'waiting_permission',
-    'closed',
-  ]
+  // Seven reports for seven state changes. working-directory/change adds none:
+  // it names the same cwd the session header already carries, so the de-dupe
+  // signature does not move. A project that *does* differ would produce its own
+  // report - that is what the signature change is for.
+  const expected = ['working', 'tool_use', 'waiting_permission', 'idle', 'error', 'waiting_permission', 'closed']
 
   check(JSON.stringify(states) === JSON.stringify(expected), 'state sequence ' + states.join(' -> '))
   check(nextResult === 'next-called', 'approval/request preserves the waterfall chain')
@@ -155,12 +149,25 @@ async function caseMapping() {
   check(stub.calls.every((item) => item.sessionId === 'ses_abc'), 'one stable session id, no event-id ghosts')
   check(stub.calls.every((item) => item.pid === 1701354615 && item.parentPid === process.pid), 'synthetic pid + real host parentPid')
   check(stub.calls.some((item) => item.tool === 'Bash'), 'tool name is forwarded')
-  check(stub.calls.some((item) => item.project === 'C:\\work\\demo'), 'working directory is forwarded')
+  // The project is the session header's cwd, not the host process's: a desktop
+  // Harness runs from its install directory, so process.cwd() would label every
+  // session with the same wrong path.
+  check(
+    stub.calls.every((item) => item.project === 'C:\\work\\demo'),
+    'every report carries the session header cwd (' + JSON.stringify([...new Set(stub.calls.map((item) => item.project))]) + ')',
+  )
+  check(
+    stub.calls.every((item) => item.parentSessionId === 'ses_parent'),
+    'the header lineage becomes parentSessionId',
+  )
+  check(
+    stub.calls.every((item) => Date.parse(item.startedAt) === 1763000000000),
+    'startedAt is the header createdAt, not the first event seen (' + stub.calls[0]?.startedAt + ')',
+  )
   check(stub.calls.at(-1)?.state === 'closed', 'process exit writes a closed report')
   check(handlers.size === 0, 'dispose removes every listener')
   check(afterCleanup === beforeCleanup, 'dispose does NOT end conversations (HMR is not an exit)')
   check(stub.calls.every((item) => item.updatedAt.endsWith('Z')), 'timestamps are UTC')
-  check(stub.calls.every((item) => item.parentSessionId === ''), 'an empty parentSessionId is still set')
   check(typeof cleanup === 'function', 'apply returns a disposer')
 }
 

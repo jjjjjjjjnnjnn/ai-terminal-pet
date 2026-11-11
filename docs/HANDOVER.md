@@ -2154,3 +2154,55 @@ Node 18+、Windows PowerShell。退出码 0 = 全过。
 `vendor/package.json` 是**新增的包内文件**，所以仓库里的 `packages/dsh-ai-terminal-pet/`
 与 npm 上的 1.2.4 tarball 差别又多了一处。**下一次发布必须是新版本号（1.2.5）**，不能重传 1.2.4；
 发版流程见 §28.6。
+
+## 31. 按真实 Harness 类型定义做的一次深度适配（2026-11-11）
+
+### 31.1 先拿到权威定义，再改代码
+
+插件是照着**猜测的事件名**写的。这一轮在本机装着的 Harness 里找到了权威定义
+（`~/.dsh/profiles/node_modules/@deepseek-ai/dsh-session/lib/types/types.d.ts`），
+`SessionEventMap` 只有这 13 个持久会话事件：
+
+```
+turn/start  turn/end  step/start  step/end  user/message
+assistant/chunk  assistant/message  tool/call  tool/result
+todo/write  request/header  request/context  session/end-seed
+```
+
+对照下来：插件里 `working-directory/change` **在整个 Harness 里根本不存在**（23 个 `.d.ts`、全部
+运行时 `.js` 都搜不到），`session/title` 只存在于**客户端**事件里，`command/done` 是**客户端命令服务**
+的事件而不是会话事件。真正能用的主机侧信号是 `turn/*`、`tool/*` 与 `approval/request` 瀑布监听器
+——这三类插件原本就接对了。
+
+### 31.2 会话头才是项目路径的唯一来源
+
+`SessionHeader` 定义（同文件）里有：
+
+```ts
+readonly id: SessionId
+readonly createdAt: number        // Unix epoch ms
+readonly cwd?: string             // Absolute working directory the session was created in
+readonly parentSession?: SessionId // The session this one was forked from
+```
+
+而插件原来：`project` 取 `process.cwd()`、`parentSessionId` 恒为 `''`、`startedAt` 取「第一次看到
+这个会话的时间」。桌面版 Harness 从安装目录启动，`process.cwd()` 通常是安装目录或 System32，
+所以**每一条 DSH 会话都被标成同一个错误路径**——面板上的「跳到终端」也会因此跳错窗口。
+
+改法：所有事件统一走 `reportFor(candidate, patch)`，它读 `headerOf(candidate)`（兼容
+`session/event` 直接给会话对象、`agent/*` 给 `{ agent: { session } }` 两种形态），把
+`cwd` / `parentSession` / `createdAt` 折进 payload。会话头对「尚未声明项目」的会话是权威；
+某个事件显式给了 `project` 时以事件为准（保留未来的 cwd-change 扩展空间）。
+
+`verify.mjs` 的用例因此改用**真实会话头形状**，并新增三条断言：每条上报的 `project` 都等于会话头
+`cwd`、`parentSessionId` 等于 `parentSession`、`startedAt` 等于 `createdAt`。
+`tests/fresh-machine.mjs` 的 S3 也加了同样三条，外加一个带 `parentSession` 的子会话。
+
+### 31.3 顺带发现的两件事
+
+- `tool/result` 的 `error` 形状是 `{ name, code }`，没有 `reason`；插件的
+  `data.error.reason || data.error.code` 因此总是落到 `code`。行为可接受，但注释里写的是
+  「reason」，容易误读——已在 `eventPatch` 的总注释里说明事件来源。
+- `turn/end` 的 `reason` 是 `TurnEndReason` 联合类型；`protocol.js` 会把它当 token 清洗
+  （空格变 `-`），所以「build failed」到面板上是 `build-failed`。这是协议行为，不是 bug，
+  但测试里必须按清洗后的值断言（`verify.mjs` 与本套件都已如此）。

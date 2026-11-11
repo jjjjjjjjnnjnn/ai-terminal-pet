@@ -494,8 +494,11 @@ async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
       check('bootstrap is memoized', first === again, JSON.stringify(again))
       equal('second bootstrap leaves the binary alone', sha256(path.join(sandbox.petDir, 'AI-Terminal-Pet.exe')), before)
 
-      // Drain one event at a time and read back what hit the disk.
-      const session = { session: { header: { id: 'ses-fresh-1' } } }
+      // Drain one event at a time and read back what hit the disk. The session
+      // shape is the real one: the Harness hands over the session, whose header
+      // carries id, cwd and lineage.
+      const createdAt = Date.parse('2026-11-11T10:00:00.000Z')
+      const session = { session: { header: { id: 'ses-fresh-1', cwd: sandbox.project, createdAt } }, id: 'ses-fresh-1' }
       const events = [
         ['turn/start', {}, { state: 'working' }],
         ['tool/call', { name: 'Bash' }, { state: 'tool_use', tool: 'Bash' }],
@@ -515,6 +518,7 @@ async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
         equal(type + ' sessionId', snapshot.sessionId, 'ses-fresh-1')
         equal(type + ' project', snapshot.project, sandbox.project)
         equal(type + ' title', snapshot.title, 'DeepSeek Harness')
+        equal(type + ' startedAt is the header createdAt', snapshot.startedAt, '2026-11-11T10:00:00.000Z')
         if (want.state) equal(type + ' state', snapshot.state, want.state)
         if (want.reason !== undefined) equal(type + ' reason', snapshot.reason, want.reason)
         if (want.tool) equal(type + ' tool', snapshot.tool, want.tool)
@@ -531,14 +535,22 @@ async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
       equal('session/title keeps the window title stable', titled?.title, 'DeepSeek Harness')
       equal('session/title carries the human title in reason', titled?.reason, 'fix-the-parser')
 
-      // A second conversation must not collide with the first.
-      const second = { session: { header: { id: 'ses-fresh-2' } } }
+      // A subagent conversation carries its parent in the header; the panel uses
+      // that to nest it instead of showing a second unrelated project.
+      const second = {
+        session: { header: { id: 'ses-fresh-2', cwd: sandbox.project, parentSession: 'ses-fresh-1' } },
+        id: 'ses-fresh-2',
+      }
       cordis.emit('session/event', second, { type: 'tool/call', data: { name: 'Read' } })
       await sleep(40)
       const firstSnapshot = snapshotFor(sandbox, 'ses-fresh-1')
       const other = snapshotFor(sandbox, 'ses-fresh-2')
       check('two conversations file two snapshots', Boolean(firstSnapshot) && Boolean(other))
       equal('the second conversation keeps its own session id', other?.sessionId, 'ses-fresh-2')
+      equal('the child reports its parent session', other?.parentSessionId, 'ses-fresh-1')
+      // An absent parent arrives as null through protocol.js's normalizer, which
+      // treats an empty string as absent; the store decodes both to "".
+      equal('the root has no parent', firstSnapshot?.parentSessionId ?? '', '')
       equal('the first conversation is untouched', firstSnapshot?.sessionId, 'ses-fresh-1')
       check('the two pids differ', firstSnapshot?.pid !== other?.pid, firstSnapshot?.pid + ' vs ' + other?.pid)
 

@@ -125,20 +125,51 @@ function officialProtocol() {
 /** Per-conversation state. Kept at module scope so plugin HMR does not lose it. */
 const sessions = new Map()
 
-function metaFor(sessionId) {
+/**
+ * The session header, whichever shape the caller was handed.
+ *
+ * `session/event` hands over the session object itself; other events hand over
+ * a wrapper with `.agent`. The header is the only place the Harness states a
+ * session's cwd, lineage and creation time, so everything below reads it from
+ * here instead of guessing.
+ */
+function headerOf(candidate) {
+  return candidate?.session?.header ?? candidate?.header ?? candidate?.agent?.session?.header ?? null
+}
+
+/** What the header says about one candidate, with safe fallbacks. */
+function sessionInfo(candidate) {
+  const header = headerOf(candidate)
+  const cwd = header && typeof header.cwd === 'string' ? header.cwd : ''
+  const parent = header && header.parentSession != null ? String(header.parentSession) : ''
+  const createdAt = header && Number.isFinite(header.createdAt) ? header.createdAt : 0
+  return { id: sessionIdOf(candidate), cwd, parent, createdAt }
+}
+
+function metaFor(sessionId, info) {
   let item = sessions.get(sessionId)
   if (!item) {
     item = {
       state: 'idle',
-      project: safeCwd(),
+      // The session's own cwd, never the host process's: a desktop Harness runs
+      // from its install directory, so process.cwd() would label every session
+      // with the same wrong path.
+      project: info?.cwd || safeCwd(),
       title: TITLE,
       tool: '',
       reason: '',
-      startedAt: new Date().toISOString(),
+      parentSessionId: info?.parent || '',
+      startedAt: new Date(info?.createdAt || Date.now()).toISOString(),
       stateAt: 0,
       sentAt: 0,
     }
     sessions.set(sessionId, item)
+  } else if (info) {
+    // The header is authoritative for a session that has not stated a project
+    // yet. An explicit project from an event wins for that report, which is
+    // what keeps a future cwd-change extension working.
+    if (!item.project && info.cwd) item.project = info.cwd
+    if (info.parent) item.parentSessionId = info.parent
   }
   return item
 }
@@ -169,14 +200,21 @@ function sessionIdOf(...candidates) {
 /**
  * What makes one report different from the previous one.
  *
- * The state alone is not enough: working-directory/change and session/title
- * only move the project or the reason, and the panel shows both. De-duplicating
- * on state alone silently dropped those two events, so a conversation that
- * changed directory kept being reported under the old one until something else
- * happened to change the state within the same minute.
+ * The state alone is not enough: a patch can move the project, the reason, the
+ * tool or the lineage without touching the state, and the panel shows all of
+ * them. De-duplicating on state alone silently dropped those updates. Identical
+ * repeats are still dropped, which is what keeps a tool that fires fifty events
+ * per second from flooding the pipe.
  */
 function signatureOf(item) {
-  return [item.state, item.reason || '', item.tool || '', item.project || '', item.title || ''].join('\u0000')
+  return [
+    item.state,
+    item.reason || '',
+    item.tool || '',
+    item.project || '',
+    item.title || '',
+    item.parentSessionId || '',
+  ].join('\u0000')
 }
 
 /**
@@ -184,10 +222,10 @@ function signatureOf(item) {
  * synchronously before its first await, so calling this from process.on('exit')
  * still leaves a correct closed-state snapshot even when the pipe is gone.
  */
-function report(sessionId, patch, force = false) {
+function report(sessionId, patch, force = false, info = null) {
   const p = officialProtocol()
   if (!p || typeof p.sendStatus !== 'function') return
-  const item = metaFor(sessionId)
+  const item = metaFor(sessionId, info)
   const previousState = item.state
   const previousSignature = signatureOf(item)
   Object.assign(item, patch)
@@ -209,7 +247,7 @@ function report(sessionId, patch, force = false) {
     schemaVersion: p.SCHEMA_VERSION,
     source: SOURCE,
     sessionId,
-    parentSessionId: '',
+    parentSessionId: item.parentSessionId || '',
     // Synthetic per-conversation pid (never used for OS liveness) plus the
     // real Harness host pid as the ancestor-chain anchor.
     pid: stablePid,
@@ -232,6 +270,17 @@ function report(sessionId, patch, force = false) {
   } catch {
     // Never let a missing pipe or a dead overlay disturb the host CLI.
   }
+}
+
+/**
+ * Report for whatever object an event handler was given, after folding in what
+ * its session header says. Every handler goes through here so the project path
+ * and the parent link are never taken from the host process or invented per
+ * event type.
+ */
+function reportFor(candidate, patch, force = false) {
+  const info = sessionInfo(candidate)
+  return report(info.id, patch, force, info)
 }
 
 /** Copy one file into place through a temp sibling, never replacing a file. */
@@ -451,7 +500,24 @@ function bootstrap(ctx) {
   return bootstrapPromise
 }
 
-/** Map the durable session events documented in Harness' SessionEventMap. */
+/**
+ * Map one durable session event onto a state patch.
+ *
+ * The authoritative list lives in @deepseek-ai/dsh-session's SessionEventMap
+ * (`turn/start`, `turn/end`, `step/start`, `step/end`, `user/message`,
+ * `assistant/chunk`, `assistant/message`, `tool/call`, `tool/result`,
+ * `todo/write`, `request/header`, `request/context`, `session/end-seed`), which
+ * this switch covers for every event that says something about activity.
+ *
+ * `working-directory/change` and `session/title` are NOT in that map: the first
+ * does not exist anywhere in the host, the second is a client-side event. Both
+ * branches are kept as cheap forward-compatibility - if a future version emits
+ * them, they map correctly - but the project path and the lineage come from
+ * session.header (see reportFor), which is the only place the host states them.
+ * `approval/asked` / `approval/decided` likewise come from the approval service
+ * rather than the session log; the approval/request waterfall listener in
+ * apply() is the path that actually fires.
+ */
 function eventPatch(type, data) {
   switch (type) {
     case 'approval/asked':
@@ -511,26 +577,25 @@ export function apply(ctx, config) {
     }
 
     on('session/event', (session, event) => {
-      const sessionId = sessionIdOf(session)
       const patch = eventPatch(event?.type, event?.data)
-      if (patch) report(sessionId, patch)
+      if (patch) reportFor(session, patch)
     })
 
     on('agent/inbox/claimed', (payload) => {
-      report(sessionIdOf(payload?.agent), { state: 'working', reason: '', tool: '' })
+      reportFor(payload?.agent, { state: 'working', reason: '', tool: '' })
     })
 
     on('agent/status', (payload) => {
       const status = String(payload?.status ?? '').toLowerCase()
       if (/run|work|busy|think|stream/.test(status)) {
-        report(sessionIdOf(payload?.agent), { state: 'working' })
+        reportFor(payload?.agent, { state: 'working' })
       } else if (/idle|done|wait|stop/.test(status)) {
-        report(sessionIdOf(payload?.agent), { state: 'idle' })
+        reportFor(payload?.agent, { state: 'idle' })
       }
     })
 
     on('agent/error', (payload) => {
-      report(sessionIdOf(payload?.agent), {
+      reportFor(payload?.agent, {
         state: 'error',
         reason: short(payload?.error?.message ?? payload?.error, 120),
       })
@@ -539,7 +604,7 @@ export function apply(ctx, config) {
     // approval/request is a waterfall listener: it must always call next(),
     // otherwise other plugins' approval handling is silently dropped.
     on('approval/request', (request, next) => {
-      report(sessionIdOf(request?.agent), {
+      reportFor(request?.agent, {
         state: 'waiting_permission',
         reason: 'permission required',
         tool: short(request?.toolName, 120),
