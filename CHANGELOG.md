@@ -446,16 +446,20 @@
   `version` 同步），所以必须换版本号。1.1.0 的 tarball 已发布且**不可变**，若让版本停在 1.1.0，仓库与那份
   tarball 就会对不上——同一个版本号对应两份不同内容，正是本仓库这一轮一直在消除的漂移。因此
   1.1.0 保留为历史发布、由 1.2.0 取代。
-- **npm 凭据问题已解决，但发布仍未发生**：整场会话里 `npm whoami` 一直是 **E401**；2026-11-10T12:20Z
-  换过 token 之后它返回 **`jjjjjjjjnnjnn`**（收尾复核时仍然有效）。`npm view dsh-ai-terminal-pet version`
-  仍旧报 **E404**，所以这个名字还空着、**一个版本都没发出去**。在包目录跑 `npm publish --dry-run`
-  通过（rc=0）：**16 files / 1.9 MB packed / 4.5 MB unpacked**。从**仓库根**发布会撞上 **EPRIVATE**
+- **npm 凭据问题已解决，发布也已完成**（历史记录保持原样，结论见下）：整场会话里 `npm whoami` 一直是 **E401**；
+  2026-11-10T12:20Z 换过 token 之后它返回 **`jjjjjjjjnnjnn`**。当时 `npm view dsh-ai-terminal-pet version`
+  报 **E404**，所以那个名字当时还空着。在包目录跑 `npm publish --dry-run` 通过（rc=0）：
+  **16 files / 1.9 MB packed / 4.5 MB unpacked**。从**仓库根**发布会撞上 **EPRIVATE**
   （根清单带 `private: true`，npm 抬到的是根清单），从 `packages/dsh-ai-terminal-pet/` 发布则正常
-  ——包清单没有 `private`。下一步是发 `1.2.2`；但这一步在本机非交互环境里结构上做不到：npm 的 `otplease`
-  在 `process.stdin.isTTY` 为假时直接抛 EOTP，永不进入 web-OTP 分支，取到的浏览器授权链接 5–8 分钟就 404
-  作废（`npm trust github` 走可信发布者同样撞 EOTP），所以只能由人在本机交互终端里跑一次。
-  仍未解锁的是「按包名安装」与被 npm-only 目录收录；手工安装靠 git 源、Release tarball、仓库地址三条路，
-  而 Discover 由本仓库自建的 format-1 索引覆盖（`docs/market-index.json`，钉 40 位 commit 的 git 源）。
+  ——包清单没有 `private`。这一步在本机非交互环境里结构上做不到：npm 的 `otplease`
+  在 `process.stdin.isTTY` 为假时直接抛 EOTP，永不进入 web-OTP 分支，所以只能由人在交互终端里跑一次。
+  **结论（2026-11-11T12:10:46Z）**：人已经跑过 `npm publish --access public`，**1.2.4 已在 npm 上**，
+  `dist-tags.latest` = `1.2.4`、shasum `dafb81998efbae8e906a36773e9737117aa482d9`、16 files / unpacked 4,462,112 B，
+  与 Release 资产逐字节相同（从 registry `npm pack` 回来 sha256 仍是 `d6b7f95a…`）。「按包名安装」与
+  「被 npm-only 目录收录」这两个前置从此都成立。**发布后头几分钟 registry 上只有占位的 `0.0.0-stage`**，
+  此时 `npm install dsh-ai-terminal-pet@1.2.4` 会报 `ETARGET`，本地 npm 缓存还需 `--prefer-online` 才看得到新版本。
+  其余安装路径（git 源、Release tarball、仓库地址）与自建 format-1 索引（`docs/market-index.json`，
+  钉 40 位 commit 的 git 源）继续可用。
 
 ### Fixed
 
@@ -513,6 +517,19 @@
   并用 `git+...#dsh-plugin-v1.0.0&path:/packages/dsh-ai-terminal-pet` 重装复验（rc=0、3.4 s、`vendor/AI-Terminal-Pet.exe` 4,371,968 B 在位）。
 
 ### Docs
+
+- **npm 1.2.4 已发布，文档里的「尚未发布」全部改成事实**（2026-11-11T12:10:46Z）：
+  `README` / `CHANGELOG` / `HANDOVER` §1 / §27.5 / §27.7 / §28.1 / §28.3 / §28.4 / `ROADMAP` §4 与「没做成什么」
+  逐条校正。发布内容与仓库里验证过的 tarball **逐字节相同**（shasum `dafb8199…`、16 files、
+  unpacked 4,462,112 B；从 registry `npm pack` 回来 sha256 仍是 `d6b7f95a…`），
+  `npm install dsh-ai-terminal-pet@1.2.4` 装出 16 个文件、`vendor/AI-Terminal-Pet.exe` 与仓库一致、
+  `lib/index.js` 作为 ESM 可加载并导出 `apply`。
+  记下一个只有发布后才会出现的坑：头几分钟 registry 上只有一个占位的 **`0.0.0-stage`** 版本
+  （`latest` 也指向它），此时 `npm install <name>@1.2.4` 报 `ETARGET`；约三分钟后真版本才出现，
+  本地 npm 缓存还需 `--prefer-online` 才看得到。
+- **dshopen 那条「已收录但未渲染」的判断被推翻**：`https://dshopen.org/index.json` 返回 **1,207 条**，
+  含本包 1.2.4（git 源、钉 `ff7f6de`、分类 `integrations`）。当初读的「854 条」来自该仓库的
+  `public/index.json`——**未重新构建的仓库副本**。教训：判读可见性要读**对方站点域**上的索引文件。
 
 - **README 重写并配真实截图**（`7c0aaaa`，双语严格镜像）：安装、CLI、五类终端接入、路线图、非目标、
   从源码开发全部对齐 v0.9.0 之后的事实；`docs/assets/README.md`（`4574cba`）逐个说明 8 张 PNG

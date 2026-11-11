@@ -202,6 +202,37 @@ func TestWriteSnapshotRoundTrips(t *testing.T) {
 	_ = path
 }
 
+// A fresh install has no runtime directory until the overlay has run once, and
+// this is exactly the situation a snapshot exists for: the overlay is not
+// running, so the only way the report survives is the file. Refusing to create
+// the directory would drop that first report silently. sendStatus in
+// protocol.js calls mkdirSync({recursive:true}) for the same reason.
+func TestWriteSnapshotCreatesAMissingRuntimeDirectory(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("LOCALAPPDATA", root)
+	now := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
+	payload := NewPayload(now)
+	payload.Source = "claude-hook"
+	payload.SessionID = "fresh-install"
+	payload.PID = 43
+	payload.State = session.StateWorking
+	payload = payload.Finish(now)
+
+	if _, err := os.Stat(filepath.Join(root, "AI-Terminal-Pet", "runtime")); !os.IsNotExist(err) {
+		t.Fatalf("the test expected no runtime directory to exist yet: %v", err)
+	}
+	if !WriteSnapshot(payload) {
+		t.Fatal("WriteSnapshot must create the runtime directory instead of giving up")
+	}
+	data, err := os.ReadFile(SnapshotPath(payload))
+	if err != nil {
+		t.Fatalf("snapshot not readable: %v", err)
+	}
+	if _, err := session.ParsePayload(data, now); err != nil {
+		t.Fatalf("snapshot is not a payload the server accepts: %v", err)
+	}
+}
+
 // A machine without the overlay hits this path on every single host event, so
 // it has to be quiet, bounded and non-fatal. The pipe name is overridden
 // because the real user pipe may well have a live listener.

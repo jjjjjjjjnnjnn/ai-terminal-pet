@@ -35,6 +35,12 @@ type Payload struct {
 // payload produced here and one produced by the Node reporter diff cleanly in
 // a test or a bug report. Field order is cosmetic on the wire, but a stable
 // order makes the two implementations comparable by eye.
+//
+// One deliberate difference from the JavaScript reporter: it emits an explicit
+// null for an absent optional field, while this emits "". Both decode to the
+// zero value in internal/session (encoding/json leaves a string untouched when
+// the JSON value is null), so the store cannot tell them apart - and always
+// emitting a string keeps this struct marshalling without a pointer per field.
 func (p Payload) MarshalJSON() ([]byte, error) {
 	type wire struct {
 		SchemaVersion   string    `json:"schemaVersion"`
@@ -164,6 +170,11 @@ func SnapshotPath(p Payload) string {
 // WriteSnapshot stores the payload atomically: temp file in the same
 // directory, then rename. The scanner never sees a half-written JSON body, and
 // a crash leaves only a ".pet-*.tmp" that the overlay sweeps on its next start.
+//
+// The directory is created when missing, which is not cosmetic: a fresh install
+// has no runtime directory until the overlay has run once, and the whole point
+// of filing a snapshot is to survive exactly the case where the overlay is not
+// running yet (sendStatus in protocol.js does the same mkdir).
 func WriteSnapshot(p Payload) bool {
 	target := SnapshotPath(p)
 	if target == "" {
@@ -174,6 +185,9 @@ func WriteSnapshot(p Payload) bool {
 		return false
 	}
 	directory := filepath.Dir(target)
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return false
+	}
 	tmp, err := os.CreateTemp(directory, ".pet-*.tmp")
 	if err != nil {
 		return false

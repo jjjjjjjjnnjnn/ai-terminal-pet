@@ -165,12 +165,12 @@ CI 用 go 1.23.0、本地用 go1.27.0，两个工具链编出的字节不同—�
 `vendor:check` 校验这些，只有当本地 Go 版本等于记录的 `go1.27.0` 时才与 `bin/` 做字节比对。
 **先红后修，不是一次就绿**（细节见 HANDOVER §27.9）。
 
-**没做成什么**：**npm 一个版本都还没发出去**——凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，
-此前整场会话都是 E401），`npm view dsh-ai-terminal-pet version` 仍是 E404，一个版本都还没发出去；
-而且这一步在本机非交互环境里结构上做不到：npm 的 `otplease` 在没有 TTY 时直接抛 EOTP，永不进入 web-OTP 分支，
-取到的浏览器授权链接 5–8 分钟就 404 作废。**要发只能由人在本机交互终端里跑一次 `npm publish`**。
-因此 **DSH 应用内 Discover 索引仍不可达**（该索引 format 1 只表达 npm 版本，或钉 40 位 commit 的 git 源），
-按包名 `add dsh-ai-terminal-pet` 还不能解析（自建索引那条路可用，见 §4）。注册表条目已于 2026-11-10T14:33:04Z
+**当时没做成什么（已在 2026-11-11T12:10:46Z 完成）**：npm 一个版本都还没发出去——凭据问题已解
+（`npm whoami` 返回 `jjjjjjjjnnjnn`），当时 `npm view dsh-ai-terminal-pet version` 还是 E404；
+这一步在本机非交互环境里结构上做不到：npm 的 `otplease` 在没有 TTY 时直接抛 EOTP，永不进入 web-OTP 分支，
+取到的浏览器授权链接 5–8 分钟就 404 作废。**结论：人已经在本机交互终端里跑过 `npm publish`，1.2.4 已上线**，
+`dist-tags.latest` = 1.2.4。因此 **DSH 应用内 Discover 索引现在可达**（npm 版本 1.2.4），
+按包名 `add dsh-ai-terminal-pet` 已经能解析（自建索引那条 git 源路仍然可用，见 §4）。注册表条目已于 2026-11-10T14:33:04Z
 合并、上游 README 已列出；**「可见」这一条后来也成立**——16:16Z 时条目页还是 404、`plugins.json` 0 命中，
 但那是上游站点构建的排队与耗时：run `42844452013` 于 16:39:27Z success 后条目页 200、`plugins.json` `count` 从 10119 涨到 10230 并收录本仓库。
 同时 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引在 16:22:29Z 重建时把本仓库从
@@ -581,7 +581,7 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 ✅ [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 的索引 2026-11-10T18:08:44Z 重建后，本仓库条目是 `pkg_name: dsh-ai-terminal-pet`、`version: 1.2.1`、topics 11 个、`verdict: bundle-plugin`，并且 **`risk_tier: "safe"`、`risk_flags` 一条不剩**（`risk_at` 17:09:14Z，是安装脚本移进 `scripts/` 后第一次真的扫到本仓库）。之前的 `verdict: script` 与 `risk` 徽章（`registry-run-key` critical + `remove-item-force-recurse` medium）从此消失，全程没有用到任何抑制字段——因为扫描器 `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，而脚本已移进 `scripts/`（`$RepoRoot = Split-Path -Parent $PSScriptRoot`，原样保留停进程、`-Recurse -Force` 与 `CurrentVersion\Run` 逻辑）。issue #367 已回帖说明，可关。
 ✅ 两条不用申请的自动采集路径（根清单采集 `LivXue/dsh-plugin-shop` 每日、双 topic 采集 `zasenjc/dsh-plugins-store` 30 分钟）已在仓库侧满足条件；但 `LivXue` 的发布分片实测只有 npm 源（26,351 条条目全带 npm tarball 的 `integrity`、`commit` 字段 0 条），所以「条件满足」≠「已被列出」；
 ✅ **自建 format-1 索引**（`ef783ba`，`docs/market-index.json`；`fe62900` 前移到 1.2.2、`fabb591` 前移到 1.2.3）：Discovery 不必再等 npm——条目 `dsh-ai-terminal-pet` `1.2.4` 用钉到 `ff7f6de` 的 git 源（版本与 `publishTimestamp` 1794379909 由发版提交 `ff7f6de` 前移，`commit` / `icon` 由紧随的 `4ee7f01` 补齐），URL <https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json>，用户加到 Discover 的索引源列表里即可看到并一键安装；校验走宿主自带的 `parseMarketIndex`，`marketInstallTarget` 产出的 spec 就是上面 3.7 秒装通的那一条（钉 `ff7f6de`），且 `verify.mjs` 有 14 条断言把它钉在包版本上（发版忘改索引会让 CI 变红）；
-⏳ **npm 尚未发布任何版本**（凭据问题已解、`npm whoami` 返回 `jjjjjjjjnnjnn`、`npm view` 仍 E404，publish 要一次性密码，而 npm 的 `otplease` 在无 TTY 时直接抛 EOTP，所以只能由人在交互终端里跑）。npm 只是「按包名安装」与「进 npm-only 目录」的前置，不再是 Discover 的前置（自建索引已覆盖后者）。
+✅ **npm 已发布 1.2.4**（2026-11-11T12:10:46Z 由人在本机交互终端执行 `npm publish --access public`）。`dist-tags.latest` = `1.2.4`、shasum `dafb81998efbae8e906a36773e9737117aa482d9`、integrity `sha512-VrD4QNfzBLbqlstDG8AW+ys9M5pu6QEPHlxyVyK1qI1Wgkc8TX10kWPB/413gzf2oufNPp3NABBdfvic3JA/jA==`、16 files / unpacked 4,462,112 B，与 Release 资产逐字节相同（从 registry `npm pack` 回来 sha256 仍是 `d6b7f95a…`；`npm install` 装出 16 个文件、`vendor/AI-Terminal-Pet.exe` 与仓库一致、`lib/index.js` 作为 ESM 可加载）。「按包名安装」与「进 npm-only 目录」这两个前置从此都成立。**注意发布后头几分钟 registry 上只有占位的 `0.0.0-stage`**，此时 `npm install <name>@1.2.4` 会报 `ETARGET`，本地 npm 还要 `--prefer-online` 才看得到新版本。
 
 | 编号 | 功能 | 价值 | 复杂度 |
 |---|---|---|---|
@@ -616,8 +616,8 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 - UI 无自动化视觉回归，靠 `--doctor`（E6，已交付但只覆盖环境/安装/运行期状态，**不做视觉比对**）+ 探针脚本 + `TestRenderPreview` / `TestRenderSettingsPreview` 光栅化 PNG 人工验证。
 - `go test -race` / `govulncheck` / `gosec` 因缺工具链（gcc 等）仍未跑（2026-11-09 复核仍然如此）。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
-- DSH 插件包的 npm 发布**尚未发生**（凭据问题已解、`npm view` 仍 E404），因此**按包名安装**与 npm-only 目录仍不通；
-  git 源、Release tarball、仓库地址三条安装路可用，自建 format-1 索引也已钉到 1.2.4。注册表条目 PR #13937 已于
+- DSH 插件包的 npm 发布**已完成**（1.2.4，2026-11-11T12:10:46Z），因此**按包名安装**与 npm-only 目录的两个前置都成立；
+  在此之前可用的三条路（git 源、Release tarball、仓库地址）与自建 format-1 索引不受影响。注册表条目 PR #13937 已于
   2026-11-10T14:33:04Z 合并、上游 README 已列出；站点页与 `plugins.json` 的延迟在 run `42844452013`（16:39:27Z
   success）之后消失，条目页 200 且 `plugins.json` 已收录本仓库——但目录里的 `install` 是构建时按 `tarball` 渲染的，
   合并后那版仍是 1.2.0；#14076 已换成 1.2.2（19:59:37Z 合并）、#14089 再推到 1.2.3（2026-11-10T21:10:15Z 合并），1.2.4 的 #14243 已开；另有两家目录已合并收录本仓库：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins) PR #902（2026-11-10T21:49:53Z，只从 npm 装，故在此之前是 browse-only）与 [zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) PR #97（2026-11-11T05:06:32Z）；1024 Store 详情页已返回 200（8,753 B）。

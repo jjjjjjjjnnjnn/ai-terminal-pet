@@ -82,10 +82,10 @@
   原先那个 critical 徽章（`registry-run-key`）与 medium 旗标（`remove-item-force-recurse`）就此消失。
   `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，安装脚本已于
   2026-11-10 移进 `scripts/`（§27.11），它读不到那两个正则的落点，也没用到任何抑制字段。
-  npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`，此前整场会话 E401），但**任何版本都还没发布到 npm**
-  （`npm view` 仍 E404，且发布要求一次性密码，非交互 shell 里拿不到），所以按包名安装暂时不可达；
+  npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`），**1.2.4 已于 2026-11-11T12:10:46Z 发布到 npm**
+  （`dist-tags.latest` = 1.2.4、shasum `dafb8199…`、与 Release 资产逐字节相同），所以按包名安装现在可达；
   `docs/market-index.json` 是仓库自建的 format-1 索引，条目 `dsh-ai-terminal-pet` **1.2.4**（`publishTimestamp`
-   1794379909 = 2026-11-11T06:51:49Z），可让 Discover 先按 git 源可用；版本与 `publishTimestamp` 已与包清单
+   1794379909 = 2026-11-11T06:51:49Z），可让 Discover 按 git 源可用；版本与 `publishTimestamp` 已与包清单
    同一批前移（那个提交是 A `ff7f6de`），`source.commit` 与图标钉点由紧随其后的 B `4ee7f01` 补成 A 的 sha）。
    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
    版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
@@ -1268,9 +1268,11 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
 
 ### 27.5 发布与分发现状（截至 2026-11-10）
 
-- **npm**：凭据问题**已解决**（2026-11-10T12:20Z 换了 token 后 `npm whoami` 返回 `jjjjjjjjnnjnn`，
-  此前整场会话都是 E401）。`npm view dsh-ai-terminal-pet version` 仍是 **E404**，说明这个名字还空着、
-  **还没有发布任何版本**。发布被一次性密码（OTP/2FA）挡住：npm 的 `otplease` 在无 TTY 时直接抛 EOTP，
+- **npm**：**已发布 1.2.4**（2026-11-11T12:10:46Z，由人在交互终端执行 `npm publish --access public`；
+  `dist-tags.latest` = 1.2.4，shasum `dafb8199…`）。以下为发布之前（截至 2026-11-10）的记录，保留作背景：
+  凭据问题**已解决**（2026-11-10T12:20Z 换了 token 后 `npm whoami` 返回 `jjjjjjjjnnjnn`，
+  此前整场会话都是 E401）。`npm view dsh-ai-terminal-pet version` 当时仍是 **E404**，说明那个名字还空着。
+  发布被一次性密码（OTP/2FA）挡住：npm 的 `otplease` 在无 TTY 时直接抛 EOTP，
   浏览器授权链接（带 `npm-auth-type: web` 的探针才拿得到未打码的那个）5–8 分钟即失效，只能由用户在本机交互式终端里发。
   发布前已在包目录跑过 `npm publish --dry-run`：rc=0，**16 files / 1.9 MB packed / 4.5 MB unpacked**
   （那次 dry-run 的 shasum 是 `166c3043…`，但之后包内 `README.md` 又改了 13 B，所以最终的号不是它；
@@ -1279,7 +1281,8 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
   所以在 `packages/dsh-ai-terminal-pet/` 目录里发布是可行的。这条对写文档的人有价值：根 shim 的
   `private` 是「别抢 npm 名」，同时也意味着**不能从仓库根发布**。
   仍未解锁的是 DSH 应用内 Plugins → Discover 索引：它只表达 npm 版本（format 1）或钉到 40 位 commit 的
-  git 源，所以 `add dsh-ai-terminal-pet` 要等这次真正发布之后才解析得到。
+  git 源。**1.2.4 发布之后** `add dsh-ai-terminal-pet` 这条按包名的路径已经解析得到（npm 版本 1.2.4），
+  自建的 format-1 索引（钉 `ff7f6de`）继续作为 git 源路径存在。
 - **GitHub Release 线：1.0.0 → 1.1.0 → 1.2.0 → 1.2.1 → 1.2.2 → 1.2.3**，一版一个 tag，旧 tag 不删也不复用：
   - **1.0.0**（已作废）：tag `dsh-plugin-v1.0.0`，资产 `dsh-ai-terminal-pet-1.0.0.tgz`
     （1,913,682 B，sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`）。
@@ -1491,18 +1494,25 @@ git cat-file -s "$(git ls-files -s packages/dsh-ai-terminal-pet/vendor/AI-Termin
 
 ### 27.7 已知残留（2026-11-11 刷新到 1.2.4）
 
-- **npm 尚未发布**：凭据问题已解决（`npm whoami` = `jjjjjjjjnnjnn`，此前 E401），但
-  `npm view dsh-ai-terminal-pet version` 仍 E404，所以**当前没有任何版本在 npm 上**（1.0.0 到 1.2.4 一个都没发）。
-  发布 1.2.4 是下一步；但这一步在本机非交互环境里结构上做不到：npm 的 `otplease` 在无 TTY 时直接抛 EOTP，
-  web-OTP 分支永不进入，取到的浏览器授权链接 5–8 分钟就 404 作废（`npm trust github` 走可信发布者同样撞 EOTP）。
-  **要发只能由人在本机交互终端里跑一次 `npm publish`**；在那之前 DSH 应用内的 npm 索引仍拿不到本包，
-  而 git 源、Release tarball、仓库地址、以及自建 format-1 索引四条路可用，手工安装不受阻塞。
-  **文档里不要写成「已发布到 npm」，也不要写成「被凭据阻塞」。**
-- **已收录**不等于**已渲染**（2026-11-11 新增的一条残留）：dshopen 的 #423 已经 closed（§1 有细节），
-  但它线上的 `public/index.json` 还是旧构建产物（854 条、0 条 git 源），目录页看不到我们。
-  同理 awesome-dsh-plugin 的 `plugins.json` 里那条 `install` 命令是构建时按条目 `tarball` 渲染的，所以
-  「PR 合并」也只意味着「下一次重建之后可见」。判断一家目录是否真的可见，要看**它公开的索引文件**，
-  不能只看 issue/PR 状态。
+- **npm 已发布 1.2.4**（2026-11-11T12:10:46Z，`npm publish --access public` 由人在本机交互终端完成）。
+  `npm view dsh-ai-terminal-pet version` → **1.2.4**，`dist-tags.latest` = 1.2.4。
+  发布内容与仓库里验证过的 tarball **逐字节相同**：shasum `dafb81998efbae8e906a36773e9737117aa482d9`、
+  integrity `sha512-VrD4QNfzBLbqlstDG8AW+ys9M5pu6QEPHlxyVyK1qI1Wgkc8TX10kWPB/413gzf2oufNPp3NABBdfvic3JA/jA==`、
+  16 files / unpacked 4,462,112 B。另用 `npm pack dsh-ai-terminal-pet@1.2.4` 从 registry 取回一份，
+  sha256 同样是 `d6b7f95a5a3a71c4a9367699e9ad9b8f7d5db522271782e8ffe29a73e45c6708`；
+  在临时目录 `npm install dsh-ai-terminal-pet@1.2.4` 装出来 16 个文件，
+  `vendor/AI-Terminal-Pet.exe` 与仓库那份 sha256 相同（`bbb5163c…`），`lib/index.js` 作为 ESM 可加载并导出 `apply`。
+  **一个坑记下来**：发布后头几分钟 registry 上只有一个占位的 `0.0.0-stage` 版本（`latest` 也指向它），
+  此时 `npm install dsh-ai-terminal-pet@1.2.4` 会报 `ETARGET`；约 3 分钟后真版本才出现。
+  本地 npm 缓存还会继续给旧 packument，`npm install --prefer-online` 才能立刻看到新版本。
+  **改这一条时不要再写「npm 尚未发布」或「被凭据阻塞」**——两者都已经是历史。
+- **已收录**不等于**已渲染**——这条经验在 2026-11-11 又推进了一步：dshopen 的 #423 已 closed，
+  而且它**站点域名上的** `https://dshopen.org/index.json` 现在确实有我们（1,207 条里的 `dsh-ai-terminal-pet`
+  1.2.4，`source.type: git`、钉 `ff7f6de`、分类 `integrations`）。之前看到的「854 条、0 条 git 源」
+  是它仓库里的 `public/index.json`，那是**未重新构建的仓库副本**，和站点实际提供的索引不是同一份。
+  所以判读规则再收紧一格：**读对方站点域上的索引文件，不要读它仓库里的 `public/` 目录**。
+  同理 awesome-dsh-plugin 的 `plugins.json` 里那条 `install` 命令是构建时按条目 `tarball` 渲染的，
+  「PR 合并」也只意味着「下一次重建之后可见」。
 - **1.2.0 的 Release 已产出，但 dry-run 的摘要已作废**：`dsh-plugin-v1.2.0` 这个 annotated tag 指向
   `4d777e32e0a9ef57bb7714287dccd7cae065346f`，GitHub Release 于 2026-11-10T12:47:24Z 发布，唯一资产
   `dsh-ai-terminal-pet-1.2.0.tgz`（**1,914,566 B / 16 files**，sha256
@@ -1814,8 +1824,9 @@ imsai 的 #912（`clean`，该仓库规定「改已存在条目永不自动合�
 （`git log --oneline bb00e58..HEAD` 看清单，`gh run list --limit 1` 看当前）。这里刻意不写死 sha 与 run 号：
 git 无法在一个提交里引用它自己或它的后继，钉死的数字只会随着下一次纯文档提交立刻过期。
 浮窗本体停 **0.9.0**、DSH 插件包已到 **1.2.4**（tag `dsh-plugin-v1.2.4` → `ff7f6de`，Release 资产
-`dsh-ai-terminal-pet-1.2.4.tgz` 1,915,340 B / sha256 `d6b7f95a…`）；**npm 上仍然一个版本都没有**
-（唯一卡在人工的一步）。这次整理只动 `.gitignore` 与四份文档（HANDOVER / CHANGELOG / ROADMAP / AGENTS.md），
+`dsh-ai-terminal-pet-1.2.4.tgz` 1,915,340 B / sha256 `d6b7f95a…`），并且 **1.2.4 已于
+2026-11-11T12:10:46Z 发布到 npm**（shasum `dafb8199…`，与 Release 资产逐字节相同）。
+这次整理只动 `.gitignore` 与四份文档（HANDOVER / CHANGELOG / ROADMAP / AGENTS.md），
 代码、包清单、包内 README 与 `docs/market-index.json` 都没碰，所以没有新 tag、没有重发 Release。
 
 ### 28.2 接手要先看什么（按顺序，别回溯长上下文）
@@ -1831,37 +1842,36 @@ git 无法在一个提交里引用它自己或它的后继，钉死的数字只�
 
 | 对象 | 状态 | 谁来动 |
 |---|---|---|
-| npm 发布 1.2.4 | **只能人工**：非交互 shell 里 `otplease` 直接抛 EOTP | 人，在本机交互终端 |
-| [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243) | open；check 跑完后 `mergeable_state` 在 `clean` / `unknown` 间抖动 | 上游维护者 |
-| [imsai-sh#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | open / `clean`；该仓库规定改已存在条目永不自动合并 | 上游维护者 |
-| [radar#1255](https://github.com/AdamPlatin123/dsh-plugin-radar/pull/1255) | open | 上游维护者 |
-| [brade#367](https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367) | open / 2 评论 | 上游维护者（我们要的信息已给全） |
-| [dshopen#423](https://github.com/polang233/dsh-plugin-index/issues/423) | **已 closed = 已收录**（2026-11-11T08:32:39Z） | 已完结 |
+| npm 发布 1.2.4 | **已完成**（2026-11-11T12:10:46Z，`latest` = 1.2.4） | 已完结 |
+| [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243) | open / MERGEABLE，两个 check SUCCESS；站点 `install` 仍渲染 1.2.3 | 上游维护者 + 等站点重建 |
+| [imsai-sh#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | open / MERGEABLE，2 条评论都是机器人；该仓库规定改已存在条目永不自动合并 | 上游维护者 |
+| [radar#1255](https://github.com/AdamPlatin123/dsh-plugin-radar/pull/1255) | open / UNKNOWN，零 check | 上游维护者 |
+| [brade#367](https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367) | open / 2 评论（都是我们自己的） | 上游维护者（我们要的信息已给全） |
+| [dshopen#423](https://github.com/polang233/dsh-plugin-index/issues/423) | **已 closed = 已收录且站点已渲染**（`dshopen.org/index.json` 1,207 条含 1.2.4） | 已完结 |
 | dshbase#322 / dsh.so#24 / dsh-plugin.org#735 / alldsh#2 / dshmarketplace.dev | 全部 open、无回应 | 上游维护者 |
 | YELEBAI/dsh-plugin-marketplace | 自动扫描，仍记 1.2.3 / `verifiedCommit 9b0df94`（`profiles` 已含 desktop） | 等它下一轮扫描 |
-| awesome-dsh-plugin 站点 `plugins.json` | 条目已在，但 `install` 仍渲染 1.2.3 | 等站点重建 |
 
-判断「是否真的可见」看**对方的公开索引文件**（`plugins.json` / `registry.json` / `public/index.json`），
-不要只看 PR/issue 状态——这是这次交接里唯一新增的教训（dshopen 已收录，但当时线上索引仍是旧构建，854 条、0 条 git 源）。
+判断「是否真的可见」看**对方的公开索引文件**（站点域上的 `index.json` / `plugins.json` / `registry.json`），
+不要只看 PR/issue 状态，**也不要读对方仓库里的 `public/` 目录**——那是未重新构建的副本。
 
-**2026-11-11 追补（已复核）**：dshopen **已经渲染出来了**。`https://dshopen.org/index.json` 现在返回
-**1,207 条**，其中包含本包 `dsh-ai-terminal-pet` **1.2.4**，`source.type: git`、
+**dshopen 的具体状态（2026-11-11 复核）**：`https://dshopen.org/index.json` 返回 **1,207 条**，
+其中包含本包 `dsh-ai-terminal-pet` **1.2.4**，`source.type: git`、
 `source.commit: ff7f6de7d87a7a4d99c06e3a9a68e9a4b417b0a9`、`path: packages/dsh-ai-terminal-pet`、
-分类 `integrations`、标签 `verified` + `updated-recent`。上面那条「854 条」当时看的是仓库内的
-`raw.githubusercontent.com/polang233/dsh-plugin-index/main/public/index.json`，那个文件是**未重新构建的
-仓库副本**，与站点实际提供的索引**不是同一份**。教训再收紧一格：**要读对方站点域上的索引文件，
-不要读它仓库里的 `public/` 目录**——后者可能落后于一次构建。
+分类 `integrations`、标签 `verified` + `updated-recent`。当初读到的「854 条、0 条 git 源」来自
+`raw.githubusercontent.com/polang233/dsh-plugin-index/main/public/index.json`，那是未重建的仓库副本。
 
-### 28.4 npm：唯一必须由人做的一步
+### 28.4 npm：**已完成**（2026-11-11T12:10:46Z）
 
-```powershell
-cd packages\dsh-ai-terminal-pet
-npm publish            # 需要一次性密码；发布 1.2.4，access public
-```
+人已经在交互终端里跑过 `npm publish --access public`，1.2.4 上线。事后核对全过：
+`dist-tags.latest` = `1.2.4`、shasum `dafb8199…`、integrity `sha512-VrD4QNfz…`、16 files、
+`npm pack dsh-ai-terminal-pet@1.2.4` 取回的 tarball 与仓库那份 sha256 相同
+（`d6b7f95a…`）；`npm install dsh-ai-terminal-pet@1.2.4` 装出 16 个文件，
+`vendor/AI-Terminal-Pet.exe` 与仓库一致，`lib/index.js` 作为 ESM 可加载。
 
-发布成功之后仓库侧要做的（否则两边会漂移）：把 `README.md` / `CHANGELOG.md` / 本文件 §27.7 里「npm 尚未发布」
-那几条改成事实，并确认 `npm view dsh-ai-terminal-pet version` 返回 1.2.4。**不要**重传或改写已发布的
-`.tgz`；**不要**把 1.2.4 的 tarball 换成一个内容不同的文件——Release 资产不可变。
+下一个版本仍然**只能由人在交互终端**发布（非交互 shell 里 npm 的 `otplease` 直接抛 EOTP）。
+发布之后仓库侧要做的（否则两边会漂移）：把 `README.md` / `CHANGELOG.md` / 本文件 §27.7 里
+「npm 尚未发布」那几条改成事实。**不要**重传或改写已发布的 `.tgz`；
+**不要**把 1.2.4 的 tarball 换成一个内容不同的文件——Release 资产不可变。
 
 ### 28.5 哪些文件「不可再改」
 
