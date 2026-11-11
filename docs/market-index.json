@@ -37,7 +37,7 @@
         "en": "A floating overlay for Windows. DeepSeek Harness sessions show up as soon as you install this bundle; OpenCode, Claude Code and Antigravity sessions join the same panel once each of those terminals has its reporter installed.",
         "zh": "Windows 桌面浮窗。装上本插件后 DeepSeek Harness 的会话立刻出现在置顶面板里；OpenCode、Claude Code 与 Antigravity 的会话要先各自装好该终端的上报端，才会汇总进同一个面板。"
       },
-      "icon": "https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/b4474a6da10a7bc3518362e910c66b9213be92e6/packages/dsh-ai-terminal-pet/icon.png",
+      "icon": "https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/ff7f6de7d87a7a4d99c06e3a9a68e9a4b417b0a9/packages/dsh-ai-terminal-pet/icon.png",
       "author": "jjjjjjjjnnjnn",
       "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
       "repository": {
@@ -66,7 +66,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
-            "commit": "b4474a6da10a7bc3518362e910c66b9213be92e6",
+            "commit": "ff7f6de7d87a7a4d99c06e3a9a68e9a4b417b0a9",
             "path": "packages/dsh-ai-terminal-pet"
           },
           "engines": {
