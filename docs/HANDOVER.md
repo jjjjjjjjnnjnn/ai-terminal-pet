@@ -1837,34 +1837,37 @@ imsai 的 #912（`clean`，该仓库规定「改已存在条目永不自动合�
 
 ### 28.1 现在在哪（一句话）
 
-这次交接整理是 `bb00e58`（「五家目录」那批）之后的**一串纯文档提交**，2026-11-11 上午推送，CI 每次全绿
-（`git log --oneline bb00e58..HEAD` 看清单，`gh run list --limit 1` 看当前）。这里刻意不写死 sha 与 run 号：
-git 无法在一个提交里引用它自己或它的后继，钉死的数字只会随着下一次纯文档提交立刻过期。
-浮窗本体停 **0.9.0**、DSH 插件包已到 **1.2.4**（tag `dsh-plugin-v1.2.4` → `ff7f6de`，Release 资产
-`dsh-ai-terminal-pet-1.2.4.tgz` 1,915,340 B / sha256 `d6b7f95a…`），并且 **1.2.4 已于
-2026-11-11T12:10:46Z 发布到 npm**（shasum `dafb8199…`，与 Release 资产逐字节相同）。
-这次整理只动 `.gitignore` 与四份文档（HANDOVER / CHANGELOG / ROADMAP / AGENTS.md），
-代码、包清单、包内 README 与 `docs/market-index.json` 都没碰，所以没有新 tag、没有重发 Release。
+浮窗本体停 **0.9.0**、DSH 插件包已到 **1.2.5**（tag `dsh-plugin-v1.2.5` → **`34aa1f7`**，Release 资产
+`dsh-ai-terminal-pet-1.2.5.tgz` **1,917,342 B / sha256 `dfa89a1e…`**），并且 1.2.4 与 1.2.5
+**都已发布到 npm**（`latest` = 1.2.5、shasum `1f6d5340…`，与 Release 资产逐字节相同）。
+下一个动作是 **ROADMAP §4 的 I1（独立安装包）**，做法与已知约束见那里的表；`docs/HANDOVER.md` §31
+是上一轮按真实 Harness 类型定义做的适配，改动上报端或插件前值得先读。
+先看清单用 `git log --oneline c8ad006..HEAD`、当前 CI 用 `gh run list --limit 1`——**这两个数字刻意不写死**，
+因为 git 无法在一个提交里引用它自己或它的后继。
+（§28 最初那次整理只动 `.gitignore` 与四份文档，所以没有新 tag；此后 §29–§31 交付了原生 hook、
+共享内核、新机套件与 1.2.5，那三轮才有代码与发版。）
 
 ### 28.2 接手要先看什么（按顺序，别回溯长上下文）
 
 1. 本文件 §1（当前状态、版本、健康、规模、分发）与本节；
-2. [README.md](../README.md) 的安装段与 connect 段——对外承诺的口径以它为准；
+2. [README.md](../README.md) 的安装段、connect 段与「设置项与文件位置」表——对外承诺的口径以它为准；
 3. 需要动包/发版时：§27.2（包结构与 `dsh.bundle` 契约）、§27.5（发布与分发现状）、§27.9–§27.10（三条发现路径
-   与自建索引）、§27.12（1.2.4 只改文案那次的完整操作）；
-4. [AGENTS.md](../AGENTS.md) 七条铁律——尤其第 6 条（发版提交必须同时前移索引）与第 1 条（reporter 绝不
-   把异常抛进宿主 CLI）。
+   与自建索引）、§27.12（1.2.4 只改文案那次的完整操作）、§31（按真实 Harness 类型定义做的适配）；
+4. [AGENTS.md](../AGENTS.md) **八条**铁律——尤其第 6 条（发版提交必须同时前移索引）、第 1 条（reporter 绝不
+   把异常抛进宿主 CLI）与第 8 条（对外结论先过 `agy --model gemini-3.8-flash-high --effort high`）；
+5. 改动上报端或插件后：`node tests/fresh-machine.mjs`（§30），它才是「新机器上装上去能不能用」的门禁。
 
-### 28.3 外部世界在等什么（2026-11-11 10:30 +0100 复读）
+### 28.3 外部世界在等什么（2026-11-11 15:40 UTC 复读）
 
 | 对象 | 状态 | 谁来动 |
 |---|---|---|
-| npm 发布 | **已完成**：1.2.4（12:10:46Z）与 1.2.5 均在 npm 上，`latest` = 1.2.5；本机 token 已绕过 2FA，agent 可直接发 | 已完结 |
-| [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243) | open / MERGEABLE，两个 check SUCCESS；站点 `install` 仍渲染 1.2.3 | 上游维护者 + 等站点重建 |
-| [imsai-sh#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | open / MERGEABLE，2 条评论都是机器人；该仓库规定改已存在条目永不自动合并 | 上游维护者 |
+| npm 发布 | **已完成**：1.2.4（12:10:46Z）与 1.2.5 均在 npm 上，`latest` = **1.2.5**；本机 token 已绕过 2FA，agent 可直接发 | 已完结 |
+| [awesome-dsh-plugin#14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385) | **1.2.5 的跟进 PR**：open / MERGEABLE，`check` 与 `Submission gate` 两个 check 都 **SUCCESS**；分支 `bump-tarball-1.2.5`，只动 `tarball`+`icon` 三行 | 上游维护者（等人工合并） |
+| [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243) | 1.2.4 的上一版跟进，已被 #14385 取代；open / MERGEABLE | 上游（合并 #14385 后可直接关） |
+| [imsai-sh#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | open / MERGEABLE；2 条机器人评论 + 1 条我们的（说明 1.2.5 已上 npm 与两个修复）；该仓库规定改已存在条目永不自动合并 | 上游维护者 |
 | [radar#1255](https://github.com/AdamPlatin123/dsh-plugin-radar/pull/1255) | open / UNKNOWN，零 check | 上游维护者 |
-| [brade#367](https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367) | open / 2 评论（都是我们自己的） | 上游维护者（我们要的信息已给全） |
-| [dshopen#423](https://github.com/polang233/dsh-plugin-index/issues/423) | **已 closed = 已收录且站点已渲染**（`dshopen.org/index.json` 1,207 条含 1.2.4） | 已完结 |
+| [brade#367](https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367) | open / 3 评论（都是我们自己的，最后一条给了 npm 版本与 tarball 哈希） | 上游维护者（我们要的信息已给全） |
+| [dshopen#423](https://github.com/polang233/dsh-plugin-index/issues/423) | **已 closed = 已收录且站点已渲染**（`dshopen.org/index.json` 1,207 条含 **1.2.4**；1.2.5 要等它下一次构建） | 等站点重建 |
 | dshbase#322 / dsh.so#24 / dsh-plugin.org#735 / alldsh#2 / dshmarketplace.dev | 全部 open、无回应 | 上游维护者 |
 | YELEBAI/dsh-plugin-marketplace | 自动扫描，仍记 1.2.3 / `verifiedCommit 9b0df94`（`profiles` 已含 desktop） | 等它下一轮扫描 |
 
@@ -1902,18 +1905,25 @@ integrity `sha512-2sEFAf0k…`、**17 files**、`npm pack dsh-ai-terminal-pet@1.
   已经发生的重写，因此**下一次发布必须是新版本号**）；
 - `packages/dsh-ai-terminal-pet/vendor/package.json`（§30.2 新增的 CommonJS 覆盖，同样属包内字节）；
 - `docs/market-index.json` 的 `versions[0]`（`verify.mjs` 断言它等于包版本）；
-- 七个 tag 指向的提交（`dsh-plugin-v1.0.0` … `v1.2.4`）与它们各自的 Release 资产。
+- **八个** tag 指向的提交（`dsh-plugin-v1.0.0` … `v1.2.5`）与它们各自的 Release 资产。
 
 改动任何一条 → 新版本号 + 新 tag + 新 Release；**纯文案改动同样要换版本号**（1.2.1 与 1.2.4 就是这么来的）。
 
 ### 28.6 想发下一个版本时的固定套路
 
 1. A 提交：改 `version`（两份清单）+ 要改的内容 + 索引的 `versions[0].version` 与 `publishTimestamp`；
-   跑 `node packages/dsh-ai-terminal-pet/verify.mjs`（当前 424 行 / 95 个 `ok`）、`npm pack` 记下字节与 sha256；
-2. 打 annotated tag（`git tag -a dsh-plugin-vX.Y.Z`）、推、发布 Release 并上传 tgz；
+   跑 `node packages/dsh-ai-terminal-pet/verify.mjs`（**不要写死条数**，它随用例增减变化）、
+   `npm pack` 记下字节与 sha256，并把它们写进 `CHANGELOG.md`；
+2. 打 annotated tag（`git tag -a dsh-plugin-vX.Y.Z`）、推、发布 Release 并上传 tgz
+   （`gh release create <tag> <tgz> --title <tag> --notes ...`，GitHub 会自己算出 `digest: sha256:…`）；
 3. B 提交：把索引的 `source.commit` 与 `icon` 钉到 A 的 sha（**git 无法在一个提交里引用自己的 sha**，所以必须两步）；
-4. 上游跟进一个只改 `tarball` / `icon` / `description` 的 PR（awesome-dsh-plugin 的 `data/plugins/*.yml`），
-   imsai 那边同理；两处都是「合并 ≠ 立刻可见」，要等对方重建。
+4. npm：在包目录 `npm publish --access public`（本机 token 已可绕过 2FA）。发完等 2–4 分钟再
+   `npm view <name> version` 确认 `latest` 换了——头几分钟 registry 上只有占位的 `0.0.0-stage`，
+   此时 `npm install <name>@<version>` 会报 `ETARGET`；
+5. 上游跟进一个只改 `tarball` / `icon` 的 PR（awesome-dsh-plugin 的 `data/plugins/*.yml`）。
+   **务必 `-R awesome-dsh-plugin/awesome-dsh-plugin`**，否则 `gh` 会把 PR 开进自己的 fork；
+   分支要建在**自己 fork**（`gh api git/refs` POST），PR 用 `--head jjjjjjjjnnjnn:<branch>`。
+   两处都是「合并 ≠ 立刻可见」，要等对方重建；判断可见性读**站点域**的索引文件，不读仓库里的 `public/`。
 
 ### 28.7 刻意保留、看起来像冗余的东西（不要清理）
 
@@ -1929,6 +1939,10 @@ integrity `sha512-2sEFAf0k…`、**17 files**、`npm pack dsh-ai-terminal-pet@1.
   `.gitignore` 末尾那条反向例外存在的原因。
 - **`.local/`**（5.7 M）：上游 JSON 快照、发版草稿、`npm pack` 产物等一次性材料，
   本次已加进 `.gitignore`；可以随时删，**不属于项目源码**。
+- **`.local/awesome-entry-1.2.5.yml`**：awesome-dsh-plugin 那条目在 1.2.5 时的**原始字节**副本。
+  必须存在，因为 PowerShell 5.1 的 `Get-Content -Raw` 会把 UTF-8 当 ANSI 解码，中文整行 mojibake——
+  要改那条目时请**用这个文件的内容直接 base64 上传**（`[IO.File]::ReadAllBytes` → `ToBase64String`），
+  不要先读成字符串再写回。§30.6 记了这次踩坑。改完记得同步更新同一个文件。
 
 ### 28.8 交接时跑过的验证（2026-11-11，全部通过）
 
@@ -1942,10 +1956,9 @@ node tests/fresh-machine.mjs --no-overlay           -> PASS: 160/160
 scripts/install.ps1 -VerifyOnly                     -> 11 file(s) match the repository, 0 warning(s)
 ```
 
-本次交接只改文档与 `.gitignore`，**没有碰任何代码、清单、包内 README 或索引**，
-所以不需要新 tag，也不需要重发 Release。（上表是 §28 当时的口径，后来随 §29–§31 一起更新：
-`pet-hook.exe` 让它从 10 项变 11 项制品、`internal` 从 9 个包变 10 个 + `cmd/pet-hook`，
-`tests/fresh-machine.mjs` 又加了一条独立门禁。）
+上表是当前口径（`c8ad006` 那次刷新）：§29–§31 交付原生 hook、共享内核、新机套件与 1.2.5 之后，
+制品从 10 项变 11 项、`internal` 从 9 个包变 10 个 + `cmd/pet-hook`，`tests/fresh-machine.mjs`
+又成为一条独立门禁。**引用这些数字时不要照抄**，跑一遍上面的命令再写。
 
 ## 29. 上报端原生化：`pet-hook.exe` 与 `internal/reporter`（2026-11-11）
 
@@ -1967,15 +1980,18 @@ cmd/pet-hook/           --mode=claude|antigravity，读 stdin，写 {} 到 stdou
       └──► internal/reporter/   ← 新增，共享内核
              reporter.go   bounded id / 脱敏 / 稳定 PID / 时间戳钳制
              payload.go    与 session.Session 对齐的 wire payload
+             stdin.go      1 MiB + 2 s 的读取上限（两个命令共用）
              send.go       快照落盘 → 拨号 → 写一行 → 只认 "OK"；启动浮窗
              approval.go   审批握手（pending-*.json 轮询）
              hook.go       hook 事件名 → session.State 的映射表
+             statusline.go 状态栏的 agent_state → session.State 映射表
 ```
 
 **关键决定**：`pet-statusline` 里那套 helper 不复制一份到 `pet-hook`。两处各写一遍意味着
 「与 `reporters/protocol.js` 保持一致」这条契约从此有两个可能各自漂移的实现；收进一个包之后，
-它可以被单元测试钉住，而不是靠人眼比对。17 个测试覆盖脱敏边界、id 截断、UTF-16 FNV-1a PID、
-时间戳钳制、审批决策树与投递语义。
+它可以被单元测试钉住，而不是靠人眼比对。`internal/reporter` 现在 **23 个 `func Test`**
+（`reporter_test.go` 16 + `send_test.go` 2 + `statusline_test.go` 5），加上 `cmd/pet-hook`
+的 13 个，覆盖脱敏边界、id 截断、UTF-16 FNV-1a PID、时间戳钳制、审批决策树、投递语义与两张映射表。
 
 `cmd/pet-statusline` **也已迁移**到 `internal/reporter`（见 §29.7）。先做 hook、再做 shim，是因为两者的
 风险不同：hook 是新增路径，出问题只影响新接入的用户；shim 是既有路径，动它必须能证明「行为一字未变」，
@@ -2247,3 +2263,56 @@ readonly parentSession?: SessionId // The session this one was forked from
 - `turn/end` 的 `reason` 是 `TurnEndReason` 联合类型；`protocol.js` 会把它当 token 清洗
   （空格变 `-`），所以「build failed」到面板上是 `build-failed`。这是协议行为，不是 bug，
   但测试里必须按清洗后的值断言（`verify.mjs` 与本套件都已如此）。
+
+## 32. 交接：下一个会话从哪里开始（2026-11-11 15:45 UTC）
+
+### 32.1 现在的事实（一句话）
+
+代码、测试、发布、分发四条线**都是绿的**，1.2.5 已上 npm 且 tag / Release / 自建索引三处一致，
+剩下的第一优先级只有一件：**ROADMAP §4 的 I1 独立安装包**。它卡在签名（本机没有代码签名证书），
+不卡在代码。
+
+### 32.2 交接口令（按顺序跑，先证明起点干净）
+
+```powershell
+git status --short                       # 必须是空的
+git log --oneline -3                     # 顶上是 c8ad006 之后的文档提交
+npm view dsh-ai-terminal-pet version     # 1.2.5
+gh run list --limit 1                    # success
+gofmt -l . ; go vet ./...                # 干净 / 0
+go test -count=1 ./...                   # 11 个包全 ok（190 个 func Test）
+node packages/dsh-ai-terminal-pet/verify.mjs
+node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
+node integrations/deepseek-harness/verify.mjs
+node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 181 并且会重启浮窗
+.\scripts\install.ps1 -VerifyOnly           # 11 file(s), 0 warning
+```
+
+### 32.3 I1 的开工顺序（照 ROADMAP §4 那张表，不要重新调研）
+
+1. **先定签名**：有没有证书，决定做「未签名但可用」还是「签名发行」。没有证书不要假装能签名。
+2. **做自解压单文件 `.exe`**：内嵌 `AI-Terminal-Pet.exe`、`pet-statusline.exe`、`pet-hook.exe`、
+   `protocol.js`；复用 `scripts/install.ps1` 的 11 件制品清单与逐件 SHA256；落到同一安装目录，
+   同样写 `HKCU\Environment\Path` 与 `HKCU\...\Run`；卸载走同一份清单。
+   **验收必须用 `tests/fresh-machine.mjs` 的沙箱模型**：一台「没装过 Go、没装过本项目」的机器，
+   双击后浮窗出现、`--doctor` 全绿、`-VerifyOnly` 等价的自校验通过。
+3. **再考虑 MSI**（WiX v3 的 `candle`/`light`，或 WiX v4 的 `wix build`），企业分发用。
+4. **签名**：`signtool sign /fd sha256 /tr <时间戳> /td sha256`，并保留「未签名也能构建」的 CI 分支。
+
+### 32.4 交接时最容易踩的四个坑（都是这一轮真的踩过的）
+
+| 坑 | 表现 | 怎么避开 |
+|---|---|---|
+| PowerShell 读 UTF-8 | `Get-Content -Raw` 按 ANSI 解码，中文整行 mojibake，上传后 YAML 报 `invalid YAML – deficient indentation` | 传文件内容一律 `[IO.File]::ReadAllBytes` + `ToBase64String`；不要「读成字符串再写回」 |
+| 仓库目录是 Low IL | 从 `bin\` 直接跑的进程读不到 `%TEMP%` 沙箱里的配置，「自动同意」永远像关着 | 测试里先把二进制复制进沙箱再执行；详见 §29.4 / §30.5 |
+| `--json` 不是存活探针 | 浮窗没跑它照样打印 `{"count":0}`，用它判断「浮窗在不在」会假绿 | 直连命名管道（名字按 `sha256(home 小写去尾)` 前 4 字节重算） |
+| `gh pr create` 默认仓库 | 不带 `-R` 时会把 PR 开进自己的 fork，上游看不到 | 永远 `-R <上游>` + `--head <自己>:<分支>` |
+
+### 32.5 还没做完、也不该由下一个会话猜的事
+
+- **awesome-dsh-plugin #14385**：两个 check 都 SUCCESS、`mergeable`，等上游人工合并；再往上一版
+  #14243 可以等 #14385 合并后关掉。这不是我们能推的。
+- **dshopen**：线上索引仍记 1.2.4，1.2.5 要等它站点自己重建；不要为了催它而重复开 issue。
+- **YELEBAI / radar / dshbase / dsh.so / dsh-plugin.org / alldsh / dshmarketplace.dev**：全部等对方扫描或回应。
+  imsai #912 与 brade #367 已经把我们能给的信息都给了（含 npm 版本与 tarball 哈希）。
+- **`go test -race` / `govulncheck` / `gosec`** 仍缺工具链（无 gcc），§6 已记录，不要假装跑过。
