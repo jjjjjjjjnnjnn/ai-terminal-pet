@@ -2341,8 +2341,8 @@ node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 
 gh pr view 14385 -R awesome-dsh-plugin/awesome-dsh-plugin --json state,mergedAt,mergeCommit
 
 # 2. 上游仓库里那条 yml 现在指向哪个版本（合并后立刻就是新版本）
-gh api repos/awesome-dsh-plugin/awesome-dsh-plugin/contents/data/plugins/`
-  `jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml --jq .content
+gh api "repos/awesome-dsh-plugin/awesome-dsh-plugin/contents/data/plugins/jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml" --jq .content
+#    （返回 base64；解开成文件后看 tarball: 那一行的版本号，别读成字符串再写回，见 §30.6）
 
 # 3. 站点域上真正渲染出来的索引——这才是用户看到的
 Invoke-WebRequest https://awesome-dsh-plugin.com/plugins.json
@@ -2354,8 +2354,8 @@ Invoke-WebRequest https://awesome-dsh-plugin.com/plugins.json
 | 位置 | 状态 |
 |---|---|
 | PR #14385 | **MERGED**（17:20:15Z，merge commit `70581cc`） |
-| 仓库里 `data/plugins/…yml` | `tarball` = `dsh-plugin-v1.2.5` ✅ |
-| 站点 `plugins.json` | `count` 10,446，本条目 `tarball` / `install` 仍是 **1.2.3** ❌ |
+| 仓库里 `data/plugins/…yml` | `tarball` = `dsh-plugin-v1.2.5` ✅，`description.en` 也已带上「安装本插件只接 DeepSeek Harness；另外三个终端要各自装上报端」那句 ✅ |
+| 站点 `plugins.json` | `count` 10,446，本条目 `tarball` / `install` 仍是 **1.2.3**，描述也是旧版（没有 reporters 那句）❌ |
 
 原因是「Build site from README」那条 workflow 的并发取消：同一分支上每隔几分钟就有新提交，
 旧 run 被 `cancelled`，所以站点重建一直在排队。**这不是我们能推的，也不要为此重复开 PR。**
@@ -2364,8 +2364,9 @@ Invoke-WebRequest https://awesome-dsh-plugin.com/plugins.json
 
 - `count` 从 10304（合并 1.2.3 后）涨到 **10,446**，`plugins.json` 有 14 MB——这个目录本身在长，
   单个条目的新旧取决于它自己那次重建。
-- 本仓库在该目录里的描述**已经**写明了「其他终端需各自安装 reporter」，是当初合并 #13937 时
-  维护者保留的版本；`dsh.catalog` 与 `docs/market-index.json` 也是同一段文字。
+- 本仓库在该目录里的描述**已经**写明了「其他终端需各自安装 reporter」，是 #14385 合并时一起带进去的；
+  `dsh.catalog` 与 `docs/market-index.json` 是同一段文字，所以**线上那条旧描述也会随重建一次性对齐**。
+  ——也就是说：这一处**不需要**再开 PR，等站点重建即可。
 
 ---
 
