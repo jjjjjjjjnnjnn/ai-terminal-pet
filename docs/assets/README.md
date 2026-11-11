@@ -17,6 +17,8 @@ layout. Nothing here is hand-drawn or mocked up.
 | `overlay-expanded-en.png` | 400x424 | not referenced | Expanded list under the English locale, kept for localization checks |
 | `demo.gif` | 760x600, 56 frames | launch posts (X, HN) | Breathe → hover → expand → row click, one caption per beat |
 | `desktop-scene.png` | 1500x860 | launch posts | The panel beside two terminals, so the strip is shown in context |
+| `smartscreen-unsigned.png` | 1320x560 | README install path B, launch posts | The two SmartScreen states an unsigned build produces - **a mockup, see below** |
+| `doctor-green.png` | 1798x358 | README install path B | `--doctor` output from a real healthy install, redacted and typeset |
 
 The three `-en` / `-hover` variants are not linked from the README because the
 Chinese captures already carry the same geometry; they exist so a locale or
@@ -35,6 +37,23 @@ desktop would include their project names and a real capture of this machine
 would not contain two terminals with a blocked session. The image says so in its
 own caption so nobody mistakes it for a screenshot of their setup.
 
+**The last two files are not the same kind of thing, and that distinction has to
+survive being copied out of this repository.**
+
+`doctor-green.png` is a *capture in everything but name*: `--doctor` prints
+deterministic text, so the card is the program's own stdout with syntax colouring
+and a window frame around it. The one edit is `<you>` in place of the capturing
+machine's user directory, because `--doctor` echoes `C:\Users\<name>\...` on
+several lines and the account name is not part of what the image demonstrates.
+
+`smartscreen-unsigned.png` is a **mockup**, and it says so in its own bottom-left
+corner. The dialog only appears on a machine that has never built this project,
+so a genuine capture would carry somebody's desktop, machine name and Windows
+build - and the post does not need any of that, it needs the two clicks. Rebuilding
+the documented dialog conveys the same thing without pretending to provenance it
+does not have. At the size this appears, the shape and the two button rows are
+what a reader takes away; the pixels are not evidence.
+
 Regenerate everything:
 
 ```powershell
@@ -43,10 +62,16 @@ go test ./internal/ui -run TestRenderPreview
 go test ./internal/ui -run TestRenderSettingsPreview
 python docs/assets/render_assets.py
 python docs/assets/make_launch_assets.py
+
+& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor > "$env:TEMP\doctor.txt"
+python docs/assets/make_doctor_card.py "$env:TEMP\doctor.txt" "$env:USERPROFILE"
+python docs/assets/make_smartscreen_notice.py
 ```
 
 `render_assets.py` reads the rasterizer output from `PET_PREVIEW_DIR`, trims the
 flat background, and writes all the PNGs above. `make_launch_assets.py` reads
-the same directory and writes `demo.gif` and `desktop-scene.png`. The
-settings-window previews are written to `$env:TEMP\petpreview-settings` and are
-not published here.
+the same directory and writes `demo.gif` and `desktop-scene.png`.
+`make_doctor_card.py` takes the captured report and needs `%USERPROFILE` as its
+second argument so it can redact it - forgetting that argument ships a real
+username. The settings-window previews are written to
+`$env:TEMP\petpreview-settings` and are not published here.

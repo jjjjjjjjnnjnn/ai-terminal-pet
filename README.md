@@ -123,7 +123,17 @@ The package carries a prebuilt overlay and the official `protocol.js`. On first 
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
    ```
 
-The zip carries the three binaries, `protocol.js`, the Harness bundle, the installer and a `SHA256SUMS.txt`, so the only thing on Windows is one download and one double-click. The release is **not code-signed yet**, so the first run shows SmartScreen's "unknown publisher" prompt: click *More info* → *Run anyway*. That prompt is a certificate the project does not have, not a problem with the file you downloaded — the per-file SHA256 values in `SHA256SUMS.txt` are the honest substitute until a certificate exists.
+The zip carries the three binaries, `protocol.js`, the Harness bundle, the installer and a `SHA256SUMS.txt`, so the only thing on Windows is one download and one double-click. The release is **not code-signed yet**, so the first run shows SmartScreen's "unknown publisher" prompt:
+
+![SmartScreen on an unsigned build](docs/assets/smartscreen-unsigned.png)
+*What an unsigned build produces on a machine that has never seen it: click **More info**, then **Run anyway**. This image is a reconstruction of the documented dialog, not a capture - see [docs/assets/README.md](docs/assets/README.md).*
+
+That prompt is a certificate the project does not have, not a problem with the file you downloaded — the per-file SHA256 values in `SHA256SUMS.txt` are the honest substitute until a certificate exists.
+
+After installing, `--doctor` should look like this (paths shortened here, everything else is the program's own output):
+
+![--doctor on a healthy install](docs/assets/doctor-green.png)
+*Nine checks, and the one that matters when you see an empty panel is `instance` — if it says a live instance is listening, the overlay is healthy and the missing piece is the terminal's reporter, not the install.*
 
 **C. Developers — build from source (Go 1.23+)**
 
@@ -489,9 +499,18 @@ dsh plugin add dsh-ai-terminal-pet
    ```
 
 zip 里带齐三个二进制、`protocol.js`、Harness 桥接包、安装脚本与 `SHA256SUMS.txt`，所以 Windows 上只需要
-一次下载加一次双击。**这一版还没有代码签名**，首次运行会撞 SmartScreen 的「未知发布者」提示：点
-「更多信息」→「仍要运行」。那个提示是本项目缺的证书，不是你下载的文件有问题——在证书到位之前，
+一次下载加一次双击。**这一版还没有代码签名**，首次运行会撞 SmartScreen 的「未知发布者」提示：
+
+![未签名构建的 SmartScreen](docs/assets/smartscreen-unsigned.png)
+*一台没见过这个项目的机器上，未签名构建会看到这个：点「更多信息」，再点「仍要运行」。这张图是按官方对话框文字重建的示意图，不是截图——说明见 [docs/assets/README.md](docs/assets/README.md)。*
+
+那个提示是本项目缺的证书，不是你下载的文件有问题——在证书到位之前，
 `SHA256SUMS.txt` 里的逐文件 SHA256 就是诚实的替代品。
+
+装完之后 `--doctor` 应该长这样（路径已缩短，其余都是程序自己的输出）：
+
+![健康安装下的 --doctor](docs/assets/doctor-green.png)
+*九项检查。面板是空的时候真正要看的是 `instance` 那一行：如果它说有实例在监听管道，说明浮窗本身是健康的，缺的是终端那边的上报端，不是安装。*
 
 **C. 开发者 —— 从源码构建（需要 Go 1.23+）**
 
