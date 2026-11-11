@@ -1933,17 +1933,19 @@ integrity `sha512-2sEFAf0k…`、**17 files**、`npm pack dsh-ai-terminal-pet@1.
 ### 28.8 交接时跑过的验证（2026-11-11，全部通过）
 
 ```
-node packages/dsh-ai-terminal-pet/verify.mjs        -> VERIFY PASSED (95 ok / 0 warn / 0 fail, rc 0)
+node packages/dsh-ai-terminal-pet/verify.mjs        -> VERIFY PASSED (rc 0)
 node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check  -> 两个 vendor 文件均 matches the source
 node integrations/deepseek-harness/verify.mjs       -> VERIFY PASSED
-gofmt -l . / go vet ./... / go test -count=1 ./...  -> 干净 / 0 / 9 个 internal 包全 ok
+gofmt -l . / go vet ./... / go test -count=1 ./...  -> 干净 / 0 / 11 个包全 ok（190 个 func Test）
 六个 reporters 逐个 node --check                     -> 全过（Node 24 只查第一个参数，必须逐个跑）
-scripts/install.ps1 -VerifyOnly                     -> 10 file(s) match the repository, 0 warning(s)
+node tests/fresh-machine.mjs --no-overlay           -> PASS: 160/160
+scripts/install.ps1 -VerifyOnly                     -> 11 file(s) match the repository, 0 warning(s)
 ```
 
 本次交接只改文档与 `.gitignore`，**没有碰任何代码、清单、包内 README 或索引**，
-所以不需要新 tag，也不需要重发 Release。（上表是 §28 当时的口径：那时还没有 `pet-hook.exe`，
-制品是 10 项、`internal` 是 9 个包；§29 交付原生 hook 之后变成 11 项 / 10 个包 + `cmd/pet-hook`。）
+所以不需要新 tag，也不需要重发 Release。（上表是 §28 当时的口径，后来随 §29–§31 一起更新：
+`pet-hook.exe` 让它从 10 项变 11 项制品、`internal` 从 9 个包变 10 个 + `cmd/pet-hook`，
+`tests/fresh-machine.mjs` 又加了一条独立门禁。）
 
 ## 29. 上报端原生化：`pet-hook.exe` 与 `internal/reporter`（2026-11-11）
 
