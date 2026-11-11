@@ -150,13 +150,38 @@ function Get-InstallArtifacts {
   return ,$items
 }
 
+# Get-FileSha256 hashes one file with .NET, not with Get-FileHash.
+#
+# Get-FileHash lives in the Microsoft.PowerShell.Utility module, which is only
+# found when PSModulePath still contains the Windows PowerShell module
+# directory. A host that starts this script with a trimmed PSModulePath - GitHub
+# Actions does exactly that when the step itself runs under PowerShell 7 - gets
+# "Get-FileHash is not recognized" and the whole installer aborts. The .NET
+# call has no module dependency and is also faster, because it streams the file
+# instead of asking the provider for a path first.
+function Get-FileSha256 {
+  param([Parameter(Mandatory)][string]$Path)
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      $bytes = $sha.ComputeHash($stream)
+    } finally {
+      $sha.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+  return ([System.BitConverter]::ToString($bytes) -replace '-', '').ToUpperInvariant()
+}
+
 # Get-Sha256OrNull answers "what does this file hash to" without throwing for a
 # file that is simply absent, because "absent" is a normal, reportable state in
 # -VerifyOnly and must not abort the rest of the report.
 function Get-Sha256OrNull {
   param([Parameter(Mandatory)][string]$Path)
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
-  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+  return (Get-FileSha256 -Path $Path)
 }
 
 # Test-PathInsideDirectory is the guard that keeps -Uninstall from acting on a
@@ -529,7 +554,7 @@ try {
   $Step = 'hash the repository sources'
   $sourceHashes = @{}
   foreach ($item in $Items) {
-    $sourceHashes[$item.To] = (Get-FileHash -LiteralPath $item.From -Algorithm SHA256).Hash
+    $sourceHashes[$item.To] = (Get-FileSha256 -Path $item.From)
   }
 
   $Step = 'copy the artifacts into the install directory'
@@ -543,7 +568,7 @@ try {
   $Step = 'verify the copied artifacts'
   $mismatched = @()
   foreach ($item in $Items) {
-    $installedHash = (Get-FileHash -LiteralPath $item.To -Algorithm SHA256).Hash
+    $installedHash = (Get-FileSha256 -Path $item.To)
     if ($installedHash -ne $sourceHashes[$item.To]) {
       $mismatched = $mismatched + ('  ' + $item.To + $NewLine + '    installed  ' + $installedHash + $NewLine + '    repository ' + $sourceHashes[$item.To])
     }

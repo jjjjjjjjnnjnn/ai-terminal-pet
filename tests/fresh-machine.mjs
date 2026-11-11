@@ -47,7 +47,14 @@ let checks = 0
 const started = Date.now()
 
 function sha256(file) {
-  return createHash('sha256').update(readFileSync(file)).digest('hex')
+  try {
+    return createHash('sha256').update(readFileSync(file)).digest('hex')
+  } catch {
+    // A missing file is an assertion failure, not a crash: a scenario that has
+    // already reported "install.ps1 succeeds: FAIL" should not take the rest of
+    // the suite down with it.
+    return ''
+  }
 }
 
 function check(label, condition, detail = '') {
@@ -94,7 +101,28 @@ function killSandboxProcesses(sandboxRoot) {
     'Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ' +
     'Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith(' + JSON.stringify(sandboxRoot) + ', [System.StringComparison]::OrdinalIgnoreCase) } | ' +
     'ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }'
-  spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 60000 })
+  spawnSync(windowsPowerShell(), ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 60000 })
+}
+
+/**
+ * Windows PowerShell, by absolute path when it is where it should be.
+ *
+ * `powershell` on PATH is whatever the host put there, and on a CI runner that
+ * host is usually PowerShell 7 with its own PSModulePath. The installer is a
+ * Windows PowerShell 5.1 script and must be exercised as one, so prefer the
+ * documented location and fall back to PATH only if it is absent.
+ */
+function windowsPowerShell() {
+  const absolute = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  return existsSync(absolute) ? absolute : 'powershell'
+}
+
+/** Run one .ps1 with the arguments the caller wants, returning the child result. */
+function runPowerShell(scriptArgs, timeout = 300000) {
+  return spawnSync(windowsPowerShell(), ['-NoProfile', '-ExecutionPolicy', 'Bypass', ...scriptArgs], {
+    encoding: 'utf8',
+    timeout,
+  })
 }
 
 /** rmSync with retries: Windows keeps handles for a moment after an exit. */
@@ -610,11 +638,19 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
   section('S5 standalone install and native hooks')
   const destination = path.join(sandbox.petDir, 'AI-Terminal-Pet.exe')
   const installScript = path.join(repoDir, 'scripts', 'install.ps1')
-  const install = spawnSync(
-    'powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', installScript, '-Destination', destination],
-    { encoding: 'utf8', timeout: 300000 },
-  )
+  const install = runPowerShell(['-File', installScript, '-Destination', destination])
+  if (install.status !== 0) {
+    // Make the next CI failure diagnosable in one line instead of a guessing
+    // game about which PowerShell the runner resolved.
+    const diag = runPowerShell([
+      '-Command',
+      '[string]$PSVersionTable.PSVersion; ' +
+        'if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) { "Get-FileHash=ok" } else { "Get-FileHash=missing" }; ' +
+        '$PSHOME',
+    ])
+    console.log('   powershell: ' + String(diag.stdout || '').trim().replace(/\s+/g, ' '))
+    console.log('   host      : ' + windowsPowerShell())
+  }
   check('install.ps1 succeeds', install.status === 0, install.stdout + install.stderr)
   check('installer reports 11 artifacts', /install: ok - 11 file/.test(install.stdout || ''), install.stdout)
 
@@ -624,11 +660,7 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
   equal('installed hook is the built one', sha256(path.join(sandbox.petDir, 'pet-hook.exe')), sha256(hookExe))
   equal('installed statusline is the built one', sha256(path.join(sandbox.petDir, 'pet-statusline.exe')), sha256(statuslineExe))
 
-  const verify = spawnSync(
-    'powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', installScript, '-Destination', destination, '-VerifyOnly'],
-    { encoding: 'utf8', timeout: 300000 },
-  )
+  const verify = runPowerShell(['-File', installScript, '-Destination', destination, '-VerifyOnly'])
   check(
     'verify-only matches everything',
     /install: verified - 11 file\(s\) match the repository, 0 warning/.test(verify.stdout || ''),
@@ -827,21 +859,14 @@ function scenarioRobustness(sandbox, overlayExe, hookExe) {
 function scenarioUninstall(sandbox, overlayExe) {
   section('S8 uninstall')
   const destination = path.join(sandbox.petDir, 'AI-Terminal-Pet.exe')
-  const uninstall = spawnSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      path.join(repoDir, 'scripts', 'install.ps1'),
-      '-Destination',
-      destination,
-      '-Uninstall',
-      '-Force',
-    ],
-    { encoding: 'utf8', timeout: 300000 },
-  )
+  const uninstall = runPowerShell([
+    '-File',
+    path.join(repoDir, 'scripts', 'install.ps1'),
+    '-Destination',
+    destination,
+    '-Uninstall',
+    '-Force',
+  ])
   check('uninstall succeeds', uninstall.status === 0, uninstall.stdout + uninstall.stderr)
   check('the install directory is gone', !existsSync(sandbox.petDir), 'still present')
   check('uninstall reports completion', /uninstall: done/.test(uninstall.stdout || ''), uninstall.stdout)
