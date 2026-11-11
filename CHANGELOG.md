@@ -648,6 +648,30 @@
   YELEBAI 仍记 1.2.3（`verifiedCommit 9b0df94`，`install.profiles` 已含 desktop）。
 ---
 
+## [1.2.5] — 2026-11-11
+插件包的第五个发布。**这一版第一次真正「装上就能用」**：前几版里有两个缺陷会让插件在没装过浮窗的
+机器上静默什么都不发（§30.2、§30.3 有完整复盘），而且项目路径连反应都没有。代码改动只有三个文件
+（`lib/index.js`、`verify.mjs`、新增 `vendor/package.json`），但它换来的是下面这些行为：
+
+- **按包名安装可用**：1.2.4 已发布到 npm，`dsh plugin add dsh-ai-terminal-pet` 现在解析得到；
+  插件包 README 里「等 npm 发布再用」那段已经过期，改成三条安装路径并列。
+- **自带的 `vendor/protocol.js` 终于能加载**：包声明 `"type": "module"`，`require()` 那个文件会
+  返回没有 `sendStatus` 的模块命名空间；`vendor/package.json` 写 `{"type":"commonjs"}` 覆盖目录
+  模块类型。受影响的是「已安装副本缺失」的所有情况（`DSH_PET_NO_BOOTSTRAP`、拷贝失败、用户删了它）。
+- **项目路径 / 上级会话 / 起始时间改从 `session.header` 读**：`cwd`、`parentSession`、`createdAt`。
+  之前用 `process.cwd()`，桌面版 Harness 从安装目录启动，于是每条会话都被标成同一个错误路径。
+- **去重签名覆盖 `state/reason/tool/project/title/parentSession`**：原来只比 state，
+  只改项目或只改标题的更新会被整条吞掉。
+
+包内容与 1.2.4 的差异：`lib/index.js`（会话头适配 + 去重签名）、`verify.mjs`（新增
+`caseVendoredProtocolLoads` 与三条会话头断言）、新增 `vendor/package.json`。两个 vendor 文件
+（`AI-Terminal-Pet.exe`、`protocol.js`）字节未变，`vendor/manifest.json` 的源码摘要在 1.2.4 那次
+就已经前移到 `39685c79…`（§29.5），本版不再改动。tarball **17 files**（1.2.4 是 16）。
+
+npm 元数据（2026-11-11T14:37:59Z 打包）：**1,917,342 B / sha256
+`dfa89a1ed412c77f85293ce8d07bf788aab6f5a5c3e1ad3e6d5be6e49c6dae5d` / shasum
+`1f6d5340aaf1639c129616c9afc6ccf5503009da`**。
+
 ## [0.9.0] — 2026-11-08 / 2026-11-09
 
 这一批把浮窗从「能看」推到「能调」，并补上了本项目自己在用的 DeepSeek Harness 接入。

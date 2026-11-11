@@ -19,42 +19,50 @@ maintainer pins a release in lib/release-pins.json, see below).
 
 ## What it does
 
-| Harness event | Overlay state |
+| Harness signal | Overlay state |
 | --- | --- |
-| turn/start, agent/inbox/claimed, agent/status running | working |
-| tool/call | tool_use |
-| approval/asked, approval/request | waiting_permission |
-| tool/result with error, command/done error, agent/error | error |
-| turn/end, command/done success | idle |
+| `turn/start`, `agent/inbox/claimed`, `agent/status` running | working |
+| `tool/call` | tool_use |
+| `approval/request` (waterfall listener) | waiting_permission |
+| `tool/result` with `error`, `agent/error` | error |
+| `turn/end`, `agent/status` idle | idle |
 | Harness process exit | closed |
+
+Events this table does not list are not part of the Harness session log: there is
+no `command/done` or `working-directory/change` in `SessionEventMap`. The project
+path, the parent session and the session start time do not come from events at
+all - they are read from `session.header` (`cwd`, `parentSession`, `createdAt`),
+which is the only place the host states them. That is also why a session shows
+the right project even though the desktop Harness itself runs from its install
+directory, and why a subagent conversation is nested under the session it was
+forked from.
 
 The overlay then plays an alert tone, shows a tray balloon on those transitions
 and its one-click jump button targets the Harness window. Plugin reload (HMR)
 disposes the listeners but deliberately does not close sessions: only a real
 process exit means the conversation is over.
 
-The bundle's entry in the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
-registry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) was
-merged on 2026-11-10, and that repository's README lists it. Being merged is not the same as
-being visible in a market, and initially it was not: the entry page answered 404 and the catalog
-file behind DSH's own Plugins -> Market did not contain this repository while the upstream site
-build was still queued. That build finished (run 42844452013, 16:39:27Z), the entry page now
-answers 200, and the catalog (`count` 10119 -> 10230) lists this repository - so it can be found
-in that market. The entry's `install` command, however, is generated from the pinned `tarball`
-and pointed at the 1.2.0 asset; a follow-up PR moves it to the current release, which is 1.2.4.
-Changing that file always means a pull request against that repository, never an edit here.
+## Where it is listed, and what each market indexes
 
-The other route needs no application at all: third-party markets harvest GitHub
-repositories carrying the `dsh-plugin` topic (this repository has it) together with
-a root `package.json` that declares `name` and `dsh.bundle`. That is exactly why
-the repository root carries a shim manifest — `dsh plugin add github:owner/repo`
-reads the root manifest, and without one the install resolves to a 0.0.0
-dependency that mounts nothing.
+Three independent paths exist today, and each one reads a different field:
 
-The package describes itself to those storefronts through `dsh.catalog`: a
-category, a one-line summary in both languages, and the capabilities it uses.
-Capabilities are self-declared and never checked — DSH does not sandbox plugins —
-so read them as a description, not a permission grant.
+| Market | What it indexes | What this package offers it |
+| --- | --- | --- |
+| npm registry | package name, version, `dist.integrity` | published as `dsh-ai-terminal-pet`; a market that installs by name gets a verified tarball |
+| dshmarket (the market tab most Harness Desktop users run) | `https://awesome-dsh-plugin.com/plugins.json`, which is generated from the [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) repository | entry merged via PR [#13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937); the `install` command it renders comes from that entry's pinned `tarball`, so bumping it is always a pull request *there*, never an edit here |
+| GitHub-harvesting markets | repositories carrying the `dsh-plugin` topic plus a root `package.json` declaring `name` and `dsh.bundle` | this repository has the topic and the root shim manifest, which is what makes `dsh plugin add github:owner/repo` resolve instead of mounting a 0.0.0 dependency |
+
+"Listed" and "visible" are different states, and only the second one helps a
+user: the awesome entry existed before its `plugins.json` entry did, because the
+site builds the catalog on a schedule. Check the market's own public index, not
+the merged pull request. The package README cannot promise what another
+repository's build will render; it can only promise that the fields those builds
+read are present and correct.
+
+The package describes itself to storefronts through `dsh.catalog`: a category, a
+one-line summary in both languages, and the capabilities it uses. Capabilities
+are self-declared and never checked — DSH does not sandbox plugins — so read them
+as a description, not a permission grant.
 The bundle is Windows only and declares `dsh.bundle.platforms: ["win32"]`, so
 other platforms show it as unsupported instead of installing it.
 
@@ -64,16 +72,25 @@ that field - the bundle mounts through `dsh.bundle` either way - but storefronts
 that sort entries by profile do: without it a registry falls back to a
 headless-or-web guess and a desktop client hides the entry.
 
-Manually, from a terminal, into a profile you own — use the release tarball or
-pin the release tag. Both are verified end to end:
+Manually, from a terminal, into a profile you own — by package name, by release
+tarball, or by pinning the release tag. All three are verified end to end:
 
 ```sh
-# release tarball: no clone, no Go toolchain
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.4/dsh-ai-terminal-pet-1.2.4.tgz
+# by package name: published on npm, no clone, no Go toolchain
+dsh plugin --profile <profile> add dsh-ai-terminal-pet
+
+# release tarball: same bytes as the npm release, straight from the GitHub Release
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.5/dsh-ai-terminal-pet-1.2.5.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.4&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.5&path:/packages/dsh-ai-terminal-pet"
 ```
+
+Those three differ only in transport. The npm path is the shortest and the one a
+market uses when it installs by name; the tarball path works when a market pins a
+release asset instead of a registry entry; the git path is the fallback for a
+machine that cannot reach npm at all. Every one of them lands the same
+prebuilt overlay in `vendor/`.
 
 Do not hand pnpm a bare repository URL. pnpm resolves a git dependency by
 running the package's lifecycle scripts, and it blocks those for unpinned
@@ -85,9 +102,12 @@ SHA-256 of that file, the SHA-256 of the Go sources it was built from, and the
 Go version that produced it, so a stale or hand-edited vendor directory fails a
 check instead of shipping quietly.
 
-The GitHub paths above need no npm. Installing by package name
-(`add dsh-ai-terminal-pet`) starts working once the package is published to the
-npm registry; until then use one of the two commands above.
+The GitHub and npm paths above need nothing from this repository at install time.
+`dsh plugin add dsh-ai-terminal-pet` resolves through the npm registry; the
+tarball and git forms resolve through GitHub. A marketplace that indexes npm
+sees the package under its own name and can verify the published integrity
+digest; a marketplace that indexes repositories sees the `dsh-plugin` topic and
+the root shim manifest.
 
 `add` is the whole install: the profile records the dependency, and the bundle
 declares itself through `dsh.bundle.patch`, so no separate `enable` step exists.
