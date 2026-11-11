@@ -31,6 +31,9 @@ The table below contrasts the everyday workflow before and after using the overl
 
 ### What it looks like
 
+![Demo](docs/assets/demo.gif)
+*The actual sequence: a session blocks on a permission prompt and the strip breathes, hovering unfolds the session list, and clicking the waiting row brings that terminal forward. Frames are rasterized from the shipped renderer; the ring stands in for the click, since a layered window draws no cursor.*
+
 ![Compact strip](docs/assets/overlay-compact.png)
 *Compact strip: pulsing state orb with status glyph, session count, state word, and waiting project name.*
 
@@ -42,6 +45,9 @@ The table below contrasts the everyday workflow before and after using the overl
 
 ![Auto-approve countdown](docs/assets/overlay-auto-approve.png)
 *Auto-approve countdown: draining bar with "Allow (5s)" prompt allowing manual veto before automatic permission approval.*
+
+![In context](docs/assets/desktop-scene.png)
+*In context: the strip sits at the screen edge beside two terminals, so a blocked session is visible without switching windows. The panel is the real renderer output; the two terminals around it are drawn, since a real capture would contain somebody's project names.*
 
 ---
 
@@ -390,6 +396,9 @@ ai-terminal-pet 在屏幕边缘贴上一条 56 像素宽的状态带。你无需
 
 以下截图均由真实的 Win32 渲染引擎在版式测试中直接光栅化生成，与程序运行时的像素布局完全一致：
 
+![动图](docs/assets/demo.gif)
+*真实交互顺序：有会话卡在权限确认时状态带开始呼吸，悬停展开会话列表，点击等待中的那一行就把对应终端带到前台。每一帧都出自发布用的同一个光栅器；点击那一拍用一圈扩散代替光标——分层窗口本身不画光标。*
+
 ![紧凑态](docs/assets/overlay-compact.png)
 *紧凑态：展示呼吸脉动的状态球、当前纳管会话总数、最高紧急度的状态词，以及正在等待确认的项目名。*
 
@@ -401,6 +410,9 @@ ai-terminal-pet 在屏幕边缘贴上一条 56 像素宽的状态带。你无需
 
 ![5 秒否决倒计时](docs/assets/overlay-auto-approve.png)
 *5 秒否决倒计时：权限请求行展示"允许（5 秒）"倒计时与渐退进度条，在倒计时结束前点击面板即可立即否决。*
+
+![实际场景](docs/assets/desktop-scene.png)
+*实际场景：状态带贴在屏幕边缘、旁边是两个终端，于是"哪个会话被卡住了"不用切窗口就能看到。面板那一半是真实光栅器输出，周围两个终端是画出来的——真实截图会带上别人机器上的项目名。*
 
 ---
 

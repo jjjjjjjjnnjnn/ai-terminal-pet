@@ -15,10 +15,25 @@ layout. Nothing here is hand-drawn or mocked up.
 | `overlay-compact-en.png` | 168x468 | not referenced | Same compact strip under the English locale, kept for localization checks |
 | `overlay-compact-hover.png` | 168x468 | not referenced | Compact strip in the hovered state (raised background and stroke) |
 | `overlay-expanded-en.png` | 400x424 | not referenced | Expanded list under the English locale, kept for localization checks |
+| `demo.gif` | 760x600, 56 frames | launch posts (X, HN) | Breathe → hover → expand → row click, one caption per beat |
+| `desktop-scene.png` | 1500x860 | launch posts | The panel beside two terminals, so the strip is shown in context |
 
 The three `-en` / `-hover` variants are not linked from the README because the
 Chinese captures already carry the same geometry; they exist so a locale or
 hover regression is visible without running a window.
+
+**`demo.gif` is honest about one thing the panels are not.** The animation
+changes only what the product changes: the whole-window opacity during the
+breathe, the hovered frame, the two panel sizes, and a ring standing in for the
+click on a row (a layered window draws no cursor, so the artefact of the click
+has to be drawn). It is 56 frames because a 12-frame breath cycle at 90 ms is
+what `pulseInterval` (160 ms, 6.25 fps) actually looks like.
+
+**`desktop-scene.png` is half illustration.** The panel half is real rasterizer
+output; the two terminal windows are drawn, because a real capture of somebody's
+desktop would include their project names and a real capture of this machine
+would not contain two terminals with a blocked session. The image says so in its
+own caption so nobody mistakes it for a screenshot of their setup.
 
 Regenerate everything:
 
@@ -27,8 +42,11 @@ $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 go test ./internal/ui -run TestRenderSettingsPreview
 python docs/assets/render_assets.py
+python docs/assets/make_launch_assets.py
 ```
 
 `render_assets.py` reads the rasterizer output from `PET_PREVIEW_DIR`, trims the
-flat background, and writes all PNGs listed above. The settings-window previews
-are written to `$env:TEMP\petpreview-settings` and are not published here.
+flat background, and writes all the PNGs above. `make_launch_assets.py` reads
+the same directory and writes `demo.gif` and `desktop-scene.png`. The
+settings-window previews are written to `$env:TEMP\petpreview-settings` and are
+not published here.
