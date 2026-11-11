@@ -164,3 +164,13 @@ jobs:
       # repository-root shim manifest. No network, no named pipe, no overlay.
       - name: Verify the DSH plugin package
         run: node packages/dsh-ai-terminal-pet/verify.mjs
+
+      # The fresh-machine suite is the only gate that exercises the paths a new
+      # user actually walks: pack the package, extract it into a DSH-style
+      # node_modules, load it with a fake Cordis context, then install with
+      # install.ps1 and drive the three binaries - all inside a sandbox with its
+      # own LOCALAPPDATA, USERPROFILE and pipe. --no-overlay skips the two
+      # scenarios that spawn a window, which a headless runner should not do.
+      # It needs the three binaries, so it runs after the build steps.
+      - name: Fresh-machine end-to-end suite
+        run: node tests/fresh-machine.mjs --no-overlay

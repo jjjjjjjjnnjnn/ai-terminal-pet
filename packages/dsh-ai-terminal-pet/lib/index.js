@@ -167,6 +167,19 @@ function sessionIdOf(...candidates) {
 }
 
 /**
+ * What makes one report different from the previous one.
+ *
+ * The state alone is not enough: working-directory/change and session/title
+ * only move the project or the reason, and the panel shows both. De-duplicating
+ * on state alone silently dropped those two events, so a conversation that
+ * changed directory kept being reported under the old one until something else
+ * happened to change the state within the same minute.
+ */
+function signatureOf(item) {
+  return [item.state, item.reason || '', item.tool || '', item.project || '', item.title || ''].join('\u0000')
+}
+
+/**
  * Publish one status. The protocol module writes the durable snapshot
  * synchronously before its first await, so calling this from process.on('exit')
  * still leaves a correct closed-state snapshot even when the pipe is gone.
@@ -175,16 +188,18 @@ function report(sessionId, patch, force = false) {
   const p = officialProtocol()
   if (!p || typeof p.sendStatus !== 'function') return
   const item = metaFor(sessionId)
-  const previous = item.state
+  const previousState = item.state
+  const previousSignature = signatureOf(item)
   Object.assign(item, patch)
   if (!p.STATES.has(item.state)) item.state = 'idle'
 
   const now = Date.now()
-  const changed = item.state !== previous
+  const changed = signatureOf(item) !== previousSignature
+  const stateChanged = item.state !== previousState
   const stale = now - item.sentAt >= KEEP_ALIVE_MS
   if (!force && !changed && !stale) return
   item.sentAt = now
-  if (changed) item.stateAt = now
+  if (stateChanged) item.stateAt = now
 
   const stablePid = typeof p.stableProcessId === 'function'
     ? p.stableProcessId(SOURCE + ':' + sessionId)

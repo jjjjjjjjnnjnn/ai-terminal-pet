@@ -134,7 +134,20 @@ async function caseMapping() {
   const afterCleanup = stub.calls.length
 
   const states = stub.calls.map((item) => item.state)
-  const expected = ['working', 'tool_use', 'waiting_permission', 'idle', 'error', 'waiting_permission', 'closed']
+  // 'error' appears twice on purpose: working-directory/change carries no state,
+  // so a report is emitted only because the project changed. De-duplicating on
+  // state alone used to swallow that event and leave the panel showing the old
+  // directory until something else moved the state.
+  const expected = [
+    'working',
+    'tool_use',
+    'waiting_permission',
+    'idle',
+    'error',
+    'error',
+    'waiting_permission',
+    'closed',
+  ]
 
   check(JSON.stringify(states) === JSON.stringify(expected), 'state sequence ' + states.join(' -> '))
   check(nextResult === 'next-called', 'approval/request preserves the waterfall chain')
@@ -408,6 +421,36 @@ async function caseMarketIndex() {
   check(icon.endsWith('/packages/dsh-ai-terminal-pet/icon.png'), 'the index icon points at this package icon')
   check(icon.includes('/' + (from.commit ?? ' ') + '/'), 'the index icon is pinned to the same commit as the install source')
 }
+/**
+ * Case 8: the vendored protocol must be loadable from the real package tree.
+ *
+ * Every other case builds a fake package root, and a fake root has no
+ * package.json - so `require()` treats its vendor/protocol.js as CommonJS and
+ * the test passes. The shipped package declares `"type": "module"`, which makes
+ * every .js file inside it ESM, and `require()` of that file then returns a
+ * module namespace whose `sendStatus` is undefined. The plugin treats that as
+ * "no protocol" and reports nothing at all, silently. That is exactly the
+ * fallback path used when the installed %LOCALAPPDATA% copy is missing, so it
+ * has to be tested against the real tree, not a synthetic one.
+ */
+async function caseVendoredProtocolLoads() {
+  const protocolPath = path.join(packageDir, 'vendor', 'protocol.js')
+  const requireFromPackage = createRequire(path.join(packageDir, 'lib', 'index.js'))
+  let loaded = null
+  let error = ''
+  try {
+    loaded = requireFromPackage(protocolPath)
+  } catch (thrown) {
+    error = thrown && thrown.message ? thrown.message.split('\n')[0] : String(thrown)
+  }
+  check(error === '', 'the vendored protocol can be required from the shipped tree (' + error + ')')
+  check(typeof loaded?.sendStatus === 'function', 'requiring the vendored protocol yields sendStatus')
+  check(typeof loaded?.stableProcessId === 'function', 'requiring the vendored protocol yields stableProcessId')
+  check(
+    existsSync(path.join(packageDir, 'vendor', 'package.json')),
+    'vendor/package.json marks the vendored directory CommonJS',
+  )
+}
 try {
   await caseMapping()
   await caseBootstrap()
@@ -416,6 +459,7 @@ try {
   await caseRootManifest()
   await caseVendorManifest()
   await caseMarketIndex()
+  await caseVendoredProtocolLoads()
 } finally {
   rmSync(root, { recursive: true, force: true })
 }

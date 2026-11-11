@@ -1881,6 +1881,7 @@ git 无法在一个提交里引用它自己或它的后继，钉死的数字只�
 - `packages/dsh-ai-terminal-pet/README.md` 与两份 `package.json`（属已发布 tarball 的字节）；
 - `packages/dsh-ai-terminal-pet/vendor/manifest.json`（同样属已发布 tarball 的字节；§29.5 记录了一次
   已经发生的重写，因此**下一次发布必须是新版本号**）；
+- `packages/dsh-ai-terminal-pet/vendor/package.json`（§30.2 新增的 CommonJS 覆盖，同样属包内字节）；
 - `docs/market-index.json` 的 `versions[0]`（`verify.mjs` 断言它等于包版本）；
 - 七个 tag 指向的提交（`dsh-plugin-v1.0.0` … `v1.2.4`）与它们各自的 Release 资产。
 
@@ -2054,3 +2055,102 @@ Bearer token、控制字符、parent session），记录 stdout、退出码、st
 
 **代价**：`pet-statusline.exe` 3,643,392 → **3,664,896 B**（+21,504 B，共享包里的审批/配置代码
 被一起链接进来）。稳态耗时实测不变：迁移前 86–92 ms、迁移后 88–93 ms（几乎全是进程创建开销）。
+
+## 30. 全新机器端到端：`tests/fresh-machine.mjs`（2026-11-11）
+
+### 30.1 它为什么存在
+
+到这一轮为止，所有自动化测试回答的都是「逻辑对不对」：`go test` 按函数测，`verify.mjs` 用假包根
+和假 Cordis 上下文测插件。**没有一个测试回答「这台机器从没见过这个项目，用户按 README 装上去，
+能不能用」**——而两个真实缺陷（§30.2、§30.3）恰好都活在这条缝里，都是「所有单元测试都绿、
+实际什么都不发生」。
+
+套件就建在这条缝上。每次运行在 `%TEMP%` 里建一个一次性沙箱：
+
+```
+<tmp>/pet-fresh-XXXX/
+  local/        ← LOCALAPPDATA（配置、运行期快照、审批目录都在这下面）
+  home/         ← USERPROFILE（管道名由它哈希出来，所以连管道都是另一条）
+  dsh/          ← DSH 风格的工作目录，node_modules/dsh-ai-terminal-pet 就在这
+  project/      ← 一个真实存在的项目目录，用来验证 cwd 映射
+  bin/          ← 三个二进制的副本（见 30.5）
+  pack/         ← npm pack 出来的 tgz
+```
+
+八个场景共 **158 项检查**，全绿约 25 秒。`--no-overlay` 跳过会开窗口的两个场景（S4 启动浮窗、
+S5 里对浮窗的投递断言退化为快照断言），CI 用这个形态。
+
+### 30.2 挖出的缺陷一：插件自带的 `vendor/protocol.js` 从来没加载成功
+
+包清单是 `"type": "module"`，所以包内任何 `.js` 都按 ESM 解释。插件用 `createRequire()` 去
+`require()` 它，Node 24 的 `require(ESM)` 会**成功**返回一个模块命名空间——但那个文件是
+`module.exports = {...}`，作 ESM 求值根本执行不到赋值，于是返回的对象里没有 `sendStatus`。
+插件下一行就判断「没有协议模块」并静默什么都不发。
+
+触发条件不是「正常安装」：正常安装时 bootstrap 会把 `protocol.js` 拷到
+`%LOCALAPPDATA%\AI-Terminal-Pet\`，那份没有 `package.json` 管着，是 CommonJS，能正常加载。
+会踩到的是：`DSH_PET_NO_BOOTSTRAP=1`、拷贝失败（只读盘/磁盘满）、用户删掉了那份副本，
+或从 git 源装但没跑过任何安装步骤。
+
+**修法**：`packages/dsh-ai-terminal-pet/vendor/package.json` 写 `{"type":"commonjs"}`。
+嵌套 `package.json` 覆盖目录模块类型是标准行为，`require` 从此正常，不需要在运行时加特判。
+
+**为什么之前的测试没发现**：`verify.mjs` 的每个用例都先把 `lib/index.js` 与 `vendor/*` 复制到
+一个**没有 `package.json`** 的假包根里，那里 `.js` 默认就是 CommonJS——假包根比真实包更宽松，
+于是这条路径永远通过。新增的 `caseVendoredProtocolLoads` 换成对**真实包目录**做 `require()`，
+并断言 `sendStatus` / `stableProcessId` 都是函数。
+
+### 30.3 挖出的缺陷二：DSH 插件只在状态变化时上报
+
+`report()` 的去重条件是「状态是否变了」。而 `working-directory/change` 只改 `project`、
+`session/title` 只改 `reason`（标题本身固定为 `DeepSeek Harness`，用于窗口识别），
+两者都不改状态——事件被整条吞掉。表现是：用户在 DSH 里换了个工作目录，浮窗继续显示旧路径，
+直到 60 秒保活或下一次状态变化才顺带刷新；改会话标题则永远到不了面板。
+
+**修法**：去重签名改为 `state` / `reason` / `tool` / `project` / `title` 五元组。重复内容仍然
+被丢弃（保活与防抖语义不变），任何一项真变了就立刻上报。`verify.mjs` 的状态序列因此多了一次
+`error`（切目录发生时状态仍是 error），已在用例里注明原因，免得下次有人把它当回归删掉。
+
+### 30.4 场景清单与它刻意验证的东西
+
+| 场景 | 关键断言（不只是「没报错」） |
+|---|---|
+| S1 空机器 | `--doctor` exit 1 且指名 `install files` 缺失；`--json` 返回 `count: 0` 的完整文档；`--version` 匹配 `0.9.0` |
+| S2 包安装 | tarball 能解开；`dsh.bundle.patch` 指向 `./cordis.patch.yml`；patch 用 `insert:` 而不是裸行（裸行只补丁不挂载）；locale、vendor 三件套都在 |
+| S3 插件 | 拷进去的 exe/protocol 哈希**等于** vendor 原件；二次 bootstrap 是同一个 memoized 结果且文件未变；7 种事件的 state/reason/tool 逐字段断言；切目录、改标题；两会话不串号且 pid 不同；`approval/request` 必定调 `next()`；dispose 后不再上报；全程没有 `logger.warn` |
+| S3b 开关 | `DSH_PET_NO_BOOTSTRAP=1` 不拷贝，但**仍然用 vendor 协议写出快照**；`config.enabled:false` 注册 0 个监听 |
+| S4 浮窗 | 沙箱里首次启动即可应答；`--json` 里能看到 `source: deepseek-harness` 的会话；**没有 `config.json`** 也能跑（全默认）；`--toggle`/`--show`/`--reset` 都 exit 0 |
+| S5 独立安装 | 11 件制品、`-VerifyOnly` 全对、`--doctor` 0 fail、两个原生 hook 的会话真的进了沙箱浮窗 |
+| S6 设置 | 自动同意关闭 → `{}`（交回宿主）；开启 → `{"decision":"allow"}`；危险命令两种方言分别 `{}` 与 `deny`；真实写 `.deny` 文件 → `deny` |
+| S7 坏机器 | 配置损坏 / 无 `LOCALAPPDATA` / 1 MiB stdin / 空 / 非 JSON / 数组 / null / 未知参数 / 未知模式：全部 exit 0 且给出答案；无监听时 `--json` 不挂起 |
+| S8 卸载 | 目录消失、`uninstall: done`、`--doctor` 重新 exit 1 |
+
+### 30.5 两个「不这么写就会假绿」的细节
+
+1. **二进制必须复制进沙箱再执行**。本仓库目录带 Low 强制完整性标签（§29.4），从 `bin/` 直接起
+   的子进程是 Low IL，读不到 `%TEMP%` 沙箱里 Medium IL 的 `config.json`——于是「自动同意」永远
+   看起来是关的，危险命令永远「放行」，而代码其实没问题。套件在 `sandbox/bin/` 放副本，一切从
+   那里跑。这条也顺带证明了 §29.4 那段结论是对的。
+2. **浮窗场景要停掉真实例，并从安装目录那份恢复**。单实例互斥体是
+   `Local\AI-Terminal-Pet-v1-SingleInstance`，每个 Windows 会话一份，所以沙箱浮窗和真浮窗不能
+   共存。恢复时**不能**用仓库 `bin/` 那份：它跑在 Low IL，控制命令连不上真浮窗的 Medium IL 管道，
+   结果是「以为恢复了、其实没恢复」，而且沙箱目录因为被那个进程占着而删不掉——这个坑真的踩到了，
+   第一次跑完留下了一个 15 MB 的沙箱和一个从沙箱路径运行的浮窗。
+
+### 30.6 跑法
+
+```powershell
+node tests/fresh-machine.mjs                 # 全量（含浮窗场景，会临时停掉正在跑的实例）
+node tests/fresh-machine.mjs --no-overlay    # CI 形态
+node tests/fresh-machine.mjs --keep          # 留沙箱现场，配合 --verbose 排查
+node tests/fresh-machine.mjs --verbose       # 打印每一项检查
+```
+
+前置：三个二进制已构建（`bin/AI-Terminal-Pet.exe`、`pet-statusline.exe`、`pet-hook.exe`）、
+Node 18+、Windows PowerShell。退出码 0 = 全过。
+
+### 30.7 这一轮对已发布包的影响
+
+`vendor/package.json` 是**新增的包内文件**，所以仓库里的 `packages/dsh-ai-terminal-pet/`
+与 npm 上的 1.2.4 tarball 差别又多了一处。**下一次发布必须是新版本号（1.2.5）**，不能重传 1.2.4；
+发版流程见 §28.6。

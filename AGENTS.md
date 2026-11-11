@@ -67,12 +67,17 @@ go test -count=1 ./...
 
 # 2. Reporter syntax and the DeepSeek Harness bundle (zero npm dependencies)
 for f in reporters/*.js; do node --check "$f"; done   # per file: node --check only guards its first argument
+node --check tests/fresh-machine.mjs
 node integrations/deepseek-harness/verify.mjs
 
 # 3. Production build
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
+
+# 3b. Fresh-machine end-to-end suite (CI runs it with --no-overlay; locally drop
+#     the flag to also boot the overlay in a sandbox and check delivery)
+node tests/fresh-machine.mjs --no-overlay
 
 # 4. Install, then let the shipped binary prove the install
 .\scripts\install.ps1

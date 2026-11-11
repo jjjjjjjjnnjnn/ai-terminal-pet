@@ -48,6 +48,27 @@
 
 ### Added
 
+- **`tests/fresh-machine.mjs`：全新机器端到端套件（158 项检查）**。它回答的是「这台机器从没见过
+  这个项目，装上去能用吗」，而不是「代码逻辑对不对」——后者由 `go test` 与 `verify.mjs` 覆盖。
+  每次运行都在 `%TEMP%` 建一个一次性沙箱，自带 `LOCALAPPDATA`、`USERPROFILE`（因此连命名管道都是
+  另一条）、DSH 风格的 `node_modules` 与一个真实存在的项目目录，八个场景：
+
+  | 场景 | 覆盖什么 |
+  |---|---|
+  | S1 空机器 | 未安装时 `--doctor` 退出 1 并指名缺什么；`--json` 仍返回空文档；`--version` 可用 |
+  | S2 包安装 | `npm pack` → 解开到 `node_modules`；清单、`dsh.bundle`、`cordis.patch.yml` 的 `insert:` 形态、locale、vendor 三件套 |
+  | S3 插件 | bootstrap 拷贝 + 哈希等于 vendor；二次调用是 memoized 而非覆盖；7 种事件的状态/原因/工具映射；切目录与改标题；两个会话互不干扰；`approval/request` 必定 `next()`；dispose 后不再上报 |
+  | S3b 开关 | `DSH_PET_NO_BOOTSTRAP=1` 不拷贝但**仍能用 vendor 协议上报**；`config.enabled:false` 一个监听都不注册 |
+  | S4 浮窗 | 沙箱里第一次启动、`--json` 能看到插件的会话、没有 `config.json` 也能跑、`--toggle`/`--show`/`--reset` 都 exit 0 |
+  | S5 独立安装 | `install.ps1` 11 件制品、`-VerifyOnly` 全对、`--doctor` 无 fail、两个原生 hook 投递进沙箱浮窗 |
+  | S6 设置 | 自动同意关闭时 defer、开着时 allow；危险命令永不自动放行（两种方言）；否决文件 → deny；`--settings` 可达 |
+  | S7 坏机器 | 配置损坏、没有 `LOCALAPPDATA`、超大 stdin、空/非 JSON/数组/null、未知参数/未知模式——全部 exit 0 且给出答案 |
+  | S8 卸载 | 目录清干净、`--doctor` 重新变红、无残留进程 |
+
+  两个设计要点写在文件头：二进制必须**复制进沙箱再执行**（本仓库目录带 Low 完整性标签，从
+  `bin/` 直接跑的子进程读不到 `%TEMP%` 沙箱里的配置文件）；浮窗相关场景会先停掉正在运行的实例、
+  结束后从**安装目录**那份重新拉起（单实例互斥体是每个 Windows 会话级别的，而仓库里那份是
+  Low IL，控制命令根本连不上 Medium IL 的管道）。CI 里跑 `--no-overlay`，只跳过会开窗口的两个场景。
 - **`ai-terminal-pet --doctor`**（`internal/app/doctor_windows.go` 563 行 + 375 行测试 /
   14 个 `func Test`）：一次跑完 **9 项**自检——`environment`（编译目标与 `LOCALAPPDATA`）、
   `install files`（安装目录里的 `AI-Terminal-Pet.exe` / `pet-statusline.exe` / `protocol.js`）、
@@ -483,6 +504,23 @@
 
 ### Fixed
 
+- **插件自带的 `vendor/protocol.js` 从来没被加载成功过**（1.2.4 及以前）：包清单声明了
+  `"type": "module"`，所以包内任何 `.js` 都按 ESM 解释；插件用 `createRequire()` 去
+  `require()` 那个文件，Node 24 的 `require(ESM)` 会**成功返回一个模块命名空间**，但里面没有
+  `sendStatus`（文件里是 `module.exports = {...}`，作 ESM 求值时根本执行不到）。插件随即判定
+  「没有协议模块」并静默什么都不发。这条路径只在**已安装的 `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js`
+  缺失**时才会走到：`DSH_PET_NO_BOOTSTRAP=1`、拷贝失败、用户删了它，或来源是 git 而没有任何安装步骤。
+  修法不是加特判，而是在 `vendor/` 里放一个 `{"type":"commonjs"}` 的 `package.json`——嵌套清单
+  是标准的「目录模块类型覆盖」，`require` 从此正常。
+  **为什么之前的测试没发现**：`verify.mjs` 的每个用例都在**没有 `package.json` 的假包根**里跑，
+  那里 `.js` 默认就是 CommonJS，于是永远通过。新增的 `caseVendoredProtocolLoads` 直接对**真实包目录**
+  做 `require()`，并断言 `sendStatus` 是函数——这个盲区现在有门禁了。
+- **DSH 插件只在状态变化时才上报，于是「切目录」和「改标题」被静默丢掉**：
+  `report()` 用「状态是否变化」去重，而 `working-directory/change` 只改 `project`、
+  `session/title` 只改 `reason`，两者都不改状态——事件本身被吞掉，面板会一直显示旧的项目路径，
+  直到 60 秒保活或别的状态变化才顺带刷新。现在去重签名覆盖 `state`/`reason`/`tool`/`project`/`title`
+  五个字段：同样的内容重复到达仍然被丢弃，但任何一项真的变了就立刻上报。
+  `verify.mjs` 的状态序列因此多了一次 `error`（切目录时状态未变），已按新语义更新并注明原因。
 - **`reporters/antigravity-statusline.js` 不读 `toolCall`，与原生 shim 不一致**：`cmd/pet-statusline`
   的 `toolName()` 依次看 `tool_name` / `toolCall` / `tool_call`，而参考实现只看 `tool_name`。
   于是「只带 `toolCall`」的 payload 会让两边落出不同的会话内容（`tool: null` vs `tool: "Read"`）。

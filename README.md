@@ -289,13 +289,20 @@ go test -count=1 ./...
 # node --check only validates the FIRST file it is given, so check each one:
 for f in reporters/*.js; do node --check "$f"; done
 node integrations/deepseek-harness/verify.mjs
+# fresh-machine end-to-end: packs the plugin, extracts it into a DSH-style
+# node_modules, loads it with a fake Cordis context, installs with install.ps1
+# and drives all three binaries inside a sandbox with its own LOCALAPPDATA,
+# USERPROFILE and named pipe (drop --no-overlay to also boot the overlay there)
+node tests/fresh-machine.mjs --no-overlay
 $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 ```
 
 `-buildvcs=false` in the three build commands is not decoration: it strips the VCS stamp, which encodes the commit and working-tree state at build time (`go version -m` shows `(devel)` without it and a pseudo-version like `v0.0.0-20261111122731-3529bffc12e1+dirty` with it). Two builds of the same source therefore produce identical bytes, on any machine and at any date. Without it `.\scripts\install.ps1 -VerifyOnly` — which compares the installed files against the copy in your working tree — reports a false failure whenever one side carries the stamp and the other does not. The binaries themselves are not committed (`bin/` is ignored); you always build them locally.
 
-`.\scripts\install.ps1 -VerifyOnly` re-checks every installed artifact against the recorded SHA256 list, and `.\scripts\install.ps1 -Uninstall` removes them. CI runs the same gates on every push: `.github/workflows/ci.yml` builds on `windows-latest` and fails the job on any `gofmt -l` output, `go vet` finding, failing `go test -count=1 ./...`, unsuccessful `go build -trimpath -buildvcs=false -ldflags "-s -w"` build, any reporter failing its own `node --check`, or failed `node integrations/deepseek-harness/verify.mjs`, `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`, or `node packages/dsh-ai-terminal-pet/verify.mjs`.
+`.\scripts\install.ps1 -VerifyOnly` re-checks every installed artifact against the recorded SHA256 list, and `.\scripts\install.ps1 -Uninstall` removes them. CI runs the same gates on every push: `.github/workflows/ci.yml` builds on `windows-latest` and fails the job on any `gofmt -l` output, `go vet` finding, failing `go test -count=1 ./...`, unsuccessful `go build -trimpath -buildvcs=false -ldflags "-s -w"` build, any reporter failing its own `node --check`, or failed `node integrations/deepseek-harness/verify.mjs`, `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`, `node packages/dsh-ai-terminal-pet/verify.mjs`, or `node tests/fresh-machine.mjs --no-overlay`.
+
+`tests/fresh-machine.mjs` is the suite that answers "does this work on a machine that has never seen it". Every scenario runs in a throwaway sandbox with its own `LOCALAPPDATA`, `USERPROFILE` (so even the named pipe is a different one) and DSH-style `node_modules`: the empty-machine CLI and `--doctor`, the package install through `npm pack`, the plugin's bootstrap copy and its event→state mapping, the overlay booting with no prior config, the standalone `install.ps1` path plus both native hooks, config defaults and the auto-approve/veto handshake, and hostile input (corrupt config, no `LOCALAPPDATA`, oversized or malformed stdin). It stops a running overlay for the duration and starts it again afterwards, because the single-instance mutex is per Windows session.
 
 ---
 
@@ -573,6 +580,11 @@ go test -count=1 ./...
 for f in reporters/*.js; do node --check "$f"; done
 node integrations/deepseek-harness/verify.mjs
 
+# 「全新机器」端到端：打包装、解包进 DSH 风格的 node_modules、用假 Cordis 上下文
+# 加载插件、跑 install.ps1，再在自带 LOCALAPPDATA / USERPROFILE / 命名管道的沙箱里
+# 驱动三个二进制（去掉 --no-overlay 会连浮窗一起在沙箱里启动）
+node tests/fresh-machine.mjs --no-overlay
+
 # UI 布局光栅化预览（在临时目录生成 PNG）
 $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
@@ -580,4 +592,6 @@ go test ./internal/ui -run TestRenderPreview
 
 安装步骤里那三条构建命令的 `-buildvcs=false` 不是装饰：它会去掉 VCS 戳记，而戳记里含构建时的 commit 与工作区状态（`go version -m` 不带旗标显示 `(devel)`，带旗标显示 `v0.0.0-<时间戳>-<sha>+dirty` 这类伪版本），所以同一份源码**在任何机器、任何时间**重建出的产物字节一致。少了这个旗标，`scripts\install.ps1 -VerifyOnly` 一旦发现两侧（已部署副本 vs 工作区的 `bin/`）构建方式不同就会误报失败。字节差的多少取决于工具链（go1.23 上是 1,024 B，go1.27 上恰好是 0 B，因为伪版本和 `(devel)` 一样长），所以真正起作用的是旗标本身而不是那个数字。二进制本身不入库（`bin/` 被 `.gitignore` 忽略），每次都要在本地重建。
 
-`.\scripts\install.ps1 -VerifyOnly` 用于随时复核已部署制品与记录的 SHA256 清单是否一致，`.\scripts\install.ps1 -Uninstall` 用于清理部署。CI 在同一组门禁上把关：`.github/workflows/ci.yml` 在 `windows-latest` 上运行，`gofmt -l` 有任何输出、`go vet` 有任何发现、`go test -count=1 ./...` 失败、`go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 报错，或 `node integrations/deepseek-harness/verify.mjs`、`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`、`node packages/dsh-ai-terminal-pet/verify.mjs` 失败，都会让流水线失败。
+`.\scripts\install.ps1 -VerifyOnly` 用于随时复核已部署制品与记录的 SHA256 清单是否一致，`.\scripts\install.ps1 -Uninstall` 用于清理部署。CI 在同一组门禁上把关：`.github/workflows/ci.yml` 在 `windows-latest` 上运行，`gofmt -l` 有任何输出、`go vet` 有任何发现、`go test -count=1 ./...` 失败、`go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 报错，或 `node integrations/deepseek-harness/verify.mjs`、`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`、`node packages/dsh-ai-terminal-pet/verify.mjs`、`node tests/fresh-machine.mjs --no-overlay` 失败，都会让流水线失败。
+
+`tests/fresh-machine.mjs` 回答的是「这台机器从没见过这个项目，装上去能用吗」。每个场景都在一个一次性沙箱里跑，沙箱自带 `LOCALAPPDATA`、`USERPROFILE`（所以连命名管道都是另一条）与 DSH 风格的 `node_modules`：空机器的 CLI 与 `--doctor`、经 `npm pack` 的包安装、插件的 bootstrap 拷贝与事件→状态映射、没有任何配置时浮窗能否启动、独立 `install.ps1` 路径加两个原生 hook、配置默认值与自动同意/否决握手，以及各种坏输入（配置损坏、没有 `LOCALAPPDATA`、超大或畸形 stdin）。由于单实例互斥体是「每个 Windows 会话」级别，它会先停掉正在运行的浮窗，跑完再启动回来。
