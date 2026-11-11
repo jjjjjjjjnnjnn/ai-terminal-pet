@@ -171,3 +171,12 @@ Two conventions in those commands are load-bearing, not style:
    - Never commit machine-specific absolute paths into source, tests, scripts or docs. Use
      `os.Getenv("LOCALAPPDATA")`, `os.UserHomeDir()`, `Path(__file__).resolve().parent`, or an
      environment variable that fails with a human-readable message.
+8. **Second opinion before a release, and every review request goes through `agy`**:
+   - When a change needs an outside look — a release, a marketplace submission, a README that makes
+     claims about other people's indexes — ask Antigravity's CLI, not a hand-written checklist:
+     `agy --model gemini-3.8-flash-high --effort high --print='<prompt>'` (the prompt must be attached
+     to `--print=`, never as a trailing argument; `agy models` lists what is installed).
+   - This is a standing preference for **every project in this workspace**, not just this one: prefer
+     `gemini-3.8-flash-high` when a second model's opinion would help, and say in the commit message
+     which finding came from it. Treat its output as a reviewer, not as an authority — verify each
+     claim against the installed packages before acting on it.

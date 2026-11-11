@@ -4,7 +4,7 @@
 > 下一位 AI 直接从 §1「当前状态」开始读，然后按 §13–§27 的时间序读 runbook，不必回溯长上下文。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（v0.9.0 之后，2026-11-11，未发版；含 DSH 插件包 1.2.4）
+## 1. 当前状态（v0.9.0 之后，2026-11-11，未发版；含 DSH 插件包 1.2.5）
 
 > 接手请先读本节与文末 §28「交接清单」，那两节给出「现在在哪、下一步做什么」；§27 是插件包分发的完整 runbook。
 
@@ -30,22 +30,24 @@
   `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
   `scripts/install.ps1` 的 `-VerifyOnly` / `-Uninstall` / `-AddToPath` 三个开关（卸载同时清理 PATH 条目）。
 - **分发**：Harness 桥接已做成独立 DSH 插件包 `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet`
-  **1.2.4**，含预编译浮窗，Release tag `dsh-plugin-v1.2.4`，资产 `dsh-ai-terminal-pet-1.2.4.tgz`；
-  1.2.3 / 1.2.2 / 1.2.1 / 1.2.0 / 1.1.0 均保持已发布、不可变，由 1.2.4 取代。**1.2.4 只改文案、不动代码**：
-  市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle 开箱即用映射的只是
-  **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话要先给各自那个终端装好上报端
-  （`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）才会汇进同一块面板。改动落在包内
-  `README.md`（7,546 B / 137 行 → **8,187 B / 146 行**）与两份清单的 `dsh.catalog` 摘要（en 225 / zh 114 字符，
-  三处逐字相同：根 shim、包清单、`docs/market-index.json`）。1.2.3 那版改的是两份清单的
-  `dsh.marketplace` 块（`profiles: ["desktop","headless","web"]`、`requiresBuildApproval: false`、
-  `manualSteps: false`），因为按 `install.profiles` 过滤的第三方商店（如 YELEBAI/dsh-plugin-marketplace）
-  此前只能把 host-only bundle 猜成 `[headless, web]`，桌面端于是看不见条目；DSH 本身从不读该字段。
-  这条声明**已经生效了**：该仓库 2026-11-11T02:19:42.600Z 那次扫描（18,385 条）里，本仓库的
-  `install.profiles` 已是 `["desktop","headless","web"]`（`verifiedCommit` 仍 `9b0df94`、`version` 仍 `1.2.3`，
-  要等下一轮才推到 1.2.4）。
-  `lib/index.js`（570 行 / 17,872 B）、两个 vendor 二进制（4,371,968 B / 20,914 B）、`cordis.patch.yml`、
-  `vendor/manifest.json`（源码摘要仍 `cf647af1…`）逐字节不变——1.2.4 没碰任何 `.go` 源码
-  （上一版 `1.2.2` 才是字节改动：`scripts/` 迁移改到 Go 注释、`vendor/manifest.json` 的源码摘要随之变）；
+  **1.2.5**，含预编译浮窗，Release tag `dsh-plugin-v1.2.5`，资产 `dsh-ai-terminal-pet-1.2.5.tgz`
+  1,917,342 B / sha256 `dfa89a1e…` / shasum `1f6d5340…`，2026-11-11T14:54:28Z 上传）。
+  1.2.4 及更早均保持已发布、不可变，由 1.2.5 取代。
+  **1.2.5 是第一次「装上就真的能用」**：包内只有三个文件与 1.2.4 不同——`lib/index.js`（会话头适配 +
+  去重签名）、`verify.mjs`（新增 `caseVendoredProtocolLoads` 与三条会话头断言）、新增
+  `vendor/package.json`（`{"type":"commonjs"}`，§30.2）；两个 vendor 二进制字节未变，
+  `vendor/manifest.json` 也不再改动（源码摘要在 1.2.4 那轮已是 `39685c79…`，§29.5）。tarball
+  **17 files**（1.2.4 是 16），npm 与 Release 资产互为逐字节相同的一份。
+  1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
+  开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
+  要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
+  才会汇进同一块面板。那版改动落在包内 `README.md` 与两份清单的 `dsh.catalog` 摘要
+  （en 225 / zh 114 字符，三处逐字相同：根 shim、包清单、`docs/market-index.json`）。
+  1.2.3 那版改的是两份清单的 `dsh.marketplace` 块（`profiles: ["desktop","headless","web"]`、
+  `requiresBuildApproval: false`、`manualSteps: false`），因为按 `install.profiles` 过滤的第三方商店
+  （如 YELEBAI/dsh-plugin-marketplace）此前只能把 host-only bundle 猜成 `[headless, web]`，桌面端于是
+  看不见条目；DSH 本身从不读该字段。这条声明**已经生效了**：该仓库 2026-11-11T02:19:42.600Z 那次扫描
+  （18,385 条）里，本仓库的 `install.profiles` 已是 `["desktop","headless","web"]`。
   仓库根的清单 shim 让它也能按仓库 URL 安装，三种安装形态实测 rc=0。`dsh.catalog` 是自我声明的 category/摘要/capabilities（不被强制），
   `keywords` 里的 `dsh-plugin` 让自动索引型市场能按 topic 采集。
   awesome-dsh-plugin 注册表 PR #13937 已于 2026-11-10T14:33:04Z 被 `fkysly` 合并，上游 README 的
@@ -60,7 +62,10 @@
   （merge commit `95d7216913d54110a794514a6c0ea0196aa08ddc`）；1.2.4 的跟进
   [PR #14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243)（分支 `bump-tarball-1.2.4`，
   commit `66ed01d`，`1 file +3/−3`：`tarball` 与 `icon` 换到 1.2.4，中英 description 各补一句 reporters 限定）
-  已于 2026-11-11 开出、等 check 与人工合并。
+  已于 2026-11-11 开出、等 check 与人工合并。1.2.5 的跟进是
+  [PR #14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385)（分支 `bump-tarball-1.2.5`，
+  commit `71954e7`，同样只动 `tarball`/`icon` 三行），开在**上游仓库**而不是自己 fork 里
+  （第一次误开到 `jjjjjjjjnnjnn/awesome-dsh-plugin#1`，已关闭并删掉那个冒出来的 fork 分支）。
   另有两家目录同期已合并收录本仓库：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins)
   的 PR #902（2026-11-10T21:49:53Z，`catalog/plugins/*.json`；该店只从 npm 安装，所以在包发到 npm 之前以
   browse-only 列出，目录侧会自动发现新包、无需再开 PR）与
@@ -83,11 +88,14 @@
   原先那个 critical 徽章（`registry-run-key`）与 medium 旗标（`remove-item-force-recurse`）就此消失。
   `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，安装脚本已于
   2026-11-10 移进 `scripts/`（§27.11），它读不到那两个正则的落点，也没用到任何抑制字段。
-  npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`），**1.2.4 已于 2026-11-11T12:10:46Z 发布到 npm**
-  （`dist-tags.latest` = 1.2.4、shasum `dafb8199…`、与 Release 资产逐字节相同），所以按包名安装现在可达；
-  `docs/market-index.json` 是仓库自建的 format-1 索引，条目 `dsh-ai-terminal-pet` **1.2.4**（`publishTimestamp`
-   1794379909 = 2026-11-11T06:51:49Z），可让 Discover 按 git 源可用；版本与 `publishTimestamp` 已与包清单
-   同一批前移（那个提交是 A `ff7f6de`），`source.commit` 与图标钉点由紧随其后的 B `4ee7f01` 补成 A 的 sha）。
+  npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`），**1.2.4 于 2026-11-11T12:10:46Z、
+  1.2.5 于同日 14:58Z 前后发布到 npm**（`dist-tags.latest` = **1.2.5**、shasum `1f6d5340…`、
+  与 Release 资产逐字节相同），所以按包名安装现在可达；
+  `docs/market-index.json` 是仓库自建的 format-1 索引，条目 `dsh-ai-terminal-pet` **1.2.5**（`publishTimestamp`
+   1794407879 = 2026-11-11T14:37:59Z），可让 Discover 按 git 源可用；版本与 `publishTimestamp` 已与包清单
+   同一批前移（那个提交是 A `34aa1f7`），`source.commit` 与图标钉点由紧随其后的 B `426ada5` 补成 A 的 sha）。
+  索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
+  提供的**替代**路径，而不是权宜之计。
    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
    版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
   细节与坑见 §27。
@@ -1267,10 +1275,18 @@ Harness 原先只有一个 host-only 的 Cordis bundle（`integrations/deepseek-
 **教训**：任何「包内 vendored 二进制」都必须用 `git ls-files` 而不是 `ls` 来确认它在树里；
 而判断一个分发链路是否真的完整，唯一可信的证据是**从那条链路的产物里解包再看一次**。
 
-### 27.5 发布与分发现状（截至 2026-11-10）
+### 27.5 发布与分发现状（截至 2026-11-11）
 
-- **npm**：**已发布 1.2.4**（2026-11-11T12:10:46Z，由人在交互终端执行 `npm publish --access public`；
-  `dist-tags.latest` = 1.2.4，shasum `dafb8199…`）。以下为发布之前（截至 2026-11-10）的记录，保留作背景：
+- **npm**：**最新是 1.2.5**（2026-11-11T14:58Z 前后上线；1.2.4 在 12:10:46Z）。
+  两次都由 agent 直接在包目录跑 `npm publish --access public` —— 本机 token 已配置成可绕过 2FA，
+  所以**不再需要人工在交互终端操作**；这一步的旧结论「只能由人跑」已经作废。
+  `dist-tags.latest` = 1.2.5、shasum `1f6d5340…`、integrity `sha512-2sEFAf0k…`、17 files。
+  发布前在包目录跑 `npm publish --dry-run` / `npm pack` 并把字节与 sha256 记进 CHANGELOG；
+  从 registry `npm pack` 回来的 tarball 与 Release 资产**逐字节相同**（sha256 `dfa89a1e…`）。
+  两个仍然成立的事实：从**仓库根**发布会撞 `EPRIVATE`（根清单 `private: true`），
+  以及发布后头几分钟 registry 上只有占位的 `0.0.0-stage`，此时 `npm install <name>@<version>`
+  会报 `ETARGET`，本地 npm 缓存还要 `--prefer-online` 才看得到新版本。
+  以下为发布之前（截至 2026-11-10）的记录，保留作背景：
   凭据问题**已解决**（2026-11-10T12:20Z 换了 token 后 `npm whoami` 返回 `jjjjjjjjnnjnn`，
   此前整场会话都是 E401）。`npm view dsh-ai-terminal-pet version` 当时仍是 **E404**，说明那个名字还空着。
   发布被一次性密码（OTP/2FA）挡住：npm 的 `otplease` 在无 TTY 时直接抛 EOTP，
@@ -1843,7 +1859,7 @@ git 无法在一个提交里引用它自己或它的后继，钉死的数字只�
 
 | 对象 | 状态 | 谁来动 |
 |---|---|---|
-| npm 发布 1.2.4 | **已完成**（2026-11-11T12:10:46Z，`latest` = 1.2.4） | 已完结 |
+| npm 发布 | **已完成**：1.2.4（12:10:46Z）与 1.2.5 均在 npm 上，`latest` = 1.2.5；本机 token 已绕过 2FA，agent 可直接发 | 已完结 |
 | [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243) | open / MERGEABLE，两个 check SUCCESS；站点 `install` 仍渲染 1.2.3 | 上游维护者 + 等站点重建 |
 | [imsai-sh#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | open / MERGEABLE，2 条评论都是机器人；该仓库规定改已存在条目永不自动合并 | 上游维护者 |
 | [radar#1255](https://github.com/AdamPlatin123/dsh-plugin-radar/pull/1255) | open / UNKNOWN，零 check | 上游维护者 |
@@ -1861,18 +1877,21 @@ git 无法在一个提交里引用它自己或它的后继，钉死的数字只�
 分类 `integrations`、标签 `verified` + `updated-recent`。当初读到的「854 条、0 条 git 源」来自
 `raw.githubusercontent.com/polang233/dsh-plugin-index/main/public/index.json`，那是未重建的仓库副本。
 
-### 28.4 npm：**已完成**（2026-11-11T12:10:46Z）
+### 28.4 npm：**已完成，且不再需要人工**（2026-11-11）
 
-人已经在交互终端里跑过 `npm publish --access public`，1.2.4 上线。事后核对全过：
-`dist-tags.latest` = `1.2.4`、shasum `dafb8199…`、integrity `sha512-VrD4QNfz…`、16 files、
-`npm pack dsh-ai-terminal-pet@1.2.4` 取回的 tarball 与仓库那份 sha256 相同
-（`d6b7f95a…`）；`npm install dsh-ai-terminal-pet@1.2.4` 装出 16 个文件，
-`vendor/AI-Terminal-Pet.exe` 与仓库一致，`lib/index.js` 作为 ESM 可加载。
+1.2.4 在 2026-11-11T12:10:46Z 上线、1.2.5 同日 14:58Z 前后上线，两次都是 agent 在包目录直接
+`npm publish --access public`。**本机 token 已经配置成可绕过 2FA**，所以「必须人跑一次」的旧结论
+作废；只有 token 失效（`npm whoami` 报 E401/E403）时才需要人重新登录。
 
-下一个版本仍然**只能由人在交互终端**发布（非交互 shell 里 npm 的 `otplease` 直接抛 EOTP）。
-发布之后仓库侧要做的（否则两边会漂移）：把 `README.md` / `CHANGELOG.md` / 本文件 §27.7 里
-「npm 尚未发布」那几条改成事实。**不要**重传或改写已发布的 `.tgz`；
-**不要**把 1.2.4 的 tarball 换成一个内容不同的文件——Release 资产不可变。
+事后核对全过（1.2.5）：`dist-tags.latest` = `1.2.5`、shasum `1f6d5340…`、
+integrity `sha512-2sEFAf0k…`、**17 files**、`npm pack dsh-ai-terminal-pet@1.2.5` 取回的 tarball
+与 Release 资产 sha256 相同（`dfa89a1e…`）；`npm install` 装出 17 个文件，
+`vendor/AI-Terminal-Pet.exe` 与仓库一致，`lib/index.js` 作为 ESM 可加载，
+`vendor/package.json` 确实是 `{"type": "commonjs"}`。
+
+发布之后仓库侧已经做完的：`README.md` / `CHANGELOG.md` / §27.7 / 本节里的「npm 尚未发布」全部改成事实。
+仍然**不要**重传或改写已发布的 `.tgz`；**不要**把某个版本的 tarball 换成内容不同的文件
+——Release 资产不可变。
 
 ### 28.5 哪些文件「不可再改」
 
