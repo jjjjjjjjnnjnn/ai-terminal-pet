@@ -481,7 +481,24 @@
 - **停用期 runbook 归档**（`8ada28b`）：`docs/HANDOVER.md` §1–§12（2026-09-24 全局停用态）逐字搬入
   `docs/archive/HANDOVER-2026-09-DISABLE.md`，正文只留指回链接；`docs/archive/README.md` 成为归档索引。
 - 早期宣传稿与草稿移入 `docs/archive/promo-2026-11-09/`，不再混在对外文档里。
-
+- **交接整理与外部状态刷新**（`9894160` / `f725534` / `51b6391`，2026-11-11 10:35 +0100）：
+  `docs/HANDOVER.md` 新增 **§28 交接清单**——一句话现状、接手先读的四份材料、外部世界还在等谁、
+  唯一必须由人做的 npm 发布、哪些文件「不可再改」、下一个版本的两步发版套路，以及**三样看起来像冗余、
+  实则刻意保留的东西**（旧的 host-only 桥接 bundle 仍占 `install.ps1` 十个制品中的七个并受 CI 校验；
+  `vendor/AI-Terminal-Pet.exe` 与 `bin/` 那份字节相同是发布产物 vs 构建产物的区别；`.local/` 是一次性暂存）。
+  同时把 §1 的最新提交前移到本次交接的提交、§27.2 的包文件表从 1.2.0 口径校准到 **1.2.4**
+  （`package.json` 2,246 B / 83 行、`README.md` 8,187 B / 146 行、`verify.mjs` 23,426 B / 424 行），并注明
+  「包目录 18 个文件」与「tarball 16 files」两个数字都对（差的正是 `verify.mjs` 与 `scripts/vendor.mjs`）。
+  `.gitignore` 补 `.local/`；`AGENTS.md` 的文档表加一行指向 §28。
+- **dshopen 收录**：`polang233/dsh-plugin-index` 的 issue #423 于 2026-11-11T08:32:39Z 以
+  `state_reason: completed` 关闭，其 `data/sources.json`（1,213 条）第 1204 条记的就是本包 **1.2.4**
+  （`source.commit` `ff7f6de`、`path` 子目录、中英摘要都带上了「其他终端需各自安装 reporter」那句，
+  分类 `integrations`）。**但它线上的 `public/index.json` 仍是旧构建**（854 条、全是 npm 源、0 条带 `source`
+  字段），所以目录页要等它下一次构建才可见——这条差异写成了 §27.7 的一条新残留：
+  **「已收录」不等于「已渲染」，判断可见性要看对方公开的索引文件，不要只看 issue/PR 状态**。
+  同一轮复读：awesome #14243 仍 open 且 `mergeable_state` 在 `clean` / `unknown` 间抖动、imsai #912 仍 `clean`
+  等人工、radar #1255 与 brade #367 仍 open、dshbase/dsh.so/dsh-plugin.org/alldsh/dshmarketplace.dev 全部无回应、
+  YELEBAI 仍记 1.2.3（`verifiedCommit 9b0df94`，`install.profiles` 已含 desktop）。
 ---
 
 ## [0.9.0] — 2026-11-08 / 2026-11-09
