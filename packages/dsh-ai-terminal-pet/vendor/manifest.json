@@ -3,8 +3,8 @@
   "generatedBy": "scripts/vendor.mjs",
   "goVersion": "go1.27.0",
   "source": {
-    "files": 25,
-    "sha256": "cf647af1aa1f45d1ed6f0df7b97e7e1439272f87064009e1989f1bfbd63db29a"
+    "files": 24,
+    "sha256": "39685c79a41c30880de852ebafecd46d777405fd0a6d4730c6bf66438addec63"
   },
   "overlay": {
     "file": "vendor/AI-Terminal-Pet.exe",

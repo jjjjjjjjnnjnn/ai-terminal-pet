@@ -126,20 +126,25 @@ function walkGoSources(dir, found) {
  * makes the digest independent of directory order, and hashing the path as well
  * as the bytes means a rename or a move between packages counts as a change.
  *
- * NON_OVERLAY_PACKAGES is what keeps that question honest as the repository
- * grows. The sweep below covers cmd/ and internal/, but not all of it is linked
- * into AI-Terminal-Pet.exe: cmd/pet-hook and internal/reporter are a separate
- * binary. Without this list, adding a hook that the overlay never imports would
- * change the digest, force a re-vendor, and leave the released package's
- * manifest describing a tree it was not built from - for a change that cannot
- * possibly affect one byte of the overlay.
+ * NON_OVERLAY_PACKAGES is what keeps that question honest. The sweep below
+ * covers cmd/ and internal/, but not all of it is linked into
+ * AI-Terminal-Pet.exe: cmd/pet-hook, cmd/pet-statusline and internal/reporter
+ * are other binaries. A package that the overlay never imports cannot change one
+ * byte of it, so leaving such a package in the digest means every unrelated edit
+ * to it demands a re-vendor - and re-vendoring a released package's manifest is
+ * exactly what the immutability rule forbids.
  *
- * cmd/pet-statusline is deliberately NOT in the list even though it is equally
- * unlinked. It has been part of every manifest since 1.0.0, so listing it here
- * would rewrite a released manifest's digest without any build-related reason.
- * Add new non-overlay packages; leave the historical set alone.
+ * cmd/pet-statusline was left inside this set in the first version of this
+ * script, to avoid rewriting a manifest that had carried it since 1.0.0. That
+ * reasoning does not survive contact: the first time the statusline shim was
+ * touched, the digest broke anyway, while the overlay binary stayed
+ * byte-identical. Being unlinked, not being old, is the property that matters.
+ *
+ * Add every new non-overlay command or package here. The list is explicit
+ * rather than an import-closure walk because an explicit list fails loudly: a
+ * new package shows up as a digest change and a reviewer adds it deliberately.
  */
-const NON_OVERLAY_PACKAGES = ['cmd/pet-hook/', 'internal/reporter/']
+const NON_OVERLAY_PACKAGES = ['cmd/pet-hook/', 'cmd/pet-statusline/', 'internal/reporter/']
 
 function isOverlaySource(relative) {
   return !NON_OVERLAY_PACKAGES.some((prefix) => relative.startsWith(prefix))

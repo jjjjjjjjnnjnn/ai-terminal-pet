@@ -400,13 +400,32 @@
 
 ### Changed
 
-- **`vendor.mjs` 的源码摘要改为排除非浮窗包**（`NON_OVERLAY_PACKAGES = ['cmd/pet-hook/',
-  'internal/reporter/']`）：摘要原本扫 `cmd/` + `internal/` 下全部非测试 `.go`，但这两个包根本
-  不进 `AI-Terminal-Pet.exe`。不排除的话，加一个浮窗用不到的 hook 就会让 1.2.4 的
-  `vendor/manifest.json` 摘要失配，逼着为一个「不可能改变浮窗一个字节」的改动重新 vendor。
-  `cmd/pet-statusline` **故意不在排除名单里**：它自 1.0.0 起就出现在每一份 manifest 里，
-  现在把它排除等于无端重写一份已发布清单的摘要。
-：`go build -trimpath -ldflags "-s -w"` →
+- **`cmd/pet-statusline` 迁到 `internal/reporter`，删掉约 250 行重复实现**：脱敏规则、id 截断、
+  UTF-16 FNV-1a PID、时间戳钳制、快照落盘这些原本在 `pet-statusline` 里各有一份拷贝，
+  现在与 `pet-hook` 共用同一个包。两份拷贝的风险不是理论上的——这次就在**两份里都**发现了同一个缺陷
+  （见 Fixed 第一条）。迁移用**行为对齐**验证：先对旧二进制跑 35 个 payload（空 stdin、非 JSON、
+  数组、各种 `agent_state`、对象形态的 workspace/model、超长与含非法字符的会话 id、epoch 秒/毫秒、
+  未来时间戳、Bearer token、控制字符）记下 stdout 与落盘字段，迁移后逐字段比对，**35/35 完全一致**。
+  语义上刻意保留了状态栏自己的两处差异：起报时间超过 5 分钟**忽略**而不是钳制（时钟偏斜的宿主否则会
+  显示一个跑了几小时的会话），以及**单次投递**而不是 `reporter.Send` 的 750 ms 重试预算
+  （状态栏每次刷新都要跑，不能付这个预算）。
+  **代价**：`pet-statusline.exe` 由 3,643,392 B 变成 3,664,896 B（+21,504 B，把共享包的审批/配置代码
+  也链接进来了）。实测稳态耗时不变（88–93 ms，主要是进程创建开销）。
+- **`ReadStdin` 也收进共享包**：`pet-hook` 与 `pet-statusline` 原本各有一份「1 MiB 上限 + 2 秒超时」的
+  读取循环，现在只有一份。
+- **`vendor.mjs` 的源码摘要改为只覆盖浮窗真正链接的包**（`NON_OVERLAY_PACKAGES = ['cmd/pet-hook/',
+  'cmd/pet-statusline/', 'internal/reporter/']`）：摘要原本扫 `cmd/` + `internal/` 下全部非测试 `.go`，
+  但这三个包根本不进 `AI-Terminal-Pet.exe`。不排除的话，动一条对浮窗没有任何影响的上报路径，
+  就会逼着重新生成一份**已发布**包的清单。
+  **第一版把 `cmd/pet-statusline` 故意留在里面**（理由是不想重写自 1.0.0 就存在的条目），
+  这个理由在第一次改 shim 时就失效了：摘要照样坏，浮窗二进制一个字节没变。于是改按
+  「是否被链接进浮窗」这个真正的标准判断。
+  **因此 `vendor/manifest.json` 被重写了一次**：`files` 25 → 24、摘要
+  `cf647af1…` → `39685c79a41c30880de852ebafecd46d777405fd0a6d4730c6bf66438addec63`；
+  两个 vendor 文件本身的字节与哈希未变（`vendor/AI-Terminal-Pet.exe` 仍 `bbb5163c…`）。
+  副作用要说清楚：**仓库里的包目录已不再逐字节等于 npm 上的 1.2.4 tarball**，所以下一次发布必须是
+  新版本号（1.2.5），不能重传 1.2.4。`vendor.mjs --check` 恢复 exit 0。
+- **构建命令统一加 `-buildvcs=false`**：`go build -trimpath -ldflags "-s -w"` →
   `go build -trimpath -buildvcs=false -ldflags "-s -w"`，四处同步——`scripts/install.ps1` 的缺失文件提示、
   `.github/workflows/ci.yml` 的两条 build 步骤、`AGENTS.md` 的 Production build、README 的安装步骤。
   **为什么必须加**：不加时二进制里带一块 VCS 戳记，而戳记含构建时的 commit 与工作区状态，所以同一个
@@ -414,6 +433,7 @@
   里的 `bin/` 是两种构建方式下的产物，就会误报 `[fail]`。二进制本身不入库（`.gitignore` 忽略 `bin/`）。
   **实测差值**：加上之后 `pet-statusline.exe` 由 **3,644,416 B → 3,643,392 B**（差 1,024 B，
   即被去掉的戳记），主程序两种写法同为 **4,371,968 B**。
+  （这两个是 go1.23 工具链下的数字；go1.27 上伪版本与 `(devel)` 等长，差值是 0 B。现役体积见本节第一条。）
   按新命令重建后 sha256：主程序 `bbb5163c296cd460d7c9a4c85e10342e125c0bd8017a065f913aa01567d41f0a`、
   shim `31c21739c60e427a387e1360b19395c5f3e9b48fc7597820bcb983a348b82328`；
   `scripts/install.ps1 -VerifyOnly` 实测 **10/10 `[ok]`**、末行
@@ -463,6 +483,15 @@
 
 ### Fixed
 
+- **「没有 runtime 目录就静默不落快照」——`pet-hook` 与 `pet-statusline` 里各有一份**：
+  两个命令都直接用 `os.CreateTemp` 往 `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\` 写快照，
+  但都不先建目录。而 `reporters/protocol.js` 的 `writeRuntimeSnapshot` 调的是
+  `mkdirSync(dirname, {recursive:true})`。后果只在**全新安装**上出现、而且完全静默：浮窗还没跑过时
+  这个目录不存在，于是每一条上报都既没有快照、又（在浮窗未启动时）没有管道，报告直接消失——
+  而「浮窗没在跑」正是快照存在的理由。现在 `WriteSnapshot` 先 `MkdirAll(0700)`，
+  `cmd/pet-statusline` 走同一条路径也一并修好。发现方式是把 JS 参考实现与原生实现的同 28 个 payload
+  逐一跑过、逐字段比对落盘结果（stdout 与其他字段本来就一致）。
+  新增 `TestWriteSnapshotCreatesAMissingRuntimeDirectory` 钉住这个前提。
 - **上报端在「永远打不开管道」时要白等满整个重试预算**：`Send` 原来把所有拨号错误一视同仁，
   失败就重试到 750 ms 预算用完。宿主是同步等上报进程结束的，所以当投递**不可能成功**时，
   这 750 ms 是纯加在开发者每一次事件上的延迟。现在 `internal/reporter/send.go` 用

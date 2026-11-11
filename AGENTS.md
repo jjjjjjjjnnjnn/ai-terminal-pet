@@ -32,10 +32,12 @@ reporters/*.js  ──[named pipe / JSON-lines]──►  cmd/ai-terminal-pet (G
 - `cmd/pet-hook/`: native hook reporter, `--mode=claude|antigravity`. Reads one hook payload on stdin
   and reports it without spawning Node. The JavaScript hooks in `reporters/` remain the reference
   implementation and the fallback.
-- `internal/reporter/`: the reporter core shared by `cmd/pet-hook` (and, eventually, `cmd/pet-statusline`):
-  redaction, bounded ids, stable PID (FNV-1a over UTF-16), timestamp clamps, snapshot write, pipe
-  delivery, approval handshake, hook-event→state mapping. Anything that must match
-  `reporters/protocol.js` belongs here so it can be unit-tested instead of eyeballed.
+- `internal/reporter/`: the reporter core shared by `cmd/pet-hook` and `cmd/pet-statusline`:
+  redaction, bounded ids, stable PID (FNV-1a over UTF-16), timestamp clamps, stdin limits, snapshot
+  write, pipe delivery, approval handshake, and both hook-event→state and statusline→state mappings.
+  Anything that must match `reporters/protocol.js` belongs here so it can be unit-tested instead of
+  eyeballed. `cmd/pet-statusline` deliberately keeps single-shot delivery and a 5-minute ignore on a
+  future `startedAt`; both are documented in its header.
 - `internal/ui/`: Win32 layered overlay — GDI canvas rasterization (`CreateDIBSection` +
   `UpdateLayeredWindow`, **no GDI+**), panel layout, tray icon, click/drag/wheel gestures, three-tab
   settings window, synthesized alert tones, per-session alerts, auto-approve countdown, jump-to-terminal.
@@ -91,10 +93,13 @@ Opt-in desktop probes (their tests `Skip` when the variable is unset — that is
 
 Two conventions in those commands are load-bearing, not style:
 
-- **`-buildvcs=false`** in both builds. The VCS stamp records the commit and the working-tree state at
-  build time, so two builds of the same source differ across machines and dates. Without the flag
-  `pet-statusline.exe` is 3,644,416 B instead of 3,643,392 B and `scripts/install.ps1 -VerifyOnly` reports a
-  false failure. The binaries are not committed (`.gitignore` ignores `bin/`), so "matches the
+- **`-buildvcs=false`** in all three builds. The VCS stamp records the commit and the working-tree state at
+  build time — `go version -m` on an unstamped build shows `(devel)`, on a stamped one a pseudo-version like
+  `v0.0.0-20261111122731-3529bffc12e1+dirty` — so two builds of the same source differ across machines, dates
+  and working-tree states. That is enough to make `scripts/install.ps1 -VerifyOnly` report a false failure;
+  the byte-count delta varies by toolchain (it was 1,024 B on go1.23 and is currently 0 B on go1.27, because
+  the pseudo-version happens to be the same length as `(devel)`), which is exactly why the flag matters more
+  than the number. The binaries are not committed (`.gitignore` ignores `bin/`), so "matches the
   repository" means "matches the copy in your working tree".
 - **`node --check` one file at a time.** `node --check a.js b.js` checks only the first argument and
   exits 0 even when the second file has a syntax error (verified on Node 24).

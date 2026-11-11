@@ -15,8 +15,9 @@
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
 | 版本 | `0.9.0`（`internal/app/app_windows.go:23`） |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,371,968 B**（4.17 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
-| 状态行 shim | `bin/pet-statusline.exe` **3,643,392 B**（3.47 MiB，合计 8,015,360 B = 7.64 MiB） |
-| 代码量 | Go 非测试源码 **10,719 行** / 测试 **4,212 行** / JS **1,742 行**（49 个 .go 文件，合计 14,931 行） |
+| 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
+| 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,734,016 B** = 11.19 MiB |
+| 代码量 | Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**（190 个 `func Test`）、JS **12 文件 / 3,650 行** |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
@@ -470,7 +471,9 @@ Go 原生 shim 稳态 0.5–0.9 s，比 node 路径的 13–17 s（经 runner）
 `vendor/manifest.json` 重新生成。
 
 **验收（已满足）**：同 payload 下原生与 JS 输出同一 session PID（FNV-1a UTF-16 已对齐）与同一 state，
-`internal/reporter` 17 个单测 + `cmd/pet-hook` 13 个单测全绿。
+`internal/reporter` 26 个单测 + `cmd/pet-hook` 13 个单测全绿。
+`cmd/pet-statusline` 随后也迁到同一个包（删掉约 250 行重复实现），并用 35 个 payload 逐字段比对
+迁移前后 stdout/退出码/快照，结果完全一致；详见 [docs/HANDOVER.md](HANDOVER.md) §29.7。
 
 **实测（同 payload、同机器、皆从 `%TEMP%` 启动以排除下面那条完整性问题）**：
 `pet-hook.exe` 稳态 **51–73 ms**，`claude-hook.js` **93–157 ms**；首跑分别是 513 ms 与 584 ms（冷启动）。
@@ -533,12 +536,16 @@ IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法
 4. 已落地：`--reset`/`--toggle` 等控制路径不再走 `app.Run()`，避免控制命令意外拉起常驻实例。
 
 ### L2 — 二进制体积（4.17 MiB → 目标 <2.5 MiB）
-**现状**：主程序 **4,371,968 B**（4.17 MiB）、shim **3,643,392 B**（3.47 MiB），合计 8,015,360 B = 7.64 MiB。
+**现状**：主程序 **4,371,968 B**（4.17 MiB）、状态行 shim **3,664,896 B**、原生 hook **3,697,152 B**，
+三者合计 **11,734,016 B** = 11.19 MiB。共享内核 `internal/reporter` 让 shim 比共享前（3,643,392 B）
+长了 **21,504 B**，hook 也因此不再各写一份脱敏/投递逻辑——用 21 KB 换掉一份会漂移的重复实现。
 本版新增 `--doctor` 让主程序比 v0.9.0 的 4,178,432 B 增加了 **193,536 B**（约 +189 KiB，+4.6%），
 其中 `internal/app/doctor_windows.go` 占 22,932 字节源码——这是「可自查」换来的体积。
 **做法**：`-ldflags "-s -w"` 已用。**`-buildvcs=false` 已实测并入**：同样的 -s -w，
-加上它会去掉 VCS 戳记，`pet-statusline.exe` 由 3,644,416 B 降到 3,643,392 B（差 1,024 B），主程序两种写法同为
-4,371,968 B。现在 `scripts/install.ps1` 的缺失提示、`AGENTS.md` 与 CI 用的都是这条命令，所以**同一份源码在任何
+加上它会去掉 VCS 戳记（`go version -m` 里从 `(devel)` 变成 `v0.0.0-<时间戳>-<sha>+dirty`）。
+字节差随工具链变化——go1.23 上 shim 由 3,644,416 B 降到 3,643,392 B（差 1,024 B），go1.27 上两种写法恰好同为
+3,664,896 B（伪版本与 `(devel)` 等长）——所以真正保证可比性的是旗标，而不是那个差值。
+现在 `scripts/install.ps1` 的缺失提示、`AGENTS.md` 与 CI 用的都是这条命令，所以**同一份源码在任何
 机器、任何时间重建出的产物字节一致**（二进制不入库，`bin/` 被 `.gitignore` 忽略）；`-VerifyOnly` 拿已部署
 副本与工作区里的 `bin/` 逐项比对，两侧构建方式不同就会误报。继续可做：剥离 `net/http` 等未用包的反射元数据（本项目不用 http，
 但 `net` 被管道复用）、用 `-tags` 关掉不需要的 `crypto` 实现。

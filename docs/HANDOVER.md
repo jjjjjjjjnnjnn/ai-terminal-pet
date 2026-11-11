@@ -17,13 +17,14 @@
   发版对象是 `ff7f6de`（= tag `dsh-plugin-v1.2.4` 指向的提交），其后依次 `4ee7f01`、`ef1d9d1`、`bb00e58`。
   **浮窗本体与 DSH 插件包是两条版本线**：浮窗停在 `0.9.0`，插件包已到 **1.2.4**（tag `dsh-plugin-v1.2.4`，
   只改文案、不动代码，见下文「分发」段与 §27.12）。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**154 个** `func Test`，
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**190 个** `func Test`，
   由 `go test -list '.*' ./...` 计数）；六个上报端逐个 `node --check` 全过；
   `node integrations/deepseek-harness/verify.mjs` 输出 VERIFY PASSED；
-  `scripts/install.ps1 -VerifyOnly` 10/10 `[ok]`、exit 0（脚本已从仓库根下沉到 `scripts/`，见 §27.11）。
-- **规模**：Go 非测试源码 **10,719** 行 / 测试 **4,212** 行 / JS **1,742** 行（49 个 `.go`、8 个 `.js`+`.mjs`）；
-  `bin/AI-Terminal-Pet.exe` **4,371,968 B**、`bin/pet-statusline.exe` **3,643,392 B**（均按
-  `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；第三方依赖 3 个（go-winio MIT、lxn/win BSD、x/sys BSD）。
+  `scripts/install.ps1 -VerifyOnly` 11/11 `[ok]`、exit 0（脚本已从仓库根下沉到 `scripts/`，见 §27.11）。
+- **规模**：Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**、JS **12 文件 / 3,650 行**；
+  `bin/AI-Terminal-Pet.exe` **4,371,968 B**、`bin/pet-statusline.exe` **3,664,896 B**、
+  `bin/pet-hook.exe` **3,697,152 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
+  第三方依赖 3 个（go-winio MIT、lxn/win BSD、x/sys BSD）。
   v0.9.0 提交时的旧值（10,201 / 3,831 / 1,633 行，4,178,432 / 3,644,416 B，140 个 `func Test`）已作废。
 - **新增**（全部在 v0.9.0 之后、未发版）：`--doctor` 自检（9 项检查）、`docs/PROTOCOL.md` 线协议规范、
   `reporters/package.json` 显式 exports、`.github/workflows/ci.yml` 单 job 门禁、
@@ -1878,6 +1879,8 @@ git 无法在一个提交里引用它自己或它的后继，钉死的数字只�
 已发布内容一旦被改，`scripts/install.ps1 -VerifyOnly` 会当场报 fail，因此下面这些只能是「另起一版」：
 
 - `packages/dsh-ai-terminal-pet/README.md` 与两份 `package.json`（属已发布 tarball 的字节）；
+- `packages/dsh-ai-terminal-pet/vendor/manifest.json`（同样属已发布 tarball 的字节；§29.5 记录了一次
+  已经发生的重写，因此**下一次发布必须是新版本号**）；
 - `docs/market-index.json` 的 `versions[0]`（`verify.mjs` 断言它等于包版本）；
 - 七个 tag 指向的提交（`dsh-plugin-v1.0.0` … `v1.2.4`）与它们各自的 Release 资产。
 
@@ -1952,8 +1955,9 @@ cmd/pet-hook/           --mode=claude|antigravity，读 stdin，写 {} 到 stdou
 它可以被单元测试钉住，而不是靠人眼比对。17 个测试覆盖脱敏边界、id 截断、UTF-16 FNV-1a PID、
 时间戳钳制、审批决策树与投递语义。
 
-`cmd/pet-statusline` **本次没有迁移**到 `internal/reporter`。它工作正常、有独立测试，而在一个
-「加一条上报路径」的提交里顺手重构既有的那一条，会把两件事的回滚半径绑在一起。下次动它时再迁。
+`cmd/pet-statusline` **也已迁移**到 `internal/reporter`（见 §29.7）。先做 hook、再做 shim，是因为两者的
+风险不同：hook 是新增路径，出问题只影响新接入的用户；shim 是既有路径，动它必须能证明「行为一字未变」，
+所以先对它做了逐 payload 的行为快照比对。
 
 ### 29.3 一个真实缺陷：`Send` 对「永远打不开」也重试满预算
 
@@ -1995,10 +1999,18 @@ icacls "$env:TEMP" /q | Select-String 'Mandatory'  # 无 → 放在这里的进�
   脚本仍是**纯 ASCII**（0 个非 ASCII 字节，PowerShell 5.1 会按 ANSI 读 BOM-less 脚本）。
 - `.github/workflows/ci.yml`：新增 `Build the hook binary` 步骤。
 - `packages/dsh-ai-terminal-pet/scripts/vendor.mjs`：`NON_OVERLAY_PACKAGES =
-  ['cmd/pet-hook/', 'internal/reporter/']`。摘要原本扫 `cmd/` + `internal/` 下全部非测试 `.go`，
-  但这两个包根本不进浮窗二进制；不排除就会为一个「不可能改变浮窗一个字节」的改动逼着重新 vendor
-  1.2.4 的清单。`cmd/pet-statusline` **故意不排除**：它自 1.0.0 起就在每一份 manifest 里。
-  改完之后 `vendor.mjs --check` 由 exit 2 回到 **exit 0**。
+  ['cmd/pet-hook/', 'cmd/pet-statusline/', 'internal/reporter/']`。摘要原本扫 `cmd/` + `internal/`
+  下全部非测试 `.go`，但这三个包根本不进浮窗二进制；不排除就会为一个「不可能改变浮窗一个字节」
+  的改动逼着重新 vendor 一份**已发布**包的清单。
+  **第一版把 `cmd/pet-statusline` 故意留在里面**（理由：它自 1.0.0 起就在每份 manifest 里，
+  排除等于无端重写），这个理由在第一次动 shim 时就失效了——摘要照样坏，而浮窗二进制一个字节没变。
+  所以改成按「是否被链接进去」这个真正的标准判断。
+  **因此这次 `vendor/manifest.json` 确实被重写了一次**：`files` 25 → 24、
+  `sha256` `cf647af1…` → `39685c79a41c30880de852ebafecd46d777405fd0a6d4730c6bf66438addec63`。
+  两个 vendor 文件的哈希与字节未变（`vendor/AI-Terminal-Pet.exe` 仍是 `bbb5163c…`）。
+  **这意味着仓库里的 `packages/dsh-ai-terminal-pet/` 已不再逐字节等于 npm 上的 1.2.4 tarball**，
+  所以下一次发布必须是**新版本号（1.2.5）**，不能重新上传 1.2.4。
+  `verify.mjs` 与运行期行为都不受影响（`--check` 恢复 exit 0）。
 
 ### 29.6 实测数字（同 payload、同机器）
 
@@ -2011,3 +2023,27 @@ icacls "$env:TEMP" /q | Select-String 'Mandatory'  # 无 → 放在这里的进�
 
 两侧都从 `%TEMP%` 启动以排除 §29.4 的完整性差异。测量工具是一次性的 Go harness
 （直接 `exec.Command`，不经 `cmd /c`），用完即删。
+
+### 29.7 `pet-statusline` 的迁移（同一批，2026-11-11）
+
+**为什么做**：`pet-statusline` 原本自己带着一份脱敏规则表、一份 id 截断、一份 UTF-16 FNV-1a PID、
+一份时间戳钳制、一份快照落盘。这些是**线协议规则**，而 `reporters/protocol.js` 是规范实现——
+三份拷贝意味着三种漂移方式。这次发现的两个缺陷就属于这一类：`pet-hook` 与 `pet-statusline`
+**各有一份同样的「不建 runtime 目录就静默不落快照」**（`reporters/protocol.js` 的
+`writeRuntimeSnapshot` 是一直 `mkdirSync(recursive)` 的）。新包现在先 `MkdirAll(0700)`。
+
+**怎么保证没改行为**：迁移前后各跑一遍同一组 **35 个 payload**（空 stdin、非 JSON、JSON 数组、
+`{}`、各个 `agent_state` 取值、对象形态的 `agent_state`/`workspace`/`model`、`tool_name` 与 `toolCall`、
+显式 pid/parentPid、epoch 秒/毫秒、RFC3339、未来时间戳、超长会话 id、含 `/ : ? *` 的会话 id、
+Bearer token、控制字符、parent session），记录 stdout、退出码、stderr、快照文件名与快照里 11 个字段。
+结果 **35/35 完全一致**。那些取值同时被 `internal/reporter/statusline_test.go` 钉住，
+所以以后再动映射表会先在测试里红，而不是等用户看到面板状态不对。
+
+**刻意保留的两处差异**（写下来免得下次「顺手统一」）：
+
+1. `startedAt` 超过 5 分钟**忽略**而不是钳制——时钟偏斜的宿主否则会显示一个跑了几小时的会话；
+2. 投递是**单次**（失败 → 启动浮窗 → 再试一次），不是 `reporter.Send` 的 750 ms 重试预算——
+   状态栏每次刷新都要跑，付不起这个预算。
+
+**代价**：`pet-statusline.exe` 3,643,392 → **3,664,896 B**（+21,504 B，共享包里的审批/配置代码
+被一起链接进来）。稳态耗时实测不变：迁移前 86–92 ms、迁移后 88–93 ms（几乎全是进程创建开销）。

@@ -152,9 +152,9 @@ jobs:
       # release as this runner.
       #
       # The digest deliberately skips the packages the overlay does not link
-      # (cmd/pet-hook and internal/reporter today): adding a second binary must
-      # not force a re-vendor of a package that cannot change one byte of the
-      # overlay.
+      # (cmd/pet-hook, cmd/pet-statusline and internal/reporter today): an edit to
+      # a binary the overlay never imports cannot change one byte of it, so it
+      # must not force a re-vendor of the released package's manifest.
       - name: Check the vendored overlay is current
         run: node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
 

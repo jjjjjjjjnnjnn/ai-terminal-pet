@@ -293,7 +293,7 @@ $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 ```
 
-`-buildvcs=false` in the two build commands is not decoration: it strips the VCS stamp, which encodes the commit and working-tree state at build time. Two builds of the same source therefore produce identical bytes, on any machine and at any date. Without it a rebuild of `pet-statusline.exe` weighs 3,644,416 B instead of 3,643,392 B, so `.\scripts\install.ps1 -VerifyOnly` — which compares the installed files against the copy in your working tree — reports a false failure whenever one side carries the stamp and the other does not. The binaries themselves are not committed (`bin/` is ignored); you always build them locally.
+`-buildvcs=false` in the three build commands is not decoration: it strips the VCS stamp, which encodes the commit and working-tree state at build time (`go version -m` shows `(devel)` without it and a pseudo-version like `v0.0.0-20261111122731-3529bffc12e1+dirty` with it). Two builds of the same source therefore produce identical bytes, on any machine and at any date. Without it `.\scripts\install.ps1 -VerifyOnly` — which compares the installed files against the copy in your working tree — reports a false failure whenever one side carries the stamp and the other does not. The binaries themselves are not committed (`bin/` is ignored); you always build them locally.
 
 `.\scripts\install.ps1 -VerifyOnly` re-checks every installed artifact against the recorded SHA256 list, and `.\scripts\install.ps1 -Uninstall` removes them. CI runs the same gates on every push: `.github/workflows/ci.yml` builds on `windows-latest` and fails the job on any `gofmt -l` output, `go vet` finding, failing `go test -count=1 ./...`, unsuccessful `go build -trimpath -buildvcs=false -ldflags "-s -w"` build, any reporter failing its own `node --check`, or failed `node integrations/deepseek-harness/verify.mjs`, `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`, or `node packages/dsh-ai-terminal-pet/verify.mjs`.
 
@@ -578,6 +578,6 @@ $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 ```
 
-安装步骤里那两条构建命令的 `-buildvcs=false` 不是装饰：它会去掉 VCS 戳记，而戳记里含构建时的 commit 与工作区状态，所以同一份源码**在任何机器、任何时间**重建出的产物字节一致。少了这个旗标，重建的 `pet-statusline.exe` 会带上戳记变成 3,644,416 B（不带戳记是 3,643,392 B），`scripts\install.ps1 -VerifyOnly` 一旦发现两侧（已部署副本 vs 工作区的 `bin/`）构建方式不同就会误报失败。二进制本身不入库（`bin/` 被 `.gitignore` 忽略），每次都要在本地重建。
+安装步骤里那三条构建命令的 `-buildvcs=false` 不是装饰：它会去掉 VCS 戳记，而戳记里含构建时的 commit 与工作区状态（`go version -m` 不带旗标显示 `(devel)`，带旗标显示 `v0.0.0-<时间戳>-<sha>+dirty` 这类伪版本），所以同一份源码**在任何机器、任何时间**重建出的产物字节一致。少了这个旗标，`scripts\install.ps1 -VerifyOnly` 一旦发现两侧（已部署副本 vs 工作区的 `bin/`）构建方式不同就会误报失败。字节差的多少取决于工具链（go1.23 上是 1,024 B，go1.27 上恰好是 0 B，因为伪版本和 `(devel)` 一样长），所以真正起作用的是旗标本身而不是那个数字。二进制本身不入库（`bin/` 被 `.gitignore` 忽略），每次都要在本地重建。
 
 `.\scripts\install.ps1 -VerifyOnly` 用于随时复核已部署制品与记录的 SHA256 清单是否一致，`.\scripts\install.ps1 -Uninstall` 用于清理部署。CI 在同一组门禁上把关：`.github/workflows/ci.yml` 在 `windows-latest` 上运行，`gofmt -l` 有任何输出、`go vet` 有任何发现、`go test -count=1 ./...` 失败、`go build -trimpath -buildvcs=false -ldflags "-s -w"` 构建失败、任一上报端 `node --check` 报错，或 `node integrations/deepseek-harness/verify.mjs`、`node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check`、`node packages/dsh-ai-terminal-pet/verify.mjs` 失败，都会让流水线失败。

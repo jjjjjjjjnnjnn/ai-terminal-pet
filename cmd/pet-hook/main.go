@@ -65,7 +65,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) int {
 		fmt.Fprintln(stdout, defaultAnswer(modeAntigravity))
 		return 0
 	}
-	raw := readStdin(stdin)
+	raw := reporter.ReadStdin(stdin)
 	input := reporter.DecodeStdin(raw)
 	now := time.Now().UTC()
 
@@ -182,27 +182,6 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  pet-hook --help               this text")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Exit code is always 0: a reporter must never break its host CLI.")
-}
-
-func readStdin(stdin io.Reader) []byte {
-	type result struct {
-		data []byte
-		err  error
-	}
-	done := make(chan result, 1)
-	go func() {
-		data, err := io.ReadAll(io.LimitReader(stdin, reporter.MaxStdinBytes+1))
-		done <- result{data, err}
-	}()
-	select {
-	case res := <-done:
-		if res.err != nil || len(res.data) > reporter.MaxStdinBytes {
-			return nil
-		}
-		return res.data
-	case <-time.After(reporter.StdinTimeout):
-		return nil
-	}
 }
 
 func claudePayload(input map[string]any, state, reason string, now time.Time) reporter.Payload {
