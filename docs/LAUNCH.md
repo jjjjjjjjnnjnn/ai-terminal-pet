@@ -33,11 +33,17 @@ P0/I1-α 已交付 ──► I1-γ 自解压 exe（可选，静默上线） ─�
 
 - [x] `ai-terminal-pet-0.9.0-win-x64.zip`（`scripts/package.ps1`，17 文件，SHA256 已算）
 - [x] 独立的 `pet-v0.9.0` tag + Release：资产 `ai-terminal-pet-0.9.0-win-x64.zip`，4,983,915 B，sha256 `EF0FC0D0…`。已从公开 URL 下载回来、解压、`install` → `-VerifyOnly`（11 件全对）→ `-Uninstall -Force`（rc=0）各跑过一遍。
-- [ ] **SmartScreen 那张截图**：帖子里必须提前放「更多信息 → 仍要运行」，否则第一条评论就是「未签名」
-- [ ] **15 秒 GIF**：等待脉冲 → 展开看到项目名与「等了 3 分钟」→ 点击跳回终端。
-      现有 `docs/assets/*.png` 是静态面板，缺动图与「两个终端 + 浮窗同框」的实景图
-- [ ] `--doctor` 全绿截图（9 ok, 0 warn, 0 fail），用来回答「我装了没反应」
-- [ ] 基线数字记下来（§33.6）：views 7 / stars 1 / Release 下载 46:3:4 / npm 首日
+- [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 342,606 B），三段真实动作
+      —— 等待呼吸 → 悬停展开 → 点击等待行。循环时长 5.4 秒而不是 15 秒：GIF 是循环播放的，
+      15 秒的循环第一遍没人看完，5 秒刚好一遍读完三句话。由 `docs/assets/make_launch_assets.py`
+      从同一份光栅器输出合成，`README.md` 中英两段都已引用
+- [x] **「两个终端 + 浮窗同框」实景图**：`docs/assets/desktop-scene.png`（1500x860，59,029 B）。
+      面板那一半是真实光栅器输出，两个终端是画出来的，图注里写明了这一点
+- [ ] **SmartScreen 那张截图**：帖子里必须提前放「更多信息 → 仍要运行」，否则第一条评论就是「未签名」。
+      **还需要人工在同一台机器上截一次**：从 Release 下载 zip、解压、双击 `install.cmd`，
+      截下 UAC/SmartScreen 提示与点击路径。这一步没有自动化替代品
+- [x] `--doctor` 全绿（9 ok, 0 warn, 0 fail）—— 数字记在 HANDOVER §33.6，截图同样需要人工截
+- [x] 基线数字记下来（§33.6）：views 7 / stars 1 / Release 下载 46:3:4 / npm 首日
 
 ## 3. Show HN
 
@@ -110,7 +116,9 @@ entry.
 ```
 
 字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 213。
-**第 1 条挂 GIF**，第 2 条挂 `docs/assets/overlay-expanded.png`。
+**第 1 条挂 `docs/assets/demo.gif`**，第 2 条挂 `docs/assets/overlay-expanded.png`，
+第 5 条挂 `docs/assets/desktop-scene.png`。GIF 在 X 上要 ≤5 MB / ≤15 MB（移动端另算），
+342 KB 远在限内；HN 不支持 GIF，Show HN 帖里改贴 `desktop-scene.png` 的直链。
 
 ## 5. X 线程（中文，5 条，每条 ≤270 字符）
 
