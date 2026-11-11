@@ -1870,8 +1870,8 @@ imsai 的 #912（`clean`，该仓库规定「改已存在条目永不自动合�
 | 对象 | 状态 | 谁来动 |
 |---|---|---|
 | npm 发布 | **已完成**：1.2.4（12:10:46Z）与 1.2.5 均在 npm 上，`latest` = **1.2.5**；本机 token 已绕过 2FA，agent 可直接发 | 已完结 |
-| [awesome-dsh-plugin#14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385) | **1.2.5 的跟进 PR**：open / MERGEABLE，`check` 与 `Submission gate` 两个 check 都 **SUCCESS**；分支 `bump-tarball-1.2.5`，只动 `tarball`+`icon` 三行 | 上游维护者（等人工合并） |
-| [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243) | 1.2.4 的上一版跟进，已被 #14385 取代；open / MERGEABLE | 上游（合并 #14385 后可直接关） |
+| [awesome-dsh-plugin#14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385) | **已合并**（2026-11-11T17:20:15Z，merge commit `70581cc`）；两个 check 都 SUCCESS。仓库里 `data/plugins/…yml` 的 `tarball` 已是 1.2.5 | 已完结（等站点重建才渲染到 `plugins.json`） |
+| [awesome-dsh-plugin#14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243) | 1.2.4 的上一版跟进，已被 #14385 取代；已 CLOSED | 已完结 |
 | [imsai-sh#912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | open / MERGEABLE；2 条机器人评论 + 1 条我们的（说明 1.2.5 已上 npm 与两个修复）；该仓库规定改已存在条目永不自动合并 | 上游维护者 |
 | [radar#1255](https://github.com/AdamPlatin123/dsh-plugin-radar/pull/1255) | open / UNKNOWN，零 check | 上游维护者 |
 | [brade#367](https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367) | open / 3 评论（都是我们自己的，最后一条给了 npm 版本与 tarball 哈希） | 上游维护者（我们要的信息已给全） |
@@ -2322,12 +2322,50 @@ node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 
 
 ### 32.5 还没做完、也不该由下一个会话猜的事
 
-- **awesome-dsh-plugin #14385**：两个 check 都 SUCCESS、`mergeable`，等上游人工合并；再往上一版
-  #14243 可以等 #14385 合并后关掉。这不是我们能推的。
+- **awesome-dsh-plugin #14385**：**已于 2026-11-11T17:20:15Z 合并**（merge commit `70581cc`），仓库里
+  `data/plugins/jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml` 的 `tarball`
+  现在指向 `dsh-plugin-v1.2.5`；但**线上 `plugins.json` 仍是旧构建**（2026-11-11T18:05Z 复读：
+  `count` 10,446，本仓库条目的 `tarball` 与 `install` 仍写着 1.2.3）——「合并」与「渲染」是两件事，
+  等它站点重建。`#14243` 已 CLOSED。
 - **dshopen**：线上索引仍记 1.2.4，1.2.5 要等它站点自己重建；不要为了催它而重复开 issue。
 - **YELEBAI / radar / dshbase / dsh.so / dsh-plugin.org / alldsh / dshmarketplace.dev**：全部等对方扫描或回应。
   imsai #912 与 brade #367 已经把我们能给的信息都给了（含 npm 版本与 tarball 哈希）。
 - **`go test -race` / `govulncheck` / `gosec`** 仍缺工具链（无 gcc），§6 已记录，不要假装跑过。
+
+### 32.6 上游门禁的实测步骤（2026-11-11 复查用）
+
+判断「合并」与「可见」不能读 PR 状态，要读两处：
+
+```powershell
+# 1. PR 是否真的合并
+gh pr view 14385 -R awesome-dsh-plugin/awesome-dsh-plugin --json state,mergedAt,mergeCommit
+
+# 2. 上游仓库里那条 yml 现在指向哪个版本（合并后立刻就是新版本）
+gh api repos/awesome-dsh-plugin/awesome-dsh-plugin/contents/data/plugins/`
+  `jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml --jq .content
+
+# 3. 站点域上真正渲染出来的索引——这才是用户看到的
+Invoke-WebRequest https://awesome-dsh-plugin.com/plugins.json
+  # 找出 name = ai-terminal-pet#dsh-ai-terminal-pet 那一条，看 tarball / install 里的版本号
+```
+
+2026-11-11T18:05Z 实测的三处状态**互不一致**，这正好是个教案：
+
+| 位置 | 状态 |
+|---|---|
+| PR #14385 | **MERGED**（17:20:15Z，merge commit `70581cc`） |
+| 仓库里 `data/plugins/…yml` | `tarball` = `dsh-plugin-v1.2.5` ✅ |
+| 站点 `plugins.json` | `count` 10,446，本条目 `tarball` / `install` 仍是 **1.2.3** ❌ |
+
+原因是「Build site from README」那条 workflow 的并发取消：同一分支上每隔几分钟就有新提交，
+旧 run 被 `cancelled`，所以站点重建一直在排队。**这不是我们能推的，也不要为此重复开 PR。**
+
+同一轮的另外两个数字记在这里，因为它们决定了这一轮宣传的落点：
+
+- `count` 从 10304（合并 1.2.3 后）涨到 **10,446**，`plugins.json` 有 14 MB——这个目录本身在长，
+  单个条目的新旧取决于它自己那次重建。
+- 本仓库在该目录里的描述**已经**写明了「其他终端需各自安装 reporter」，是当初合并 #13937 时
+  维护者保留的版本；`dsh.catalog` 与 `docs/market-index.json` 也是同一段文字。
 
 ---
 
