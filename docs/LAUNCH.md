@@ -29,6 +29,26 @@ P0/I1-α 已交付 ──► I1-γ 自解压 exe（可选，静默上线） ─�
 **不要投的**：`WOOK98/awesome-deepseek-harness-plugins`（imsai 的 fork、已停更）、
 `ydhrdh/dsh-marketplace`（7 条、0 stars）。详见 HANDOVER §28.3。
 
+### 1.1 已经投出去的那批，现在的真实状态（2026-11-11T18:20Z 复查）
+
+**「投了」不等于「有人看」**，下面五条是同一批提交，状态差别很大：
+
+| 目标 | 状态 | 说明 |
+|---|---|---|
+| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | ✅ **已合并并已是 1.2.5**（PR #14385，17:20:15Z，merge commit `70581cc`） | 仓库里 yml 已是 1.2.5、描述也带 reporters 那句；**站点 `plugins.json` 仍渲染 1.2.3**，等它重建 |
+| [dshopen](https://github.com/polang233/dsh-plugin-index/issues/423) | ✅ **已收录并已渲染** | `dshopen.org/index.json` 1,207 条含本包 **1.2.4**，`labels: verified + updated-recent`；1.2.5 要等它下一次构建 |
+| [dshbase #322](https://github.com/ylwl1997/dshbase/issues/322) | ⏳ open / **0 评论** | 08:35Z 提交，至今无人回应 |
+| [dsh.so #24](https://github.com/dsh-so/dsh-plugin-submissions/issues/24) | ⏳ open / **0 评论** | 08:36Z |
+| [dsh-plugin.org #735](https://github.com/dshplugin/dsh-plugin-hub/issues/735) | ⏳ open / **0 评论** | 08:46Z；这个库的 `Submission gate` 若会回应通常几分钟内就有，0 评论意味着没进队列 |
+| [AllDSH #2](https://github.com/alldsh/submissions/issues/2) | ⏳ open / **0 评论** | 08:44Z |
+| [brade #367](https://github.com/bradeGithub/DSH-Plugins-Marketplace/issues/367) | ⏳ open / 3 评论（都是我们自己的） | 它的自动扫描已把本仓库判成 `bundle-plugin` + `risk_tier: safe`，issue 只是留证，可关 |
+| [imsai #912](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/912) | ⏳ open | 该库对已有条目的改动永不自动合并 |
+| [radar #1255](https://github.com/AdamPlatin123/dsh-plugin-radar/pull/1255) | ⏳ open / 零 check | 无回应 |
+
+**结论（也是发给人的那句）**：这一轮 DSH 生态里**唯一可主动推动的只剩「等站点重建」**，
+其余全是等对方。发帖时不要把「已提交五家」写成「已被五家收录」——那是两件事。
+
+
 ## 2. 发布前必须就位的东西
 
 - [x] `ai-terminal-pet-0.9.0-win-x64.zip`（`scripts/package.ps1`，17 文件，SHA256 已算）
