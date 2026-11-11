@@ -116,7 +116,7 @@ The package carries a prebuilt overlay and the official `protocol.js`. On first 
 
 **B. Everyone else — download the portable zip, no Go toolchain**
 
-1. Download `ai-terminal-pet-0.9.0-win-x64.zip` from [Releases](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases).
+1. Download [`ai-terminal-pet-0.9.0-win-x64.zip`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v0.9.0) (4.98 MB, 17 files).
 2. Unzip it anywhere, then double-click `install.cmd` (or run it from a terminal: `.\install.cmd -AddToPath` also puts the commands on your PATH).
 3. Verify that the installation works:
    ```powershell
