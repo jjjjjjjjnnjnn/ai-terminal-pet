@@ -22,7 +22,7 @@ P0/I1-α 已交付 ──► I1-γ 自解压 exe（可选，静默上线） ─�
 | **Show HN** | 高 | 一条 URL 提交 + 作者首楼技术补充 | 周一–周四 08:00–10:00 ET；周五与周日几乎必沉 |
 | **X（英文线程）** | 高 | 5 条，链接放最后一条 | 不做「RT/关注」诱导；GIF 挂在第 1 条 |
 | **X（中文线程）** | 中高 | 5 条，同一批事实，中文原生表达 | 与英文线程**同一天内**发，不要隔周 |
-| **DSH 生态（GitHub）** | 中但最确定 | 注册表条目跟进 PR、topic 采集、自建索引 | 实测证据：1.2.3 的 tarball 被下载 **46** 次，1.2.4/1.2.5 只有 3/4 次——**把已有条目推到最新版比发帖更有效** |
+| **DSH 生态（GitHub）** | 中但最确定 | 注册表条目跟进 PR、topic 采集、自建索引 | 实测证据：`v1.2.3` 的 tarball 被下载 **47** 次，`v1.2.4`/`v1.2.5` 只有 4/5 次——**把已有条目推到最新版比发帖更有效** |
 | r/ClaudeAI / r/ChatGPTCoding | 中 | 英文帖改写为问答体 | HN 之后 4 小时再发，避免同一批人重复看到 |
 | V2EX / 掘金 / 少数派 | 中 | 中文长文（带 GIF） | 第三日再发，不要与 X 同日 |
 
@@ -39,11 +39,14 @@ P0/I1-α 已交付 ──► I1-γ 自解压 exe（可选，静默上线） ─�
       从同一份光栅器输出合成，`README.md` 中英两段都已引用
 - [x] **「两个终端 + 浮窗同框」实景图**：`docs/assets/desktop-scene.png`（1500x860，59,029 B）。
       面板那一半是真实光栅器输出，两个终端是画出来的，图注里写明了这一点
-- [ ] **SmartScreen 那张截图**：帖子里必须提前放「更多信息 → 仍要运行」，否则第一条评论就是「未签名」。
-      **还需要人工在同一台机器上截一次**：从 Release 下载 zip、解压、双击 `install.cmd`，
-      截下 UAC/SmartScreen 提示与点击路径。这一步没有自动化替代品
-- [x] `--doctor` 全绿（9 ok, 0 warn, 0 fail）—— 数字记在 HANDOVER §33.6，截图同样需要人工截
-- [x] 基线数字记下来（§33.6）：views 7 / stars 1 / Release 下载 46:3:4 / npm 首日
+- [x] `--doctor` 全绿（9 ok, 0 warn, 0 fail），截图 `docs/assets/doctor-green.png`
+      （1798x358 / 63,335 B）已生成：那是程序自己的 stdout，只加了着色与窗口边框，
+      并把捕获机器上的用户名换成 `<you>`
+- [x] `docs/assets/smartscreen-unsigned.png`（1320x560 / 30,204 B）：**按官方对话框文字重建的示意图**，
+      不是真机截图，图左下角写着 MOCKUP。真机截图需要一台"从没构建过本项目"的机器，
+      而且会带上别人的桌面与机器名；这两张卡片把"你会看到什么、点哪里"说清楚就够了
+- [x] 基线数字记下来（§33.6 已复读）：views 7 / stars 1 / 社区健康度 85% /
+      Release 下载 `v1.2.3`=47、`v1.2.4`=4、`v1.2.5`=5、`pet-v0.9.0`=3（上线 40 分钟，未宣传）
 
 ## 3. Show HN
 
@@ -117,8 +120,12 @@ entry.
 
 字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 213。
 **第 1 条挂 `docs/assets/demo.gif`**，第 2 条挂 `docs/assets/overlay-expanded.png`，
-第 5 条挂 `docs/assets/desktop-scene.png`。GIF 在 X 上要 ≤5 MB / ≤15 MB（移动端另算），
+第 4 条挂 `docs/assets/smartscreen-unsigned.png`（未签名这件事先说在前面，
+而不是等人来问），第 5 条挂 `docs/assets/desktop-scene.png`。GIF 在 X 上要 ≤5 MB / ≤15 MB（移动端另算），
 342 KB 远在限内；HN 不支持 GIF，Show HN 帖里改贴 `desktop-scene.png` 的直链。
+
+**Show HN 的正文不发图**，HN 的帖子是纯文本，图只能放在链接的仓库里——所以 README 里的
+这四张图是 HN 那条帖子的实际配图位置。
 
 ## 5. X 线程（中文，5 条，每条 ≤270 字符）
 
@@ -207,10 +214,11 @@ files alone does not wire it. The connect table in the README has one line per t
 
 | 指标 | 怎么读 | 基线（2026-11-11） |
 |---|---|---|
-| Release 下载数 | `gh api repos/.../releases` | 1.2.3 = 46 / 1.2.4 = 3 / 1.2.5 = 4 |
+| Release 下载数 | `gh api repos/.../releases` | `v1.2.3` = **47** / `v1.2.4` = 4 / `v1.2.5` = 5 / `pet-v0.9.0` = 3 |
 | 仓库浏览 | `gh api .../traffic/views` | 30 天 7 views / 2 uniques |
 | star / fork | `gh repo view` | 1 / 0 |
 | npm | `npm view dsh-ai-terminal-pet version` | 1.2.5 |
+| 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条 |
 
 **判断渠道是否真的起效，看下载数的增量，不看点赞数。** 发帖后 24 小时内的 Release 下载增量
