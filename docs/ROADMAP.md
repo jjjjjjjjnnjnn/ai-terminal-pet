@@ -599,31 +599,44 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 | F1 | 悬停展开面板时显示完整会话明细（就地浮层） | 中 | 中 |
 | F9 | 紧凑态显示「最久等待了多久」，把"有人在等"升级成"等了 12 分钟" | 中 | 低 |
 
-**I1 是下一个会话的第一优先级**，因为它挡着「单独也能开箱就用」这条对外承诺的最后一环。
-动手前先读这张表（2026-11-11 在本机实测，别重新猜）：
+### I1 拆成三段，第一段已交付（2026-11-11）
+
+I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三段互不阻塞，而且第一段今天就做完了：
+
+| 段 | 内容 | 状态 |
+|---|---|---|
+| **I1-α** | **便携 zip**：`scripts/package.ps1` 打出 `dist\ai-terminal-pet-0.9.0-win-x64.zip`（17 个文件，仓库原有布局的子集 + 根转发器 + `SHA256SUMS.txt`），配 `scripts/install.cmd` 承接 RemoteSigned，CI 增加打包门禁与 artifact 上传 | ✅ **已交付**（零版本号代价：不动 `.go`，`vendor/manifest.json` 摘要不变） |
+| **I1-γ** | **自解压单文件 `.exe`**：把 11 件制品 `//go:embed` 进一个 Go 安装器，`--verify`/`--uninstall` 对齐现有语义，未签名发行 | ⏳ 未开工（3–5 天） |
+| **I1-β** | **换版本号**：`Version` → 1.0.0，重建三二进制 → vendor 重算 → 插件 1.2.6 → 双清单 + 索引同提交 → 双 tag + Release → npm → 上游 PR | ⏳ 排在文案定型之后，一次付清 |
+
+**为什么必须先有 α 再做 γ**：α 让漏斗今天就通（下载即双击即用），而 γ 只是少一步解压；
+反过来先做 γ 会让「新机器能不能装上」这条承诺晚三天，而且 γ 的验收要复用 α 已经固定的制品清单
+与 `SHA256SUMS.txt` 语义——从清单倒推实现比从实现推清单便宜。
+
+**已知约束（2026-11-11 本机实测，不要重新调研）**：
 
 | 事实 | 现状 |
 |---|---|
 | `signtool.exe` | **有**：`C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe` |
-| 代码签名证书 | **没有**：`Cert:\CurrentUser\My` 与 `Cert:\LocalMachine\My` 的 `-CodeSigningCert` 都是空 |
+| 代码签名证书 | **没有**：`Cert:\CurrentUser\My` 与 `Cert:\LocalMachine\My` 的 `-CodeSigningCert` 都是空。**决策：先出未签名包，接受 SmartScreen，签名作为独立事项** |
 | WiX / NSIS | **没装**：`candle.exe`、`wix`、`makensis` 都不在 PATH，也不在 Windows Kits 里 |
-| 已有安装能力 | `scripts/install.ps1`（11 件制品、逐件 SHA256、PATH/Run 键、`-Uninstall`）、`verify.mjs`、`tests/fresh-machine.mjs`（160 项端到端） |
+| PowerShell 默认策略 | **`RemoteSigned`**（CurrentUser）。这正是 α 里 `install.cmd` 存在的唯一理由 |
+| 已有安装能力 | `scripts/install.ps1`（11 件制品、逐件 SHA256、PATH/Run 键、`-Uninstall`）、`scripts/install.cmd`、`scripts/package.ps1`、`verify.mjs`、`tests/fresh-machine.mjs`（**162** 项端到端） |
 
-**所以 I1 的第一小步不是写安装器，而是决定签名怎么办**：没有证书只能出「未签名安装包」，
-用户会撞 SmartScreen 的「未知发布者」，和现在的 PowerShell 脚本相比只是少了一步 Go。
-建议按这个顺序推进：
-
-1. **自解压单文件 `.exe`**：内嵌主程序 + `pet-statusline.exe` + `pet-hook.exe` + `protocol.js`，
-   复用 `scripts/install.ps1` 的制品清单与哈希校验，落到同一安装目录、同样写 `HKCU` Run/PATH。
-   未签名也能用，只是首次运行有 SmartScreen 提示。验收：在一台**没装过 Go、没装过本项目**的机器上
-   双击后能出浮窗、`--doctor` 全绿；可直接复用 `tests/fresh-machine.mjs` 的沙箱模型来断言落盘结果。
-2. **MSI**（企业分发用）：需要先装 WiX v3（`candle`/`light`）或改用 WiX v4 的 `wix build`。
-   MSI 的卸载/修复语义比自解压 exe 标准，代价是构建链变重。
-3. **签名**：必须有人的输入（买证书或用 Azure Trusted Signing）。代码侧只需把
-   `signtool sign /fd sha256 /tr <时间戳> /td sha256` 挂进发布脚本，并保留「未签名也能构建」的 CI 分支。
+**γ 的验收**：在一台**没装过 Go、没装过本项目**的机器上双击后浮窗出现、`--doctor` 全绿，
+且沙箱里（`tests/fresh-machine.mjs` 的模型）落盘字节与 zip 版一致。签名留空壳位：
+`signtool sign /fd sha256 /tr <时间戳> /td sha256` 挂进发布脚本，并保留「未签名也能构建」的 CI 分支。
 
 **不要**为了「看起来专业」给安装器引入运行时依赖：安装器自身必须自包含（Go 或 PowerShell 都行），
 理由与 AGENTS.md 第 3 条「零外部运行时依赖」是同一条。
+
+### 对外宣传的顺序约束（2026-11-11 定）
+
+**正式发声排在 β 之后**，不要在 0.9.0 上先宣传再改号——评论区第一条就会是
+「README 说 1.2.5、npm 是 1.2.5、exe 却是 0.9.0」。α 与 γ 可以静默上线，让先到的人先装上。
+宣传素材里的每一个数字都必须是当场跑出来的（190 个 `func Test` / 162 项新机检查 / 4.17 MiB /
+7 个 `func Test` 之外的三条测量），不要写「全量安全扫描」——`-race`、`govulncheck`、`gosec`
+仍缺 gcc，§6 已记录。
 
 F8、F9 都是「一个下午」的量级，且不触碰渲染核心，适合作为下一次迭代的起点。
 F1 现在价值下降：展开态已经能列出 6 行带项目名、状态、来源和相对时间的明细，

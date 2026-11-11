@@ -1,0 +1,59 @@
+name: Feature or idea
+description: Something the overlay should do, or a setting it should have.
+title: '[idea] '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The project has two standing non-goals, so a request that goes against them will be
+        declined rather than debated: it is **not** a terminal multiplexer or a log viewer, and
+        it makes **no** network calls, has **no** account and sends **no** telemetry. Everything
+        stays under `%LOCALAPPDATA%\AI-Terminal-Pet\`.
+
+        It also stays Windows-only for now: the UI layer is Win32 and the IPC is Windows named
+        pipes, so cross-platform is an architectural change (recorded in `docs/ROADMAP.md` as E3),
+        not a port.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The situation you are in
+      description: What you are doing, what the overlay shows, and what you cannot tell from it. A concrete scenario beats a feature name.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+      description: Sketch freely. If it needs a new `config.json` key, say what it would be called and what its default should be.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Panel layout or drawing
+        - Session list or state mapping
+        - Notifications and sound
+        - Settings window
+        - Auto-approve and the veto window
+        - Jump to terminal
+        - CLI
+        - Installation and packaging
+        - A new terminal integration
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints this should respect
+      options:
+        - label: It must not add an external runtime dependency (the binaries are statically compiled, Win32 only)
+        - label: It must not make the host terminal wait or throw (reporters fail fast and silently)
+        - label: It must not send anything over the network

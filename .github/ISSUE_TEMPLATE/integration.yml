@@ -1,0 +1,56 @@
+name: Terminal or reporter support
+description: Ask for a terminal that is not in the connect table, or report that an existing hook does not fire.
+title: '[terminal] '
+labels: ['integration']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The overlay does not read any terminal itself: each terminal reports through a hook or
+        plugin, so "the pet does not show my terminal" almost always means the hook is not wired
+        or is not firing.
+
+        If you want to write the reporter yourself, you do not need to read this repository's
+        source: [`docs/PROTOCOL.md`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/blob/main/docs/PROTOCOL.md)
+        is the complete wire contract (fields, state semantics, pipe-name derivation, the `OK`/`ERR`
+        reply, and the redaction rules).
+
+  - type: dropdown
+    id: request
+    attributes:
+      label: What are you asking for
+      options:
+        - A terminal not listed in the connect table
+        - An existing hook that never fires
+        - An existing hook that fires with the wrong state
+        - Writing my own reporter, and I have a protocol question
+    validations:
+      required: true
+
+  - type: input
+    id: terminal-name
+    attributes:
+      label: Terminal or CLI
+      description: Name and a link, plus how its hook/plugin system works (a config file, an env var, a wrapper script).
+    validations:
+      required: true
+
+  - type: textarea
+    id: hook-shape
+    attributes:
+      label: What events can it emit, and in what shape
+      description: |
+        Paste the payload or the config snippet. The mapping question is always "which of the
+        seven states does this event mean": idle, thinking, working, tool_use,
+        waiting_permission, error, closed.
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried
+      description: Which reporter, which config, and the `--json` output or `--doctor` summary afterwards.
+    validations:
+      required: false

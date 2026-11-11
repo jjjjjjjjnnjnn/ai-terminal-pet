@@ -30,10 +30,75 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-未发布版本：见下方 `[Unreleased]` 段——2026-11-10 在 v0.9.0 之上完成的文档、自检工具、安装脚本与 CI 改动，
-版本常量仍是 `0.9.0`，尚未发版。**注意浮窗本体与 DSH 插件包是两条版本线**：浮窗本体停在 `0.9.0`，
+未发布版本：见下方两个 `[Unreleased]` 段——2026-11-10/11 在 v0.9.0 之上完成的文档、自检工具、安装脚本与 CI 改动，
+以及 2026-11-11 的宣传准备批（便携 zip、`install.cmd` 入口、仓库门面），版本常量仍是 `0.9.0`，尚未发版。
+**注意浮窗本体与 DSH 插件包是两条版本线**：浮窗本体停在 `0.9.0`，
 插件包（
-`packages/dsh-ai-terminal-pet/`）走自己的 `1.x` 与 `dsh-plugin-v1.x.y` tag，当前 **1.2.4**。
+`packages/dsh-ai-terminal-pet/`）走自己的 `1.x` 与 `dsh-plugin-v1.x.y` tag，当前 **1.2.5**。
+
+---
+
+## [Unreleased] — 2026-11-11（宣传准备批）
+
+这一批同样不换版本号，但它把「非 Harness 用户怎么拿到这个东西」这条断掉的漏斗接上了。
+触发点是本轮实测：`.\scripts\install.ps1` 在本机默认 `RemoteSigned` 策略下**直接被拒**
+（报的是安全策略的官话，不像装错了），而 README 的安装第 2 步就是那一行，任何普通用户照抄必然失败；
+同时 Release 资产里没有任何可下载的成品包——`dsh-plugin-v*` 的 tarball 只是插件包，
+非 Harness 用户要么装 Go 工具链，要么从 tarball 里手动挖 `vendor/AI-Terminal-Pet.exe`。
+
+### Added
+
+- **`scripts/install.cmd`：文档里的安装入口**。RemoteSigned 会拒绝一个带「从互联网下载」标记的本地
+  `.ps1`，而从 Release 解压出来的文件恰好带这个标记；`install.cmd` 用
+  `-ExecutionPolicy Bypass` 启动**一个** `powershell.exe`，不改任何 MachinePolicy / UserPolicy /
+  CurrentUser 设置，参数与退出码原样转发。它不加任何安装逻辑，`install.ps1` 仍是唯一实现。
+  纯 ASCII（Windows PowerShell 5.1 按 ANSI 读无 BOM 脚本，与 `install.ps1` 同一条理由）。
+- **`scripts/package.ps1`：便携 zip 打包**，产物 `dist\ai-terminal-pet-<overlay 版本>-win-x64.zip`。
+  里面是**仓库原有布局的一个子集**（`bin\` 三个二进制、`reporters\protocol.js`、
+  `integrations\deepseek-harness\ai-terminal-pet-bridge\` 七个文件、`scripts\install.ps1`、
+  `scripts\install.cmd`），加一个 zip 根的 `install.cmd` 转发器、`README.install.txt` 与
+  `SHA256SUMS.txt`。选这个形状是因为 `install.ps1` 的一切路径都从 `Split-Path -Parent $PSScriptRoot`
+  推导——同一份脚本既能装仓库也能装 zip，不需要第二套安装实现，也不会有「校验集 ≠ 安装集」的漂移。
+  版本号从 `internal/app/app_windows.go` 的 `const Version` 读取，不在这里写第二份。
+  三个已知的 PowerShell 陷阱都是实测撞到的，已写进脚本注释：`Compress-Archive` 与
+  `ZipFile.CreateFromDirectory` 在 .NET Framework 下写出**反斜杠**分隔的条目名（Linux/macOS 上
+  `unzip` 会解出一个名字里带反斜杠的文件），所以改为逐条目写入；`[ZipArchive]` 必须先
+  `Add-Type` 两个程序集才解析得到；`CreateEntryFromFile` 是 `ZipFileExtensions` 上的扩展方法，
+  而 PowerShell 没有扩展方法语法。每个条目钉固定时间戳，同一份源码重建出的 zip 逐字节相同
+  （与三个二进制用 `-buildvcs=false` 是同一条理由）。
+  打包前会比对 `bin\AI-Terminal-Pet.exe` 与插件包 `vendor\AI-Terminal-Pet.exe`，不一致就拒绝打包
+  ——这两个是同一产品同一个版本号下的两份副本，任一侧陈旧都会让两类用户拿到不同字节。
+  CI 用 `PET_PACKAGE_SKIP_VENDOR_CHECK=1` 把它降级为警告，因为 runner 的 Go 版本与提交进仓库
+  的 vendor 二进制不是同一个（那是跨工具链字节相等不可能达成的老问题）。
+- **`.github/workflows/ci.yml` 增加打包门禁与产物上传**：镜像里跑 `package.ps1` 并断言语义
+  （文件数与逐名比对，不数目录条目），再把 zip 作为 `ai-terminal-pet-win-x64` artifact 留存 7 天。
+- **`tests/fresh-machine.mjs` 增到 162 项（S5b）**：用 `cmd.exe` 跑 `scripts\install.cmd`
+  的两种形态，断言参数转发（`-VerifyOnly` 打印 `11 file(s) ... 0 warning`）与退出码转发
+  （`-VerifyOnly -Uninstall` 仍是 2）。走 `-Destination` 指向沙箱，所以不碰本机的真实安装目录。
+- **仓库门面**：`CONTRIBUTING.md`（含六条硬规则、发布不可变文件清单、`--doctor` 作为报障前置）、
+  `CODE_OF_CONDUCT.md`（Contributor Covenant 2.1）、`.github/ISSUE_TEMPLATE/` 三份表单
+  （bug 强制附 `--doctor` 全文、terminal 接入请求、feature 并列出两条非目标）、
+  `pull_request_template.md`（门禁清单 + 是否触碰发布不可变文件的显式勾选）。
+  仓库 description / homepage / topics 同时更新，topics 从 11 个补到 15 个（`opencode`、
+  `antigravity`、`ai-agents`、`coding-agents`）——社区健康度此前只有 42%，缺的正是这些。
+
+### Changed
+
+- **README 三个安装路径并列**：A（Harness 用户，npm 裸包名）、B（下载便携 zip 双击 `install.cmd`，
+  零 Go 工具链）、C（开发者从源码构建）。英文段与中文段同步。
+  **首次运行会撞 SmartScreen「未知发布者」**，两段都提前写明点「更多信息 → 仍要运行」，
+  并说明 `SHA256SUMS.txt` 是签名到位之前诚实的来源证明——这一版刻意不签，因为没有证书。
+- **README 事实修正**：插件版本 1.2.4 → **1.2.5**、npm 已发布（`dist-tags.latest` 1.2.5，
+  17 个文件，tarball 与 Release 资产逐字节相同）、market-index 钉到 `34aa1f7`、
+  徽章 `tests-154` → `tests-190` 并加 npm 徽章、"No standalone installer yet" 改为
+  "Not code-signed"、CI 门禁列表补上 `package.ps1`。
+- **`.gitignore` 增加 `dist/`**：打包产物是 5 MB 二进制，随每个 release 重建，不入库。
+
+### Fixed
+
+- **文档承诺与默认 Windows 策略冲突**（本轮实测）：README 第 2 步的 `.\scripts\install.ps1`
+  在 `RemoteSigned` 下抛 `UnauthorizedAccess`，现在由 `install.cmd` 承接，并在两段正文里解释原因，
+  而不是让用户第一次接触这个项目就读一条安全策略错误。
 
 ---
 

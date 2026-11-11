@@ -2290,6 +2290,10 @@ node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 
 
 ### 32.3 I1 的开工顺序（照 ROADMAP §4 那张表，不要重新调研）
 
+> **2026-11-11 更新**：I1 已拆成 I1-α / I1-γ / I1-β 三段，**α 已交付**（见 §33）。
+> 下面第 1 条（定签名）已有结论：**先出未签名包，接受 SmartScreen**，签名作为独立事项。
+> 第 2 条（自解压单文件）现在是 I1-γ，它的验收要复用 α 已经固定的制品清单与 `SHA256SUMS.txt` 语义。
+
 1. **先定签名**：有没有证书，决定做「未签名但可用」还是「签名发行」。没有证书不要假装能签名。
 2. **做自解压单文件 `.exe`**：内嵌 `AI-Terminal-Pet.exe`、`pet-statusline.exe`、`pet-hook.exe`、
    `protocol.js`；复用 `scripts/install.ps1` 的 11 件制品清单与逐件 SHA256；落到同一安装目录，
@@ -2316,3 +2320,164 @@ node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 
 - **YELEBAI / radar / dshbase / dsh.so / dsh-plugin.org / alldsh / dshmarketplace.dev**：全部等对方扫描或回应。
   imsai #912 与 brade #367 已经把我们能给的信息都给了（含 npm 版本与 tarball 哈希）。
 - **`go test -race` / `govulncheck` / `gosec`** 仍缺工具链（无 gcc），§6 已记录，不要假装跑过。
+
+---
+
+## 33. 便携 zip、`install.cmd` 与仓库门面（2026-11-11 宣传准备批）
+
+本轮的目标是「在确保稳定之后开始对外宣传」。稳定性这一条**先被证明**（见 §33.6 的实测），
+然后动手时发现漏斗上还有两个真实断点，必须先修掉才谈得上宣传：
+
+1. **`.\scripts\install.ps1` 在默认 `RemoteSigned` 策略下直接被拒**。README 的安装第 2 步就是那一行，
+   任何普通用户照抄必然失败，而且报的是安全策略的官话（`UnauthorizedAccess`），不像「装错了」。
+   这比「没有独立安装包」更致命，因为它是**当前唯一被文档承诺的路径**。
+2. **Release 资产里没有成品包**。`dsh-plugin-v*` 的 tarball 只是 DSH 插件包；非 Harness 用户
+   要么装 Go 工具链，要么从 tarball 里手动挖 `vendor/AI-Terminal-Pet.exe`。
+
+### 33.1 `scripts/install.cmd`：文档入口换成 cmd
+
+`RemoteSigned` 拒绝一个带「从互联网下载」标记的本地 `.ps1`，而**从 Release 解压出来的文件恰好带这个标记**
+——这正是「别人第一次接触这个项目」的形态。`install.cmd` 只做一件事：
+`powershell.exe -NoProfile -NoLogo -ExecutionPolicy Bypass -File "%~dp0install.ps1" %*`，
+参数与 `%ERRORLEVEL%` 原样转发，`endlocal & exit /b %_STATUS%`。
+
+三条设计约束：
+
+- **`-ExecutionPolicy Bypass` 只作用于这一个 powershell 进程**，不改 MachinePolicy / UserPolicy /
+  CurrentUser，别的脚本不受影响。脚本注释里写明了这一点，因为这是用户最合理的担心。
+- **不加任何安装逻辑**。`install.ps1` 仍是唯一实现；新增的第二份实现就是漂移的来源。
+- **纯 ASCII**，理由与 `install.ps1` 相同（Windows PowerShell 5.1 按 ANSI 读无 BOM 脚本）。
+  `%~dp0` 里可能有中文路径，但那是运行时数据，不是脚本字节。
+
+无参数时（双击的场景）才 `pause`，因为双击的 cmd 会随脚本结束立即关窗，把最后一行——包括失败——
+一起吞掉。`pause` 在非控制台 stdin 下立即返回，所以无人值守调用不受影响。
+
+### 33.2 `scripts/package.ps1`：便携 zip
+
+产物 `dist\ai-terminal-pet-<overlay 版本>-win-x64.zip`，17 个文件：
+
+```
+bin\AI-Terminal-Pet.exe  bin\pet-statusline.exe  bin\pet-hook.exe
+reporters\protocol.js
+integrations\deepseek-harness\ai-terminal-pet-bridge\   (7 files)
+scripts\install.ps1      scripts\install.cmd
+install.cmd              README.install.txt   SHA256SUMS.txt   LICENSE
+```
+
+**为什么是这个形状**：`install.ps1` 的一切路径都从 `Split-Path -Parent $PSScriptRoot` 推导，
+所以一个「与仓库同形」的子树不需要第二套安装实现，也不需要改写路径——**装 zip 和装仓库跑的是同一份脚本**。
+任何其他形状都得单独验证一遍，而「校验集 ≠ 安装集」正是过去残留旧 `protocol.js`、
+所有上报端静默失联的成因（§1i）。
+
+版本号从 `internal/app/app_windows.go` 的 `const Version = "..."` 正则读出，**不在这里写第二份**。
+顺手记一条：浮窗本体（0.9.0）与插件包（1.2.x）是两条版本线，zip 名必须跟**浮窗**那条。
+
+**三个 PowerShell 陷阱，全是实测撞到的**（都写进了脚本注释）：
+
+| 陷阱 | 表现 | 原因与修法 |
+|---|---|---|
+| `Compress-Archive` | 条目名是 `bin\pet-hook.exe`（反斜杠） | Windows PowerShell 5.1 走 .NET Framework，它写反斜杠；Explorer/7-Zip 能读，`tar -xf` 与 Linux 上的 `unzip` 会解出一个名字里带反斜杠的**单个文件**。zip 规范要的是 `/` |
+| `ZipFile.CreateFromDirectory` | 同上 | 它内部也用框架的 `CreateEntry`，不给名字就没法控制分隔符。**唯一可控的做法是逐条目写入并显式给名字** |
+| `[ZipArchive]::new(...)` | `找不到类型 [System.IO.Compression.ZipArchive]` | 5.1 要先 `Add-Type -AssemblyName System.IO.Compression` + `...FileSystem`；PS7 自带 |
+| `$archive.CreateEntryFromFile(...)` | `找不到 ... CreateEntryFromFile 方法` | 那是 `ZipFileExtensions` 上的**扩展方法**，PowerShell 没有扩展方法语法，`$obj.Method()` 解析不到 |
+| `$item.LastWriteTime = ...` | `正在创建模式下无法修改条目` | 条目一旦写入字节就进入 create 模式；**必须在写字节之前**赋时间戳，所以改成先 `CreateEntry` → 赋时间戳 → `Open()` → 拷贝流 |
+
+每个条目钉固定时间戳 `2026-11-11T00:00:00Z`，所以同一份源码重建出的 zip**逐字节相同**
+——与三个二进制用 `-buildvcs=false` 是同一条理由。实测连跑两次 sha256 一致。
+
+**打包前的交叉校验**：比对 `bin\AI-Terminal-Pet.exe` 与
+`packages\dsh-ai-terminal-pet\vendor\AI-Terminal-Pet.exe`，不一致就**拒绝打包**。
+这两个是同一产品同一版本号下的两份副本，任一侧陈旧都会让两类用户拿到不同字节、同一个名字。
+CI 用 `PET_PACKAGE_SKIP_VENDOR_CHECK=1` 把它降级为警告——runner 的 Go 版本与提交进仓库的 vendor
+二进制不是同一个（`go.mod` 的 `go 1.23.0` 是下限不是钉版本，跨工具链字节相等从来不可能达成，§27.9）。
+真正能比对的是**切 release 的那台机器**，所以这个拒绝留在那里咬人。
+
+**断言方式**：数的是**文件**不是条目（目录条目是正常的），而且逐个名字比对，
+最后再断言每个条目名都不含反斜杠。第一版数了条目数，于是 18 vs 17 把正确的包判成失败——
+「zip 是对的、检查是错的」和「检查过了、zip 少了三个文件」都真实发生过。
+
+### 33.3 CI 与门禁
+
+`.github/workflows/ci.yml` 在 `fresh-machine` 之后新增两步：`Package the portable zip`
+（`shell: pwsh`，带 `PET_PACKAGE_SKIP_VENDOR_CHECK=1`）与 `Upload the portable zip`
+（artifact 名 `ai-terminal-pet-win-x64`，留存 7 天，`if-no-files-found: error`）。
+理由是：一个打不出包的打包脚本对 release 而言就是红的构建，不能等到切版本那天才发现。
+
+`tests/fresh-machine.mjs` 增到 **162** 项，新增 S5b：用 `cmd.exe` 跑 `scripts\install.cmd`
+的两种形态，断言
+(1) 参数转发——`-VerifyOnly` 打出 `11 file(s) ... 0 warning`；
+(2) 退出码转发——`-VerifyOnly -Uninstall` 仍是 **2**。
+两者都带 `-Destination` 指向沙箱，所以**不碰本机的真实安装目录**——第一版没有带，
+于是它在本机（已装过本项目）会绿、在干净的 CI runner 上会红，而失败原因与 wrapper 无关。
+
+### 33.4 仓库门面（宣传前必须补的那一栏）
+社区健康度实测 **42%**（缺 CONTRIBUTING、CoC、issue/PR 模板）。本轮补齐：
+
+- `CONTRIBUTING.md`：六条硬规则（reporter 快速失败 / 零运行时依赖 / 管道名跨语言契约 /
+  UTF-8+LF 与纯 ASCII 脚本 / 协议改动走 PROTOCOL §11 / 不写死本机路径）、
+  发布不可变文件清单、`--doctor` 作为报障前置、三套环境陷阱（Low IL、`--json` 不是存活探针）。
+- `CODE_OF_CONDUCT.md`：Contributor Covenant 2.1 全文。
+- `.github/ISSUE_TEMPLATE/`：`bug.yml`（**强制**附 `--doctor` 全文）、`integration.yml`
+  （新终端接入，指向 `docs/PROTOCOL.md`）、`feature.yml`（并列两条非目标，先问「你在什么场景里」）。
+- `.github/pull_request_template.md`：门禁清单 + 「是否触碰发布不可变文件」的显式勾选
+  ——后者决定这次 PR 要不要连带一个版本号，事前问比事后发现便宜。
+- 仓库元数据：description 改成带关键词的一句（含 Claude Code / OpenCode / Antigravity /
+  DeepSeek Harness、4.17 MiB、零运行时依赖、无账号无网络），设 Homepage，topics 11 → **15**
+  （补 `opencode`、`antigravity`、`ai-agents`、`coding-agents`）。
+
+### 33.5 README / CHANGELOG / ROADMAP 的事实修正
+
+README 修的不是叙事而是**事实**：插件 1.2.4 → **1.2.5**、npm 已发布（`dist-tags.latest` 1.2.5、
+17 文件、tarball 与 Release 资产逐字节相同）、market-index 钉到 `34aa1f7`、
+徽章 `tests-154` → `tests-190` 并加 npm 徽章、`No standalone installer yet` → `Not code-signed`、
+安装段改为 A/B/C 三条并列路径、CI 门禁列表补 `package.ps1`。
+英文段与中文段同步改——这一段之前两边已经分叉过一次（英文说「npm 尚未发布」、中文说「已发布」）。
+
+ROADMAP §4 把 I1 拆成 α（已交付，零版本号代价）/ γ（自解压单 exe，未开工）/ β（换版本号，排在文案定型后），
+并记下「正式发声排在 β 之后」这条排程约束，以及「不要在 0.9.0 上先宣传再改号」的理由。
+
+### 33.6 本轮的实测基线（宣传材料的每个数字都以这张表为准）
+
+```
+git status --short                               干净（开工前）
+git log --oneline -3                             735ebd0 / c8ad006 / b7a7142
+npm view dsh-ai-terminal-pet version             1.2.5
+gh run list --limit 1                            success（43052732146, 1m41s）
+go version                                       go1.27.0 windows/amd64
+gofmt -l . / go vet ./...                        干净 / 0
+go test -count=1 ./...                           11 个包全 ok，190 个 func Test
+node packages/dsh-ai-terminal-pet/verify.mjs     VERIFY PASSED
+node .../scripts/vendor.mjs --check              两个 vendor 文件 matches the source
+node integrations/deepseek-harness/verify.mjs    VERIFY PASSED
+node tests/fresh-machine.mjs --no-overlay        PASS 162/162（本轮新增 2 项）
+scripts\install.cmd -VerifyOnly                  install: verified - 11 file(s), 0 warning(s)
+--doctor（已装实例）                              9 ok, 0 warn, 0 fail
+scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
+                                                 sha256 EF0FC0D0A9278F8C52E3C7D796B668EDBBE87105FF0CD040314ADE88E1B346F4
+```
+
+外部世界的基线（gh api / npm registry 实读，用于事后判断宣传有没有效果）：
+
+| 指标 | 值 |
+|---|---|
+| Release 下载数 | 1.2.3 = **46**、1.2.4 = 3、1.2.5 = 4（46 是注册表条目钉的 tarball 带来的） |
+| 仓库 30 天浏览 | 7 views / 2 uniques（截至 2026-11-10） |
+| star / fork / watcher | 1 / 0 / 0 |
+| npm 首次发布 | 1.2.4 于 2026-11-11T12:07:36Z，1.2.5 于 14:58:53Z |
+
+**46 vs 3 这个对比是本轮最有用的一个数字**：把市场条目推到最新版的渠道价值，
+比发一条推文更确定。宣传的重点应该是「让已经存在的分发路径指向最新资产」，
+其次才是「制造新的入口」。
+
+### 33.7 还没做完的（下一轮直接接着做）
+
+- **I1-γ 自解压单文件 `.exe`**：`cmd/pet-setup`，`//go:embed` 11 件制品，`--verify` / `--uninstall`
+  对齐现有语义。验收复用 `tests/fresh-machine.mjs` 的沙箱模型。
+- **推送这批改动**：`scripts/install.cmd`、`scripts/package.ps1` 与文档改动尚未 commit。
+  推送后 CI 会第一次真的打 zip，git 里不出现 `dist/`（`.gitignore` 已加）。
+- **便携 zip 的 Release**：CI 的 artifact 只有 7 天，对外分发要一个独立的 `pet-v0.9.0` tag
+  ——与插件线 `dsh-plugin-v*` **互不干扰**，这是仓库既有约定。
+- **宣传素材**：15 秒 GIF（等待脉冲 → 展开看到项目名与"等了 3 分钟" → 点击跳回终端）比 5 张静态
+  PNG 更有说服力；现有图都是纯面板，缺一张「两个终端 + 浮窗同框」的实景图。
+- **文案**：外部可见的一切（README 对外声明段、X / Hacker News 帖、市场条目描述）按 AGENTS.md
+  第 8 条先过 `agy --model gemini-3.8-flash-high --effort high`，再逐条核对事实后落笔。

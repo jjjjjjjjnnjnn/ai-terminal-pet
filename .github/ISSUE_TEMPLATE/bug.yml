@@ -1,0 +1,84 @@
+name: Bug report
+description: Something does not work - the overlay is missing, a session is not reported, or a terminal is not connected.
+title: '[bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, run the self-check and paste its output below. Nine out of ten reports
+        are resolved by one line of that report.
+
+        ```powershell
+        & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor
+        ```
+
+        Two things that look like bugs and are not: a directory carrying a Low mandatory
+        integrity label makes every executable inside it unable to reach the overlay's pipe,
+        and `--json` prints `{"count":0}` even when the overlay is not running (it reads disk
+        snapshots, not a live process).
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: --doctor output
+      description: The full report, all nine lines plus the summary line. Redacted is fine; trimmed is not.
+      render: text
+      placeholder: |
+        [ok] environment: windows/amd64 (compile time); windows=true; LOCALAPPDATA=...
+        ...
+        doctor: 9 ok, 0 warn, 0 fail
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What you expected and what happened
+      description: Which terminal, which reporter or hook you configured, and what you saw on the panel.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --version`, plus the `dsh-ai-terminal-pet` version if you installed the DSH plugin.
+      placeholder: '0.9.0'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: terminal
+    attributes:
+      label: Which terminal/host
+      multiple: true
+      options:
+        - Claude Code
+        - OpenCode
+        - Antigravity
+        - DeepSeek Harness
+        - A custom reporter (generic.js or my own)
+        - Not sure / the overlay itself
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and display scaling
+      description: `winver` output and the scaling percentage matter for layout and hit-testing reports.
+      placeholder: 'Windows 11 24H2 build 26100, 150%'
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: error.log
+      description: |
+        If `%LOCALAPPDATA%\AI-Terminal-Pet\error.log` exists, paste the last run. It rotates, so
+        older runs may be in `error.log.1`.
+      render: text
+    validations:
+      required: false
