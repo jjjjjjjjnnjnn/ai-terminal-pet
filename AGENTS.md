@@ -60,7 +60,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (184 func Test across 10 internal packages + cmd/pet-hook)
+# 1. Static analysis and all unit tests (190 func Test across 10 internal packages + cmd/pet-hook)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -69,6 +69,7 @@ go test -count=1 ./...
 for f in reporters/*.js; do node --check "$f"; done   # per file: node --check only guards its first argument
 node --check tests/fresh-machine.mjs
 node integrations/deepseek-harness/verify.mjs
+node packages/dsh-ai-terminal-pet/verify.mjs
 
 # 3. Production build
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
@@ -79,19 +80,29 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/
 #     the flag to also boot the overlay in a sandbox and check delivery)
 node tests/fresh-machine.mjs --no-overlay
 
+# 3c. The portable release zip. Refuses when bin\ and vendor\ disagree on the
+#     overlay; CI sets PET_PACKAGE_SKIP_VENDOR_CHECK=1 because its Go release differs.
+.\scripts\package.ps1
+
 # 4. Install, then let the shipped binary prove the install
-.\scripts\install.ps1
-.\scripts\install.ps1 -VerifyOnly     # per-file SHA256; exit 0 only when everything matches
+.\scripts\install.cmd                 # cmd wrapper: RemoteSigned refuses a downloaded .ps1
+.\scripts\install.cmd -VerifyOnly     # per-file SHA256; exit 0 only when everything matches
 & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 9 checks; exit 1 on any failure
-.\scripts\install.ps1 -AddToPath      # optional: adds the install dir to HKCU Path
-.\scripts\install.ps1 -Uninstall      # needs `yes` at the prompt, or -Force
+.\scripts\install.cmd -AddToPath      # optional: adds the install dir to HKCU Path
+.\scripts\install.cmd -Uninstall      # needs `yes` at the prompt, or -Force
 
 # 5. Optional UI Layout Preview (renders PNGs into PET_PREVIEW_DIR)
 $env:PET_PREVIEW_DIR = "$env:TEMP\petpreview"
 go test ./internal/ui -run TestRenderPreview
 go test ./internal/ui -run TestRenderSettingsPreview
-python docs/assets/render_assets.py   # composes hero.png and the panel PNGs from that directory
+python docs/assets/render_assets.py        # hero.png and the panel PNGs
+python docs/assets/make_launch_assets.py   # demo.gif and desktop-scene.png
 ```
+
+`scripts\install.ps1` stays the single implementation; `install.cmd` only starts one `powershell.exe`
+with `-ExecutionPolicy Bypass` and forwards every argument and exit code, because a stock Windows install
+runs RemoteSigned and that refuses a `.ps1` carrying the "downloaded from the internet" marker — which is
+exactly what a user who unzips a release has.
 
 Opt-in desktop probes (their tests `Skip` when the variable is unset — that is why CI stays headless):
 `PET_PREVIEW_DIR`, `PET_SOUND_PROBE`, `PET_FOCUS_PROBE`, `PET_DSH_PROBE`, `PET_PRESENCE_PROBE`.
@@ -121,6 +132,7 @@ Two conventions in those commands are load-bearing, not style:
 | How did we get here? (runbooks §13–§27) | [docs/HANDOVER.md](docs/HANDOVER.md) |
 | I am picking this up from someone else. What is pending, what must not be edited, what looks redundant but is not? | [docs/HANDOVER.md](docs/HANDOVER.md) §28 (handover checklist) |
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |
+| I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/LAUNCH.md](docs/LAUNCH.md) — the only place outward-facing copy lives, with the measured numbers it must not exceed |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |
 | Frozen historical documents | [docs/archive/README.md](docs/archive/README.md) |
@@ -144,8 +156,8 @@ Two conventions in those commands are load-bearing, not style:
      Windows system libraries (`user32.dll`, `gdi32.dll`, `shell32.dll`).
 4. **Encoding & Line Endings**:
    - Preserve UTF-8 encoding across all files. `.gitattributes` pins `* text=auto eol=lf`; do not
-     introduce CRLF. `scripts/install.ps1` must stay pure ASCII, because Windows PowerShell 5.1 reads a
-     BOM-less script as ANSI.
+     introduce CRLF. `scripts/install.ps1`, `scripts/install.cmd` and `scripts/package.ps1` must stay
+     pure ASCII, because Windows PowerShell 5.1 reads a BOM-less script as ANSI.
 5. **Cross-language protocol contract**:
    - The pipe name is the first 4 bytes of `sha256(home lowercased, trailing separators trimmed)`
      rendered as 8 hex chars. It is implemented twice — Go (`internal/pipeserver`) and JS
@@ -180,3 +192,8 @@ Two conventions in those commands are load-bearing, not style:
      `gemini-3.8-flash-high` when a second model's opinion would help, and say in the commit message
      which finding came from it. Treat its output as a reviewer, not as an authority — verify each
      claim against the installed packages before acting on it.
+   - **Every outward-facing text goes through it before it is posted or published**: the launch copy in
+     [docs/LAUNCH.md](docs/LAUNCH.md), a marketplace description, a README paragraph that makes a promise,
+     an issue reply that explains a design decision. Drafting is cheap; a claim the project cannot
+     support, published under its own name, is not. The `docs/LAUNCH.md` round found exactly that: a
+     draft that read as if all four terminals worked with zero setup, when only DeepSeek Harness does.
