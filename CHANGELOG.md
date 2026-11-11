@@ -57,9 +57,11 @@
   |---|---|
   | S1 空机器 | 未安装时 `--doctor` 退出 1 并指名缺什么；`--json` 仍返回空文档；`--version` 可用 |
   | S2 包安装 | `npm pack` → 解开到 `node_modules`；清单、`dsh.bundle`、`cordis.patch.yml` 的 `insert:` 形态、locale、vendor 三件套 |
-  | S3 插件 | bootstrap 拷贝 + 哈希等于 vendor；二次调用是 memoized 而非覆盖；7 种事件的状态/原因/工具映射；切目录与改标题；两个会话互不干扰；`approval/request` 必定 `next()`；dispose 后不再上报 |
+  | S3 插件 | bootstrap 拷贝 + 哈希等于 vendor；二次调用是 memoized 而非覆盖；7 种事件的状态/原因/工具映射；切目录与改标题；两个会话互不干扰；`approval/request` 必定 `next()`；dispose 后不再上报；**中文路径与中文工具名原样往返** |
   | S3b 开关 | `DSH_PET_NO_BOOTSTRAP=1` 不拷贝但**仍能用 vendor 协议上报**；`config.enabled:false` 一个监听都不注册 |
   | S4 浮窗 | 沙箱里第一次启动、`--json` 能看到插件的会话、没有 `config.json` 也能跑、`--toggle`/`--show`/`--reset` 都 exit 0 |
+  | S4b 冷启动 | `--quit` 让浮窗真的退出（**连管道一起消失**）；之后只跑一次 `pet-hook`，浮窗应当被上报端自己拉起来，并且那条会话可见 |
+  | S4c 八条会话 | 连续 8 条会话全部进 store；`--json` 的排序与 `internal/session.Sort` 一致（先按状态优先级，同状态内新的在前） |
   | S5 独立安装 | `install.ps1` 11 件制品、`-VerifyOnly` 全对、`--doctor` 无 fail、两个原生 hook 投递进沙箱浮窗 |
   | S6 设置 | 自动同意关闭时 defer、开着时 allow；危险命令永不自动放行（两种方言）；否决文件 → deny；`--settings` 可达 |
   | S7 坏机器 | 配置损坏、没有 `LOCALAPPDATA`、超大 stdin、空/非 JSON/数组/null、未知参数/未知模式——全部 exit 0 且给出答案 |

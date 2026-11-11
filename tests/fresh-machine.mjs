@@ -23,6 +23,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import net from 'node:net'
 import {
   existsSync,
   mkdirSync,
@@ -139,8 +140,7 @@ function removeWithRetry(target) {
 }
 
 /** Sandbox layout: one root, and nothing shared with the real machine. */
-function makeSandbox() {
-  const root = mkdtempSync(path.join(tmpdir(), 'pet-fresh-'))
+function makeSandbox() {  const root = mkdtempSync(path.join(tmpdir(), 'pet-fresh-'))
   const sandbox = {
     root,
     localAppData: path.join(root, 'local'),
@@ -212,17 +212,78 @@ function runExe(exe, argv, env, timeout = 60000) {
   return spawnSync(exe, argv, { encoding: 'utf8', timeout, env })
 }
 
-/** True when a live overlay answers on this sandbox's pipe. */
-function overlayAnswers(exe, env) {
-  const result = runExe(exe, ['--json'], env, 15000)
-  return result.status === 0 && String(result.stdout || '').trim().startsWith('{')
+/**
+ * The named pipe this sandbox's overlay listens on.
+ *
+ * Same algorithm as reporters/protocol.js and internal/pipeserver: sha256 over
+ * the lowercased home directory with trailing separators trimmed, first four
+ * bytes as hex. Deriving it here is what makes liveness testable at all.
+ */
+function pipePathFor(env) {
+  const home = String(env.USERPROFILE || env.HOME || '')
+    .replace(/[\\/]+$/, '')
+    .toLowerCase()
+  return '\\\\.\\pipe\\ai-terminal-pet-v1-' + createHash('sha256').update(home, 'utf8').digest('hex').slice(0, 8)
+}
+
+/**
+ * True when something is listening on this sandbox's pipe.
+ *
+ * `--json` is not a liveness probe: it prints a document built from the
+ * snapshot files whether or not the overlay is running, so a check built on it
+ * silently passes after the overlay has exited. Connecting to the pipe is the
+ * honest question, and connecting without writing is harmless - the server
+ * reads to EOF and closes.
+ */
+function overlayAlive(env, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ path: pipePathFor(env) })
+    let settled = false
+    const finish = (alive) => {
+      if (settled) return
+      settled = true
+      socket.destroy()
+      resolve(alive)
+    }
+    socket.once('connect', () => finish(true))
+    socket.once('error', () => finish(false))
+    setTimeout(() => finish(false), timeoutMs)
+  })
 }
 
 async function waitForOverlay(exe, env, timeoutMs = 25000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (overlayAnswers(exe, env)) return true
+    if (await overlayAlive(env)) return true
     await sleep(250)
+  }
+  return false
+}
+
+async function waitForOverlayGone(exe, env, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (!(await overlayAlive(env))) return true
+    await sleep(250)
+  }
+  return false
+}
+
+/**
+ * Ask an overlay to quit, and make sure it did.
+ *
+ * A single `--quit` is usually enough, but the control write can lose a race
+ * with the liveness probe: the pipe server reads each connection to EOF with a
+ * five second timeout, so a probe that connected milliseconds earlier can make
+ * the next control command see "all pipe instances are busy". Retrying is
+ * cheaper than diagnosing that later, and a silent non-stop turns into a
+ * mutex conflict that breaks every later scenario.
+ */
+async function stopOverlay(exe, env) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    runExe(exe, ['--quit'], env, 15000)
+    if (await waitForOverlayGone(exe, env, 8000)) return true
+    await sleep(500)
   }
   return false
 }
@@ -317,6 +378,11 @@ async function main() {
     writeFileSync(to, readFileSync(from))
   }
 
+  // The plugin calls sendStatus(..., { launch: true }), and protocol.js will
+  // spawn whatever AI_TERMINAL_PET_EXE names as long as it resolves inside the
+  // install directory. S3 points that at a harmless stub once the directory
+  // exists, so an in-process plugin scenario can never start the real overlay.
+
   let sandboxOverlay = null
   const realEnv = { ...process.env }
   // Control commands talk to the real user's pipe, and a Low-integrity binary
@@ -325,12 +391,11 @@ async function main() {
   // would expect to come back afterwards.
   const installedRealOverlay = path.join(realEnv.LOCALAPPDATA || '', 'AI-Terminal-Pet', 'AI-Terminal-Pet.exe')
   const realOverlay = existsSync(installedRealOverlay) ? installedRealOverlay : builtOverlay
-  const realWasRunning = runGui && overlayAnswers(realOverlay, realEnv)
+  const realWasRunning = runGui && (await overlayAlive(realEnv))
   if (realWasRunning) {
     console.log('stopping the running overlay for the duration of the run')
-    runExe(realOverlay, ['--quit'], realEnv, 15000)
-    await sleep(1500)
-    if (overlayAnswers(realOverlay, realEnv)) {
+    const stopped = await stopOverlay(realOverlay, realEnv)
+    if (!stopped) {
       console.log('warning: the overlay did not stop; the overlay scenarios may be skipped')
     }
   }
@@ -340,7 +405,10 @@ async function main() {
     const pkg = scenarioPackageInstall(sandbox)
     await scenarioPluginOnEmptyMachine(sandbox, pkg)
     await scenarioPluginDisabledPaths(sandbox, pkg)
-    if (runGui) sandboxOverlay = await scenarioOverlayBoots(sandbox)
+    if (runGui) {
+      sandboxOverlay = await scenarioOverlayBoots(sandbox)
+      await scenarioOverlayResilience(sandbox)
+    }
     scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe)
     await scenarioSettingsAndConfig(sandbox, overlayExe, hookExe)
     scenarioRobustness(sandbox, overlayExe, hookExe)
@@ -348,8 +416,7 @@ async function main() {
   } finally {
     // Ask the sandbox overlay to leave first: a graceful shutdown releases its
     // file handles, which is what decides whether the sandbox can be deleted.
-    runExe(overlayExe, ['--quit'], sandbox.env, 15000)
-    await sleep(1200)
+    await stopOverlay(overlayExe, sandbox.env)
     if (sandboxOverlay && sandboxOverlay.pid) {
       try {
         process.kill(sandboxOverlay.pid)
@@ -361,9 +428,16 @@ async function main() {
     await sleep(600)
     if (realWasRunning) {
       console.log('\nrestoring the real overlay')
-      const child = spawn(realOverlay, [], { detached: true, stdio: 'ignore', env: realEnv })
-      child.unref()
-      await waitForOverlay(realOverlay, realEnv)
+      let up = false
+      for (let attempt = 0; attempt < 3 && !up; attempt++) {
+        const child = spawn(realOverlay, [], { detached: true, stdio: 'ignore', env: realEnv })
+        child.unref()
+        up = await waitForOverlay(realOverlay, realEnv, 10000)
+        // A sandbox instance that has not finished exiting still holds the
+        // mutex, so the first attempt can lose the race and exit immediately.
+        if (!up) await sleep(1500)
+      }
+      if (!up) console.log('warning: could not restart the real overlay; start it again from its install path')
     }
     if (!keepSandbox) {
       if (!removeWithRetry(sandbox.root)) console.log('could not remove the sandbox: ' + sandbox.root)
@@ -462,7 +536,6 @@ function scenarioPackageInstall(sandbox) {
 async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
   section('S3 plugin bootstrap and event mapping on an empty machine')
   check('still nothing installed before the plugin loads', !existsSync(sandbox.petDir))
-
   await withSandboxEnv(sandbox.env, async () => {
     // A cache-busting query gives this scenario its own module instance, so
     // bootstrapPromise and the protocol cache are cold even when another
@@ -485,6 +558,13 @@ async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
         equal('copied overlay is the vendored binary', sha256(path.join(sandbox.petDir, 'AI-Terminal-Pet.exe')), sha256(pkg.vendorExe))
         equal('copied protocol is the vendored copy', sha256(path.join(sandbox.petDir, 'protocol.js')), sha256(pkg.vendorProtocol))
       }
+
+      // Keep every launch attempt inside the sandbox. protocol.js accepts an
+      // override only when it resolves inside the install directory, so the
+      // stub lives there; withSandboxEnv restores the variable afterwards.
+      const stub = path.join(sandbox.petDir, 'harness-launch-stub.exe')
+      writeFileSync(stub, readFileSync(path.join(sandbox.bin, 'pet-statusline.exe')))
+      process.env.AI_TERMINAL_PET_EXE = stub
 
       // bootstrap() is memoized: the second call must return the very same
       // promise result and must not touch the file again.
@@ -564,6 +644,22 @@ async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
 
       check('unknown session events are ignored', snapshotFor(sandbox, 'ses-unknown') === null)
 
+      // Non-ASCII paths are not an edge case for this project's users. A path
+      // with Chinese characters has to survive JSON encoding, the snapshot, the
+      // store and --json without being mangled.
+      const unicodeProject = path.join(sandbox.root, '项目 开发', '状态 浮窗')
+      mkdirSync(unicodeProject, { recursive: true })
+      writeFileSync(path.join(unicodeProject, 'README.md'), 'unicode\n', 'utf8')
+      const unicodeSession = {
+        session: { header: { id: 'ses-unicode', cwd: unicodeProject, createdAt } },
+        id: 'ses-unicode',
+      }
+      cordis.emit('session/event', unicodeSession, { type: 'tool/call', data: { name: '读取' } })
+      await sleep(60)
+      const unicodeSnapshot = snapshotFor(sandbox, 'ses-unicode')
+      equal('a non-ASCII project path survives the round trip', unicodeSnapshot?.project, unicodeProject)
+      equal('a non-ASCII tool name survives the round trip', unicodeSnapshot?.tool, '读取')
+
       // Disposing must unhook without clearing the panel.
       const beforeDispose = snapshotFor(sandbox, 'ses-fresh-1')?.state
       dispose()
@@ -573,6 +669,10 @@ async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
       equal('nothing is reported after dispose', snapshotFor(sandbox, 'ses-fresh-1')?.state, beforeDispose)
 
       check('plugin never warned', cordis.warnings.length === 0, cordis.warnings.join(' | '))
+      // sendStatus is fire-and-forget: its launch attempt happens a tick or two
+      // after the call. Staying inside the sandbox environment until it has
+      // settled is what keeps a stray `spawn` from starting the REAL overlay.
+      await sleep(400)
     } finally {
       process.chdir(previousCwd)
     }
@@ -617,6 +717,92 @@ async function scenarioPluginDisabledPaths(sandbox, pkg) {
     return count
   })
   equal('config.enabled = false registers nothing', listeners, 0)
+}
+
+/**
+ * S4b/S4c: the two things a user does that a happy-path boot does not cover -
+ * starting with the overlay closed, and running more conversations than the
+ * panel can show at once.
+ */
+async function scenarioOverlayResilience(sandbox) {
+  section('S4b a reporter starts the overlay when it is not running')
+  const installed = path.join(sandbox.petDir, 'AI-Terminal-Pet.exe')
+  const hook = path.join(sandbox.bin, 'pet-hook.exe')
+
+  equal('--quit exits 0', runExe(installed, ['--quit'], sandbox.env, 15000).status, 0)
+  const gone = await waitForOverlayGone(installed, sandbox.env, 10000)
+  check('the pipe is gone after --quit', gone)
+  // The reporter is the only thing that runs on a machine where the user has
+  // never started the overlay: it files a snapshot and launches the binary.
+  const launched = spawnSync(hook, ['--mode=claude'], {
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      session_id: 'ses-coldstart',
+      cwd: sandbox.project,
+      tool_name: 'Bash',
+      tool_input: { command: 'ls' },
+    }),
+    encoding: 'utf8',
+    timeout: 30000,
+    env: sandbox.env,
+  })
+  equal('the reporter exits 0 while starting the overlay', launched.status, 0)
+  check('the reporter filed its snapshot before launching', Boolean(snapshotFor(sandbox, 'ses-coldstart')))
+
+  const up = await waitForOverlay(installed, sandbox.env, 25000)
+  check('the overlay comes back on its own', up)
+  if (up) {
+    const report = readOverlaySessions(installed, sandbox.env)
+    const ids = new Set((report?.sessions || []).map((item) => item.sessionId))
+    check('the cold-start session is visible', ids.has('ses-coldstart'), [...ids].join(','))
+  }
+
+  section('S4c more conversations than the panel can show')
+  const ids = []
+  for (let index = 0; index < 8; index++) {
+    const id = 'ses-many-' + index
+    ids.push(id)
+    const result = spawnSync(hook, ['--mode=claude'], {
+      input: JSON.stringify({
+        hook_event_name: 'PreToolUse',
+        session_id: id,
+        cwd: path.join(sandbox.project, 'p' + index),
+        tool_name: 'Bash',
+        tool_input: { command: 'ls' },
+      }),
+      encoding: 'utf8',
+      timeout: 30000,
+      env: sandbox.env,
+    })
+    if (result.status !== 0) check('session ' + id + ' reported', false, String(result.status))
+  }
+  await sleep(800)
+  const report = readOverlaySessions(installed, sandbox.env)
+  check('--json still returns a document with many sessions', report !== null)
+  const present = new Set((report?.sessions || []).map((item) => item.sessionId))
+  const missing = ids.filter((id) => !present.has(id))
+  equal('every one of the eight conversations is in the store', missing.length, 0)
+  check('the store reports a count that covers them', (report?.count || 0) >= 8, 'count=' + report?.count)
+  const updated = (report?.sessions || []).map((item) => Date.parse(item.updatedAt)).filter((value) => Number.isFinite(value))
+  // Sort order is state priority first, then newest first inside a state (see
+  // internal/session.Sort). Asserting "sorted by time" would be wrong: an
+  // older error deliberately outranks a newer idle session.
+  const states = (report?.sessions || []).map((item) => item.state)
+  const seen = new Set()
+  let grouped = true
+  for (let index = 0; index < states.length; index++) {
+    if (index > 0 && states[index] === states[index - 1]) continue
+    if (seen.has(states[index])) grouped = false
+    seen.add(states[index])
+  }
+  check('sessions are grouped by state', grouped, states.join(','))
+  let newestFirst = true
+  const items = report?.sessions || []
+  for (let index = 1; index < items.length; index++) {
+    if (items[index].state !== items[index - 1].state) continue
+    if (Date.parse(items[index].updatedAt) > Date.parse(items[index - 1].updatedAt)) newestFirst = false
+  }
+  check('within a state, the newest session comes first', newestFirst, updated.map((value) => new Date(value).toISOString().slice(11, 23)).join(' '))
 }
 
 /** S4: the copied overlay actually boots in the sandbox and reports sessions. */
