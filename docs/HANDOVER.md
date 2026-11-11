@@ -2425,6 +2425,17 @@ CI 用 `PET_PACKAGE_SKIP_VENDOR_CHECK=1` 把它降级为警告——runner 的 G
   DeepSeek Harness、4.17 MiB、零运行时依赖、无账号无网络），设 Homepage，topics 11 → **15**
   （补 `opencode`、`antigravity`、`ai-agents`、`coding-agents`）。
 
+**一个必须知道的口径**：GitHub 的 `community/profile` API 只把**单个** `.github/ISSUE_TEMPLATE.md`
+算作 `issue_template`，所以用了 `ISSUE_TEMPLATE/` 目录里的表单之后，`health_percentage` 停在 **85%**
+（贡献指南、行为准则、PR 模板、许可证、README 五项都是 present）。**85 不是没做完**，别照着这个数字
+继续加文件；要判断表单是否真的生效，看新建 issue 页的模板选择器。
+
+这套表单第一版是**坏的**：`bug.yml` 里 `description: \`winver\` output ...` 的反引号让 YAML
+标量提前结束，文件扫不过——GitHub 会静默拒收，选择器里什么都不显示，而坏掉的恰好是唯一强制要
+`--doctor` 全文的那张表。修法是改成引号标量，并且改成**先跑一个 YAML 解析器再信它**。
+另外 `config.yml` 把 `blank_issues_enabled` 关掉：bug 表单的第一个必填项就是 `--doctor` 全文，
+空表单正好是绕开它的捷径，关掉之后「最省事的路径」和「能回答问题的路径」重合。
+
 ### 33.5 README / CHANGELOG / ROADMAP 的事实修正
 
 README 修的不是叙事而是**事实**：插件 1.2.4 → **1.2.5**、npm 已发布（`dist-tags.latest` 1.2.5、
