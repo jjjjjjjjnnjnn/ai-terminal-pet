@@ -98,6 +98,18 @@ AI-Terminal-Pet.exe (Go 1.23, single-instance mutex)
 
 ### Install
 
+There are two ways in. Pick the one that matches how you got here.
+
+**A. DeepSeek Harness user — no Go toolchain, nothing to build**
+
+```powershell
+dsh plugin add dsh-ai-terminal-pet
+```
+
+The package carries a prebuilt overlay and the official `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. Install from a GitHub Release tarball or the repository if you prefer (`dsh plugin add <path-or-git-url>`); the same bootstrap runs.
+
+**B. Everyone else — build from source (Go 1.23+)**
+
 Installation takes about 30 seconds on Windows using PowerShell:
 
 1. Build the executables:
@@ -226,6 +238,41 @@ ai-terminal-pet --json --pretty
 
 The `--json` command never blocks on a GUI process because it reads session snapshots directly from disk.
 
+### Settings and where everything lives
+
+Right-click the overlay for a quick menu (show/hide, reset position, notifications, sound and its volume, always-on-top, edge retract, auto-approve, language, start with Windows, quit) — or `Settings…` in that menu, or `ai-terminal-pet --settings`, for the full window. There are three tabs and no OK button: every change applies as soon as you make it, except **Auto-approve timeout**, which is read once at startup.
+
+| Tab | Setting | `config.json` key | Default | What it does |
+|---|---|---|---|---|
+| General | Notifications | `notifications` | `true` | Tray balloon when a session starts waiting for permission or hits an error |
+| General | Always on top | `alwaysOnTop` | `true` | Keeps the panel above normal windows |
+| General | Edge retract | `edgeRetract` | `true` | Slides into the screen edge when the pointer leaves |
+| General | Opacity | `opacity` | `235` | Panel opacity, 40–255 |
+| General | Language | `language` | `auto` | `auto`, `en` or `zh-CN`; `auto` follows the Windows UI language |
+| General | Start with Windows | *(registry)* | off | Writes the `HKCU\...\Run` entry; same as `--autostart=on` |
+| Sound | Alert sound | `sound` | `true` | Master switch for the synthesized tone |
+| Sound | Scheme | `soundScheme` | `chime` | `chime`, `bell`, `soft` or `pulse`; the play button auditions it |
+| Sound | Volume | `soundVolume` | `85` | 0–100 |
+| Sound | Sound on waiting | `soundOnWaiting` | `true` | Tone when a session needs approval |
+| Sound | Sound on error | `soundOnError` | `true` | Tone when a session errors |
+| Sound | Notify on finish | `notifyOnFinish` | `true` | Softer, distinct tone when a busy session goes idle |
+| Sessions | Auto-approve | `autoApprove` | `false` | Off by default; see Safety below |
+| Sessions | Auto-approve timeout | `autoApproveTimeoutSec` | `5` | Veto window, 1–60 s; **needs a restart** |
+| Sessions | Reset window position | *(immediate)* | — | Same as `--reset` |
+
+The remaining keys in `config.json` are runtime state, not settings: `placed`, `x`, `y`, `zoom`, `expanded`. The overlay writes them so it reopens where you left it; editing them by hand is harmless but pointless.
+
+| Path | Contents |
+|---|---|
+| `%LOCALAPPDATA%\AI-Terminal-Pet\config.json` | Everything in the table above |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\state.json` | Window placement (the runtime keys) |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\` | One JSON snapshot per live session; the overlay and `--json` both read this |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\approvals\` | `pending-*.json` plus the `.deny` sibling the panel writes when you tap to veto |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` | The wire protocol every reporter loads |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\error.log` | Rotated crash log; `--doctor` tells you whether it exists |
+
+A hand-edited or corrupted `config.json` never bricks anything: out-of-range values fall back to their defaults and an unreadable file means "defaults", with auto-approve treated as off.
+
 ### Safety
 
 Terminal hooks run inside your development environment, so their boundaries are strict:
@@ -250,6 +297,8 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 - **Low-integrity working directories**: If a whole directory tree carries a Low mandatory integrity label, executables inside it inherit that label, and a Low-integrity process cannot open the overlay's pipe (the overlay runs at Medium). Copy the binaries to the install directory or `%TEMP%` before testing from such a tree; the installed copies are unaffected.
 
+- **No standalone installer yet**: there is no `.zip` or `.msi` for a Windows user who does not use the DeepSeek Harness. That user builds from source (install path B) or unpacks `vendor/AI-Terminal-Pet.exe` from a release tarball by hand. A signed single-file installer is on the roadmap.
+
 - **Named-pipe squatting**: Same-user pipe preemption is mitigated by acquiring a named mutex first, but it is not completely eliminated. A full challenge-response handshake remains documented for future hardening.
 
 - **Auto-approve countdown restart**: Changing the auto-approve countdown duration requires an overlay restart, while all other settings hot-reload automatically.
@@ -261,6 +310,8 @@ Terminal hooks run inside your development environment, so their boundaries are 
 ### Roadmap
 
 - **Native hook binary**: `pet-hook.exe` ships as the primary Claude Code and Antigravity reporter (`--mode=claude|antigravity`), and the JavaScript hooks remain as the reference implementation and fallback.
+
+- **Standalone installer**: a signed single-file `.exe`/`.msi` so a Windows user who does not use the DeepSeek Harness can install without a Go toolchain (currently they build from source or unpack the release tarball).
 
 - **Cross-platform support**: Extracting the UI layer behind a presenter interface with Unix domain socket transport for macOS and Linux (not started).
 
@@ -389,7 +440,22 @@ AI 编码终端 (Claude Code / OpenCode / Antigravity)
 
 ### 装起来
 
-本项目仅支持 Windows 平台。打开 PowerShell，按步骤执行构建与安装：
+本项目仅支持 Windows 平台。装法有两种，看你是哪类用户。
+
+**A. DeepSeek Harness 用户 —— 不需要 Go 工具链，什么都不用编译**
+
+```powershell
+dsh plugin add dsh-ai-terminal-pet
+```
+
+包里已经带了预编译好的浮窗与官方 `protocol.js`。首次加载时插件会把它们**只在缺失时**复制到
+`%LOCALAPPDATA%\AI-Terminal-Pet\`，所以永远不会覆盖你自己维护的安装。装完即用：下一条会话就在
+面板上了。想从 GitHub Release 的 tarball 或仓库地址装也一样（`dsh plugin add <路径或 git 地址>`），
+跑的都是同一套 bootstrap。
+
+**B. 其他用户 —— 从源码构建（需要 Go 1.23+）**
+
+打开 PowerShell，按步骤执行构建与安装：
 
 ```powershell
 # 1. 编译主程序、原生状态栏 shim 与原生 hook
@@ -515,6 +581,41 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 `--json` 命令直接读取本地磁盘上的快照文件，不与 GUI 进程进行任何同步通信，因此无论浮窗是否运行都能立刻返回，绝不会因界面卡死而阻塞。
 
+### 设置项与文件位置
+
+右键浮窗会弹出快捷菜单（显示/隐藏、重置位置、通知、声音与音量、置顶、贴边收起、自动同意、语言、开机自启、退出）；要完整设置就点菜单里的「设置…」或执行 `ai-terminal-pet --settings`。三个页签、没有「确定」按钮：改完立即生效，**唯一例外是自动同意倒计时**，它在启动时读一次，改完要重启浮窗。
+
+| 页签 | 设置项 | `config.json` 键 | 默认值 | 作用 |
+|---|---|---|---|---|
+| 常规 | 通知 | `notifications` | `true` | 会话开始等待确认或出错时弹托盘气球 |
+| 常规 | 窗口置顶 | `alwaysOnTop` | `true` | 面板始终压在普通窗口之上 |
+| 常规 | 贴边收起 | `edgeRetract` | `true` | 鼠标移开后滑进屏幕边缘 |
+| 常规 | 不透明度 | `opacity` | `235` | 40–255 |
+| 常规 | 界面语言 | `language` | `auto` | `auto` / `en` / `zh-CN`；`auto` 跟随系统 |
+| 常规 | 开机自启 | *（注册表）* | 关 | 写 `HKCU\...\Run`，等同 `--autostart=on` |
+| 声音 | 提示音 | `sound` | `true` | 合成音色的总开关 |
+| 声音 | 音色 | `soundScheme` | `chime` | `chime` / `bell` / `soft` / `pulse`；播放键可试听 |
+| 声音 | 音量 | `soundVolume` | `85` | 0–100 |
+| 声音 | 等待确认提示音 | `soundOnWaiting` | `true` | 需要授权时响 |
+| 声音 | 出错提示音 | `soundOnError` | `true` | 会话出错时响 |
+| 声音 | 完成提醒 | `notifyOnFinish` | `true` | 忙碌会话转为空闲时响一声音色更柔的提示 |
+| 会话 | 自动同意 | `autoApprove` | `false` | 默认关，见下一节「安全边界」 |
+| 会话 | 自动同意倒计时 | `autoApproveTimeoutSec` | `5` | 否决窗口 1–60 秒；**改完需重启** |
+| 会话 | 重置窗口位置 | *（立即执行）* | — | 等同 `--reset` |
+
+`config.json` 里剩下的键是运行期状态而不是设置：`placed`、`x`、`y`、`zoom`、`expanded`。浮窗写它们是为了「下次在原来的位置、原来的缩放打开」，手改无害但没意义。
+
+| 路径 | 内容 |
+|---|---|
+| `%LOCALAPPDATA%\AI-Terminal-Pet\config.json` | 上表全部设置 |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\state.json` | 窗口位置与缩放（运行期那些键） |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\` | 每条存活会话一个 JSON 快照；浮窗与 `--json` 都读这里 |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\approvals\` | `pending-*.json` 与用户点「否决」时浮窗写的 `.deny` 兄弟文件 |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` | 所有上报端加载的线协议 |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\error.log` | 轮转的崩溃日志；`--doctor` 会告诉你它是否存在 |
+
+手改坏 `config.json` 不会把程序搞挂：越界值回落到默认值，文件读不出来就整体按默认处理，其中自动同意按「关」处理。
+
 系统的状态持久化分为两份文件：
 - `%LOCALAPPDATA%\AI-Terminal-Pet\config.json`：存放用户偏好设置，包括通知开关、音效配置、置顶状态、贴边收起、不透明度、界面语言以及自动同意开关等。文件在浮窗启动时读取，修改设置时由后台协程异步合并写入；缺失或格式错误项会自动回退到默认值，损坏的文件绝不阻碍程序启动。
 - `%LOCALAPPDATA%\AI-Terminal-Pet\state.json`：存放浮窗的屏幕坐标、当前缩放比例以及是否处于展开态。浮窗移动或缩放后自动保存，重启后原样恢复窗口几何位置。
@@ -537,6 +638,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 - **仅限 Windows**：仅基于 Win32 分层窗口与 Windows 命名管道构建，不支持 macOS 或 Linux。
 - **杀毒软件增加进程启动开销**：在部分开启杀毒软件钩子的机器上，频繁启动 Node 进程会导致可感知的延迟；建议改用原生 `pet-hook.exe` / `pet-statusline.exe`，并为安装目录配置杀毒排除项。
 - **低完整性工作目录**：若整棵目录树带 Low 强制完整性标签，其中的可执行文件继承该标签，而 Low 完整性进程打不开浮窗的命名管道（浮窗跑在 Medium）。在这种目录里直接用 `bin\` 下的二进制测试会静默投递不到，请先复制到安装目录或 `%TEMP%` 再跑；安装后的副本不受影响。
+- **还没有独立安装包**：不使用 DeepSeek Harness 的 Windows 用户目前没有 `.zip` / `.msi` 可下——要么按装法 B 从源码构建，要么从 Release tarball 里手动取出 `vendor/AI-Terminal-Pet.exe`。签名过的单文件安装包在路线图上。
 - **同用户管道抢占未根除**：通过互斥体优先排序缓解了同用户命名管道被抢占的风险，但尚未实现基于独占标志的彻底根除。
 - **倒计时时长修改需重启**：自动同意倒计时时长在程序启动时一次性载入，修改该配置项需要重启浮窗进程方可生效，其余配置项均支持热加载。
 - **缺少像素级视觉回归测试**：纯逻辑、几何计算与命中测试具备完整的单元测试覆盖，并提供了 PNG 预览渲染，但目前尚未接入像素级别的自动化视觉回归测试。
@@ -547,6 +649,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 以下为当前计划进行的改进项：
 
 - **上报端已原生化**：`pet-hook.exe`（`--mode=claude|antigravity`）是 Claude Code 与 Antigravity 的正式上报端，JavaScript hook 保留为参照实现与降级路径。
+- **独立安装包**：做一个签名过的单文件 `.exe` / `.msi`，让不使用 DeepSeek Harness 的 Windows 用户不必装 Go 工具链（目前只能从源码构建或从 Release tarball 里取二进制）。
 - **跨平台抽象探索**：计划将窗口渲染层抽象为通用接口，为后续探索基于 Unix 域套接字的平台移植奠定结构基础。
 - **二进制体积压缩**：计划将主程序体积从现状 4.17 MiB 降至 2.5 MiB 以内。手段包括剥离无用反射元数据、去掉未用包，以及把 pet-statusline 里基于 regexp 的脱敏规则改成手写扫描器。
 
