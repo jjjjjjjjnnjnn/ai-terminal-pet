@@ -483,6 +483,12 @@
 
 ### Fixed
 
+- **`reporters/antigravity-statusline.js` 不读 `toolCall`，与原生 shim 不一致**：`cmd/pet-statusline`
+  的 `toolName()` 依次看 `tool_name` / `toolCall` / `tool_call`，而参考实现只看 `tool_name`。
+  于是「只带 `toolCall`」的 payload 会让两边落出不同的会话内容（`tool: null` vs `tool: "Read"`）。
+  现在参考实现也按同样顺序解析。发现方式是把参考实现与原生 shim 一起跑过 **33 个 payload**
+  并逐字段比对落盘快照：其余字段（state / reason / sessionId / pid / project / model / terminal）
+  本来就已经一致，修完这 33 个全部一致。
 - **「没有 runtime 目录就静默不落快照」——`pet-hook` 与 `pet-statusline` 里各有一份**：
   两个命令都直接用 `os.CreateTemp` 往 `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\` 写快照，
   但都不先建目录。而 `reporters/protocol.js` 的 `writeRuntimeSnapshot` 调的是

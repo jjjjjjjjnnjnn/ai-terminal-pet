@@ -2039,6 +2039,13 @@ Bearer token、控制字符、parent session），记录 stdout、退出码、st
 结果 **35/35 完全一致**。那些取值同时被 `internal/reporter/statusline_test.go` 钉住，
 所以以后再动映射表会先在测试里红，而不是等用户看到面板状态不对。
 
+另外做了一次**跨语言**比对：参考实现 `reporters/antigravity-statusline.js` 与原生 shim 跑同一组
+33 个 payload，逐字段比落盘快照。`state` / `reason` / `sessionId` / `pid` / `project` / `model` /
+`terminal` 本来就一致，只有 `tool` 不一致（参考实现不读 `toolCall`）——已把参考实现补齐，现在 33/33 一致。
+做这个比对有个前提要记住：**两边在「浮窗二进制不存在」时都不上报**，参考实现还会转去调 notifier，
+所以 harness 必须放一个占位的 `AI-Terminal-Pet.exe`，并把 `USERPROFILE` 也指到临时目录，
+否则任何一边都可能摸到真实浮窗的管道。
+
 **刻意保留的两处差异**（写下来免得下次「顺手统一」）：
 
 1. `startedAt` 超过 5 分钟**忽略**而不是钳制——时钟偏斜的宿主否则会显示一个跑了几小时的会话；
