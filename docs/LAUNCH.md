@@ -32,7 +32,7 @@ P0/I1-α 已交付 ──► I1-γ 自解压 exe（可选，静默上线） ─�
 ## 2. 发布前必须就位的东西
 
 - [x] `ai-terminal-pet-0.9.0-win-x64.zip`（`scripts/package.ps1`，17 文件，SHA256 已算）
-- [ ] 独立的 `pet-v0.9.0` tag + Release（CI artifact 只留 7 天，对外分发要 tag）
+- [x] 独立的 `pet-v0.9.0` tag + Release：资产 `ai-terminal-pet-0.9.0-win-x64.zip`，4,983,915 B，sha256 `EF0FC0D0…`。已从公开 URL 下载回来、解压、`install` → `-VerifyOnly`（11 件全对）→ `-Uninstall -Force`（rc=0）各跑过一遍。
 - [ ] **SmartScreen 那张截图**：帖子里必须提前放「更多信息 → 仍要运行」，否则第一条评论就是「未签名」
 - [ ] **15 秒 GIF**：等待脉冲 → 展开看到项目名与「等了 3 分钟」→ 点击跳回终端。
       现有 `docs/assets/*.png` 是静态面板，缺动图与「两个终端 + 浮窗同框」的实景图

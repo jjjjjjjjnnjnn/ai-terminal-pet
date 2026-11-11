@@ -2437,7 +2437,6 @@ ROADMAP §4 把 I1 拆成 α（已交付，零版本号代价）/ γ（自解压
 并记下「正式发声排在 β 之后」这条排程约束，以及「不要在 0.9.0 上先宣传再改号」的理由。
 
 ### 33.6 本轮的实测基线（宣传材料的每个数字都以这张表为准）
-
 ```
 git status --short                               干净（开工前）
 git log --oneline -3                             735ebd0 / c8ad006 / b7a7142
@@ -2473,11 +2472,17 @@ scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
 
 - **I1-γ 自解压单文件 `.exe`**：`cmd/pet-setup`，`//go:embed` 11 件制品，`--verify` / `--uninstall`
   对齐现有语义。验收复用 `tests/fresh-machine.mjs` 的沙箱模型。
-- **推送这批改动**：`scripts/install.cmd`、`scripts/package.ps1` 与文档改动尚未 commit。
-  推送后 CI 会第一次真的打 zip，git 里不出现 `dist/`（`.gitignore` 已加）。
-- **便携 zip 的 Release**：CI 的 artifact 只有 7 天，对外分发要一个独立的 `pet-v0.9.0` tag
-  ——与插件线 `dsh-plugin-v*` **互不干扰**，这是仓库既有约定。
+- **I1-β 换版本号**：`Version` → 1.0.0 与插件 1.2.6 的一次性雪崩，排在文案定型之后。
+  注意 `pet-v0.9.0` 的 Release 资产已经发布且**不可变**——0.9.0 的 zip 是既成事实，
+  1.0.0 会是新的 `pet-v1.0.0` 资产，不要试图替换 0.9.0 那份。
+- **便携 zip 已上线**（`pet-v0.9.0`，2026-11-11）：资产 `ai-terminal-pet-0.9.0-win-x64.zip`
+  4,983,915 B / sha256 `EF0FC0D0…`，从公开 URL 下载回来解压、`install` → `-VerifyOnly`
+  （11 件全对）→ `-Uninstall -Force`（rc=0）都实测过。它是**静默上线**：README 已指向它，
+  但对外发声仍排在 β 之后（§33.5 的排程约束）。
 - **宣传素材**：15 秒 GIF（等待脉冲 → 展开看到项目名与"等了 3 分钟" → 点击跳回终端）比 5 张静态
   PNG 更有说服力；现有图都是纯面板，缺一张「两个终端 + 浮窗同框」的实景图。
-- **文案**：外部可见的一切（README 对外声明段、X / Hacker News 帖、市场条目描述）按 AGENTS.md
-  第 8 条先过 `agy --model gemini-3.8-flash-high --effort high`，再逐条核对事实后落笔。
+- **文案**：外部可见的一切（README 对外声明段、X / Hacker News 帖、市场条目描述）已按 AGENTS.md
+  第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对，成品落在
+  [docs/LAUNCH.md](LAUNCH.md)。该轮评审至少纠正了一条会真出问题的事实表述：
+  初稿把浮窗写成像是对 Claude Code / OpenCode / Antigravity 开箱即用，而实际只有
+  DeepSeek Harness 无需配置。
