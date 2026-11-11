@@ -153,7 +153,10 @@ async function main() {
       state: mapped[0],
       reason: mapped[1],
       startedAt: input.started_at || input.startedAt || input.session_start_time || null,
-      tool: input.tool_name || null,
+      // cmd/pet-statusline reads toolCall/tool_call as well as tool_name, and
+      // the two implementations must file the same session: preferring a bare
+      // tool_name and falling back to the call object is what the shim does.
+      tool: input.tool_name || (input.toolCall && input.toolCall.name) || (input.tool_call && input.tool_call.name) || null,
       terminal: "antigravity"
     }, { retryMs: 1500 })
   } catch {}
