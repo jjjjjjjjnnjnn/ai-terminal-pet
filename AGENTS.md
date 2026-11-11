@@ -140,6 +140,14 @@ Two conventions in those commands are load-bearing, not style:
      (that is exactly what happened to `b4474a6`: run `42894142140`, step
      `Verify the DSH plugin package`, `fail: the newest indexed version is the packaged version`).
      Move the index, the two manifests and the packaged README together, then tag.
+   - Because git cannot embed a commit's own sha, a release takes two commits: **A** moves the
+     version, the packaged README and the index's `version` / `publishTimestamp` (and is what the tag
+     points at); **B** rewrites the index's `source.commit` and `icon` to A's real sha. Neither may be
+     skipped: 1.2.1 → 1.2.3 all shipped this way, and 1.2.4 is the first one where the two halves were
+     planned before the version bump rather than patched afterwards.
+   - Any text-only release still costs a version number. Release assets are immutable, so editing one
+     sentence in the packaged README or in `dsh.catalog` means a new tag (that is why 1.2.1 and 1.2.4
+     exist); never re-upload or rewrite a published `.tgz`.
 7. **Portability**:
    - Never commit machine-specific absolute paths into source, tests, scripts or docs. Use
      `os.Getenv("LOCALAPPDATA")`, `os.UserHomeDir()`, `Path(__file__).resolve().parent`, or an

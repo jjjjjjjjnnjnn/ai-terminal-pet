@@ -6,7 +6,14 @@ overlay: a small always-on-top Win32 pet that shows which sessions are working,
 which one is waiting for your approval, which failed, and which finished.
 
 The package ships the overlay binary and the official reporter protocol module
-inside the tarball, so a single market install is enough to get a pet on screen.
+inside the tarball, so a single market install is enough to get a pet on screen
+that follows **this Harness's** sessions. It does not attach to any other
+terminal by itself: sessions from OpenCode, Claude Code and Antigravity appear
+only after that terminal's own reporter is installed into it. The repository
+README section [Connect your terminal](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet#connect-your-terminal)
+has one hook per terminal; the panel, the pipe and the protocol are shared, so
+once a terminal reports it shows up next to the Harness sessions.
+
 No npm dependencies, no install scripts, no network calls at runtime (unless the
 maintainer pins a release in lib/release-pins.json, see below).
 
@@ -34,7 +41,7 @@ file behind DSH's own Plugins -> Market did not contain this repository while th
 build was still queued. That build finished (run 42844452013, 16:39:27Z), the entry page now
 answers 200, and the catalog (`count` 10119 -> 10230) lists this repository - so it can be found
 in that market. The entry's `install` command, however, is generated from the pinned `tarball`
-and pointed at the 1.2.0 asset; a follow-up PR moves it to the current release, which is 1.2.3.
+and pointed at the 1.2.0 asset; a follow-up PR moves it to the current release, which is 1.2.4.
 Changing that file always means a pull request against that repository, never an edit here.
 
 The other route needs no application at all: third-party markets harvest GitHub
@@ -62,10 +69,10 @@ pin the release tag. Both are verified end to end:
 
 ```sh
 # release tarball: no clone, no Go toolchain
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.3/dsh-ai-terminal-pet-1.2.3.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.4/dsh-ai-terminal-pet-1.2.4.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.3&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.4&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Do not hand pnpm a bare repository URL. pnpm resolves a git dependency by
@@ -122,7 +129,9 @@ keeps working without an overlay.
 
 This bundle is a convenience. The overlay is a Go application that installs
 normally with `scripts/install.ps1` from the repository, and every other reporter
-(Claude Code, OpenCode, Antigravity, generic) talks to the same named pipe. A
+(Claude Code, OpenCode, Antigravity, generic) talks to the same named pipe.
+Those reporters are separate installs, not part of this package: a terminal that
+has none of them hooked reports nothing, in this install or in any other. A
 machine that only wants the overlay does not need this package; a machine that
 only wants the plugin gets one installed automatically.
 
