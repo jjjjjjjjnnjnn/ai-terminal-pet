@@ -11,9 +11,10 @@
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
 - **版本**：`0.9.0`（`internal/app/app_windows.go:23` 的 `Version` 常量，`--doctor` 与文档刷新都没有改它）。
-  最新提交 `9894160`（`docs: hand the repository over, and record dshopen as accepted`，2026-11-11 10:35 +0100
-  已推送，与 `origin/main` 同步，CI run `42996496825` success；其前 `bb00e58`、`ef1d9d1`、`4ee7f01`、发版提交
-  `ff7f6de` = tag `dsh-plugin-v1.2.4` 指向的对象，再往前依次是 `9b0df94`、`12b90cc`、`fabb591`、`b4474a6`）；
+  交接整理是 `bb00e58`（「五家目录」那批）之后的一串**纯文档提交**，2026-11-11 上午推送、CI 每次全绿；
+  全貌用 `git log --oneline bb00e58..HEAD` 查，当前 CI 用 `gh run list --limit 1` 查——**这两个数字刻意不写死**，
+  因为 git 无法在一个提交里引用它自己或它的后继；
+  发版对象是 `ff7f6de`（= tag `dsh-plugin-v1.2.4` 指向的提交），其后依次 `4ee7f01`、`ef1d9d1`、`bb00e58`。
   **浮窗本体与 DSH 插件包是两条版本线**：浮窗停在 `0.9.0`，插件包已到 **1.2.4**（tag `dsh-plugin-v1.2.4`，
   只改文案、不动代码，见下文「分发」段与 §27.12）。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**154 个** `func Test`，
@@ -1809,8 +1810,9 @@ imsai 的 #912（`clean`，该仓库规定「改已存在条目永不自动合�
 
 ### 28.1 现在在哪（一句话）
 
-仓库 `main` 上是 **`9894160`**（`docs: hand the repository over, and record dshopen as accepted`，交付这一版的
-就是本节所述的那次整理），CI run `42996496825` 绿；其前 `bb00e58` 是「五家目录」那一批文档。
+这次交接整理是 `bb00e58`（「五家目录」那批）之后的**一串纯文档提交**，2026-11-11 上午推送，CI 每次全绿
+（`git log --oneline bb00e58..HEAD` 看清单，`gh run list --limit 1` 看当前）。这里刻意不写死 sha 与 run 号：
+git 无法在一个提交里引用它自己或它的后继，钉死的数字只会随着下一次纯文档提交立刻过期。
 浮窗本体停 **0.9.0**、DSH 插件包已到 **1.2.4**（tag `dsh-plugin-v1.2.4` → `ff7f6de`，Release 资产
 `dsh-ai-terminal-pet-1.2.4.tgz` 1,915,340 B / sha256 `d6b7f95a…`）；**npm 上仍然一个版本都没有**
 （唯一卡在人工的一步）。这次整理只动 `.gitignore` 与四份文档（HANDOVER / CHANGELOG / ROADMAP / AGENTS.md），
