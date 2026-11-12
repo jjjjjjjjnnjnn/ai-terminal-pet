@@ -4,33 +4,33 @@
 > 下一位 AI 直接从 §1「当前状态」开始读，然后按 §13–§27 的时间序读 runbook，不必回溯长上下文。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-11 晚；浮窗 **1.0.0**、插件包 **1.2.6**、两个成品包已发布）
+## 1. 当前状态（2026-11-12 午；浮窗 **1.0.1**、插件包 **1.2.7**、两个成品包已就绪待发布）
 
 > 接手请先读本节与文末 §28「交接清单」，那两节给出「现在在哪、下一步做什么」；§27 是插件包分发的完整 runbook。
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.0`**（`internal/app/app_windows.go:23`），插件包 **`1.2.6`**。两条版本线各有 tag：
-  `pet-v1.0.0` 与 `dsh-plugin-v1.2.6`。**原先的「浮窗停 0.9.0、插件 1.2.5」是 2026-11-11 下午的事实，
-  已被本轮替换**——写在这里是因为 §32/§33 的历史段落仍会引用那两个数字。
-  查当前 CI 用 `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个
-  提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**201 个** `func Test`，
+- **版本**：浮窗 **`1.0.1`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.7`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`pet-v1.0.1` 与 `dsh-plugin-v1.2.6`/`dsh-plugin-v1.2.7`。
+  **`pet-v1.0.1` 与 `dsh-plugin-v1.2.7` 是本轮新打的**，资产见 §36；`pet-v1.0.0` 与 `dsh-plugin-v1.2.6`
+  仍然有效且不可变。查当前 CI 用 `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，
+  因为 git 无法在一个提交里引用它自己或它的后继。
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**206 个** `func Test`，
   11 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` 11 份文档全解；
   `scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；`--doctor` **9 ok / 0 warn / 0 fail**。
-- **规模**：Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**（201 个 `func Test`，
+- **规模**：Go 非测试源码 **35 文件 / 12,584 行**、测试 **30 文件 / 5,603 行**（206 个 `func Test`，
   外加 `cmd/pet-setup` 的 20 个）、JS **12 文件 / 4,346 行**；
-  `bin/AI-Terminal-Pet.exe` **4,371,968 B**、`bin/pet-statusline.exe` **3,664,896 B**、
+  `bin/AI-Terminal-Pet.exe` **4,377,600 B**（1.0.1）、`bin/pet-statusline.exe` **3,664,896 B**、
   `bin/pet-hook.exe` **3,697,152 B**、`dist/pet-setup.exe` **14,125,568 B**
   （均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.6**；`dsh-plugin-v1.2.6` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.6.tgz` **1,917,331 B / sha256 `671cdc95…`**；钉 tag 的 git 源；
-    仓库根的清单 shim。
-  - 浮窗线：`pet-v1.0.0` 的 Release 带两个资产——`ai-terminal-pet-1.0.0-win-x64.zip`
-    **4,983,903 B / sha256 `70D992B1…`** 与 `pet-setup.exe` **14,125,568 B / sha256 `87D5E60B…`**；
-    `pet-v0.9.0` 仍在（不可变，已被取代）。
+  - 插件线：npm `latest` = **1.2.7**（发布后核对 `dist-tags.latest`、17 个文件、tarball 与 Release 资产
+    逐字节相同）；`dsh-plugin-v1.2.7` 的 Release 资产 `dsh-ai-terminal-pet-1.2.7.tgz`
+    **1,919,625 B / shasum `efa49bef…`**；钉 tag 的 git 源；仓库根的清单 shim。
+  - 浮窗线：`pet-v1.0.1` 的 Release 带两个资产——`ai-terminal-pet-1.0.1-win-x64.zip`
+    **4,985,803 B / sha256 `849A3AA9…`** 与 `pet-setup.exe` **14,131,200 B / sha256 `8389B426…`**
+    （本机 `scripts/package.ps1` 产出，见 §36）；`pet-v1.0.0` 与 `pet-v0.9.0` 仍在（不可变，已被取代）。
   - 三个资产都**从公网 URL 下载回来复验过**：`pet-setup.exe --version` 打印 `pet-setup 1.0.0`；
     沙箱（自带 `LOCALAPPDATA`/`USERPROFILE`）里 install → 11 件哈希全对 → `--verify` 11 件全对 →
     `--uninstall`（输 yes）目录归零；zip 解出 17 个文件；`npm pack dsh-ai-terminal-pet@1.2.6`
@@ -2857,3 +2857,90 @@ Go 要么隐式换工具链（`GOTOOLCHAIN=auto` 会额外下载一整套 Go，�
 - `docs/LAUNCH.md` **动过**：只改「实测状态」类文字（渠道表里 `v1.2.5` 的下载数、awesome 的
   `plugins.json` 已渲染 1.2.6、dshopen 仍 1.2.4、§8 的下载/upvote 基线），**没有改任何对外文案**
   （标题、X 线程、Show HN 正文、市场摘要一个字未动，因为推动它们的事实没变）。
+
+## 36. F9：紧凑态显示等待时长（2026-11-12，浮窗 1.0.1 / 插件 1.2.7）
+
+### 36.1 做了什么，以及为什么不是「加一行」
+
+产品开头那句承诺是「哪个终端卡住了、卡了多久」。前半句一直在紧凑态上，**后半句要展开面板才看得到**——
+一个 56×156 的常驻条，却把用户最常问的事实藏在二级界面里。
+
+所以这一轮**不加行、不改尺寸**，改的是「最大那行装什么」：
+
+| 位置 | 有人在等时（waiting_permission / error） | 其它情况 |
+|---|---|---|
+| 大号槽（22 → 16 号粗体） | `12分` / `12m` | 会话数（`3`），与以前一字不差 |
+| 下面那行（9 号） | `3 个会话` / `3 sessions` | `会话` / `sessions`，与以前一字不差 |
+| 状态行 / 项目名 / 跳转条 / 命中区 | 未动 | 未动 |
+
+**为什么坚持不动几何**：`compactWidth/compactHeight` 一动，`docs/assets/` 里全部面板 PNG、`demo.gif`、
+`desktop-scene.png`、README 中英两段的尺寸描述、以及插件包里的 `screenshots/compact.png` 都要重出。
+素材重出是可以做的（本轮也做了），但**「为了一个能塞进现有空间的事实而改产品轮廓」是本末倒置**——
+先量、再决定，这一轮两条都做了：先量字体，再证明它塞得下，然后才动布局。
+
+### 36.2 三个判断，每个都有测试钉住
+
+1. **只对「真的有人在等」的状态显示时长**：`waiting_permission` 与 `error`。忙碌（`working`/`tool_use`/
+   `thinking`）没有人在等；`idle`/`closed` 的时间戳意思是「什么时候结束的」。`TestCompactWaitOnlyCoversStatesThatWaitOnTheUser`。
+2. **多个会话在等时取最早开始等的那个**，不是优先级最高的：卡了 12 分钟的权限确认比 30 秒前的构建失败
+   更值得先看。注意这与 `mostUrgentJump`（跳转条）的规则**不同且故意不同**——跳转要的是「最该点哪个」，
+   时长要的是「谁等最久」。`TestCompactWaitPrefersTheOldestWait`。
+3. **取整边界与展开行共用一套**（<1 分 → 最小标签、<1 小时按分、<2 小时是「1 小时」、之后按小时；
+   超过 99 小时截断，展开态仍显示准确数字）。两个各自维护阈值的格式化器，就是同一个瞬间在两处
+   一个说「刚刚」一个说「1 分钟前」的成因。`TestShortElapsedUsesTheSameBucketsAsRelativeTime`。
+
+### 36.3 那个必须记下来的 Bug：时长会在呼吸时冻结
+
+呼吸态（waiting/error）的帧复用 `purePulseFrame` **刻意忽略 `clock`**——脉冲只改整窗 alpha、不改像素，
+这是上一轮把 CPU 从 ~8% 压下来的关键。所以：**如果把时长挂在 `clock` 上，它会被当成「只有时钟变了」
+而复用旧位图，`12m` 会一直停在 12 分钟直到下一次上报**。
+
+修法是给 `renderedKey` 一个独立的 `waitMinute` 分钟桶，只在「紧凑态 + 有人等」时赋值。三条断言：
+跨分钟内 20 秒仍可复用（不白烧 GDI）、跨到下一分钟必须重绘、忙碌/展开态 `waitMinute` 必须是 0
+（否则每个忙碌面板都会每分钟白重绘一次）。`TestFrameKeyAdvancesTheDurationPerMinute`。
+
+### 36.4 文案与尺寸都是量出来的
+
+用渲染器自己的 `measure()`（同一份 YaHei UI 字体）逐个测候选串，16 号粗体、48 逻辑单位：
+
+| 串 | 宽度 |
+|---|---|
+| `12m` / `59m` | 33 px |
+| `1小时` | 39 px |
+| `23小时` | 42 px |
+| `99小时` | 44 px |
+| `12 sessions`（9 号） | 36 px |
+
+所以时长用 16 号而不是 22（22 号下 `9小时+` 已经 54 px、`12小时` 52 px 出界）。
+`TestWaitLabelFitsTheStripIsAMeasuredClaim` 把这张表钉进测试——以后改字号或文案撞到边是测试红，
+而不是在 100% 缩放的桌面上才发现。
+
+### 36.5 这一轮的实测
+
+```
+gofmt -l . / go vet ./...                     干净 / 0
+go test -count=1 ./...                        12 个包全 ok，206 个 func Test（新增 5）
+node tests/fresh-machine.mjs --no-overlay     PASS 162/162
+三个 verify.mjs + vendor --check             全 PASS；vendor 两文件 matches
+scripts\install.cmd -VerifyOnly               11/11
+--doctor（安装 1.0.1 之后）                    7 ok / 2 warn / 0 fail（两条 warn 是浮窗没在跑）
+scripts\package.ps1                           zip 4,985,803 B / 17 files；pet-setup.exe 14,131,200 B
+vendor/manifest.json                          源码摘要 ab16b003…（24 文件 / go1.27.0）
+                                              overlay 4,377,600 B / sha256 59f1cfcf…
+npm pack（1.2.7）                             17 files / shasum efa49bef…
+```
+
+**素材**：`docs/assets/` 的面板 PNG、`hero.png`、`demo.gif`（345,212 B / 56 帧）、`desktop-scene.png`
+全部由 `render_assets.py` 与 `make_launch_assets.py` 从同一份光栅器输出重出；插件包里的
+`screenshots/compact.png` 同步替换（`screenshots.json` 条目不变）。`desktop-scene.png` 与 `demo.gif`
+的图注仍然写明「终端窗口是画的、面板是真实光栅器输出」。
+
+### 36.6 发布形状
+
+- **A 提交**（本批）：`Version` → 1.0.1、`internal/ui` 与 `internal/i18n` 的改动、新测试、
+  三个二进制重编 + `npm run vendor`（摘要与 overlay 哈希重算）、两份清单与根 shim 的 1.2.7、
+  `docs/market-index.json` 的 `version` 与 `publishTimestamp`、README/CHANGELOG 的版本口径、全部素材。
+- **tag**：`pet-v1.0.1`、`dsh-plugin-v1.2.7`；两个 Release 各带其资产；`npm publish`。
+- **B 提交**：把索引的 `source.commit` 与 `icon` 钉到 A 的真实 sha（git 无法在提交里引用自己）。
+- 上游：awesome-dsh-plugin 的 `bump-tarball-1.2.7` 跟进 PR（只改 `tarball`/`icon`）。
+

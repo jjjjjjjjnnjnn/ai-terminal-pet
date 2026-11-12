@@ -21,11 +21,12 @@ import (
 
 // Version is reported by `ai-terminal-pet --version`.
 //
-// 1.0.0 rather than 0.9.0: this release ships three install paths (one command,
-// two downloads, source), a self-checking installer, a single-file setup and a
-// cross-checked documentation set. The number also stops being the fourth
-// different one in circulation - the overlay said 0.9.0 while npm said 1.2.5.
-const Version = "1.0.0"
+// 1.0.1 rather than 1.0.0: the compact strip now answers "how long" as well as
+// "how many" - the one fact the whole product exists for ("which terminal is
+// blocked, and for how long") used to require expanding the panel. Same
+// silhouette, same geometry; the biggest type on the strip changes subject
+// while somebody waits.
+const Version = "1.0.1"
 
 func Run() error {
 	return RunWith(false)

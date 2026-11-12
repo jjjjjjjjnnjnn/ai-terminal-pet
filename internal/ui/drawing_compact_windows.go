@@ -90,6 +90,13 @@ type renderedKey struct {
 	approveSec int64
 	// clock is what makes a time-driven frame differ from the last one.
 	clock int64
+	// waitMinute is the minute bucket of the compact strip's duration, and 0
+	// when the strip is not showing one. It has to be separate from clock:
+	// purePulseFrame deliberately ignores clock (the breath is expressed as
+	// window alpha, not as new pixels), so a field that only exists to make the
+	// duration text advance would otherwise be thrown away and "12m" would
+	// freeze until the next reporter push.
+	waitMinute int64
 }
 
 func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64) renderedKey {
@@ -105,6 +112,14 @@ func frameKey(width, height int, digest uint64, state session.State, count int, 
 		tuck:       int32(math.Round(tuck * 1000)),
 		lang:       lang,
 		approveSec: approveSec,
+	}
+	// The compact strip prints a duration only while somebody is waiting, and it
+	// is minute-grained, so one repaint per minute is enough. This is the same
+	// reasoning as the expanded panel's bucket below - except that here the
+	// duration is drawn even while the pulse reuses the bitmap, so it cannot
+	// ride on clock (see waitMinute).
+	if !expanded && (state == session.StateWaitingPermission || state == session.StateError) {
+		key.waitMinute = now.Unix() / 60
 	}
 	switch {
 	case animating:
@@ -246,8 +261,20 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 
 	drawStatusOrb(target, center, value(14), value(28), state, now, pressed)
 
-	target.text(value(4), value(50), width-value(8), value(26), compactCount(len(items)), value(22), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-	target.text(value(4), value(76), width-value(8), value(12), i18n.T(lang, i18n.KeyPanelSessions), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	// The big slot answers whichever question the panel is actually asking.
+	// While somebody is blocked on the user it shows HOW LONG ("12m" / "12分",
+	// 16-bold: the widest case measured is "99小时+" at 44 px, and fitText is
+	// still applied as a guard); the count moves down to the caption, so the
+	// strip reads 12m / 3 sessions / Waiting / <project>. Everything busy keeps
+	// the original count-then-noun pair, unchanged.
+	if waited, ok := compactWait(items, now, lang); ok {
+		target.text(value(4), value(50), width-value(8), value(26), target.fitText(waited, value(16), 700, width-value(8)), value(16), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		noun := fmt.Sprintf(i18n.T(lang, i18n.KeySummarySessions), len(items))
+		target.text(value(4), value(76), width-value(8), value(12), target.fitText(noun, value(9), 400, width-value(8)), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	} else {
+		target.text(value(4), value(50), width-value(8), value(26), compactCount(len(items)), value(22), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		target.text(value(4), value(76), width-value(8), value(12), i18n.T(lang, i18n.KeyPanelSessions), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	}
 
 	target.fillRect(value(12), value(96), width-value(24), 1, colorDivider)
 
@@ -269,6 +296,72 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 	subject, subjectColor := compactSubject(items, state, lang)
 	subject = target.fitText(subject, value(9), 400, width-value(8))
 	target.text(value(4), value(124), width-value(8), value(14), subject, value(9), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+}
+
+// compactWait renders the longest wait among the sessions that want the user.
+//
+// Only waiting_permission and error qualify. Those are the states where "how
+// long" answers a question the user is asking; working / tool_use / thinking are
+// busy (nobody is waiting on anybody), and idle / closed carry a timestamp that
+// means "when it finished", not "how long it held me up".
+//
+// The OLDEST such session wins, not the highest-priority one: when a permission
+// prompt and a failed build are both on screen, the prompt is the one that has
+// been blocking longest, and that is the fact a glance should return.
+func compactWait(items []session.Session, now time.Time, lang i18n.Lang) (string, bool) {
+	var oldest time.Time
+	for _, current := range items {
+		if current.State != session.StateWaitingPermission && current.State != session.StateError {
+			continue
+		}
+		stamp := current.UpdatedAt
+		if stamp.IsZero() {
+			// A snapshot without a timestamp still deserves the slot; it just
+			// cannot contribute a duration, so it counts as "right now" rather
+			// than dropping the whole answer.
+			stamp = now
+		}
+		if oldest.IsZero() || stamp.Before(oldest) {
+			oldest = stamp
+		}
+	}
+	if oldest.IsZero() {
+		return "", false
+	}
+	return shortElapsed(now.Sub(oldest), lang), true
+}
+
+// shortElapsed is the strip's compact duration. Its bucket boundaries are
+// relativeTime's on purpose: two formatters with their own thresholds is how a
+// panel ends up saying "刚刚" in one place and "1 分钟前" in another for the same
+// instant.
+//
+// Anything under a minute collapses to the smallest label, because "0分" reads
+// like a bug while "1分" is merely cautious.
+func shortElapsed(delta time.Duration, lang i18n.Lang) string {
+	if delta < 0 {
+		delta = 0
+	}
+	switch {
+	case delta < time.Minute:
+		return i18n.T(lang, i18n.KeyTimeShortMin1)
+	case delta < time.Hour:
+		// 59 minutes is the longest text in this bucket: "59分" is 36 px at
+		// 16-bold, comfortably inside the 48 the strip has between its insets.
+		return fmt.Sprintf(i18n.T(lang, i18n.KeyTimeShortMins), int(delta.Minutes()))
+	case delta < 2*time.Hour:
+		return i18n.T(lang, i18n.KeyTimeShortHour1)
+	default:
+		hours := int(delta.Hours())
+		if hours > 99 {
+			// A week-old snapshot is not informative at this size, and an
+			// unbounded integer would eventually overrun the slot. 99+ is the
+			// ceiling; the long form in the expanded list still says the exact
+			// number.
+			hours = 99
+		}
+		return fmt.Sprintf(i18n.T(lang, i18n.KeyTimeShortHours), hours)
+	}
 }
 
 // compactSubject picks the one line of text worth showing under the count:

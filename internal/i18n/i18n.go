@@ -134,6 +134,14 @@ const (
 	KeyTimeHour1 = "time.hour1"
 	KeyTimeHours = "time.hours"
 
+	// The short forms exist for the compact strip only: it is 56 logical units
+	// wide, where "12 minutes ago" cannot be drawn. The expanded rows keep the
+	// long wording, because there the sentence is the point.
+	KeyTimeShortMin1  = "time.shortMin1"
+	KeyTimeShortMins  = "time.shortMins"
+	KeyTimeShortHour1 = "time.shortHour1"
+	KeyTimeShortHours = "time.shortHours"
+
 	KeyTrayShow      = "tray.show"
 	KeyTrayHide      = "tray.hide"
 	KeyTrayReset     = "tray.reset"
@@ -247,6 +255,11 @@ var dictEn = map[string]string{
 	KeyTimeHour1: "1 hour ago",
 	KeyTimeHours: "%d hours ago",
 
+	KeyTimeShortMin1:  "1m",
+	KeyTimeShortMins:  "%dm",
+	KeyTimeShortHour1: "1h",
+	KeyTimeShortHours: "%dh",
+
 	KeyTrayShow:      "Show panel",
 	KeyTrayHide:      "Hide to tray",
 	KeyTrayReset:     "Reset position and size",
@@ -357,6 +370,11 @@ var dictZhCN = map[string]string{
 	KeyTimeMins:  "%d 分钟前",
 	KeyTimeHour1: "1 小时前",
 	KeyTimeHours: "%d 小时前",
+
+	KeyTimeShortMin1:  "1分",
+	KeyTimeShortMins:  "%d分",
+	KeyTimeShortHour1: "1小时",
+	KeyTimeShortHours: "%d小时",
 
 	KeyTrayShow:      "显示浮窗",
 	KeyTrayHide:      "隐藏到托盘",
