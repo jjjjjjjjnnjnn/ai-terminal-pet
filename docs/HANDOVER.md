@@ -1,12 +1,14 @@
 # HANDOVER — ai-terminal-pet 交接文档
 
 > 交接时间：2026-09-24（UTC+8 下午）；2026-11-09 刷新到 v0.9.0；2026-11-10 补记 v0.9.0 之后未发版的工作，含 DSH 插件包 1.2.3 与市场条目合并；2026-11-11 刷新到插件包 1.2.4（只改文案）并补齐三家已合并的目录；**2026-11-11 10:30 +0100 交接整理**——同步到 `bb00e58`、记入 dshopen 收录、新增 §28 交接清单。
-> 下一位 AI 直接从 §1「当前状态」开始读，然后按 §13–§27 的时间序读 runbook，不必回溯长上下文。
+> 下一位 AI 直接从 §1「当前状态」与 §38「交接：2026-11-12 会话结束」开始读，然后按 §13–§27 的时间序读
+> runbook，不必回溯长上下文；§35–§38 是 2026-11-12 这一天四轮工作的施工记录。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
 ## 1. 当前状态（2026-11-12 下午；浮窗 **1.0.2**、插件包 **1.2.8**，两个 Release 与 npm 都已发布）
 
-> 接手请先读本节与文末 §28「交接清单」，那两节给出「现在在哪、下一步做什么」；§27 是插件包分发的完整 runbook。
+> 接手请先读本节与文末 **§38「交接：2026-11-12 会话结束」**，那两节给出「现在在哪、下一步做什么」；
+> §28 是更早一版的清单（分发状态已过期，只保留它的清单形状），§27 是插件包分发的完整 runbook。
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
@@ -3025,3 +3027,90 @@ vendor/manifest.json                          overlay 4,391,424 B / sha256 f7788
 - `perSourceColor` 只改**来源名**，不改左侧状态脊与状态词：那两处是信号本身。
 - 未知上报端取中性色（`Secondary`），不猜。新终端要显示自己的颜色，得在 `sourceColor` 里加一行。
 - `hiddenAtLaunch` 只作用于启动。托盘菜单、`--show`、`--toggle` 之后仍然是权威——它不是「隐藏模式」。
+
+## 38. 交接：2026-11-12 会话结束（浮窗 1.0.2 / 插件 1.2.8，下一步 F8）
+
+### 38.1 这一整天做了什么（四轮，全部在线上）
+
+| 轮次 | 交付 | 版本 |
+|---|---|---|
+| 门禁加固 | `scan` 作业（govulncheck + gosec，G115 按族排除、G703 按路径限定四个文件）、`fresh-machine` 失败信息不再空、五个 action 升到 node24、提交身份：id 形式 noreply + SSH 签名（**历史不重写**） | 无版本号 |
+| F9 | 紧凑态大号槽在有人等时改显**等待时长**（`12分`/`12m`），几何不变 | `pet-v1.0.1` / `dsh-plugin-v1.2.7` |
+| 外观 | 三套命名调色板（`slate` 默认 / `paper` / `contrast`）、`perSourceColor`、`hiddenAtLaunch`、设置窗口第四页签「外观」 | `pet-v1.0.2` / `dsh-plugin-v1.2.8` |
+
+三条版本线的账都在：`pet-v0.9.0`、`v1.0.0`、`v1.0.1`、`v1.0.2` 与 `dsh-plugin-v1.0.0` … `v1.2.8`，**全部不可变**，
+不要替换任何已发布资产。
+
+### 38.2 开工口令（按顺序跑，先证明起点干净）
+
+```powershell
+git status --short                       # 必须为空
+git log --oneline -6                     # 顶上是本轮的文档提交
+npm view dsh-ai-terminal-pet version     # 1.2.8
+gh run list --limit 1                    # success（build+verify 与 scan 两个作业）
+gofmt -l . ; go vet ./...                # 干净 / 0
+go test -count=1 ./...                   # 12 个包全 ok，218 个 func Test
+node packages/dsh-ai-terminal-pet/verify.mjs
+node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
+node integrations/deepseek-harness/verify.mjs
+node tests/fresh-machine.mjs --no-overlay   # 162/162
+python tools/check_docs_links.py            # 11 份文档全解
+.\scripts\install.cmd -VerifyOnly           # 11 file(s), 0 warning
+& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 9 ok / 0 warn / 0 fail（浮窗在跑时）
+```
+
+**注意**：本机的 `--doctor` 如果不带浮窗实例在跑，会给 2 条 warn（pipe/instance），那是正常的；
+9 ok 的前提是「有实例在监听」。
+
+### 38.3 下一步：F8（最后一项，也是三步里最大的一步）
+
+**F8 —— 点击会话行复制项目路径 + 气泡回执**（ROADMAP §4）。为什么它比 F9 大：现在的规则是「点击任意处收起」，
+所以要做 F8 必须改成「点击行 = 复制路径 + 回执，点击行以外的面板区域 = 收起」，并且新增一个绘制元素与一个
+定时器。ROADMAP 里已经写明建议的交互形态，不要重新设计。
+
+三条施工约束（都是前两轮踩出来的，别绕过去）：
+1. **命中区域必须与绘制同源**（`focusHit` / `expandedRowFocusRect` 那样的纯函数），否则会出现「画在这儿、
+   点在那儿」。
+2. **任何新画的东西都要进 `renderedKey`**，否则「同一个 key = 同一张位图」的帧复用会把它吞掉——
+   1.0.1 的时长冻结与 1.0.2 的主题不重绘都是这个成因。
+3. **回执的定时器要与现有动画定时器同一套装/卸机制**（`syncAnimation`），别新开一个常驻计时器。
+
+发版代价与之前一样：三个二进制重编 → `npm run vendor` → 插件 1.2.9 → A 提交（版本+索引时间戳）→
+双 tag + 双 Release + npm → B 提交钉索引 sha → awesome 的 `bump-tarball-1.2.9` 跟进 PR。
+`docs/assets/` 需要重出（回执是一个新视觉元素，`TestRenderPreview` 要加一个用例）。
+
+### 38.4 这一天学到、下一轮别再犯的
+
+| 事项 | 记在哪 |
+|---|---|
+| `go run` 的两个扫描器各自要求比本模块更新的 Go，所以 CI 把它们放独立 `scan` 作业，构建作业继续钉 1.23 | §35.4 / `ci.yml` 注释 |
+| 本机完整形态（不带 `--no-overlay`）会与本机宿主 hooks 抢单实例互斥体，看起来像产品缺陷；`--no-overlay` 才是门禁 | §35.8 |
+| 呼吸态复用位图忽略 `clock`，任何「随时钟变化的内容」都要自己的桶字段 | §36.3 |
+| 浅色主题里「次要文字」必须变暗；对比度只对「文字 vs 它自己的底色」成立，别声称 WCAG | §37.3 |
+| `config.ValidTheme` 与 `ui.normalizeTheme` 是有意重复，由 `internal/app` 的测试钉住；新增设置必须同时改 `applyUISettings` | §37.4 |
+| 上游条目 PR 永远只改 `tarball` 一行，且**必须用 base64 上传**（PowerShell 5.1 会把 UTF-8 当 ANSI 解码） | §30.6 / §37.6 |
+| PowerShell 里 `git show > file` 会写出 UTF-16，Python 读 UTF-8 会报 `0xff`；用 `cmd /c "git show … > file"` | 本轮实测 |
+
+### 38.5 外部世界现在是什么样（2026-11-12 13:50Z 实读）
+
+- **npm**：`dist-tags.latest` = **1.2.8**；`npm pack` 取回的 tarball 与 Release 资产逐字节相同。
+- **awesome-dsh-plugin**：1.2.7 的跟进 PR [#14688](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14688)
+  仍 open；1.2.8 的跟进 PR [#14718](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14718)
+  已开、MERGEABLE、check 在跑。**上游仓库里的 `tarball` 仍是 1.2.6**——合并前不会变，别以为 PR 开了就等于收录。
+- **dshopen**：线上 `index.json` 仍渲染 1.2.4，等它自己重建。
+- **四家人工目录**（dshbase / dsh.so / dsh-plugin.org / AllDSH）仍 open、0 评论，不要再投。
+- **下载数**（发版后约 15 分钟）：`pet-v1.0.2` = 0、`dsh-plugin-v1.2.8` = 0；对照 `pet-v1.0.1` = 5、
+  `dsh-plugin-v1.2.7` = 2、`pet-v1.0.0` = 4、`v1.2.6` = 9、`v1.2.3` = 47。
+- **提交身份**：`user.email` = `236163329+jjjjjjjjnnjnn@users.noreply.github.com`（仓库内），
+  SSH 签名，`gh api .../commits/main` 实测 `verified: true / reason: valid`。
+  **118+ 个历史提交与 11+ 个已发布 tag 刻意未重写**（§35.5）。
+
+### 38.6 交接时最容易踩的坑（本轮真的踩了）
+
+| 坑 | 表现 | 怎么避开 |
+|---|---|---|
+| 版本号批量替换 | 上一轮把 `1.2.6` 全量替换成 `1.2.7`，结果出现「tag 是 1.2.7、资产名还是 1.2.6」这种自相矛盾的句子 | 用带**断言**的脚本改文档：每条替换必须恰好命中一次，改完再断言结果里应有的字符串都在 |
+| 中文段落被合并坏掉 | `462dca2` 把两版中文段落首尾相接，留下一个从句中开始的残句；第一次修的时候又把故事讲了两遍 | 改中文长段前先数「同一事实出现几次」；重复检测用探针字符串 |
+| `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
+| 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
+
