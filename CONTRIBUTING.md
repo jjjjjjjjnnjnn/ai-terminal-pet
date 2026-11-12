@@ -28,8 +28,13 @@ Two environment traps that look like product bugs and are not:
 
 ```powershell
 gofmt -l .        # must print nothing
-go vet ./...      # must print nothing
+go vet ./...
 go test -count=1 ./...
+
+# The two scanners need no C compiler. They declare a Go newer than this
+# module's floor, which is why CI runs them in their own `scan` job:
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -severity high -confidence high -exclude G115,G703 ./...
 
 # node --check validates only the FIRST file it is given, so check each one:
 foreach ($f in Get-ChildItem reporters\*.js) { node --check $f.FullName }
@@ -40,6 +45,18 @@ node packages/dsh-ai-terminal-pet/verify.mjs
 node tests/fresh-machine.mjs --no-overlay
 .\scripts\install.cmd -VerifyOnly
 ```
+
+Two things about that list are worth knowing before you trust a red run:
+
+- **`-race` is not here.** On Windows it needs gcc/cgo, which this project does not require (see
+  `docs/ROADMAP.md` §6). Do not call the scans above a "full security audit"; they are a static scan and a
+  dependency-vulnerability scan.
+- **`tests/fresh-machine.mjs` without `--no-overlay` only makes sense on an idle machine.** The GUI scenarios
+  boot the overlay, and the single-instance mutex is `Local\AI-Terminal-Pet-v1-SingleInstance` - per Windows
+  session, not per sandbox. If a host CLI with this project's reporter is running in the same session, its next
+  hook event relaunches the real overlay, the sandbox copy loses the mutex and exits cleanly without creating
+  its pipe, and S4 looks like a product failure. Kill every `AI-Terminal-Pet.exe` first if you want the 182-check
+  form; CI deliberately runs the 162-check form (`docs/HANDOVER.md` §35.8 has the measurement).
 
 `tests/fresh-machine.mjs` is the gate that answers "does this work on a machine that has never seen it" — it packs the plugin, extracts it into a DSH-style `node_modules`, installs through the installer and drives all three binaries inside a sandbox with its own `LOCALAPPDATA`, `USERPROFILE` and named pipe. Drop `--no-overlay` to also boot the overlay inside that sandbox.
 
