@@ -129,9 +129,9 @@ func TestFrameKeyAdvancesTheDurationPerMinute(t *testing.T) {
 	// Start on a minute boundary: with an arbitrary offset, "20 seconds later"
 	// can cross the boundary and the check would be wrong, not the code.
 	start := time.Unix(1_000_020, 0)
-	first := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 3, false, false, false, 0, true, start, i18n.LangEn, -1, themeSlate, false)
-	sameBucket := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 3, false, false, false, 0, true, start.Add(20*time.Second), i18n.LangEn, -1, themeSlate, false)
-	nextBucket := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 3, false, false, false, 0, true, start.Add(70*time.Second), i18n.LangEn, -1, themeSlate, false)
+	first := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 3, false, false, false, 0, true, start, i18n.LangEn, -1, themeSlate, false, 0, 0, -1)
+	sameBucket := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 3, false, false, false, 0, true, start.Add(20*time.Second), i18n.LangEn, -1, themeSlate, false, 0, 0, -1)
+	nextBucket := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 3, false, false, false, 0, true, start.Add(70*time.Second), i18n.LangEn, -1, themeSlate, false, 0, 0, -1)
 	if first.waitMinute != sameBucket.waitMinute {
 		t.Fatalf("20 s later the minute bucket moved: %d vs %d", first.waitMinute, sameBucket.waitMinute)
 	}
@@ -149,12 +149,12 @@ func TestFrameKeyAdvancesTheDurationPerMinute(t *testing.T) {
 	// A busy panel shows no duration, so it must not carry a minute bucket at
 	// all - otherwise every busy compact panel would repaint once a minute for
 	// nothing.
-	busy := frameKey(compactWidth, compactHeight, 7, session.StateWorking, 3, false, false, false, 0, false, start, i18n.LangEn, -1, themeSlate, false)
+	busy := frameKey(compactWidth, compactHeight, 7, session.StateWorking, 3, false, false, false, 0, false, start, i18n.LangEn, -1, themeSlate, false, 0, 0, -1)
 	if busy.waitMinute != 0 {
 		t.Fatalf("busy compact frame has waitMinute %d, want 0", busy.waitMinute)
 	}
 	// The expanded panel keeps its own 15 s clock and must not gain this one.
-	expanded := frameKey(expandedWidth, 300, 7, session.StateError, 3, true, false, false, 0, false, start, i18n.LangEn, -1, themeSlate, false)
+	expanded := frameKey(expandedWidth, 300, 7, session.StateError, 3, true, false, false, 0, false, start, i18n.LangEn, -1, themeSlate, false, 0, 0, -1)
 	if expanded.waitMinute != 0 {
 		t.Fatalf("expanded frame has waitMinute %d, want 0", expanded.waitMinute)
 	}

@@ -23,12 +23,14 @@ package ui
 //     coalesces it onto a background writer.
 
 import (
+	"fmt"
 	"math"
 	"syscall"
 	"time"
 	"unsafe"
 
 	"ai-terminal-pet/internal/i18n"
+	"ai-terminal-pet/internal/session"
 	win "github.com/lxn/win"
 )
 
@@ -119,6 +121,18 @@ const (
 	settingsApproveDown
 	settingsApproveUp
 	settingsReset
+
+	// Attentiveness: the rows that decide whether an alert is useful. They
+	// share the Sessions tab with auto-approve, because both answer "what does
+	// this thing do while I am not watching".
+	settingsForegroundAware
+	settingsIdleMinutes
+	settingsDonePolicy
+	settingsQuietCurrent
+	settingsQuietSubagents
+	settingsMuteClear
+	settingsTestWaiting
+	settingsTestDone
 )
 
 // settingsTabControl maps a sidebar index onto its control id.
@@ -193,6 +207,14 @@ type settingsView struct {
 	Theme          string
 	PerSource      bool
 	HiddenAtLaunch bool
+	// Attentiveness. DonePolicy is the persisted string so the segment and
+	// the tick can both be derived from one field.
+	ForegroundAware bool
+	IdleMinutes     int
+	DonePolicy      string
+	QuietCurrent    bool
+	QuietSubagents  bool
+	MuteCount       int
 }
 
 type settingsRect struct {
@@ -403,23 +425,29 @@ func settingsSegmentRect(control settingsRect, count, index int) settingsRect {
 func (a *App) settingsView() settingsView {
 	settings := a.options.Settings
 	return settingsView{
-		Notifications:  settings.Notifications,
-		AlwaysOnTop:    settings.AlwaysOnTop,
-		EdgeRetract:    settings.EdgeRetract,
-		Sound:          settings.Sound,
-		SoundOnWaiting: settings.SoundOnWaiting,
-		SoundOnError:   settings.SoundOnError,
-		NotifyOnFinish: settings.NotifyOnFinish,
-		AutoApprove:    settings.AutoApprove,
-		AutoStart:      a.options.AutoStart,
-		Opacity:        int(a.options.Opacity),
-		Volume:         settings.SoundVolume,
-		ApproveTimeout: a.approveSeconds(),
-		Scheme:         validSoundScheme(settings.SoundScheme),
-		Language:       settings.Language,
-		Theme:          normalizeTheme(settings.Theme),
-		PerSource:      settings.PerSourceColor,
-		HiddenAtLaunch: settings.HiddenAtLaunch,
+		Notifications:   settings.Notifications,
+		AlwaysOnTop:     settings.AlwaysOnTop,
+		EdgeRetract:     settings.EdgeRetract,
+		Sound:           settings.Sound,
+		SoundOnWaiting:  settings.SoundOnWaiting,
+		SoundOnError:    settings.SoundOnError,
+		NotifyOnFinish:  settings.NotifyOnFinish,
+		AutoApprove:     settings.AutoApprove,
+		AutoStart:       a.options.AutoStart,
+		Opacity:         int(a.options.Opacity),
+		Volume:          settings.SoundVolume,
+		ApproveTimeout:  a.approveSeconds(),
+		Scheme:          validSoundScheme(settings.SoundScheme),
+		Language:        settings.Language,
+		Theme:           normalizeTheme(settings.Theme),
+		PerSource:       settings.PerSourceColor,
+		HiddenAtLaunch:  settings.HiddenAtLaunch,
+		ForegroundAware: settings.ForegroundAware,
+		IdleMinutes:     settings.IdleSeconds / 60,
+		DonePolicy:      string(ValidDonePolicy(settings.DonePolicy)),
+		QuietCurrent:    settings.QuietCurrent,
+		QuietSubagents:  settings.QuietSubagents,
+		MuteCount:       a.mutes.size(),
 	}
 }
 
@@ -437,7 +465,7 @@ func (a *App) settingsRows() []settingsRow {
 	case 1:
 		return soundRows(a.lang)
 	case 2:
-		return sessionRows(a.lang)
+		return sessionRows(a.lang, a.mutes.size())
 	case 3:
 		return appearanceRows(a.lang)
 	default:
@@ -512,11 +540,42 @@ func soundRows(lang i18n.Lang) []settingsRow {
 			title:  i18n.T(lang, i18n.KeySettingsPreview),
 			hint:   i18n.T(lang, i18n.KeySettingsPreviewHint),
 			action: i18n.T(lang, i18n.KeySettingsPreviewPlay)},
+		// Two test buttons, not one: "did the tone play" and "did the balloon
+		// arrive" are different questions, and the second one is the only way
+		// to check notification permission without waiting for a real blocker.
+		{control: settingsTestWaiting, kind: rowButton,
+			title:  i18n.T(lang, i18n.KeySettingsTestWaiting),
+			hint:   i18n.T(lang, i18n.KeySettingsTestWaitingHint),
+			action: i18n.T(lang, i18n.KeySettingsTestPlay)},
+		{control: settingsTestDone, kind: rowButton,
+			title:  i18n.T(lang, i18n.KeySettingsTestDone),
+			hint:   i18n.T(lang, i18n.KeySettingsTestDoneHint),
+			action: i18n.T(lang, i18n.KeySettingsTestPlay)},
 	}
 }
 
-func sessionRows(lang i18n.Lang) []settingsRow {
+func sessionRows(lang i18n.Lang, muteCount int) []settingsRow {
 	return []settingsRow{
+		{control: settingsForegroundAware, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsForegroundAware), hint: i18n.T(lang, i18n.KeySettingsForegroundAwareHint)},
+		{control: settingsIdleMinutes, kind: rowStepper, minimum: 0, maximum: 120,
+			title: i18n.T(lang, i18n.KeySettingsIdleMinutes), hint: i18n.T(lang, i18n.KeySettingsIdleMinutesHint)},
+		{control: settingsDonePolicy, kind: rowSegment,
+			title: i18n.T(lang, i18n.KeySettingsDonePolicy),
+			hint:  i18n.T(lang, i18n.KeySettingsDonePolicyHint),
+			options: []string{
+				i18n.T(lang, i18n.KeySettingsDoneBackground),
+				i18n.T(lang, i18n.KeySettingsDoneOff),
+				i18n.T(lang, i18n.KeySettingsDoneAlways),
+			}},
+		{control: settingsQuietCurrent, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsQuietCurrent), hint: i18n.T(lang, i18n.KeySettingsQuietCurrentHint)},
+		{control: settingsQuietSubagents, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsQuietSubagents), hint: i18n.T(lang, i18n.KeySettingsQuietSubagentsHint)},
+		{control: settingsMuteClear, kind: rowButton,
+			title:  fmt.Sprintf("%s · %d", i18n.T(lang, i18n.KeySettingsMuteCount), muteCount),
+			hint:   i18n.T(lang, i18n.KeySettingsMuteCountHint),
+			action: i18n.T(lang, i18n.KeySettingsMuteClearAction)},
 		{control: settingsAutoApprove, kind: rowToggle,
 			title: i18n.T(lang, i18n.KeySettingsAutoApprove), hint: i18n.T(lang, i18n.KeySettingsAutoApproveHint)},
 		{control: settingsApproveUp, alt: settingsApproveDown, kind: rowStepper, minimum: 1, maximum: 60,
@@ -527,6 +586,8 @@ func sessionRows(lang i18n.Lang) []settingsRow {
 			action: i18n.T(lang, i18n.KeySettingsResetAction)},
 		{control: settingsNone, kind: rowNote,
 			title: i18n.T(lang, i18n.KeySettingsSessionsNote)},
+		{control: settingsNone, kind: rowNote,
+			title: i18n.T(lang, i18n.KeySettingsAttendNote)},
 	}
 }
 
@@ -562,8 +623,37 @@ func settingsSegmentIndex(row settingsRow, view settingsView) int {
 		return settingsLanguageIndex(view.Language)
 	case settingsTheme:
 		return settingsThemeIndex(view.Theme)
+	case settingsDonePolicy:
+		return settingsDonePolicyIndex(view.DonePolicy)
 	}
 	return -1
+}
+
+// settingsDonePolicyIndex maps the persisted policy onto the segment, whose
+// option order is the one config.DonePolicies declares: background, off, always.
+func settingsDonePolicyIndex(value string) int {
+	switch ValidDonePolicy(value) {
+	case DonePolicyOff:
+		return 1
+	case DonePolicyAlways:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// settingsDonePolicyAt is the inverse, and it is exhaustive on purpose: a
+// segment index outside 0..2 keeps the current value rather than inventing one.
+func settingsDonePolicyAt(index int) (DonePolicy, bool) {
+	switch index {
+	case 0:
+		return DonePolicyBackground, true
+	case 1:
+		return DonePolicyOff, true
+	case 2:
+		return DonePolicyAlways, true
+	}
+	return "", false
 }
 
 // settingsThemeIndex maps the persisted palette onto the segment index.
@@ -624,6 +714,16 @@ func settingsToggleState(row settingsRow, view settingsView) bool {
 		return view.PerSource
 	case settingsHiddenAtLaunch:
 		return view.HiddenAtLaunch
+	case settingsForegroundAware:
+		return view.ForegroundAware
+	case settingsQuietCurrent:
+		return view.QuietCurrent
+	case settingsQuietSubagents:
+		return view.QuietSubagents
+	case settingsDonePolicy:
+		// The segment draws its own selection; there is no tick to derive, so
+		// this reports the value the "on" style would use only for completeness.
+		return view.DonePolicy != string(DonePolicyOff)
 	}
 	return false
 }
@@ -1300,6 +1400,50 @@ func (a *App) settingsMouseUp(x, y int) {
 	a.settingsApply(control, index)
 }
 
+// idleMinutes is the live idle threshold in whole minutes.
+func (a *App) idleMinutes() int {
+	seconds := a.options.Settings.IdleSeconds
+	if seconds <= 0 {
+		return 0
+	}
+	return seconds / 60
+}
+
+// setIdleMinutes clamps the idle threshold into the range config.json accepts
+// and keeps the ui-side seconds in step. Zero is a real value there - "window
+// focus only" - so it must survive the clamp.
+func (a *App) setIdleMinutes(minutes int) {
+	if minutes < 0 {
+		minutes = 0
+	}
+	if minutes > 120 {
+		minutes = 120
+	}
+	a.options.Settings.IdleSeconds = minutes * 60
+}
+
+// testAlert fires one balloon through the same path a real alert uses, so the
+// three things that can go wrong (a balloon that never appears, a tone that
+// never plays, a setting that is not the one being tested) are all visible at
+// once. It deliberately counts against no session: a test alert must not mark a
+// row unread or start a coalescing window on somebody's conversation.
+func (a *App) testAlert(kind session.Kind) {
+	switch kind {
+	case session.KindDone:
+		a.balloonText(i18n.T(a.lang, i18n.KeyBalloonDoneTitle),
+			i18n.T(a.lang, i18n.KeyBalloonDoneBody), niifInfo)
+		if a.options.Settings.Sound && ValidDonePolicy(a.options.Settings.DonePolicy) != DonePolicyOff {
+			beep(beepFinished)
+		}
+	default:
+		a.balloonText(i18n.T(a.lang, i18n.KeyBalloonWaitTitle),
+			i18n.T(a.lang, i18n.KeySettingsTestWaitingHint), uint32(win.NIIF_WARNING))
+		if soundWanted(session.KindApproval, a.attentionSettings()) {
+			beep(beepExclamation)
+		}
+	}
+}
+
 // settingsApplySlider mirrors a drag position into the live settings without
 // persisting. Release persists.
 func (a *App) settingsApplySlider(control settingsControl, x int) {
@@ -1377,6 +1521,35 @@ func (a *App) settingsApply(control settingsControl, index int) {
 			a.approvals.update(nil, time.Now(), false, 0)
 		}
 		a.postRefresh()
+	case settingsForegroundAware:
+		settings.ForegroundAware = !settings.ForegroundAware
+	// The stepper convention, unchanged: index 0 is the minus half, 1 the plus.
+	case settingsIdleMinutes:
+		if index == 0 {
+			a.setIdleMinutes(a.idleMinutes() - 1)
+		} else {
+			a.setIdleMinutes(a.idleMinutes() + 1)
+		}
+	case settingsDonePolicy:
+		if policy, ok := settingsDonePolicyAt(index); ok {
+			settings.DonePolicy = string(policy)
+			// Keep the legacy two-way view in step, so an older build reading
+			// the same file still sees a coherent answer.
+			settings.NotifyOnFinish = policy != DonePolicyOff
+		}
+	case settingsQuietCurrent:
+		settings.QuietCurrent = !settings.QuietCurrent
+	case settingsQuietSubagents:
+		settings.QuietSubagents = !settings.QuietSubagents
+	case settingsMuteClear:
+		if a.mutes.clear() > 0 {
+			settings.MutedSessions = a.mutes.list()
+			a.postRefresh()
+		}
+	case settingsTestWaiting:
+		a.testAlert(session.KindApproval)
+	case settingsTestDone:
+		a.testAlert(session.KindDone)
 	case settingsApproveDown:
 		a.setApproveSeconds(a.approveSeconds() - 1)
 	case settingsApproveUp:
@@ -1433,6 +1606,12 @@ func (a *App) setApproveSeconds(seconds int) {
 // applyDefaultSettings restores every preference to its documented default.
 // Window placement is deliberately untouched: "restore defaults" is about
 // behaviour, and silently moving the panel would be a surprise.
+//
+// Two things are deliberately NOT restored: window placement (above) and the
+// per-session mute list. A mute is a decision about one conversation - a
+// background job the user silenced on purpose - and clearing it would start
+// waking them again without being asked. The Sessions tab has an explicit
+// "clear all" for that.
 func (a *App) applyDefaultSettings() {
 	defaults := DefaultSettings()
 	current := a.options.Settings
@@ -1451,6 +1630,17 @@ func (a *App) applyDefaultSettings() {
 	current.Theme = defaults.Theme
 	current.PerSourceColor = defaults.PerSourceColor
 	current.HiddenAtLaunch = defaults.HiddenAtLaunch
+	current.ForegroundAware = defaults.ForegroundAware
+	current.IdleSeconds = defaults.IdleSeconds
+	current.DonePolicy = defaults.DonePolicy
+	current.NotifyOnFinish = defaults.NotifyOnFinish
+	current.QuietCurrent = defaults.QuietCurrent
+	current.QuietSubagents = defaults.QuietSubagents
+	// The mute list is a user decision about specific conversations, not a
+	// preference: "restore defaults" restores behaviour, and silently unmuting
+	// a background job the user silenced on purpose would start waking them
+	// again. The Sessions tab has its own "clear all" button for that.
+	current.MutedSessions = a.mutes.list()
 	a.options.Settings = current
 	a.options.Opacity = uint8(defaults.Opacity)
 	setSoundVolume(current.SoundVolume)

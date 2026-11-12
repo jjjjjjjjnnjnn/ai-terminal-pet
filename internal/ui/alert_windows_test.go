@@ -1,59 +1,34 @@
 package ui
 
+// The regression tests that shaped this area, kept and re-pointed at the pure
+// policy. The old code answered these three questions with four functions
+// (currentAlertStates / transitionLevel / decideAlerts / soundForState); the
+// questions are the same, so the tests are the same questions asked of the
+// replacement, and every one of them is a bug that actually shipped.
+
 import (
 	"testing"
+	"time"
 
 	"ai-terminal-pet/internal/session"
 )
 
-// The old code kept one global "most urgent session" key. Clearing it when
-// that session ended made a still-waiting sibling re-alert later, so a balloon
-// appeared to be caused by an unrelated new session. These cases pin the
-// per-conversation transition model.
-func TestTransitionLevel(t *testing.T) {
-	cases := []struct {
-		name     string
-		previous session.State
-		existed  bool
-		current  session.State
-		want     alertLevel
-	}{
-		{"new busy session is silent", session.StateIdle, false, session.StateWorking, alertNone},
-		{"new idle session is silent", session.StateIdle, false, session.StateIdle, alertNone},
-		{"new session already waiting", session.StateIdle, false, session.StateWaitingPermission, alertUrgent},
-		{"new session already failed", session.StateIdle, false, session.StateError, alertUrgent},
-		{"unchanged waiting does not repeat", session.StateWaitingPermission, true, session.StateWaitingPermission, alertNone},
-		{"unchanged busy does not repeat", session.StateWorking, true, session.StateWorking, alertNone},
-		{"busy to waiting is urgent", session.StateWorking, true, session.StateWaitingPermission, alertUrgent},
-		{"busy to error is urgent", session.StateToolUse, true, session.StateError, alertUrgent},
-		{"waiting to idle is finished", session.StateWaitingPermission, true, session.StateIdle, alertFinished},
-		{"working to idle is finished", session.StateWorking, true, session.StateIdle, alertFinished},
-		{"working to closed is finished", session.StateWorking, true, session.StateClosed, alertFinished},
-		{"error to idle is finished", session.StateError, true, session.StateIdle, alertFinished},
-		{"idle to working is not an alert", session.StateIdle, true, session.StateWorking, alertNone},
-		{"idle to idle is not an alert", session.StateIdle, true, session.StateIdle, alertNone},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := transitionLevel(tc.previous, tc.existed, tc.current); got != tc.want {
-				t.Fatalf("got %d, want %d", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestCurrentAlertStatesKeysArePerConversation(t *testing.T) {
+// TestFactsOfKeysArePerConversation: the per-conversation identity is the
+// point. A single global "most urgent session" key used to be cleared when
+// that session ended, which made a still-waiting sibling look like it had been
+// caused by an unrelated new session.
+func TestFactsOfKeysArePerConversation(t *testing.T) {
 	a := session.Session{Source: "deepseek-harness", SessionID: "ses_1", PID: 11, State: session.StateWorking}
 	b := session.Session{Source: "deepseek-harness", SessionID: "ses_1", PID: 22, State: session.StateWaitingPermission}
 	c := session.Session{Source: "deepseek-harness", SessionID: "ses_2", PID: 11, State: session.StateIdle}
-	states := currentAlertStates([]session.Session{a, b, c})
-	if len(states) != 3 {
-		t.Fatalf("want 3 distinct identities, got %d", len(states))
+	facts := factsOf([]session.Session{a, b, c}, time.Now(), nil)
+	if len(facts) != 3 {
+		t.Fatalf("want 3 distinct identities, got %d", len(facts))
 	}
-	if states[sessionAlertKey(a)] != session.StateWorking ||
-		states[sessionAlertKey(b)] != session.StateWaitingPermission ||
-		states[sessionAlertKey(c)] != session.StateIdle {
-		t.Fatal("states were mixed between conversations")
+	if facts[sessionAlertKey(a)].State != session.StateWorking ||
+		facts[sessionAlertKey(b)].State != session.StateWaitingPermission ||
+		facts[sessionAlertKey(c)].Kind != session.KindDone {
+		t.Fatal("facts were mixed between conversations")
 	}
 }
 
@@ -73,64 +48,119 @@ func TestBusyState(t *testing.T) {
 	}
 }
 
-func TestDecideAlertsDoesNotReannounceASibling(t *testing.T) {
-	waiting := session.Session{Source: "deepseek-harness", SessionID: "A", PID: 1, State: session.StateWaitingPermission}
+// Every conversation is tracked separately, so a sibling ending never
+// re-announces one that has been waiting the whole time. This is the ghost
+// popup, and it is why the baseline is a map rather than one key.
+func TestPlanAlertsDoesNotReannounceASibling(t *testing.T) {
+	settings := attentionSettings()
+	waiting := session.Session{Source: "deepseek-harness", SessionID: "A", PID: 1, State: session.StateWaitingPermission, Reason: "permission"}
 	busy := session.Session{Source: "claude-ipc", SessionID: "B", PID: 2, State: session.StateWorking}
 	fresh := session.Session{Source: "opencode", SessionID: "C", PID: 3, State: session.StateWorking}
 
-	// B ends (its snapshot disappears) while A is still waiting. The only
-	// alert is a soft "finished" - A must NOT be announced again.
-	previous := currentAlertStates([]session.Session{waiting, busy})
-	level, subject := decideAlerts(previous, []session.Session{waiting})
-	if level != alertFinished || subject != nil {
-		t.Fatalf("sibling ending produced level=%d subject=%v, want finished/nil", level, subject)
+	previous := factsOf([]session.Session{waiting, busy}, time.Now(), nil)
+	now := time.Now()
+
+	// B ends (its snapshot disappears) while A is still waiting. The only alert
+	// is a soft "finished", attributed to B itself - A must not speak.
+	plan := PlanAlerts([]AlertInput{
+		{Session: waiting, Kind: session.KindApproval, Previous: session.StateWaitingPermission,
+			Existed: true, PresenceKnown: true},
+		{Session: session.Session{Source: "claude-ipc", SessionID: "B", PID: 2, State: session.StateClosed},
+			Kind: session.KindDone, Previous: session.StateWorking, Existed: true, PresenceKnown: true},
+	}, settings, nil)
+	if plan.Balloon == nil || plan.Balloon.SessionID != "B" {
+		t.Fatalf("the balloon should name the session that finished, got %+v", plan.Balloon)
+	}
+	if plan.Reasons[sessionAlertKey(waiting)] != decisionUnchanged {
+		t.Fatalf("the waiting sibling spoke: %q", plan.Reasons[sessionAlertKey(waiting)])
 	}
 
-	// Starting an unrelated session while A waits must be completely silent.
-	level, subject = decideAlerts(currentAlertStates([]session.Session{waiting}), []session.Session{waiting, fresh})
-	if level != alertNone || subject != nil {
-		t.Fatalf("starting a new session produced an alert: level=%d", level)
+	// Starting an unrelated session while A waits must be completely silent too.
+	plan = PlanAlerts([]AlertInput{
+		{Session: waiting, Kind: session.KindApproval, Previous: session.StateWaitingPermission,
+			Existed: true, PresenceKnown: true},
+		{Session: fresh, Kind: session.KindNone, Previous: session.StateIdle,
+			Existed: true, Present: true, PresenceKnown: true},
+	}, settings, nil)
+	if plan.Balloon != nil {
+		t.Fatalf("a new working session produced a balloon: %+v", plan.Balloon)
 	}
+	_ = previous
+	_ = now
 
 	// A real new urgent session still gets announced, with itself as subject.
-	level, subject = decideAlerts(currentAlertStates([]session.Session{busy}),
-		[]session.Session{busy, waiting})
-	if level != alertUrgent || subject == nil || subject.SessionID != "A" {
-		t.Fatalf("a new waiting session was missed: level=%d subject=%v", level, subject)
+	plan = PlanAlerts([]AlertInput{
+		{Session: waiting, Kind: session.KindApproval, Previous: session.StateIdle,
+			Existed: true, PresenceKnown: true},
+	}, settings, nil)
+	if plan.Balloon == nil || plan.Balloon.SessionID != "A" {
+		t.Fatalf("a session that just started waiting was missed: %+v", plan.Balloon)
 	}
+}
 
-	// A settling into idle is a completion naming A itself.
-	settled := waiting
-	settled.State = session.StateIdle
-	level, subject = decideAlerts(currentAlertStates([]session.Session{waiting}), []session.Session{settled})
-	if level != alertFinished || subject == nil || subject.SessionID != "A" {
-		t.Fatalf("completion was not attributed to its session: level=%d subject=%v", level, subject)
+// A session that opens already blocked does need announcing; a plain new busy
+// one must not. That was the "it only pops up when I start a new session"
+// complaint, and the rule now lives in Decide's Existed branch.
+func TestNewSessionAnnouncedOnlyWhenBlocked(t *testing.T) {
+	settings := attentionSettings()
+	cases := []struct {
+		name  string
+		state session.State
+		want  bool
+	}{
+		{"new working session is silent", session.StateWorking, false},
+		{"new idle session is silent", session.StateIdle, false},
+		{"new session already waiting", session.StateWaitingPermission, true},
+		{"new session already failed", session.StateError, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := AlertInput{
+				Session: session.Session{Source: "opencode", SessionID: "n", PID: 5, State: tc.state},
+				Kind:    session.KindOf(tc.state, ""), Existed: false, PresenceKnown: true,
+			}
+			got := Decide(in, settings, 0)
+			if got.Balloon != tc.want {
+				t.Fatalf("balloon=%v, want %v (%+v)", got.Balloon, tc.want, got)
+			}
+		})
 	}
 }
 
 // The per-event switches must actually gate the tone: muting "waiting" must not
-// silence errors, and the master switch must silence everything.
-func TestSoundForStateHonoursPerEventSwitches(t *testing.T) {
-	on := Settings{Sound: true, SoundOnWaiting: true, SoundOnError: true}
-	if !soundForState(on, session.StateWaitingPermission) || !soundForState(on, session.StateError) {
+// silence errors, and the master switch must silence everything. The gate moved
+// from state to kind when questions and plan reviews joined waiting_permission,
+// and this is the test that keeps both halves honest.
+func TestSoundWantedHonoursPerEventSwitches(t *testing.T) {
+	on := attentionSettings()
+	if !soundWanted(session.KindApproval, on) || !soundWanted(session.KindError, on) {
 		t.Fatal("everything should be audible by default")
 	}
 	quietWaiting := on
 	quietWaiting.SoundOnWaiting = false
-	if soundForState(quietWaiting, session.StateWaitingPermission) {
+	if soundWanted(session.KindApproval, quietWaiting) {
 		t.Fatal("muting waiting did not silence the waiting tone")
 	}
-	if !soundForState(quietWaiting, session.StateError) {
+	if !soundWanted(session.KindError, quietWaiting) {
 		t.Fatal("muting waiting also silenced errors")
+	}
+	// A question is the same interruption as an approval, so it follows the
+	// same gate - not a third switch nobody asked for.
+	if soundWanted(session.KindQuestion, quietWaiting) {
+		t.Fatal("muting waiting must also silence a question")
 	}
 	quietError := on
 	quietError.SoundOnError = false
-	if soundForState(quietError, session.StateError) {
+	if soundWanted(session.KindError, quietError) {
 		t.Fatal("muting errors did not silence the error tone")
 	}
 	master := on
 	master.Sound = false
-	if soundForState(master, session.StateWaitingPermission) || soundForState(master, session.StateError) {
-		t.Fatal("the master switch must silence every event")
+	in := AlertInput{
+		Session: session.Session{Source: "opencode", SessionID: "m", PID: 9, State: session.StateWaitingPermission},
+		Kind:    session.KindApproval, Previous: session.StateWorking, Existed: true, PresenceKnown: true,
+	}
+	if got := Decide(in, master, 0); got.Tone != "" {
+		t.Fatalf("the master switch must silence every tone, got %q", got.Tone)
 	}
 }

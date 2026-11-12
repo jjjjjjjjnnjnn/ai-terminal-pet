@@ -144,7 +144,12 @@ func TestDefaultSettingsMirrorConfig(t *testing.T) {
 		defaults.Language != expected.Language ||
 		defaults.AutoApprove != expected.AutoApprove ||
 		defaults.AutoApproveTimeoutSec != expected.AutoApproveTimeoutSec ||
-		defaults.Opacity != expected.Opacity {
+		defaults.Opacity != expected.Opacity ||
+		defaults.ForegroundAware != expected.ForegroundAware ||
+		defaults.IdleSeconds != expected.IdleMinutes*60 ||
+		defaults.DonePolicy != expected.DonePolicy ||
+		defaults.QuietCurrent != expected.QuietCurrent ||
+		defaults.QuietSubagents != expected.QuietSubagents {
 		t.Fatalf("ui.DefaultSettings() drifted from config.Default():\n ui: %+v\ncfg: %+v", defaults, expected)
 	}
 	if len(SoundSchemes) != len(config.SoundSchemes) {
@@ -173,7 +178,7 @@ func settingsRowsIn(tab int, lang i18n.Lang) []settingsRow {
 	case 1:
 		return soundRows(lang)
 	case 2:
-		return sessionRows(lang)
+		return sessionRows(lang, 0)
 	case 3:
 		return appearanceRows(lang)
 	default:
@@ -217,6 +222,100 @@ func TestAppearanceTabIsLaidOutLikeEveryOtherTab(t *testing.T) {
 	}
 	if settingsTabCount != 4 {
 		t.Fatalf("settingsTabCount = %d, want 4", settingsTabCount)
+	}
+}
+
+// TestSessionsTabIsLaidOutLikeEveryOtherTab is the same contract for the tab
+// that grew: every row fits, every control is hit-testable at its drawn centre,
+// and the attentiveness rows name the controls their handlers switch on. The
+// height assertion is the one that catches a tab that grew past the window,
+// which is what a four-row addition is most likely to do.
+func TestSessionsTabIsLaidOutLikeEveryOtherTab(t *testing.T) {
+	for _, lang := range []i18n.Lang{i18n.LangZhCN, i18n.LangEn} {
+		rows := sessionRows(lang, 2)
+		for _, dpi := range []uint32{96, 120, 144, 192} {
+			geometry := settingsGeometryFor(dpi, 2, rows)
+			last := geometry.frames[len(geometry.frames)-1]
+			if bottom := last.bottom(); bottom > geometry.height-geometry.scale(settingsMargin)/2 {
+				t.Fatalf("%v dpi %d: sessions tab overflows the panel (%d > %d)", lang, dpi, bottom, geometry.height)
+			}
+			for index, row := range rows {
+				if row.control == settingsNone {
+					continue
+				}
+				rect := geometry.controls[index]
+				control, _, _, ok := geometry.hit(rect.Left+rect.Width/2, rect.Top+rect.Height/2)
+				if !ok || control != row.control {
+					t.Fatalf("%v dpi %d row %d: hit %d, want %d", lang, dpi, index, control, row.control)
+				}
+			}
+		}
+	}
+}
+
+// The Done segment and the persisted policy have to agree in both directions,
+// or clicking "Off" would select "Background" on the next paint.
+func TestDonePolicySegmentRoundTrip(t *testing.T) {
+	row := settingsRow{}
+	for _, candidate := range sessionRows(i18n.LangEn, 0) {
+		if candidate.control == settingsDonePolicy {
+			row = candidate
+		}
+	}
+	if len(row.options) != len(DonePolicyNames()) {
+		t.Fatalf("done segment offers %d options, DonePolicyNames has %d", len(row.options), len(DonePolicyNames()))
+	}
+	for index, policy := range DonePolicyNames() {
+		if got := settingsDonePolicyIndex(string(policy)); got != index {
+			t.Fatalf("settingsDonePolicyIndex(%q) = %d, want %d", policy, got, index)
+		}
+		back, ok := settingsDonePolicyAt(index)
+		if !ok || back != policy {
+			t.Fatalf("settingsDonePolicyAt(%d) = %q/%v, want %q", index, back, ok, policy)
+		}
+	}
+	if got := settingsDonePolicyIndex("nonsense"); got != 0 {
+		t.Fatalf("unknown policy selected segment %d, want 0", got)
+	}
+	// Out-of-range indices keep the current value rather than inventing one.
+	if _, ok := settingsDonePolicyAt(7); ok {
+		t.Fatal("index 7 is not an option and must not resolve")
+	}
+	view := settingsView{DonePolicy: string(DonePolicyOff)}
+	if got := settingsSegmentIndex(row, view); got != 1 {
+		t.Fatalf("off should select segment 1, got %d", got)
+	}
+}
+
+// The mutable-view settings (view) are a derived snapshot; the live ones are
+// what the handlers read. A field missing from settingsView cannot be drawn.
+func TestSettingsViewCarriesAttentiveness(t *testing.T) {
+	a := &App{
+		options: Options{Settings: Settings{
+			ForegroundAware: true,
+			IdleSeconds:     10 * 60,
+			DonePolicy:      string(DonePolicyAlways),
+			QuietCurrent:    false,
+			QuietSubagents:  false,
+			MutedSessions:   []string{"src\x00id"},
+		}},
+		mutes: newMuteSet([]string{"src\x00id"}),
+	}
+	view := a.settingsView()
+	if !view.ForegroundAware {
+		t.Fatal("foreground awareness did not reach the view")
+	}
+	if view.IdleMinutes != 10 {
+		t.Fatalf("idle minutes in view = %d, want 10", view.IdleMinutes)
+	}
+	if view.DonePolicy != string(DonePolicyAlways) {
+		t.Fatalf("done policy in view = %q", view.DonePolicy)
+	}
+	if view.QuietCurrent || view.QuietSubagents {
+		t.Fatal("quiet switches were inverted in the view")
+	}
+	if view.MuteCount != 1 {
+		t.Fatalf("mute count in view = %d, want 1", view.MuteCount)
 	}
 }
 

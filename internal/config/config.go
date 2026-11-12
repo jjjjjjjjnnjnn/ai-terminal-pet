@@ -75,7 +75,82 @@ const (
 	ThemeContrast = "contrast"
 
 	DefaultTheme = ThemeSlate
+
+	// DonePolicy values. They live here rather than in internal/ui because
+	// config.json is what stores them; ui has ValidDonePolicy over the same
+	// three names, and internal/app has a test that the two lists agree.
+	DonePolicyOff        = "off"
+	DonePolicyBackground = "background"
+	DonePolicyAlways     = "always"
+
+	DefaultDonePolicy = DonePolicyBackground
+
+	// DefaultIdleMinutes is the "the window is in front but nobody is there"
+	// threshold. Three minutes is long enough that reading a long tool output
+	// is not mistaken for being away, and short enough that walking off does
+	// not keep the panel quiet past the point where it stops being useful.
+	DefaultIdleMinutes = 3
+	MaxIdleMinutes     = 120
+
+	// muteListMax caps the per-session silence list, so a hand-edited
+	// config.json cannot grow it without bound.
+	muteListMax = 200
 )
+
+// DonePolicies is the complete, user-visible set, in the order the settings
+// window offers them: the default first.
+var DonePolicies = []string{DonePolicyBackground, DonePolicyOff, DonePolicyAlways}
+
+// ValidDonePolicy normalises an unknown or empty value, so a hand-edited
+// config.json cannot silence every completion by accident.
+func ValidDonePolicy(value string) string {
+	for _, policy := range DonePolicies {
+		if strings.EqualFold(strings.TrimSpace(value), policy) {
+			return policy
+		}
+	}
+	return DefaultDonePolicy
+}
+
+// SessionMuteKey is the identity a mute is stored under. Deliberately not the
+// store's key, which includes the pid: hook reporters hand out a synthetic pid
+// per process, so a mute keyed on pid would expire every time the host
+// restarted while the conversation stayed the same.
+func SessionMuteKey(source, sessionID string) string {
+	source = strings.TrimSpace(source)
+	sessionID = strings.TrimSpace(sessionID)
+	if source == "" || sessionID == "" {
+		return ""
+	}
+	return source + "\x00" + sessionID
+}
+
+// NormalizeMutes trims, de-duplicates and caps a mute list. Anything that
+// cannot be a key - empty, or missing the separator - is dropped rather than
+// carried: a corrupt entry must not make the whole list unusable, and this runs
+// on every load.
+func NormalizeMutes(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, len(values))
+	cleaned := make([]string, 0, len(values))
+	for _, value := range values {
+		key := strings.TrimSpace(value)
+		if key == "" || !strings.Contains(key, "\x00") {
+			continue
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		cleaned = append(cleaned, key)
+		if len(cleaned) >= muteListMax {
+			break
+		}
+	}
+	return cleaned
+}
 
 // Themes is the complete, user-visible set of palettes, in the order the
 // settings window offers them.
@@ -172,6 +247,39 @@ type Config struct {
 	// startup preference only: --show, --toggle and the tray entry point stay
 	// authoritative afterwards.
 	HiddenAtLaunch bool `json:"hiddenAtLaunch"`
+	// ForegroundAware makes an alert depend on whether the user is already
+	// looking at that session's terminal. It defaults to on: a balloon for a
+	// prompt the user is reading is noise, and the overlay used to make it
+	// every time. Turning it off restores the pre-1.0.3 "always announce"
+	// behaviour without touching any other switch.
+	ForegroundAware bool `json:"foregroundAware"`
+	// IdleMinutes is how long without keyboard or mouse input counts as being
+	// away even while the terminal is in front. Only consulted when
+	// ForegroundAware is on. 0 means "window focus only", which is the honest
+	// reading of switching the idle half off.
+	IdleMinutes int `json:"idleMinutes"`
+	// DonePolicy is when a finished turn is announced: "background" (only
+	// when the session was not the one being looked at, the default), "off",
+	// or "always". It replaces the single NotifyOnFinish switch, which could
+	// only express always-or-never; the tray and settings window read this
+	// field, and NotifyOnFinish stays as the migration input for existing
+	// config files (see Normalize).
+	DonePolicy string `json:"donePolicy"`
+	// QuietCurrent suppresses the balloon for the session that is being looked
+	// at, leaving only the row's unread mark. It never suppresses errors and
+	// never suppresses a tone.
+	QuietCurrent bool `json:"quietCurrent"`
+	// MutedSessions is the per-session silence list. Entries are
+	// "<source>\x00<sessionId>" - the same identity the store keys on, minus
+	// the pid, because a hook reporter's pid is a synthetic hash that changes
+	// with the process while the conversation does not. It is capped and
+	// pruned if hand-edited into nonsense.
+	MutedSessions []string `json:"mutedSessions"`
+	// QuietSubagents silences sessions that declare a parent session. Hosts
+	// split one turn into child sessions and alerting for each is noise. It is
+	// a heuristic: a forked conversation also carries a parent id, and the two
+	// cannot be told apart from what reporters send.
+	QuietSubagents bool `json:"quietSubagents"`
 }
 
 // Default returns the settings used when config.json is absent or unreadable.
@@ -183,6 +291,9 @@ func Default() Config {
 		Opacity: 235, Language: "auto", AutoApprove: false,
 		AutoApproveTimeoutSec: DefaultAutoApproveTimeoutSec,
 		Theme:                 DefaultTheme, PerSourceColor: false,
+		ForegroundAware: true, IdleMinutes: DefaultIdleMinutes,
+		DonePolicy: DefaultDonePolicy, QuietCurrent: true,
+		QuietSubagents: true,
 	}
 }
 
@@ -208,6 +319,12 @@ func (c Config) Normalize() Config {
 		c.AutoApproveTimeoutSec = Default().AutoApproveTimeoutSec
 	}
 	c.Theme = ValidTheme(c.Theme)
+	if c.IdleMinutes < 0 || c.IdleMinutes > MaxIdleMinutes {
+		c.IdleMinutes = DefaultIdleMinutes
+	}
+	c.DonePolicy = ValidDonePolicy(c.DonePolicy)
+	c.MutedSessions = NormalizeMutes(c.MutedSessions)
+	c.NotifyOnFinish = c.DonePolicy != DonePolicyOff
 	return c
 }
 
@@ -222,7 +339,31 @@ func DecodeConfig(data []byte) Config {
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		return Default()
 	}
+	// "reply completed" used to be one boolean. A file written before the
+	// three-way policy existed can only express always or never, so if that is
+	// all it has, read it as exactly that: true meant "announce every
+	// completion" and making an opted-in alert quieter is a change a user
+	// experiences as breakage. A file that already carries donePolicy keeps it.
+	if !hasField(data, "donePolicy") {
+		if parsed.NotifyOnFinish {
+			parsed.DonePolicy = DonePolicyAlways
+		} else {
+			parsed.DonePolicy = DonePolicyOff
+		}
+	}
 	return parsed.Normalize()
+}
+
+// hasField reports whether one JSON object key is present. The distinction
+// between "absent" and "present but empty" is what the migration above needs,
+// and unmarshalling into a struct cannot express it.
+func hasField(data []byte, name string) bool {
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return false
+	}
+	_, ok := probe[name]
+	return ok
 }
 
 // Load reads config.json, falling back to Default on any error.

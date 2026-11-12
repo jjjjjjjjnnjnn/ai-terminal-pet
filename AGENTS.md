@@ -200,16 +200,15 @@ Two conventions in those commands are load-bearing, not style:
    - Never commit machine-specific absolute paths into source, tests, scripts or docs. Use
      `os.Getenv("LOCALAPPDATA")`, `os.UserHomeDir()`, `Path(__file__).resolve().parent`, or an
      environment variable that fails with a human-readable message.
-8. **Second opinion before a release, and every review request goes through `agy`**:
-   - When a change needs an outside look — a release, a marketplace submission, a README that makes
-     claims about other people's indexes — ask Antigravity's CLI, not a hand-written checklist:
-     `agy --model gemini-3.8-flash-high --effort high --print='<prompt>'` (the prompt must be attached
-     to `--print=`, never as a trailing argument; `agy models` lists what is installed).
-   - This is a standing preference for **every project in this workspace**, not just this one: prefer
-     `gemini-3.8-flash-high` when a second model's opinion would help, and say in the commit message
-     which finding came from it. Treat its output as a reviewer, not as an authority — verify each
-     claim against the installed packages before acting on it.
-   - **Every outward-facing text goes through it before it is posted or published**: the launch copy in
+8. **Review the work yourself, with the model that wrote it**:
+   - Do not shell out to `agy`, `gemini`, or any other model CLI for a second opinion. The whole
+     chain — implementation, review, and the wording of anything outward-facing — runs in the session
+     that is doing the work, on the model the user selected for it.
+   - The substance of the old rule stays, because it was never about which model answered: read the
+     claim back against the code before publishing it. A review that cannot point at the line
+     implementing a sentence in the README is not a review. Where a claim depends on another
+     repository's behaviour, read that repository's own files rather than recalling them.
+   - **Every outward-facing text is verified before it is posted or published**: the launch copy in
      [docs/LAUNCH.md](docs/LAUNCH.md), a marketplace description, a README paragraph that makes a promise,
      an issue reply that explains a design decision. Drafting is cheap; a claim the project cannot
      support, published under its own name, is not. The `docs/LAUNCH.md` round found exactly that: a

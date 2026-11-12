@@ -112,9 +112,9 @@ func TestNormalizeThemeFallsBackToSlate(t *testing.T) {
 // anything drawn has to be in the key.
 func TestThemeAndProvenanceMoveTheFrameKey(t *testing.T) {
 	now := time.Unix(1_000_020, 0)
-	base := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, themeSlate, false)
-	themed := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, themePaper, false)
-	perSource := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, themeSlate, true)
+	base := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, themeSlate, false, 0, 0, -1)
+	themed := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, themePaper, false, 0, 0, -1)
+	perSource := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, themeSlate, true, 0, 0, -1)
 	if base == themed {
 		t.Fatal("a theme change must repaint")
 	}
@@ -122,7 +122,7 @@ func TestThemeAndProvenanceMoveTheFrameKey(t *testing.T) {
 		t.Fatal("turning provenance colours on must repaint")
 	}
 	// An unknown theme name normalises to slate, so it must NOT repaint.
-	same := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, "nonsense", false)
+	same := frameKey(compactWidth, compactHeight, 7, session.StateWaitingPermission, 2, true, false, false, 0, false, now, i18n.LangEn, -1, "nonsense", false, 0, 0, -1)
 	if base != same {
 		t.Fatal("an unknown theme name normalised to slate but the key still moved")
 	}

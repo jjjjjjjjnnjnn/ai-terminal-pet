@@ -237,6 +237,47 @@ const (
 	KeySchemeBell  = "scheme.bell"
 	KeySchemeSoft  = "scheme.soft"
 	KeySchemePulse = "scheme.pulse"
+
+	// Attentiveness: the settings that decide whether an alert is useful. They
+	// sit on the Sessions tab next to auto-approve, because both answer "what
+	// does this thing do behind my back".
+	KeySettingsForegroundAware     = "settings.foregroundAware"
+	KeySettingsForegroundAwareHint = "settings.foregroundAware.hint"
+	KeySettingsIdleMinutes         = "settings.idleMinutes"
+	KeySettingsIdleMinutesHint     = "settings.idleMinutes.hint"
+	KeySettingsDonePolicy          = "settings.donePolicy"
+	KeySettingsDonePolicyHint      = "settings.donePolicy.hint"
+	KeySettingsDoneBackground      = "settings.donePolicy.background"
+	KeySettingsDoneOff             = "settings.donePolicy.off"
+	KeySettingsDoneAlways          = "settings.donePolicy.always"
+	KeySettingsQuietCurrent        = "settings.quietCurrent"
+	KeySettingsQuietCurrentHint    = "settings.quietCurrent.hint"
+	KeySettingsQuietSubagents      = "settings.quietSubagents"
+	KeySettingsQuietSubagentsHint  = "settings.quietSubagents.hint"
+	KeySettingsMuteCount           = "settings.muteCount"
+	KeySettingsMuteCountHint       = "settings.muteCount.hint"
+	KeySettingsMuteClear           = "settings.muteClear"
+	KeySettingsMuteClearAction     = "settings.muteClear.action"
+	KeySettingsAttendNote          = "settings.attend.note"
+
+	KeyTrayMuteSession   = "tray.muteSession"
+	KeyTrayUnmuteSession = "tray.unmuteSession"
+
+	KeyPanelUnread = "panel.unread"
+	KeyPanelMuted  = "panel.muted"
+
+	// Alert test buttons: the three things a user can be asked about, each
+	// firing a real balloon through the same path a real alert uses.
+	KeySettingsTestWaiting     = "settings.test.waiting"
+	KeySettingsTestWaitingHint = "settings.test.waiting.hint"
+	KeySettingsTestDone        = "settings.test.done"
+	KeySettingsTestDoneHint    = "settings.test.done.hint"
+	KeySettingsTestPlay        = "settings.test.play"
+
+	KeyBalloonDoneNamed  = "balloon.doneNamed"
+	KeyBalloonMutedTitle = "balloon.mutedTitle"
+	KeyBalloonMutedBody  = "balloon.mutedBody"
+	KeyAlertReceiptNote  = "alerts.receiptNote"
 )
 
 var dictEn = map[string]string{
@@ -366,6 +407,42 @@ var dictEn = map[string]string{
 	KeySchemeBell:  "Bell",
 	KeySchemeSoft:  "Soft",
 	KeySchemePulse: "Pulse",
+
+	KeySettingsForegroundAware:     "Only alert when I am not looking",
+	KeySettingsForegroundAwareHint: "A prompt you are reading does not also pop a balloon; its row is still marked unread",
+	KeySettingsIdleMinutes:         "Count me away after",
+	KeySettingsIdleMinutesHint:     "Longest quiet stretch before a window in front stops counting as attention; 0 means window focus only",
+	KeySettingsDonePolicy:          "When a reply finishes",
+	KeySettingsDonePolicyHint:      "Background: only sessions you were not watching; off: never; always: every time",
+	KeySettingsDoneBackground:      "Background",
+	KeySettingsDoneOff:             "Off",
+	KeySettingsDoneAlways:          "Always",
+	KeySettingsQuietCurrent:        "Stay quiet for the session I am reading",
+	KeySettingsQuietCurrentHint:    "Same session, no balloon, unread mark instead; errors and tones are unaffected",
+	KeySettingsQuietSubagents:      "Silence child sessions",
+	KeySettingsQuietSubagentsHint:  "Sessions that declare a parent are steps of one turn, not separate work",
+	KeySettingsMuteCount:           "Muted sessions",
+	KeySettingsMuteCountHint:       "Right-click a session row to mute or unmute it; this clears the whole list",
+	KeySettingsMuteClear:           "Mute list",
+	KeySettingsMuteClearAction:     "Clear all",
+	KeySettingsAttendNote:          "These decide whether an alert is useful, never whether a session is safe: auto-approve still counts down while muted.",
+
+	KeyTrayMuteSession:   "Mute this session's alerts",
+	KeyTrayUnmuteSession: "Unmute this session's alerts",
+
+	KeyPanelUnread: "unread",
+	KeyPanelMuted:  "muted",
+
+	KeySettingsTestWaiting:     "Send a test: needs you",
+	KeySettingsTestWaitingHint: "A real balloon and tone through the same path an approval uses; counts against no session",
+	KeySettingsTestDone:        "Send a test: reply finished",
+	KeySettingsTestDoneHint:    "The completion balloon with the timbre of the current Done setting",
+	KeySettingsTestPlay:        "Send",
+
+	KeyBalloonDoneNamed:  "Finished",
+	KeyBalloonMutedTitle: "Session muted",
+	KeyBalloonMutedBody:  "Its alerts are off until you unmute the row",
+	KeyAlertReceiptNote:  "The last alert decision is written to runtime/alerts.json and printed by --json.",
 }
 
 var dictZhCN = map[string]string{
@@ -495,6 +572,42 @@ var dictZhCN = map[string]string{
 	KeySchemeBell:  "钟声",
 	KeySchemeSoft:  "柔和",
 	KeySchemePulse: "脉冲",
+
+	KeySettingsForegroundAware:     "只在我不看着时提醒",
+	KeySettingsForegroundAwareHint: "正在阅读的请求不再额外弹气泡，但是那一行仍会标为未读",
+	KeySettingsIdleMinutes:         "静止多久算离开",
+	KeySettingsIdleMinutesHint:     "窗口在前台但多久没有键鼠输入就不再算你在看；0 表示只看窗口焦点",
+	KeySettingsDonePolicy:          "回复完成时",
+	KeySettingsDonePolicyHint:      "仅后台：只提醒你没在看的会话；关闭：从不；总是：每次",
+	KeySettingsDoneBackground:      "仅后台",
+	KeySettingsDoneOff:             "关闭",
+	KeySettingsDoneAlways:          "总是",
+	KeySettingsQuietCurrent:        "正在看的会话保持安静",
+	KeySettingsQuietCurrentHint:    "同一个会话不弹气泡、只留未读标记；错误与提示音不受影响",
+	KeySettingsQuietSubagents:      "子会话不提醒",
+	KeySettingsQuietSubagentsHint:  "声明了上级会话的那些是同一轮的步骤，不是独立工作",
+	KeySettingsMuteCount:           "已静音的会话",
+	KeySettingsMuteCountHint:       "右键点会话行可以静音或恢复；这里清空整个列表",
+	KeySettingsMuteClear:           "静音列表",
+	KeySettingsMuteClearAction:     "全部恢复",
+	KeySettingsAttendNote:          "这些只影响提醒是否有用，不影响会话是否安全：静音期间自动同意倒计时照常进行。",
+
+	KeyTrayMuteSession:   "静音此会话的提醒",
+	KeyTrayUnmuteSession: "恢复此会话的提醒",
+
+	KeyPanelUnread: "未读",
+	KeyPanelMuted:  "已静音",
+
+	KeySettingsTestWaiting:     "试发：需要你处理",
+	KeySettingsTestWaitingHint: "走与真实审批相同的路径弹一条真气泡并响提示音；不挂到任何会话上",
+	KeySettingsTestDone:        "试发：回复完成",
+	KeySettingsTestDoneHint:    "用当前「回复完成」设置的音色发一条完成气泡",
+	KeySettingsTestPlay:        "发送",
+
+	KeyBalloonDoneNamed:  "已完成",
+	KeyBalloonMutedTitle: "该会话已静音",
+	KeyBalloonMutedBody:  "在行上恢复之前，它的提醒保持关闭",
+	KeyAlertReceiptNote:  "最近的提醒判定写入 runtime/alerts.json，并由 --json 打印。",
 }
 
 // T returns the label for key in lang. A missing key falls back to

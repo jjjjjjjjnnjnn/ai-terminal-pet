@@ -225,8 +225,51 @@ func runDoctor(env doctorEnv) DoctorReport {
 		runCheck("instance", func() DoctorCheck { return checkInstance(connectErr) }),
 		runCheck("node", func() DoctorCheck { return checkNode(env) }),
 		runCheck("autostart", func() DoctorCheck { return checkAutoStart(env) }),
+		runCheck("alerts", func() DoctorCheck { return checkAlerts(env) }),
 	}
 	return DoctorReport{Checks: checks}
+}
+
+// checkAlerts reports the arithmetic behind the last alert decision. It is a
+// warning rather than a failure when nothing has been recorded: a fresh install
+// has no receipt yet, which is normal, while a receipt that cannot be parsed
+// would mean every future alert is unexplained.
+func checkAlerts(env doctorEnv) DoctorCheck {
+	if env.localAppData == "" {
+		return DoctorCheck{Status: doctorWarn, Detail: "LOCALAPPDATA is not set, so runtime/alerts.json cannot be located"}
+	}
+	directory := filepath.Join(env.localAppData, installDirectoryName, "runtime")
+	path := filepath.Join(directory, "alerts.json")
+	record := readAlertReport(directory)
+	if record == nil {
+		// Distinguish "no receipt yet" - normal on a fresh install, and a
+		// warning nobody can act on is worse than silence - from "there is
+		// one and it will not parse", which really does mean every alert is
+		// unexplained.
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			return DoctorCheck{Status: doctorOK, Detail: "no alert receipt yet (" + path + "); the overlay writes one on its first scan"}
+		}
+		return DoctorCheck{Status: doctorWarn, Detail: path + " is present but cannot be parsed; the next overlay scan overwrites it"}
+	}
+	detail := fmt.Sprintf("last scan %s, presence=%s, balloon=%s", record.At.Format(time.RFC3339), record.Presence, emptyAsNone(record.Balloon))
+	if record.Skipped != "" {
+		detail += ", skipped=" + record.Skipped
+	}
+	if len(record.Sessions) > 0 {
+		decisions := make([]string, 0, len(record.Sessions))
+		for _, session := range record.Sessions {
+			decisions = append(decisions, session.Kind+"/"+session.Decision)
+		}
+		detail += ", decisions=" + strings.Join(decisions, "; ")
+	}
+	return DoctorCheck{Status: doctorOK, Detail: detail}
+}
+
+func emptyAsNone(value string) string {
+	if value == "" {
+		return "none"
+	}
+	return value
 }
 
 func runCheck(name string, check func() DoctorCheck) (result DoctorCheck) {

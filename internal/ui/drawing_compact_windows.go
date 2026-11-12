@@ -105,9 +105,21 @@ type renderedKey struct {
 	// duration text advance would otherwise be thrown away and "12m" would
 	// freeze until the next reporter push.
 	waitMinute int64
+	// unreadRows and mutedRows pack the per-row marks into bit sets, one bit
+	// per drawn row. They are in the key for the reason theme and perSource
+	// are: a mark changes pixels and nothing else, so "same key, same bitmap"
+	// would skip the repaint and the badge would appear only at the next
+	// unrelated refresh.
+	unreadRows uint64
+	mutedRows  uint64
+	// hoverRow is which row the pointer is over, -1 for none. The row highlight
+	// is drawn, so it has to be in the key for the same reason as the marks
+	// above - and a stale highlight is exactly the shape of bug this project
+	// has already shipped twice.
+	hoverRow int32
 }
 
-func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64, theme string, perSource bool) renderedKey {
+func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64, theme string, perSource bool, unreadRows, mutedRows uint64, hoverRow int) renderedKey {
 	key := renderedKey{
 		width:      width,
 		height:     height,
@@ -122,6 +134,9 @@ func frameKey(width, height int, digest uint64, state session.State, count int, 
 		approveSec: approveSec,
 		theme:      normalizeTheme(theme),
 		perSource:  perSource,
+		unreadRows: unreadRows,
+		mutedRows:  mutedRows,
+		hoverRow:   int32(hoverRow),
 	}
 	// The compact strip prints a duration only while somebody is waiting, and it
 	// is minute-grained, so one repaint per minute is enough. This is the same
@@ -160,6 +175,15 @@ type panelState struct {
 	// (see approvalSessionKey). Nil unless auto-approve is on and a
 	// permission turn is actually pending.
 	Countdown map[string]approvalView
+	// Unread and Muted are the per-row marks, looked up by session identity
+	// (source + id, never the pid). They are drawn as a badge, not as a colour,
+	// because the row's colour belongs to the state alone.
+	Unread *unreadSet
+	Muted  *muteSet
+	// HoverRow is which row the pointer is over, -1 for none. It is a field
+	// rather than a local because the row highlight is part of the frame the
+	// key hashes (see renderedKey.hoverRow).
+	HoverRow int
 	// Tuck is 0 when the panel is fully on screen and 1 when it has slid all
 	// the way into its docked edge.
 	Tuck float64
@@ -212,7 +236,7 @@ func drawVerticalPanel(target *canvas, state panelState) {
 	if state.Tuck < 1 {
 		target.setAlphaScale(1 - state.Tuck)
 		if state.Expanded {
-			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised, state.Lang, state.Countdown)
+			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised, state.Lang, state.Countdown, state.Unread, state.Muted, state.HoverRow)
 		} else {
 			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed, state.Lang)
 		}
@@ -396,7 +420,7 @@ func compactSubject(items []session.Session, state session.State, lang i18n.Lang
 	return projectLabel(items[0], lang), colors.Secondary
 }
 
-func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba, lang i18n.Lang, countdown map[string]approvalView) {
+func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba, lang i18n.Lang, countdown map[string]approvalView, unread *unreadSet, mutes *muteSet, hoverRow int) {
 	width := target.width
 	height := target.height
 	unit := float64(width) / expandedWidth
@@ -428,8 +452,18 @@ func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time
 	} else {
 		rows := minInt(len(items), expandedMaxRows)
 		for index := 0; index < rows; index++ {
+			// Geometry from the shared helper, not re-derived here: the same
+			// function answers "which row did the user click" (rows_windows.go).
+			left, rowTop, rowWidth, rowHeight := expandedRowRect(width, index)
 			view, ok := lookupCountdown(countdown, items[index])
-			drawVerticalSession(target, items[index], value(14), top+index*value(expandedRowHeight), width-value(28), value(expandedRowHeight)-value(4), now, value, lang, view, ok)
+			mark := unreadMarkNone
+			if unread != nil && unread.has(items[index]) {
+				mark |= unreadMarkUnread
+			}
+			if mutes != nil && mutes.has(items[index]) {
+				mark |= unreadMarkMuted
+			}
+			drawVerticalSession(target, items[index], left, rowTop, rowWidth, rowHeight, now, value, lang, view, ok, mark, hoverRow == index)
 		}
 		if hidden := len(items) - rows; hidden > 0 {
 			y := top + rows*value(expandedRowHeight)
@@ -486,6 +520,15 @@ func lookupCountdown(countdown map[string]approvalView, current session.Session)
 	return view, ok
 }
 
+// The per-row marks. Both are drawn as a word rather than as a colour or an
+// icon: the row already spends its colour on the state, and a glyph would need
+// a font guarantee this project does not want to make.
+const (
+	unreadMarkNone = iota
+	unreadMarkUnread
+	unreadMarkMuted
+)
+
 // drawVerticalSession is one row of the expanded list: project and state on
 // the first line, where it came from and how long ago it spoke on the second.
 // The relative time is the part that makes the list actionable - "waiting for
@@ -494,7 +537,7 @@ func lookupCountdown(countdown map[string]approvalView, current session.Session)
 // While an auto-approve countdown runs for the session, the second line's
 // right half becomes the ticking Allow (Ns) plus a draining bar, so the
 // user sees exactly how long they have to veto.
-func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int, lang i18n.Lang, view approvalView, hasCountdown bool) {
+func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int, lang i18n.Lang, view approvalView, hasCountdown bool, mark int, hovered bool) {
 	target.fillRounded(left, top, width, height, 6, colors.RaisedRow)
 	accent := stateColor(current.State)
 	// The rail is the one place a row uses a large patch of colour. Keeping it
@@ -502,6 +545,22 @@ func drawVerticalSession(target *canvas, current session.Session, left, top, wid
 	rail := accent
 	rail.A = 190
 	target.fillRounded(left+scale(1), top+scale(1), scale(3), height-scale(2), 2, rail)
+	// A sealed row - read or muted - is drawn with its rail dimmed rather than
+	// with a second colour: the state is still the signal, and "I have seen
+	// this" is a property of the row, not of the state.
+	if mark != unreadMarkNone {
+		rail.A = 90
+		target.fillRounded(left+scale(1), top+scale(1), scale(3), height-scale(2), 2, rail)
+	}
+	// A hovered row lifts its fill. This is the only affordance that says a row
+	// is a target at all - the arrow says "jump", but nothing said "this row
+	// has an action of its own", and a per-row right-click menu needs one.
+	if hovered {
+		hover := colors.Raised
+		hover.A = 200
+		target.fillRounded(left, top, width, height, 6, hover)
+		target.fillRounded(left+scale(1), top+scale(1), scale(3), height-scale(2), 2, rail)
+	}
 
 	textLeft := left + scale(9)
 	stateWidth := scale(48)
@@ -510,8 +569,25 @@ func drawVerticalSession(target *canvas, current session.Session, left, top, wid
 	focusX, focusY, focusSize := expandedRowFocusRect(target.width, top, height)
 	stateX := left + width - stateWidth - focusSize - scale(8)
 
-	target.text(textLeft, top+scale(3), stateX-textLeft-scale(6), scale(12), projectLabel(current, lang), scale(10), 700, colors.Primary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
-	target.text(stateX, top+scale(3), stateWidth, scale(12), stateLabel(current.State, lang), scale(8), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	// The marks are drawn, not written. A badge with text stole width from the
+	// reason - the one column that says what the agent is actually doing - and
+	// "未读" truncating "Bash(go test)" is a worse trade than no badge at all.
+	// A dot costs the width of a character and a muted row is dimmed instead,
+	// which is a signal with no width at all.
+	dimmed := mark&unreadMarkMuted != 0
+	projectColor := colors.Primary
+	stateColorValue := accent
+	detailColor := colors.Secondary
+	stampColor := colors.Muted
+	if dimmed {
+		projectColor = colors.Secondary
+		detailColor = colors.Muted
+		stampColor = colors.Muted
+		stateColorValue = colors.Secondary
+	}
+
+	target.text(textLeft, top+scale(3), stateX-textLeft-scale(6), scale(12), projectLabel(current, lang), scale(10), 700, projectColor, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(stateX, top+scale(3), stateWidth, scale(12), stateLabel(current.State, lang), scale(8), 700, stateColorValue, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 
 	detail := fmt.Sprintf("%s · %s", current.Source, reasonLabel(current, lang))
 	detailWidth := stateX - textLeft - scale(6)
@@ -525,16 +601,25 @@ func drawVerticalSession(target *canvas, current session.Session, left, top, wid
 		target.text(textLeft, top+scale(17), sourceWidth+scale(4), scale(10), source, scale(8), 700, sourceColor(current.Source), dtSingleLine|dtVCenter|dtNoPrefix)
 		rest := fmt.Sprintf(" · %s", reasonLabel(current, lang))
 		if remain := detailWidth - sourceWidth; remain > scale(10) {
-			target.text(textLeft+sourceWidth, top+scale(17), remain, scale(10), target.fitText(rest, scale(8), 400, remain), scale(8), 400, colors.Secondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+			target.text(textLeft+sourceWidth, top+scale(17), remain, scale(10), target.fitText(rest, scale(8), 400, remain), scale(8), 400, detailColor, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 		}
 	} else {
-		target.text(textLeft, top+scale(17), detailWidth, scale(10), detail, scale(8), 400, colors.Secondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+		target.text(textLeft, top+scale(17), detailWidth, scale(10), detail, scale(8), 400, detailColor, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 	}
 	stamp := relativeTime(current.UpdatedAt, now, lang)
 	if hasCountdown {
 		stamp = fmt.Sprintf(i18n.T(lang, i18n.KeyApproveCountdown), view.RemainingSec)
 	}
-	target.text(stateX, top+scale(17), stateWidth, scale(10), stamp, scale(8), 400, colors.Muted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(stateX, top+scale(17), stateWidth, scale(10), stamp, scale(8), 400, stampColor, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	// An unread row gets a dot at the end of the second line, inside the space
+	// the state column already reserved. It costs no layout: the state word
+	// above it is short by construction ("等待确认" at 8px in 48 units).
+	if mark&unreadMarkUnread != 0 && !dimmed {
+		dot := accent
+		dot.A = 235
+		size := maxInt(scale(3), 2)
+		target.fillEllipse(stateX+stateWidth-size, top+scale(17)+(scale(10)-size)/2, size, size, dot)
+	}
 	if hasCountdown && view.Fraction > 0 {
 		barWidth := int(float64(width-scale(18)) * view.Fraction)
 		if barWidth > 0 {

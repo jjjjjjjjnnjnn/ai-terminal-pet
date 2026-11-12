@@ -79,22 +79,37 @@ func TestRenderPreview(t *testing.T) {
 		// still draws the whole frame - cropping here is what makes the
 		// preview show what the user actually sees.
 		crop int
+		// marks attaches the per-row badges: unread marks on the first row,
+		// muted on the second. The two are different claims about a row (it
+		// needs you / it does not speak), so they get their own previews.
+		marks bool
+		// hoverRow is which row the pointer is over, -1 for none.
+		hoverRow int
 	}{
-		{"compact-waiting", waiting, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
-		{"compact-waiting-hover", waiting, false, false, true, 0, 3, i18n.LangZhCN, false, 0},
-		{"compact-busy", busy, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
-		{"compact-error", broken, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
-		{"compact-empty", nil, false, false, false, 0, 3, i18n.LangZhCN, false, 0},
-		{"compact-waiting-en", waiting, false, false, false, 0, 3, i18n.LangEn, false, 0},
-		{"docked-tuck-half", busy, false, false, false, 0.5, 3, i18n.LangZhCN, false, 33},
-		{"docked-tuck-full", busy, false, false, false, 1, 3, i18n.LangZhCN, false, 10},
-		{"docked-tuck-full-idle", idle, false, false, false, 1, 3, i18n.LangZhCN, false, 10},
-		{"expanded-waiting", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0},
-		{"expanded-waiting-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0},
-		{"expanded-approve-zh", waiting, true, false, false, 0, 2, i18n.LangZhCN, true, 0},
-		{"expanded-approve-en", waiting, true, false, false, 0, 2, i18n.LangEn, true, 0},
-		{"expanded-many", many, true, false, false, 0, 2, i18n.LangZhCN, false, 0},
-		{"expanded-empty", nil, true, false, false, 0, 2, i18n.LangZhCN, false, 0},
+		{"compact-waiting", waiting, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
+		{"compact-waiting-hover", waiting, false, false, true, 0, 3, i18n.LangZhCN, false, 0, false, -1},
+		{"compact-busy", busy, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
+		{"compact-error", broken, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
+		{"compact-empty", nil, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
+		{"compact-waiting-en", waiting, false, false, false, 0, 3, i18n.LangEn, false, 0, false, -1},
+		{"docked-tuck-half", busy, false, false, false, 0.5, 3, i18n.LangZhCN, false, 33, false, -1},
+		{"docked-tuck-full", busy, false, false, false, 1, 3, i18n.LangZhCN, false, 10, false, -1},
+		{"docked-tuck-full-idle", idle, false, false, false, 1, 3, i18n.LangZhCN, false, 10, false, -1},
+		{"expanded-waiting", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1},
+		{"expanded-waiting-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0, false, -1},
+		{"expanded-approve-zh", waiting, true, false, false, 0, 2, i18n.LangZhCN, true, 0, false, -1},
+		{"expanded-approve-en", waiting, true, false, false, 0, 2, i18n.LangEn, true, 0, false, -1},
+		{"expanded-many", many, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1},
+		{"expanded-empty", nil, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1},
+		// The alert layer's two visible states: a row waiting on the user that
+		// was announced while they were elsewhere (unread), and a row the user
+		// silenced (muted). Neither changes the geometry, so both can be
+		// reviewed against the existing expanded previews.
+		{"expanded-unread", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, true, -1},
+		{"expanded-unread-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0, true, -1},
+		// A hovered row is the only affordance saying the row itself is a
+		// target, which is what makes the per-row context menu discoverable.
+		{"expanded-row-hover", waiting, true, false, true, 0, 2, i18n.LangZhCN, false, 0, false, 1},
 	}
 	for _, tc := range cases {
 		width := compactWidth
@@ -126,6 +141,9 @@ func TestRenderPreview(t *testing.T) {
 			Hovered:   tc.hovered,
 			Lang:      tc.lang,
 			Countdown: countdown,
+			Unread:    unreadFor(tc.items, tc.marks),
+			Muted:     mutedFor(tc.items, tc.marks),
+			HoverRow:  tc.hoverRow,
 			Tuck:      tc.tuck,
 			Sliver:    dockedSliver,
 			Dock:      dockRight,
@@ -139,6 +157,32 @@ func TestRenderPreview(t *testing.T) {
 		writePNG(t, path, upscale(img, tc.scale))
 		t.Logf("wrote %s (%dx%d)", path, width, height)
 	}
+}
+
+// unreadFor and mutedFor attach the per-row marks to a preview. Only the first
+// two rows are marked, because a preview that badges every row would not show
+// what a single mark looks like next to an unmarked neighbour - which is the
+// thing the eye has to be able to tell apart on the real panel.
+func unreadFor(items []session.Session, marks bool) *unreadSet {
+	if !marks {
+		return nil
+	}
+	set := newUnreadSet()
+	if len(items) > 0 {
+		set.mark([]string{session.Identity(items[0])})
+	}
+	return set
+}
+
+func mutedFor(items []session.Session, marks bool) *muteSet {
+	if !marks {
+		return nil
+	}
+	set := newMuteSet(nil)
+	if len(items) > 1 {
+		set.set(items[1], true)
+	}
+	return set
 }
 
 // cropImage keeps the leftmost logicalWidth columns, which is the part of a

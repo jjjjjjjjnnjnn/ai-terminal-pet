@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -24,6 +25,11 @@ const (
 	timerClock     = 2
 	timerAnimation = 3
 
+	// defaultIdleSeconds mirrors config.DefaultIdleMinutes. The ui package
+	// deliberately does not import config (the app layer owns the file paths),
+	// so internal/app has a test that the two values agree.
+	defaultIdleSeconds = 3 * 60
+
 	menuShow          = 1001
 	menuHide          = 1002
 	menuExit          = 1003
@@ -40,6 +46,10 @@ const (
 	menuSoundVolume   = 1014
 	menuNotifyFinish  = 1015
 	menuSettings      = 1016
+	// menuMuteSession is the per-row action on the expanded list. It shares
+	// the menu id space with the tray entries because the two menus are never
+	// shown at the same time.
+	menuMuteSession = 1017
 
 	// The pulse and the slide share one timer but want different frame rates.
 	//
@@ -87,8 +97,30 @@ type Settings struct {
 	// only wants to hear genuine blockers can mute the rest.
 	SoundOnWaiting bool
 	SoundOnError   bool
-	// NotifyOnFinish makes a session settling into idle/closed an alert too.
+	// NotifyOnFinish is kept as the legacy two-way view of DonePolicy: it is
+	// true whenever a completion can be announced at all. New code should read
+	// DonePolicy; this stays because the tray check mark and older config
+	// files still speak it, and Normalize keeps the two consistent.
 	NotifyOnFinish bool
+	// DonePolicy is when a finished turn is announced: background / off /
+	// always. It is the live preference; NotifyOnFinish is derived.
+	DonePolicy string
+	// ForegroundAware makes an alert depend on whether the user is already
+	// looking at that session's terminal.
+	ForegroundAware bool
+	// IdleSeconds is how long without input counts as being away even while a
+	// window is in front. Zero means window focus only. It is stored in
+	// config.json as idleMinutes; seconds here because that is what the
+	// comparison against GetLastInputInfo's result wants.
+	IdleSeconds int
+	// QuietCurrent suppresses the balloon for the session being looked at,
+	// leaving its unread mark.
+	QuietCurrent bool
+	// MutedSessions is the persisted per-session silence list, as
+	// "<source>\x00<sessionId>" keys.
+	MutedSessions []string
+	// QuietSubagents silences sessions that declare a parent session.
+	QuietSubagents bool
 	AlwaysOnTop    bool
 	// EdgeRetract slides the panel into the screen edge it is hugging when
 	// nothing needs attention.
@@ -139,6 +171,11 @@ func DefaultSettings() Settings {
 		Theme:                 themeSlate,
 		PerSourceColor:        false,
 		HiddenAtLaunch:        false,
+		ForegroundAware:       true,
+		IdleSeconds:           defaultIdleSeconds,
+		DonePolicy:            string(DonePolicyBackground),
+		QuietCurrent:          true,
+		QuietSubagents:        true,
 	}
 }
 
@@ -170,6 +207,10 @@ type Options struct {
 	// returns whether the change took effect; the UI keeps the old state when
 	// it returns false, so the tick never lies about the registry.
 	OnAutoStartChanged func(bool) bool
+	// Presence is the process/window cache the attendance sampler reuses for
+	// jump-to-terminal's ranking. Sharing it means one Toolhelp snapshot serves
+	// both, instead of the sampler enumerating the desktop a second time.
+	Presence *platform.Presence
 }
 
 var activeWindow atomic.Pointer[App]
@@ -253,13 +294,18 @@ type App struct {
 	// change between pulse and slide frame rates retunes it instead of being
 	// ignored.
 	timerInterval uint32
-	// alertStates is the last observed state of every session. Tracking each
-	// conversation separately matters: a single global "most urgent session"
-	// key used to be reset whenever that session ended, so another still-
-	// waiting session re-alerted later - or an unrelated new session looked
-	// like the cause of a balloon. The first load only seeds this map, which
-	// stops hot reload/restart from replaying old alerts.
-	alertStates map[string]session.State
+	// alertStates is the last observed state of every session, keyed by the
+	// store's key. Tracking each conversation separately matters: a single
+	// global "most urgent session" key used to be reset whenever that session
+	// ended, so another still-waiting session re-alerted later - or an
+	// unrelated new session looked like the cause of a balloon. The first load
+	// only seeds this map, which stops hot reload/restart from replaying old
+	// alerts.
+	//
+	// It is now a map of alertFacts rather than of states, because the policy
+	// needs the thing being asked for (a permission prompt and a question are
+	// both waiting_permission) as well as the state itself.
+	alertStates map[string]alertFacts
 	// lastAvailable is the grace anchor for the idle self-destruct. With the
 	// new existence model a live terminal keeps its session indefinitely, so
 	// this only ever fires after every AI terminal has really been closed.
@@ -272,8 +318,28 @@ type App struct {
 	lang i18n.Lang
 	// approvals tracks the live auto-approve countdowns, keyed by session.
 	// approveTimeout is how long each countdown runs. UI thread only.
-	approvals       *approvalTracker
-	approveTimeout  time.Duration
+	approvals      *approvalTracker
+	approveTimeout time.Duration
+	// mutes is the per-session silence list and unread the marks that survive a
+	// suppressed balloon. Both are keyed on session.Identity rather than the
+	// store's key, so a hook reporter's synthetic pid cannot invalidate either.
+	mutes  *muteSet
+	unread *unreadSet
+	// attendance is the desktop sample the alert policy reads. It is filled by
+	// its own goroutine (attention_windows.go): enumerating other processes'
+	// windows on the UI thread is how a hung window becomes an AppHang.
+	attendance *attendanceSampler
+	// lastAlertAt is when each conversation last produced a balloon, keyed by
+	// session.Identity. It folds two completions of one session into one noise.
+	lastAlertAt map[string]time.Time
+	// lastAlertRecord is the most recent decision record, written beside the
+	// runtime snapshots so "--json" and a bug report can answer "was it silent
+	// because it decided to be, or because it never ran".
+	lastAlertRecord alertRecord
+	// contextRow is which session row the pointer is over, or -1. It resolves
+	// both the row's hover highlight and the row a right-click targets, from
+	// the same geometry the rows are drawn with.
+	contextRow      int
 	taskbarMessage  uint32
 	trayIcon        win.HICON
 	trayAdded       bool
@@ -350,6 +416,10 @@ func New(values *store.Store, options Options) *App {
 		lang:           i18n.Resolve(i18n.Setting(options.Settings.Language), i18n.SystemLocale()),
 		approvals:      newApprovalTracker(),
 		approveTimeout: time.Duration(timeout) * time.Second,
+		mutes:          newMuteSet(options.Settings.MutedSessions),
+		unread:         newUnreadSet(),
+		lastAlertAt:    make(map[string]time.Time, 4),
+		contextRow:     -1,
 	}
 }
 
@@ -580,6 +650,19 @@ func (a *App) Run() error {
 	watchStop := make(chan struct{})
 	defer close(watchStop)
 	go a.watchHang(watchStop)
+	// The attendance sampler is a second goroutine with the same lifetime: it
+	// enumerates other processes' windows, which must never happen on the UI
+	// thread, and it must stop when this window goes away rather than leak one
+	// ticker per overlay instance.
+	if a.attendance == nil && a.options.Presence != nil {
+		a.attendance = newAttendanceSampler(a.options.Presence)
+	}
+	if a.attendance != nil {
+		a.attendance.publish(a.sessions)
+		go a.attendance.run(watchStop, func() time.Duration {
+			return time.Duration(a.options.Settings.IdleSeconds) * time.Second
+		}, a.postRefresh)
+	}
 	var envelope messageEnvelope
 	for {
 		result := win.GetMessage(&envelope.event, 0, 0, 0)
@@ -773,6 +856,10 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 			return 0
 		}
 		a.trackHover()
+		// Which row is under the pointer, from the same geometry the rows are
+		// drawn with. It drives the row's hover highlight and the row a
+		// right-click targets, so "the row I pointed at" is one answer, not two.
+		a.trackRowHover(int(int16(uint16(lParam))), int(int16(uint16(lParam>>16))))
 		return 0
 	case wmMouseLeave:
 		a.clearHover()
@@ -811,6 +898,14 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		}
 		return 0
 	case wmContextMenu:
+		// A right-click on a session row is about that session; anywhere else
+		// it is the panel's own menu. The row is resolved from the same
+		// geometry the row is drawn with, so "mute the row I clicked" cannot
+		// target its neighbour.
+		if a.expanded && a.contextRow >= 0 && a.contextRow < len(a.sessions) {
+			a.showSessionMenu(a.sessions[a.contextRow])
+			return 0
+		}
 		a.showContextMenu(false)
 		return 0
 	case wmKeyDown:
@@ -912,6 +1007,69 @@ func (a *App) handleTrayMessage(message uint32, lParam uintptr) {
 	}
 }
 
+// trackRowHover records which session row the pointer is over. It is split out
+// of trackHover (which is about WM_MOUSELEAVE and the tuck) because the two
+// have different lifetimes: hovering affects the frame, the row affects a
+// highlight and a context menu.
+func (a *App) trackRowHover(x, y int) {
+	row := -1
+	if a.expanded {
+		if index, ok := expandedRowHit(x, y, a.width, a.height, len(a.sessions)); ok {
+			row = index
+		}
+	}
+	if row == a.contextRow {
+		return
+	}
+	a.contextRow = row
+	// The highlight is part of the frame, so a change here is a repaint. The
+	// row index rides in renderedKey as hoverRow (see frameKey).
+	a.postRefresh()
+}
+
+// showSessionMenu is the per-row context menu: mute or unmute this one
+// conversation, and nothing else. It is deliberately short - the full menu
+// stays on a right-click anywhere outside a row, and mixing the two is how
+// people mute the panel when they meant to hide a row.
+func (a *App) showSessionMenu(target session.Session) {
+	menu := win.CreatePopupMenu()
+	if menu == 0 {
+		return
+	}
+	defer win.DestroyMenu(menu)
+	lang := a.lang
+	muted := a.mutes.has(target)
+	label := i18n.T(lang, i18n.KeyTrayMuteSession)
+	if muted {
+		label = i18n.T(lang, i18n.KeyTrayUnmuteSession)
+	}
+	a.appendMenu(menu, 0, menuMuteSession, checkLabel(label, muted))
+	var cursor win.POINT
+	win.GetCursorPos(&cursor)
+	win.SetForegroundWindow(a.window())
+	command := win.TrackPopupMenu(menu, win.TPM_RIGHTBUTTON|win.TPM_RETURNCMD|win.TPM_NONOTIFY, cursor.X, cursor.Y, 0, a.window(), nil)
+	if command != menuMuteSession {
+		return
+	}
+	a.toggleSessionMute(target)
+}
+
+// toggleSessionMute flips the mute for one conversation and repaints. The list
+// is persisted through the same settings callback everything else uses, so it
+// survives the overlay exiting when no session is left - which is its normal
+// end of life, not an error path.
+func (a *App) toggleSessionMute(target session.Session) {
+	muted := a.mutes.toggle(target)
+	if muted {
+		// A muted conversation cannot be "unread": the mark exists to say
+		// "this needs you", and the user just said it does not.
+		a.unread.clearOne(target)
+	}
+	a.options.Settings.MutedSessions = a.mutes.list()
+	a.publishSettings()
+	a.postRefresh()
+}
+
 // trackHover arms the one-shot WM_MOUSELEAVE notification the first time the
 // cursor enters the panel. Without TrackMouseEvent there is no leave message,
 // so the highlight would stay on forever after the first hover.
@@ -957,10 +1115,14 @@ func (a *App) verifyHover() {
 }
 
 func (a *App) clearHover() {
-	if !a.hovering {
+	if !a.hovering && a.contextRow < 0 {
 		return
 	}
 	a.hovering = false
+	// Leaving the panel also leaves the row: a highlight that survives the
+	// pointer would claim the row is still a target under the cursor, and a
+	// right-click elsewhere would then mute a row the pointer is not over.
+	a.contextRow = -1
 	a.syncTuck()
 	a.postRefresh()
 }
@@ -1147,19 +1309,26 @@ func (a *App) jumpTo(row int) bool {
 		Terminal:  target.Terminal,
 	}
 	handle := uintptr(a.window())
+	// Jumping to a conversation is the user looking at it, so its unread mark
+	// is spent. This happens before the off-thread lookup because that is
+	// where the intent is known; a failed focus still counts as "I went to
+	// look", which is what the mark was asking for.
+	if a.unread.clearOne(target) {
+		a.postRefresh()
+	}
 	go func() {
 		// Only the lookup runs off-thread (EnumWindows touches other
 		// processes). The resolved HWND is posted back so activation happens
 		// on the UI thread, which holds the foreground after the click.
-		target, _, ok := platform.ResolveTarget(request)
+		resolved, _, ok := platform.ResolveTarget(request)
 		if handle == 0 {
 			return
 		}
-		if !ok || target == 0 {
+		if !ok || resolved == 0 {
 			win.PostMessage(win.HWND(handle), wmFocusResult, 0, 0)
 			return
 		}
-		win.PostMessage(win.HWND(handle), wmFocusActivate, target, 0)
+		win.PostMessage(win.HWND(handle), wmFocusActivate, resolved, 0)
 	}()
 	return true
 }
@@ -1309,7 +1478,11 @@ func (a *App) showContextMenu(fromTray bool) {
 	position++
 	a.appendMenu(menu, position, menuSoundVolume, fmt.Sprintf("%s · %d%%", i18n.T(lang, i18n.KeyTraySoundVolume), a.options.Settings.SoundVolume))
 	position++
-	a.appendMenu(menu, position, menuNotifyFinish, checkLabel(i18n.T(lang, i18n.KeyTrayNotifyFinish), a.options.Settings.NotifyOnFinish))
+	// The tick mirrors the three-way policy, not the legacy boolean: a ticked
+	// row means "completions speak", which is true for both background and
+	// always. a.options.Settings.NotifyOnFinish is kept in step by every
+	// handler that changes the policy, including Normalize on load.
+	a.appendMenu(menu, position, menuNotifyFinish, checkLabel(i18n.T(lang, i18n.KeyTrayNotifyFinish), ValidDonePolicy(a.options.Settings.DonePolicy) != DonePolicyOff))
 	position++
 	a.appendMenu(menu, position, menuTopmost, checkLabel(i18n.T(lang, i18n.KeyTrayTopmost), a.options.Settings.AlwaysOnTop))
 	position++
@@ -1365,10 +1538,17 @@ func (a *App) showContextMenu(fromTray bool) {
 		beep(beepExclamation)
 		a.publishSettings()
 	case menuNotifyFinish:
-		a.options.Settings.NotifyOnFinish = !a.options.Settings.NotifyOnFinish
-		if a.options.Settings.NotifyOnFinish {
+		// The tray entry is the legacy two-way view of the three-way policy:
+		// switching it off means DonePolicyOff, switching it on restores the
+		// default (background), never "always" - a user who said "on" asked
+		// for completions, not for a balloon every time they watch one finish.
+		if ValidDonePolicy(a.options.Settings.DonePolicy) == DonePolicyOff {
+			a.options.Settings.DonePolicy = string(DonePolicyBackground)
 			beep(beepFinished)
+		} else {
+			a.options.Settings.DonePolicy = string(DonePolicyOff)
 		}
+		a.options.Settings.NotifyOnFinish = ValidDonePolicy(a.options.Settings.DonePolicy) != DonePolicyOff
 		a.publishSettings()
 	case menuTopmost:
 		a.options.Settings.AlwaysOnTop = !a.options.Settings.AlwaysOnTop
@@ -1592,14 +1772,35 @@ func (a *App) updateTooltip() {
 	win.Shell_NotifyIcon(win.NIM_MODIFY, &data)
 }
 
-// alertLevel ranks what just happened across all sessions in one load.
-type alertLevel uint8
+// alertFacts is what the alert policy remembers about one conversation between
+// scans: the state it was in and the kind it was asking for. The kind is the
+// half that makes "answered a permission prompt, then got asked a question"
+// visible - the state did not move, but the ask did.
+type alertFacts struct {
+	State session.State
+	Kind  session.Kind
+	// At is when this state first appeared, which is what a completion's
+	// coalescing window measures against.
+	At time.Time
+}
 
-const (
-	alertNone alertLevel = iota
-	alertFinished
-	alertUrgent
-)
+// factsOf builds the snapshot the next scan compares against. When neither the
+// state nor the kind changed, the original timestamp is kept: coalescing
+// measures "how long has this been settled", not "when did the reporter last
+// repeat itself".
+func factsOf(items []session.Session, now time.Time, previous map[string]alertFacts) map[string]alertFacts {
+	facts := make(map[string]alertFacts, len(items))
+	for _, value := range items {
+		key := sessionAlertKey(value)
+		kind := session.KindOfSession(value)
+		fact := alertFacts{State: value.State, Kind: kind, At: now}
+		if old, ok := previous[key]; ok && old.State == value.State && old.Kind == kind {
+			fact.At = old.At
+		}
+		facts[key] = fact
+	}
+	return facts
+}
 
 // busyState is true for states that mean "the agent is doing something".
 // Leaving one of these for idle/closed is a real completion, whereas an idle
@@ -1613,135 +1814,251 @@ func busyState(state session.State) bool {
 	return false
 }
 
-// transitionLevel is the pure decision behind alertOnTransitions. A new
-// session that opens already in an alert state does need announcing, but a
-// plain new working session must not: that was the "it only pops up when I
-// start a new session" complaint.
-func transitionLevel(previous session.State, existed bool, current session.State) alertLevel {
-	if !existed {
-		if current == session.StateWaitingPermission || current == session.StateError {
-			return alertUrgent
-		}
-		return alertNone
-	}
-	if previous == current {
-		return alertNone
-	}
-	switch current {
-	case session.StateWaitingPermission, session.StateError:
-		return alertUrgent
-	case session.StateIdle, session.StateClosed:
-		if busyState(previous) {
-			return alertFinished
-		}
-	}
-	return alertNone
-}
+// alertLevel ranks what just happened across all sessions in one load.
+type alertLevel uint8
+
+const (
+	alertNone alertLevel = iota
+	alertFinished
+	alertUrgent
+)
 
 func sessionAlertKey(value session.Session) string {
 	return fmt.Sprintf("%s\x00%s\x00%d", value.Source, value.SessionID, value.PID)
 }
 
-func currentAlertStates(items []session.Session) map[string]session.State {
-	states := make(map[string]session.State, len(items))
-	for _, value := range items {
-		states[sessionAlertKey(value)] = value.State
-	}
-	return states
-}
-
-// decideAlerts is the pure half of alertOnTransitions. Keeping it separate is
-// what lets a regression test reproduce the ghost-popup scenario: one session
-// ending used to reset a single global key and re-announce a sibling that had
-// been waiting the whole time.
-func decideAlerts(previous map[string]session.State, items []session.Session) (alertLevel, *session.Session) {
-	level := alertNone
-	var subject *session.Session
-	for index := range items {
-		candidate := &items[index]
-		was, existed := previous[sessionAlertKey(*candidate)]
-		if found := transitionLevel(was, existed, candidate.State); found > level {
-			level, subject = found, candidate
-		}
-	}
-	// List() drops closed sessions entirely. A disappearance is the
-	// strongest completion signal there is, but it must never masquerade
-	// as an urgent alert from a different, still-waiting conversation.
-	present := currentAlertStates(items)
-	for key, was := range previous {
-		if _, stillHere := present[key]; !stillHere && busyState(was) && level < alertFinished {
-			level = alertFinished
-		}
-	}
-	return level, subject
-}
-
-// alertOnTransitions fires the configured alerts on real state transitions.
-// This is the point of the whole app: the overlay is glanceable, but an alert
-// reaches the user when the panel is hidden, covered, or they are looking at
-// another monitor.
+// alertOnTransitions turns one load into at most one balloon, one tone and a
+// set of unread marks. The policy itself is in attention.go and is pure; this
+// is the part that touches the window, the tray and the clock.
 //
-// Every conversation is tracked independently. The old implementation kept a
-// single global key for the *most urgent* session: when that session ended the
-// key was cleared, so a still-waiting sibling re-alerted later and looked like
-// it had been caused by an unrelated new session. The first load only seeds
-// the map, so hot reload / restart never replays historical alerts. The sound
-// and the balloon share one decision, so turning either off never changes when
-// the other fires.
+// Two structural points, both of which used to be wrong:
+//
+//   - The baseline (`alertStates`) is refreshed on **every** load, including
+//     while every alert is muted. That is what stops a re-enable from replaying
+//     everything that happened while alerts were off.
+//   - Only a *change* is offered to the policy. A session that has been waiting
+//     for ten minutes is not news every eight seconds; the scan cadence is a
+//     repaint cadence, not an alert cadence.
 func (a *App) alertOnTransitions() {
-	current := currentAlertStates(a.sessions)
-	if a.alertStates == nil || (!a.options.Settings.Notifications && !a.options.Settings.Sound) {
-		// Keep the baseline fresh even while muted, so re-enabling alerts
-		// cannot replay everything that happened while they were off.
-		a.alertStates = current
+	now := time.Now()
+	current := factsOf(a.sessions, now, a.alertStates)
+	previous := a.alertStates
+	// Seeding: the first load after launch (or after a hot reload replaced the
+	// handlers) must not replay historical alerts.
+	a.alertStates = current
+	if previous == nil {
+		return
+	}
+	if a.unread.retain(a.sessions) {
+		a.postRefresh()
+	}
+
+	sample, sampleKnown := a.attendance.Current()
+	settings := a.attentionSettings()
+
+	inputs := a.alertInputs(previous, current, sample, sampleKnown, settings)
+	// A conversation that disappeared while it was busy is a completion, and
+	// List() drops it, so it can never appear in the loop above. It is
+	// synthesized here so a closed terminal still says it finished.
+	inputs = append(inputs, a.vanishedInputs(previous, current, sample)...)
+
+	if len(inputs) == 0 {
 		return
 	}
 
-	level, subject := decideAlerts(a.alertStates, a.sessions)
-	a.alertStates = current
-	if level == alertNone || (level == alertFinished && !a.options.Settings.NotifyOnFinish) {
+	plan := PlanAlerts(inputs, settings, a.lastAlertAt)
+	receipt := buildAlertRecord(now, inputs, plan, sample, sampleKnown)
+	a.persistReceipt(receipt)
+
+	if plan.Balloon != nil {
+		if plan.Balloon.State == session.StateIdle || plan.Balloon.State == session.StateClosed {
+			a.balloonText(i18n.T(a.lang, i18n.KeyBalloonDoneTitle),
+				doneBalloonBody(*plan.Balloon, a.lang), niifInfo)
+		} else {
+			a.balloon(*plan.Balloon)
+		}
+	}
+	if plan.Tone != "" {
+		beep(toneKind(plan.Tone))
+	}
+	if len(plan.Unread) > 0 {
+		a.unread.mark(plan.Unread)
+		a.rememberAlerts(inputs, plan, now)
+		a.postRefresh()
 		return
 	}
-	if level == alertUrgent && subject != nil {
-		// Per-event switches: someone who only wants to hear genuine blockers
-		// can mute the "waiting for approval" tone without losing the error
-		// one. The completion tone is gated by NotifyOnFinish above.
-		if soundForState(a.options.Settings, subject.State) {
-			beep(beepKind(subject.State))
-		}
-	} else if a.options.Settings.Sound {
-		beep(beepFinished)
+	a.rememberAlerts(inputs, plan, now)
+}
+
+// rememberAlerts records when each conversation last spoke, so two completions
+// of one session inside the coalescing window become one noise.
+func (a *App) rememberAlerts(inputs []AlertInput, plan AlertPlan, now time.Time) {
+	if a.lastAlertAt == nil {
+		a.lastAlertAt = make(map[string]time.Time, len(inputs))
 	}
-	if a.options.Settings.Notifications {
-		if level == alertUrgent && subject != nil {
-			a.balloon(*subject)
-		} else {
-			a.balloonText(i18n.T(a.lang, i18n.KeyBalloonDoneTitle),
-				i18n.T(a.lang, i18n.KeyBalloonDoneBody), niifInfo)
+	for index := range inputs {
+		key := sessionAlertKey(inputs[index].Session)
+		if plan.Reasons[key] == decisionDoneAway || plan.Reasons[key] == decisionDoneSeen {
+			a.lastAlertAt[key] = now
 		}
 	}
 }
 
-// soundForState reports whether this transition should make a noise, honouring
-// both the master switch and the per-event one.
-func soundForState(settings Settings, state session.State) bool {
-	if !settings.Sound {
+// persistReceipt stores the decision record and keeps the in-memory copy that
+// --json and --doctor read without touching the disk.
+func (a *App) persistReceipt(record alertRecord) {
+	if a.sameAlertRecord(record) {
+		return
+	}
+	a.lastAlertRecord = record
+	writeAlertRecord(record)
+}
+
+// sameAlertRecord reports whether the new record is indistinguishable from the
+// last one, so an idle 8-second tick does not rewrite the file.
+func (a *App) sameAlertRecord(record alertRecord) bool {
+	if len(a.lastAlertRecord.Sessions) != len(record.Sessions) {
 		return false
 	}
-	if state == session.StateError {
-		return settings.SoundOnError
+	if a.lastAlertRecord.Balloon != record.Balloon ||
+		a.lastAlertRecord.Tone != record.Tone ||
+		a.lastAlertRecord.Presence != record.Presence ||
+		a.lastAlertRecord.Present != record.Present ||
+		a.lastAlertRecord.Attending != record.Attending ||
+		a.lastAlertRecord.Skipped != record.Skipped {
+		return false
 	}
-	return settings.SoundOnWaiting
+	for index := range record.Sessions {
+		if a.lastAlertRecord.Sessions[index] != record.Sessions[index] {
+			return false
+		}
+	}
+	return true
 }
 
-// beepKind maps a state onto one of the synthesised timbres: errors get the
-// descending figure, everything else the rising one.
-func beepKind(state session.State) uint32 {
-	if state == session.StateError {
-		return beepError
+// alertInputs builds the policy's view of every conversation that moved.
+func (a *App) alertInputs(previous, current map[string]alertFacts, sample attendanceState, sampleKnown bool, settings AttentionSettings) []AlertInput {
+	inputs := make([]AlertInput, 0, len(a.sessions))
+	for _, value := range a.sessions {
+		key := sessionAlertKey(value)
+		kind := session.KindOfSession(value)
+		old, existed := previous[key]
+		if existed && old.State == value.State && old.Kind == kind {
+			continue
+		}
+		in := AlertInput{
+			Session:       value,
+			Kind:          kind,
+			Previous:      old.State,
+			Existed:       existed,
+			ChangedKind:   existed && old.Kind != kind,
+			Muted:         a.mutes.has(value),
+			Subagent:      strings.TrimSpace(value.ParentSessionID) != "",
+			PresenceKnown: sampleKnown,
+		}
+		if sampleKnown {
+			in.Present = sample.Present
+			in.Attending = sample.Attending[session.Identity(value)]
+		}
+		inputs = append(inputs, in)
 	}
-	return beepExclamation
+	return inputs
 }
+
+// vanishedInputs synthesizes a completion for a conversation that was busy and
+// is gone: the strongest completion signal there is.
+func (a *App) vanishedInputs(previous, current map[string]alertFacts, sample attendanceState) []AlertInput {
+	var inputs []AlertInput
+	for key, old := range previous {
+		if _, stillHere := current[key]; stillHere {
+			continue
+		}
+		if !busyState(old.State) {
+			continue
+		}
+		source, sessionID := splitAlertKey(key)
+		inputs = append(inputs, AlertInput{
+			Session:  session.Session{Source: source, SessionID: sessionID, State: session.StateClosed},
+			Kind:     session.KindDone,
+			Previous: old.State,
+			Existed:  true,
+			Present:  sample.Present,
+		})
+	}
+	return inputs
+}
+
+// splitAlertKey reads the first two parts of sessionAlertKey back. The pid is
+// not needed here, and the two that are needed identify whose completion this
+// was.
+func splitAlertKey(key string) (source, sessionID string) {
+	parts := strings.SplitN(key, "\x00", 3)
+	if len(parts) > 0 {
+		source = parts[0]
+	}
+	if len(parts) > 1 {
+		sessionID = parts[1]
+	}
+	return source, sessionID
+}
+
+// attentionSettings maps the live preferences onto the policy's narrow view.
+func (a *App) attentionSettings() AttentionSettings {
+	settings := a.options.Settings
+	return AttentionSettings{
+		Notifications:   settings.Notifications,
+		Sound:           settings.Sound,
+		SoundOnWaiting:  settings.SoundOnWaiting,
+		SoundOnError:    settings.SoundOnError,
+		DonePolicy:      ValidDonePolicy(settings.DonePolicy),
+		QuietCurrent:    settings.QuietCurrent,
+		ForegroundAware: settings.ForegroundAware,
+		IdleAfter:       time.Duration(settings.IdleSeconds) * time.Second,
+		QuietSubagents:  settings.QuietSubagents,
+	}
+}
+
+// toneKind maps a decision's timbre name onto the synthesised kind constant.
+func toneKind(tone string) uint32 {
+	switch tone {
+	case toneError:
+		return beepError
+	case toneFinished:
+		return beepFinished
+	default:
+		return beepExclamation
+	}
+}
+
+// doneBalloonBody names the project in a completion balloon. The old copy was
+// the same sentence for every session, which told the user nothing actionable.
+func doneBalloonBody(value session.Session, lang i18n.Lang) string {
+	body := i18n.T(lang, i18n.KeyBalloonDoneBody)
+	if label := projectLabel(value, lang); label != "" {
+		body = label + " · " + body
+	}
+	return body
+}
+
+// presenceLabel renders the sample for the receipt, distinguishing "nobody
+// could tell" from "the user is away" - two states that read the same on the
+// panel and mean opposite things in a bug report.
+func presenceLabel(sample attendanceState, known bool) string {
+	if !known {
+		return "unknown"
+	}
+	if sample.Present {
+		return "present"
+	}
+	return "away"
+}
+
+// soundForState and beepKind were the two halves of the tone decision that
+// used to live here. They moved into the alert policy (attention.go), which now
+// decides per kind rather than per state, because a question and an approval
+// are both waiting_permission. This comment stays so the next reader looking
+// for them in this file finds out where they went instead of concluding they
+// were deleted without a replacement.
 
 // balloon shows the tray balloon tip. It is a no-op when the tray icon is not
 // registered, which happens briefly during startup and after an Explorer
@@ -1798,7 +2115,7 @@ func (a *App) present() error {
 	// on every statusline render and most pushes repeat the same state - which
 	// used to mean a full GDI repaint of the panel several times a second for
 	// nothing.
-	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now, a.lang, a.approvals.maxRemainingSeconds(now), a.options.Settings.Theme, a.options.Settings.PerSourceColor)
+	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now, a.lang, a.approvals.maxRemainingSeconds(now), a.options.Settings.Theme, a.options.Settings.PerSourceColor, unreadBits(a.sessions, a.unread), mutedBits(a.sessions, a.mutes), a.contextRow)
 	if key == a.lastFrame && a.surface != nil {
 		return nil
 	}
@@ -1831,6 +2148,9 @@ func (a *App) present() error {
 			Hovered:   a.hovering,
 			Lang:      a.lang,
 			Countdown: a.approvals.views(time.Now()),
+			Unread:    a.unread,
+			Muted:     a.mutes,
+			HoverRow:  a.contextRow,
 			Tuck:      a.tuck,
 			Sliver:    a.sliverWidth(),
 			Dock:      a.dock,
@@ -1879,6 +2199,12 @@ func (a *App) load() {
 	// expired) lose their countdowns here, on the only path that observes
 	// store changes.
 	a.approvals.update(a.sessions, time.Now(), a.options.Settings.AutoApprove, a.approveTimeout)
+	// The attendance sampler evaluates its own copy of the session list, so it
+	// is handed the one that was just loaded rather than reading a.sessions
+	// from another goroutine.
+	if a.attendance != nil {
+		a.attendance.publish(a.sessions)
+	}
 	// Both are cheap no-ops unless the tray icon exists, and both read only
 	// the freshly loaded snapshot.
 	a.updateTooltip()

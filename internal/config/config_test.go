@@ -5,10 +5,19 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
+
+// sameConfig compares two Configs field by field. Config is no longer
+// comparable with == because MutedSessions is a slice, and comparing whole
+// structs is exactly the assertion these tests want - so the comparison lives
+// here once rather than being rewritten field-by-field at each call site.
+func sameConfig(left, right Config) bool {
+	return reflect.DeepEqual(left, right)
+}
 
 func TestDecodeConfigFallsBackToDefaults(t *testing.T) {
 	defaults := Default()
@@ -22,7 +31,7 @@ func TestDecodeConfigFallsBackToDefaults(t *testing.T) {
 		{"json array", `[1,2,3]`},
 		{"not json", "hello"},
 	} {
-		if got := DecodeConfig([]byte(tc.data)); got != defaults {
+		if got := DecodeConfig([]byte(tc.data)); !sameConfig(got, defaults) {
 			t.Fatalf("%s: got %+v want %+v", tc.name, got, defaults)
 		}
 	}
@@ -119,7 +128,7 @@ func TestRoundTripThroughDisk(t *testing.T) {
 
 func TestLoadMissingFilesUseDefaults(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nope.json")
-	if got := Load(missing); got != Default() {
+	if got := Load(missing); !sameConfig(got, Default()) {
 		t.Fatalf("missing config must default, got %+v", got)
 	}
 	if got := LoadState(missing); got != DefaultState() {

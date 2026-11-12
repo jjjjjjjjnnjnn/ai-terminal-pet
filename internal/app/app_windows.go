@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -126,6 +127,12 @@ func RunWith(openSettings bool) error {
 			SoundOnWaiting:        settings.SoundOnWaiting,
 			SoundOnError:          settings.SoundOnError,
 			NotifyOnFinish:        settings.NotifyOnFinish,
+			DonePolicy:            settings.DonePolicy,
+			ForegroundAware:       settings.ForegroundAware,
+			IdleSeconds:           settings.IdleMinutes * 60,
+			QuietCurrent:          settings.QuietCurrent,
+			MutedSessions:         append([]string(nil), settings.MutedSessions...),
+			QuietSubagents:        settings.QuietSubagents,
 			AlwaysOnTop:           settings.AlwaysOnTop,
 			EdgeRetract:           settings.EdgeRetract,
 			Language:              settings.Language,
@@ -139,6 +146,10 @@ func RunWith(openSettings bool) error {
 		AutoStart:             autostartEnabled,
 		AutoApproveTimeoutSec: settings.AutoApproveTimeoutSec,
 		OpenSettings:          openSettings,
+		// The attendance sampler reuses this exact cache: one Toolhelp
+		// snapshot and one EnumWindows pass serve both liveness and "is the
+		// user looking at that session", instead of enumerating twice.
+		Presence: presence,
 		Initial: ui.Placement{
 			Placed:   placement.Placed,
 			X:        placement.X,
@@ -480,7 +491,10 @@ func (s *configSaver) write(value ui.Settings) {
 func (s *configSaver) echo(value config.Config) bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.hasWritten && s.written == value
+	// reflect.DeepEqual rather than ==: Config carries a slice now (the
+	// per-session mute list), and this comparison is "is this reload the echo
+	// of our own write", which has to mean field-for-field equality.
+	return s.hasWritten && reflect.DeepEqual(s.written, value)
 }
 
 func (s *configSaver) flush() {
@@ -503,6 +517,20 @@ func applyUISettings(target *config.Config, value ui.Settings) {
 	target.SoundOnWaiting = value.SoundOnWaiting
 	target.SoundOnError = value.SoundOnError
 	target.NotifyOnFinish = value.NotifyOnFinish
+	// The three-way completion policy is the live field; NotifyOnFinish above
+	// stays as the legacy two-way view, and Normalize keeps them consistent
+	// when the file is read back.
+	target.DonePolicy = config.ValidDonePolicy(value.DonePolicy)
+	target.ForegroundAware = value.ForegroundAware
+	if value.IdleSeconds >= 0 {
+		target.IdleMinutes = value.IdleSeconds / 60
+	}
+	target.QuietCurrent = value.QuietCurrent
+	// The mute list is written back the way the ui package holds it, then
+	// normalised on read; storing it here means a mute survives the overlay
+	// exiting when no session is left (which is its normal end of life).
+	target.MutedSessions = append([]string(nil), value.MutedSessions...)
+	target.QuietSubagents = value.QuietSubagents
 	target.AlwaysOnTop = value.AlwaysOnTop
 	target.EdgeRetract = value.EdgeRetract
 	target.Language = value.Language
@@ -527,6 +555,33 @@ type Report struct {
 	Count         int               `json:"count"`
 	GeneratedAt   time.Time         `json:"generatedAt"`
 	Sessions      []session.Session `json:"sessions"`
+	// Alerts is the last alert decision the overlay recorded, or null when
+	// there is no receipt. It is how a script (or a bug report) answers "was
+	// it silent because it decided to be, or because nothing ran": the record
+	// carries one reason token per considered session.
+	Alerts *AlertReport `json:"alerts"`
+}
+
+// AlertReport is the subset of the overlay's receipt that belongs in the
+// machine-readable report. It mirrors internal/ui's record rather than
+// importing it (the app layer does not reach into a window package), and a
+// test pins the two field names together.
+type AlertReport struct {
+	At       time.Time            `json:"at"`
+	Presence string               `json:"presence"`
+	Present  bool                 `json:"present"`
+	Balloon  string               `json:"balloon,omitempty"`
+	Tone     string               `json:"tone,omitempty"`
+	Skipped  string               `json:"skipped,omitempty"`
+	Sessions []AlertReportSession `json:"sessions,omitempty"`
+}
+
+type AlertReportSession struct {
+	Identity string `json:"identity"`
+	State    string `json:"state"`
+	Kind     string `json:"kind"`
+	Decision string `json:"decision"`
+	Unread   bool   `json:"unread,omitempty"`
 }
 
 // Snapshot reads the on-disk reporter snapshots and returns the same aggregate
@@ -564,13 +619,34 @@ func Snapshot() (Report, error) {
 	if items == nil {
 		items = []session.Session{}
 	}
+	// The alert receipt is read here rather than fetched from the live window:
+	// --json must never depend on a GUI process, and this file is written by
+	// the overlay for exactly this purpose.
+	alerts := readAlertReport(filepath.Join(localAppData, "AI-Terminal-Pet", "runtime"))
 	return Report{
 		SchemaVersion: session.SchemaVersion,
 		State:         session.Aggregate(items),
 		Count:         len(items),
 		GeneratedAt:   now.UTC(),
 		Sessions:      items,
+		Alerts:        alerts,
 	}, nil
+}
+
+// readAlertReport reads runtime/alerts.json. A missing or unreadable file is
+// null, not a failure: an overlay that has not run since the upgrade has no
+// receipt, and that is not a fault in the reporter a script is asking about.
+func readAlertReport(directory string) *AlertReport {
+	path := filepath.Join(directory, "alerts.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var record AlertReport
+	if err := json.Unmarshal(data, &record); err != nil {
+		return nil
+	}
+	return &record
 }
 
 // EncodeReport renders a report as JSON. pretty switches to indented output for
