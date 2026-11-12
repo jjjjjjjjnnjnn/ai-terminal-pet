@@ -63,7 +63,7 @@ zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，�
 
 | 目标 | 状态 | 说明 |
 |---|---|---|
-| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | ✅ **两次合并都完成**：#14385（17:20:15Z，`70581cc`）→ 1.2.5；**#14439（20:12:31Z，`475a48e`）→ 1.2.6** | 仓库里 `data/plugins/*.yml` 的 `tarball` 已是 **1.2.6**；**站点 `plugins.json` 也已渲染 1.2.6**（2026-11-12 实测 `count` 10,581，该条目 `version: 1.2.6`、`tarball` 指向 `dsh-plugin-v1.2.6` 的资产）——这处「合并 vs 渲染」的延迟终于追平 |
+| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | ✅ **1.2.6 的两次合并都完成**（#14385 → 1.2.5、#14439 → 1.2.6），1.2.7 的跟进 PR [#14688](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14688) 已开、MERGEABLE | 仓库里 `data/plugins/*.yml` 的 `tarball` 是 **1.2.6**，站点 `plugins.json` 也已渲染 1.2.6（2026-11-12 实测 `count` 10,581）。1.2.7 的条目改动已提在 #14688（只改 `tarball` 一行，中文描述逐字节未动），等 check 与人工合并 |
 | [dshopen](https://github.com/polang233/dsh-plugin-index/issues/423) | ✅ **已收录并已渲染** | `dshopen.org/index.json` **1,207 条**含本包 **1.2.4**（commit `ff7f6de`），`labels: verified + updated-recent`；**落后两个版本**，要等它下一次构建 |
 | [YELEBAI/dsh-plugin-marketplace](https://github.com/YELEBAI/dsh-plugin-marketplace) | ✅ **自动采集，已收录** | `registry/plugins.json` 第 8,729 条：`version: 1.2.5`、`verifiedCommit: 584bc2f`、`install.spec` = `github:jjjjjjjjnnjnn/ai-terminal-pet#584bc2f`、`profiles: [desktop, headless, web]`、`verifiedAt` 17:54:34Z。**无需申请**，它按 topic 自动扫 |
 | [bradeGithub/DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) | ✅ **自动采集，已收录** | `registry.json` 第 13,128 条：`pkg_name`/`npm_pkg_name` = `dsh-ai-terminal-pet`、`version: 1.2.4`、topics 15 个、`stars_delta_30d` 也在记。issue #367 只是留证，可关 |
