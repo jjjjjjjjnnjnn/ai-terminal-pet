@@ -18,6 +18,7 @@ if hasattr(sys.stdout, "reconfigure"):
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ["README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "AGENTS.md", "CHANGELOG.md",
         "docs/HANDOVER.md", "docs/ROADMAP.md", "docs/PROTOCOL.md", "docs/LAUNCH.md",
+        "docs/UPSTREAM.md",
         "docs/assets/README.md", "packages/dsh-ai-terminal-pet/README.md"]
 
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)")

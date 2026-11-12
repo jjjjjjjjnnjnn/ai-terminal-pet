@@ -1,14 +1,16 @@
 # HANDOVER — ai-terminal-pet 交接文档
 
 > 交接时间：2026-09-24（UTC+8 下午）；2026-11-09 刷新到 v0.9.0；2026-11-10 补记 v0.9.0 之后未发版的工作，含 DSH 插件包 1.2.3 与市场条目合并；2026-11-11 刷新到插件包 1.2.4（只改文案）并补齐三家已合并的目录；**2026-11-11 10:30 +0100 交接整理**——同步到 `bb00e58`、记入 dshopen 收录、新增 §28 交接清单。
-> 下一位 AI 直接从 §1「当前状态」与 §38「交接：2026-11-12 会话结束」开始读，然后按 §13–§27 的时间序读
-> runbook，不必回溯长上下文；§35–§38 是 2026-11-12 这一天四轮工作的施工记录。
+> 下一位 AI 直接从 §1「当前状态」与 **§39「交接：上游目录条目 sync」** 开始读，然后按 §13–§27 的时间序读
+> runbook，不必回溯长上下文；§35–§38 是 2026-11-12 这一天四轮工作的施工记录，§39 是同日晚上把「上架」
+> 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
 ## 1. 当前状态（2026-11-12 下午；浮窗 **1.0.2**、插件包 **1.2.8**，两个 Release 与 npm 都已发布）
 
-> 接手请先读本节与文末 **§38「交接：2026-11-12 会话结束」**，那两节给出「现在在哪、下一步做什么」；
-> §28 是更早一版的清单（分发状态已过期，只保留它的清单形状），§27 是插件包分发的完整 runbook。
+> 接手请先读本节与文末 **§39「交接：上游目录条目 sync」**（上架机制，读它再读 §28 的清单形状）；
+> §28 是更早一版的清单（分发状态已过期，只保留它的清单形状），§27 是插件包分发的完整 runbook，
+> 而上游目录条目的规则、八步发版顺序与「合并 ≠ 可见」的判断方式在 [docs/UPSTREAM.md](UPSTREAM.md)。
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
@@ -3113,4 +3115,64 @@ python tools/check_docs_links.py            # 11 份文档全解
 | 中文段落被合并坏掉 | `462dca2` 把两版中文段落首尾相接，留下一个从句中开始的残句；第一次修的时候又把故事讲了两遍 | 改中文长段前先数「同一事实出现几次」；重复检测用探针字符串 |
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
+
+## 39. 交接：上游目录条目 sync（2026-11-12 晚，第 39 轮）
+
+### 39.1 一句话：把「上架」从手感变成机制
+
+上游维护者 `fkysly` 在 `#14718` 上留言说这条 PR **和 main 冲突**，因此 GitHub 不跑检查、他也合不了，要求
+「以 main 上的内容为底，把这次的新增加进去」。这是**第 N 次**同一件事了，所以这一轮不再只是把那条 PR 修好，
+而是把它变成一条可以验证的路：规则进 [docs/UPSTREAM.md](UPSTREAM.md)，动作进 `tools/upstream-entry.mjs`，
+判断进 CI。
+
+### 39.2 冲突的真实成因（不是「我们改错了」）
+
+| 事实 | 依据 |
+|---|---|
+| 我们的 PR 只改了 1 行（`tarball:` 1.2.7 → 1.2.8） | `gh api .../pulls/14718/files`：`+1 −1` |
+| 上游 `main` 在**同一天**里也人工改过同一个文件 | `b2e2347`「Describe merged entries by what they do and disclose defaults」把该文件整份重写；`4f05a50d`（`#14688`）把 `tarball` 推到 1.2.7 |
+| 两边都改 `tarball:` 那一行 → 内容冲突 | `git merge-tree --write-tree main fork/bump-tarball-1.2.8` 报 `CONFLICT (content)` |
+| 冲突的 PR **没有 merge ref** → GitHub 不创建 `check` 运行 → 依赖它的 `Submission gate` 也不跑 | 上游 `contributing.md` 的「gate 一栏是空」那一段写的就是这件事 |
+| 修完之后 | `mergeable=MERGEABLE`，`check` 正常排队（本轮实测） |
+
+**所以「用旧分支开 PR + 让 git 合并」这条路在结构上就会坏**：那个文件本来就由维护者持续人工润色。
+结论写进文档：**永远从上游 `main` 重建那一行，不合并旧分支**。
+
+### 39.3 这一轮把哪句话改对了（诚实记录）
+
+条目里的 `Click a row to jump to that terminal` 当时就**不是真的**：点行会收起面板，只有**行尾箭头**跳转。
+改成 `Click the arrow at the end of a row to jump to that terminal`（zh：`点一下某一行的行尾箭头即可跳到对应终端`）。
+这属于「描述必须可核对」那一条（上游复审第 1 项会读源码核对），不是文案润色。
+
+### 39.4 三条施工教训（下一轮别再犯）
+
+| 教训 | 具体表现 |
+|---|---|
+| 工具的「能读」不等于「会读」 | 我给 `openBumpPR` 写的是 `execFileSync('gh', [...])`，本机 `gh` 已登录所以本地绿；换到 CI 就是**没有 gh、也没有跨仓库 token**，那一步永远走 `supported:false`。改成直接调公开 REST（`GET /pulls?head=owner:branch`），无 token 也能跑，`GH_TOKEN` 存在时才带 |
+| 忘了 `await` 是最安静的 bug | `openBumpPR` 改成 async 之后，调用点漏了 `await`，于是 `pending.open` 永远是 `undefined` → 输出「SKIP 而不是红」——**恰好是那种看起来正常、其实没判断的失败**。本地一条 `--check` 就能暴露它，前提是真看一眼输出 |
+| 依赖外部仓库的检查，结论要分四类 | 已列出 / 有 PR 开着 / 发了版却没人推 / 读不到（未发布、无 gh、网络失败）。只有第三种该红；其余三种「红」只会训练人忽略红灯 |
+
+### 39.5 这一轮的实测（2026-11-12 晚）
+
+```
+node --test tools/upstream-entry.test.mjs        # 8 tests pass（纯函数：文件名、URL、四种拒绝、单行断言、CRLF）
+node tools/upstream-entry.mjs --check            # in flight：still 1.2.7，但 #14718 开着 → OK
+node tools/upstream-entry.mjs --check --version 1.2.99   # asset 404 → SKIP（未发布的版本不该红）
+python tools/check_docs_links.py                 # 12 files（新文档已纳入）
+gh pr view 14718 --json mergeable                # MERGEABLE，check 在跑
+```
+
+`gofmt -l .` / `go vet ./...` / `go test -count=1 ./...` / 三个 verify / `vendor.mjs --check` /
+`fresh-machine --no-overlay` 全部照旧通过；**这一轮没有改任何非测试的 `.go` 文件**，所以
+`vendor/manifest.json` 的源码摘要不变，浮窗仍 1.0.2、插件包仍 1.2.8——不需要发版。
+
+### 39.6 现在上游是什么状态（交接要点）
+
+- `#14718`（1.2.8）：**已重建为单提交、单文件、+3/−3**，`MERGEABLE`，`check` 在跑，等维护者合并。
+  合并后站点重建才会把 `plugins.json` 的 install 命令渲染成 1.2.8。
+- `#14688`（1.2.7）：仍 open。它和 `#14718` 改的是同一行，**先合哪个都行，后合那个会再冲突一次**；
+  我们的工具可以再来一遍（从 `main` 重建）。
+- 上游 `main` 现在指向 1.2.7 —— **「PR 开着」不等于「已收录」**，判断可见性读站点索引文件。
+- 下一轮发版（1.2.9）时：`node tools/upstream-entry.mjs --version 1.2.9 --write --branch bump-tarball-1.2.9 --pr <号>`。
+
 

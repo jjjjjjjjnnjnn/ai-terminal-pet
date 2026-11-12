@@ -42,6 +42,8 @@ foreach ($f in Get-ChildItem reporters\*.js) { node --check $f.FullName }
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
 node packages/dsh-ai-terminal-pet/verify.mjs
+node tools/upstream-entry.mjs --check
+node --test tools/upstream-entry.test.mjs
 node tests/fresh-machine.mjs --no-overlay
 .\scripts\install.cmd -VerifyOnly
 ```
@@ -73,7 +75,7 @@ These are load-bearing; a pull request that breaks one will be asked to change:
 5. **Protocol changes follow [`docs/PROTOCOL.md`](docs/PROTOCOL.md) §11.** A schema change is a versioned decision, not a field rename.
 6. **No machine-specific absolute paths** in source, tests, scripts or docs. Use `%LOCALAPPDATA%`, `os.UserHomeDir()`, `Path(__file__).resolve().parent`, or an environment variable that fails with a human-readable message.
 
-The full architecture notes, release procedure and the reason each of these exists are in [`docs/HANDOVER.md`](docs/HANDOVER.md) and [`AGENTS.md`](AGENTS.md).
+The full architecture notes, release procedure and the reason each of these exists are in [`docs/HANDOVER.md`](docs/HANDOVER.md) and [`AGENTS.md`](AGENTS.md). The catalogue side — the `awesome-dsh-plugin` rules, the release-to-listing checklist, and why the entry is rebuilt from that repository's `main` instead of merged — is in [`docs/UPSTREAM.md`](docs/UPSTREAM.md).
 
 ## Release-immutable files
 

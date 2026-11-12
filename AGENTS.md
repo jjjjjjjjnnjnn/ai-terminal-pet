@@ -82,6 +82,8 @@ for f in reporters/*.js; do node --check "$f"; done   # per file: node --check o
 node --check tests/fresh-machine.mjs
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
+node tools/upstream-entry.mjs --check   # catalogue entry points at this package version (SKIP is not a pass)
+node --test tools/upstream-entry.test.mjs
 python tools/check_docs_links.py   # every relative path and #anchor in the docs we maintain
 
 # 3. Production build
@@ -143,6 +145,7 @@ Two conventions in those commands are load-bearing, not style:
 | What changed in which version? | [CHANGELOG.md](CHANGELOG.md) |
 | What is planned, and why? | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | How did we get here? (runbooks §13–§27) | [docs/HANDOVER.md](docs/HANDOVER.md) |
+| **A release is out — how does it reach the catalogue, and why does the entry keep conflicting?** | **[docs/UPSTREAM.md](docs/UPSTREAM.md)** — the upstream rules, the eight-step release-to-listing order, `tools/upstream-entry.mjs`, and what "listed" vs "visible" actually means |
 | I am picking this up from someone else. What is pending, what must not be edited, what looks redundant but is not? | [docs/HANDOVER.md](docs/HANDOVER.md) §28 (handover checklist) |
 | I am working on GitHub email, commit identity, signing or account settings | [docs/HANDOVER.md](docs/HANDOVER.md) §34 — the measured identity table, and the one irreversible decision (rewriting history) |
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |

@@ -20,6 +20,10 @@ concurrency:
 
 permissions:
   contents: read
+  # tools/upstream-entry.mjs --check asks whether a bump pull request is already
+  # open in the catalogue repository, so it needs to read pull requests on
+  # github.com with the run's token. Nothing here writes anything.
+  pull-requests: read
 
 # Every action here is on a major that declares `using: node24`. The previous
 # majors (checkout@v4, setup-go@v5, setup-node@v4, setup-python@v5,
@@ -206,6 +210,24 @@ jobs:
       # zone marker - the exact shape of a file a user unzips from a release.
       - name: Fresh-machine end-to-end suite
         run: node tests/fresh-machine.mjs --no-overlay
+
+      # Does the catalogue entry in awesome-dsh-plugin point at the release this
+      # package version names? That repository is where every storefront gets its
+      # install command from, and each release has to move one line there by
+      # hand. `--check` reads two hosts and one pull-request list, and its three
+      # outcomes are deliberate: OK (listed), OK when a bump PR is open (the
+      # entry only moves when a maintainer merges), and red only when nobody has
+      # opened one at all. Unreleased versions, missing tokens and network
+      # failures SKIP rather than pass. Rules and the rebuild tool:
+      # docs/UPSTREAM.md.
+      - name: Upstream catalogue entry
+        run: node tools/upstream-entry.mjs --check
+
+      # The rules behind the check above, pinned as unit tests: the entry file
+      # name, the tarball URL shape, and the four refusals that keep a rebuild
+      # from carrying somebody else's edit into a maintainer's review.
+      - name: Upstream entry rules
+        run: node --test tools/upstream-entry.test.mjs
 
       # Every relative link and in-document anchor in the docs we wrote. GitHub
       # renders a broken one without a warning, and a launch post is the worst

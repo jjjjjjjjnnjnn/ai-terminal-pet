@@ -36,6 +36,8 @@
 （`[Unreleased]` 只能属于「还没发出去的东西」，留着它会和本段第一句直接矛盾）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 原先写在这一段的「浮窗停在 0.9.0、插件包 1.2.5」是当时的事实，现在是历史。
+两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
+[docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
 ## [1.0.2] — 2026-11-12（浮窗：外观成为设置）
 
@@ -102,6 +104,37 @@
 - 尺寸是被**量出来的**，不是看出来的：用真实字体（YaHei UI）在 48 逻辑单位里逐个测过候选串，
   最宽的 `99小时` 在 16 号粗体下 44 px；`TestWaitLabelFitsTheStripIsAMeasuredClaim` 把这件事钉住，
   以后改字号或文案撞到边会在测试里红，而不是在 100% 缩放的桌面上才发现。
+
+## 上游同步批 — 2026-11-12（同样没占版本号，产品字节未变）
+
+这一批只动 `tools/`、CI 与文档，并修了上游那个条目 PR 的冲突。**没有改任何非测试的 `.go` 文件**，
+所以 `vendor/manifest.json` 的源码摘要不变，浮窗仍 1.0.2、插件包仍 1.2.8。
+
+### Added
+
+- **`tools/upstream-entry.mjs`**（含 `tools/upstream-entry.test.mjs` 8 条纯函数测试）：从上游
+  `awesome-dsh-plugin` 的 **`main` 重建**我们的条目文件，而不是合并旧分支。每一步都是断言，拒绝而不是
+  「大概没问题」：目标 `.tgz` 先探一次（不是 200/302 就停）、`tarball:` 行必须恰好一行、
+  URL 不许需要 YAML 引号、CRLF 直接拒、**把那一个字符串换回去必须与上游逐字节相同**（换不回去说明
+  带了别人的改动）、`git diff` 必须是 `1 file changed / 1 1`、`--force-with-lease` 只推自己 fork 的
+  `bump-tarball-*` 分支。`--check` 有三种**故意不同**的结论：已列出 → OK；上游还旧但有对应 PR 开着 →
+  OK（上架要等人合，不是我们可控）；发版了却没人推 → 红；未发布的版本 / 读不到上游 / 没 `gh` → SKIP
+  （skip 不是 pass，输出里写明）。
+- **`docs/UPSTREAM.md`**：上游 `contributing.md` 的硬要求逐条对照我们的现状、一次发版的八步顺序、
+  工具的用法与拒绝条件、「合并 ≠ 可见」该读谁、描述怎么写、当天真踩过的六个坑、以及一页发版清单。
+- **CI**：`verify` 作业新增 `Upstream catalogue entry`（`--check`）与 `Upstream entry rules`
+  （`node --test`）；`permissions` 增加 `pull-requests: read`，因为 `--check` 要看上游是否已有 PR 开着。
+
+### Fixed
+
+- **`#14718` 的冲突**：旧分支是拿 `tarball` 行做三方合并的，而上游 `main` 在同一天里被维护者人工
+  改过同一个文件（`#14688` 把条目推到 1.2.7），于是内容冲突 → **冲突的 PR 没有 merge ref，GitHub 连
+  `check` 都不跑**，`Submission gate` 也就不触发，PR 停在「等检查」里。改法按维护者 `fkysly` 的原话：
+  以上游 `main` 为底重建，只把那一个字符串换成 1.2.8，其余（中英描述、上报端前置条件、「DSH 会话只做
+  状态映射与跳转、授权仍在 DSH 完成」）**逐字保留**；推上去后 `mergeable=MERGEABLE`，`check` 正常启动。
+- **条目里的一句描述本来就不准**：`Click a row to jump to that terminal` —— 实际点行会**收起面板**，
+  只有**行尾箭头**跳转。改成 `Click the arrow at the end of a row to jump to that terminal`，
+  中文同步。这是条目自己的一句，不是别人的；面板以后真有了「点行做某事」再改，不留两种手势的说法。
 
 ## [1.2.7] — 2026-11-12（DSH 插件包）
 
