@@ -2319,15 +2319,41 @@ node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 
 
 ### 32.5 还没做完、也不该由下一个会话猜的事
 
-- **awesome-dsh-plugin #14385**：**已于 2026-11-11T17:20:15Z 合并**（merge commit `70581cc`），仓库里
-  `data/plugins/jjjjjjjjnnjnn__ai-terminal-pet--packages-dsh-ai-terminal-pet.yml` 的 `tarball`
-  现在指向 `dsh-plugin-v1.2.5`；但**线上 `plugins.json` 仍是旧构建**（2026-11-11T18:05Z 复读：
-  `count` 10,446，本仓库条目的 `tarball` 与 `install` 仍写着 1.2.3）——「合并」与「渲染」是两件事，
-  等它站点重建。`#14243` 已 CLOSED。
-- **dshopen**：线上索引仍记 1.2.4，1.2.5 要等它站点自己重建；不要为了催它而重复开 issue。
-- **YELEBAI / radar / dshbase / dsh.so / dsh-plugin.org / alldsh / dshmarketplace.dev**：全部等对方扫描或回应。
-  imsai #912 与 brade #367 已经把我们能给的信息都给了（含 npm 版本与 tarball 哈希）。
+> **2026-11-12 07:40 +0100 复读更新**：下面这张表在本会话结束时**又全部变了**，所以旧条目保留但被覆盖。
+> 现状（每条都是刚读对方公开索引/API 得到的，不是读 PR 状态）：
+
+- **awesome-dsh-plugin**：#14385（→1.2.5，17:20:15Z）与 **#14439（→1.2.6，20:12:31Z，`475a48e`）都已合并**，
+  仓库里 yml 已是 1.2.6，**线上 `plugins.json`（`count` 10,578）现在也渲染 1.2.6 了**——
+  这条「合并 vs 渲染」的延迟终于追平。`#14243` 早已 CLOSED。**不需要再开 PR，等下一个版本时再说。**
+- **dsh-plugin.org（`dshplugin/dsh-plugin-hub` #735）**：**2026-11-12T00:43:14Z 由 `yacuo` 以
+  `completed` 关闭**，留言：`platforms: ["win32"]` → 条目标注 Windows-only，**从源码安装**
+  （`dsh plugin --profile web add github:jjjjjjjjnnjnn/ai-terminal-pet`）。但**它会拉到什么版本**要注意：
+  它不钉版本，走的是仓库根 shim，因此永远装到默认分支的最新提交——本次实测其线上目录
+  `api.dsh-plugin.org/plugins.en.json`（6,688 条）里**还没有本包的条目**（同账号只有 `dsh-triage`、
+  `dsh-remedy`），所以要等它下一次重建。
+- **dshopen**：线上 `dshopen.org/index.json`（1,207 条）仍记 **1.2.4**，落后两个版本，等它自己重建。
+- **YELEBAI/dsh-plugin-marketplace**：**自动采集，已收录**（`registry/plugins.json` 第 8,729 条，
+  `version: 1.2.5`、`verifiedCommit: 584bc2f`、`profiles: [desktop, headless, web]`）。它按 topic 扫，
+  不用申请；下一次扫描会自己走到 1.2.6。
+- **bradeGithub/DSH-Plugins-Marketplace**：**自动采集，已收录**（`registry.json` 第 13,128 条，
+  `version: 1.2.4`）。issue #367 只是留证，**可以关了**。
+- **imsai-sh/awesome-deepseek-harness-plugins**：目录文件已合并并在
+  `catalog/plugins/jjjjjjjjnnjnn--ai-terminal-pet--packages--dsh-ai-terminal-pet.json`，
+  `category: notify`，中英摘要齐全；**它不钉版本，所以没有滞后问题**。PR #912 仍 open，
+  但对这个仓库来说「目录已在」就等于「已收录」。
+- **zhu1090093659/dsh-community-plugins**：PR #97 于 2026-11-11T05:06:31Z 合并、reviewer 给的是
+  **APPROVED**，`community.json`（124 条）里 `id: dsh-ai-terminal-pet` 在位。它的评审意见只有一句
+  **不阻断的建议**：文案里最好写明「Claude Code / OpenCode / Antigravity 需另装 reporters」——
+  **这条已经落实**（1.2.4 起三处清单、README 中英两段、1.2.6 的条目描述都写了）。
+- **dshbase #322 / dsh.so #24 / alldsh #2 / AdamPlatin123/dsh-plugin-radar #1255**：截至
+  2026-11-12 07:40 **四家全是 open、0 评论、updated_at 还停在 08:1x–08:4x**。等对方，不要再投。
+- **dshmarketplace.dev**：公开搜索 `/api/v1/plugins?q=ai-terminal-pet` 仍回 `{"total":0}`。
 - **`go test -race` / `govulncheck` / `gosec`** 仍缺工具链（无 gcc），§6 已记录，不要假装跑过。
+- **CI 有两条 `failure`（不是 cancelled）**，都已修复且现行全绿，查历史时不要误判：
+  `43030375577`（2026-11-11T13:34Z）挂在 **Fresh-machine end-to-end suite**（当时刚加进 CI 的 S 系列）；
+  `42894142140`（2026-11-10T20:19Z）挂在 **Verify the DSH plugin package**
+  （「索引最新版本 == 包版本」断言，正是 §27 记的 `b4474a6` 那类问题）。
+  其余 5 条非 success 的 run 全是 `cancelled`，来自 `concurrency` 的同分支新推送取消——**不是失败**。
 
 ### 32.6 上游门禁的实测步骤（2026-11-11 复查用）
 
@@ -2567,3 +2593,106 @@ scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
 同一份评审在 DSH 论坛帖上又抓出三处：四终端并列触犯该区的「禁止无关推广」、把自家 `protocol.js`
 说成「官方 protocol 模块」、以及 `**_> …_**` 在 Markdown 里渲染不出引用块（"非官方"声明会变成
 一串星号）。三处都是会让人删帖的那种，不是措辞偏好。
+
+---
+
+## 34. 交接：2026-11-12 早，下一个会话做 GitHub 邮箱与账号相关的事
+
+### 34.1 这一刻的事实（一句话）
+
+五条线全绿：**浮窗 1.0.0 / 插件包 1.2.6 / npm `latest` = 1.2.6 / `pet-v1.0.0` 两个资产都在 /
+DSH Discussions 帖 #13001 已发**；上游合并的三个（awesome-dsh-plugin、imsai、zhu）都已落地，
+自动采集的两家（YELEBAI、brade）也都收录了。**下一个会话的目标不是再发版本，而是处理 GitHub 邮箱
+与账号这条线**——它和本仓库的「谁是提交者」直接相关，所以先写清现状。
+
+### 34.2 现在的邮箱事实（本会话实测，别凭记忆）
+
+| 项 | 值 | 怎么得到的 |
+|---|---|---|
+| git 提交身份 | `jjjjjjjjnnjnn <jjjjjjjjnnjnn@users.noreply.github.com>` | `git config user.name` / `user.email`；**全仓 2596 行历史里只有这一个 author**（`git log --format='%ae'` 去重后 1 条） |
+| GitHub 账号 | `jjjjjjjjnnjnn`（显示名 `RobertJJJ`），id **236163329**，2025-10-05 注册 | `gh api user` |
+| GitHub 认为这个提交是他吗 | **是**，`author.login = jjjjjjjjnnjnn` | `gh api repos/.../commits` 的 `author` 字段 |
+| 提交签名 | **`verified: false`（`reason: unsigned`）** | 同上；这是「本地 ssh 提交没签名」，不是邮箱问题 |
+| 账号 profile 的 email 字段 | **两个都是 `null`**（`email` 与 `public_email`） | `gh api user` |
+| `gh` token 的 scopes | `gist, read:org, repo, workflow` —— **没有 `user`** | `gh auth status`；因此 `gh api user/emails` 返回 404，要读邮箱列表必须先 `gh auth refresh -h github.com -s user` |
+| 仓库里有没有硬编码的私人邮箱 | **没有**。全仓 `*.md/*.js/*.mjs/*.ps1/*.go/*.json` 扫描只命中 `dsh-ai-terminal-pet@x.y.z` 这类包名伪装成邮箱的字符串 | 用正则跑 `git ls-files` 全量扫过 |
+
+**结论**：现在的 `jjjjjjjjnnjnn@users.noreply.github.com` 是**旧式 noreply 地址**，它能正确归属
+（GitHub 认了 `author.login`），但它有两个实际代价：(1) 别人无法从提交里点进一个真实联系地址；
+(2) 这个地址**不含账号 id**，所以账号改名后历史提交会失去归属——按 GitHub 的说法，带 id 的形式
+`236163329+jjjjjjjjnnjnn@users.noreply.github.com` 才是改名后仍然归属的形式。
+**要不要改、改成哪个，是下一个会话要决定的第一件事**，而且它一旦决定就要重写 2596 行历史的
+author（`git filter-repo`），**必须在动手前明确这是不可逆的**。
+
+### 34.3 邮箱这条线上，本会话确认过的四个子问题
+
+1. **Outlook 侧有五个账号在本机**（`outlook_list_accounts`）：
+   `chenyuyou2026@outlook.com`（默认）、`rongjiajun2025@outlook.com`（**GitHub 通知都发到这里**）、
+   `rongjiajun701@outlook.com`、`jiajun.rong@schloss-heessen.de`（token 已过期）、
+   `rongjiajun2026@outlook.com`（token 已过期）。
+   **GitHub 的通知全部落在 `rongjiajun2025`**，所以改 GitHub 通知邮箱前先确认那个账号还在用。
+2. **`rongjiajun701` 收的信几乎全是垃圾邮件**（同类约会站点的批量投放），
+   **不要把它当作 GitHub 的联系邮箱**。
+3. **有一个还没回的问题**：DSH Discussion #8202 里 `Jianwei Mao` 问了一句
+   「你这是用大模型回复的吗？」——这是账号相关的声誉问题，下一个会话可以顺手处理（不处理也不算漏）。
+4. **`gh api user/emails` 需要 `user` scope**，而当前 token 没有。要读/改邮箱必须重新授权；
+   `gh auth refresh -h github.com -s user` 是唯一正规做法，**不要**用 `gh api -X PATCH user` 盲改。
+
+### 34.4 与邮箱/账号相关、但属于本仓库的待办（按优先级）
+
+| 优先级 | 事 | 为什么与「邮箱/账号」有关 |
+|---|---|---|
+| **高** | 确认 `git config user.email` 是否改成 id 形式，然后决定要不要重写历史 | 决定所有已发布 tag 的提交归属；`dsh-plugin-v*` 与 `pet-v*` 的 11 个 tag 都指向现有提交 |
+| **中** | 给提交**加签名**（`git commit -S`，ssh 签名最便宜） | 现在 60 次 run 里所有提交都是 `verified: false`；签名与邮箱是同一个「提交者身份」话题 |
+| **中** | 把 GitHub profile 的 `email` 设成能收信的真实地址（现在两个字段都是 null） | 影响别人能否联系到你、也影响 GitHub 的隐私规则（公开与否） |
+| **低** | 清理 token scope：现在缺 `user`；如果将来要读通知/邮箱，得加 | 见 34.3 第 4 条 |
+| **低** | DSH #8202 那条「用不用大模型回复」的追问 | 声誉，不属于代码 |
+
+### 34.5 下会话的开工口令（按顺序，先证明起点干净）
+
+```powershell
+git status --short                       # 必须是空的（当前只有一个未跟踪的 .agents/ 目录）
+git log --oneline -3
+npm view dsh-ai-terminal-pet version     # 1.2.6
+gh run list --limit 1                    # success
+gofmt -l . ; go vet ./...                # 干净 / 0
+go test -count=1 ./...                   # 201 个 func Test，12 个包全 ok
+node packages/dsh-ai-terminal-pet/verify.mjs
+node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check
+node integrations/deepseek-harness/verify.mjs
+node tests/fresh-machine.mjs --no-overlay   # 162/162
+python tools/check_docs_links.py            # 11 份文档全解
+.\scripts\install.cmd -VerifyOnly           # 11 file(s), 0 warning
+& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 9 ok / 0 warn / 0 fail
+```
+
+**注意 `node --test tests/*.test.js` 不存在**：本仓库没有 `*.test.js`，只有 `tests/fresh-machine.mjs`。
+`.agents/tasks/` 里那五张自动派发的工单都把这一行写进「验收命令」，**照着跑会得到 `tests 0 / pass 0`
+且退出码 1**——那不是失败，是那份模板抄错了。正确的端到端命令是
+`node tests/fresh-machine.mjs --no-overlay`。
+
+### 34.6 `.agents/` 里的五张工单：都不是新工作，且已被本会话的改动覆盖
+
+本会话开始前个人知识库中枢往 `.agents/tasks/` 派了五张工单，逐张核对的结果：
+
+| 工单 | 它的验收标准 | 与现状的关系 |
+|---|---|---|
+| TSK-20261112-010 登记 dsh-plugin-hub 收录状态 | 记第 5 家、注明源码安装与 win32 单平台 | **事实已经更新**：`dshplugin/dsh-plugin-hub` #735 已于 2026-11-12T00:43:14Z 以 `completed` 关闭，留言写明「`platforms: ["win32"]` 标注 Windows-only、从源码安装」，已写进 §32.5 |
+| TSK-20261112-011 验证 awesome 1.2.6 合并并核对镜像版本 | 复读 `plugins.json` 与 dshopen | 已做：`plugins.json` 现已渲染 **1.2.6**，dshopen 仍 1.2.4，见 §32.5 |
+| TSK-20261112-012 核查 CI 失败原因 | `go test` 与 reporter 测试全绿 | 已做：两条真 `failure` 的 run 定位到具体 step（见 §32.5 末两条），本地全绿 |
+| TSK-20261112-014 落实 zhu 的审核反馈 | 文案里写明各终端 reporter 要另装 | **早已落实**，reviewer 的那句建议本身也标了「不阻断」 |
+| TSK-20261112-015 核验 npm 版本 | `latest=1.2.6 / 0.3.6` | 已做：`latest` = **1.2.6**（`0.3.6` 是 `dsh-remedy`，同账号下的另一个包） |
+
+**所以这五张工单不需要再开工**；它们唯一有价值的信息是「模板把验收命令写成了
+`node --test tests/*.test.js`」，而那行在本仓库永远 0 通过（§34.5）。
+
+### 34.7 交接时最容易踩的几个坑（这一轮真的踩了）
+
+| 坑 | 表现 | 怎么避开 |
+|---|---|---|
+| PowerShell 5.1 的 `>` 重定向 | `gh api ... > file` 把 UTF-8 当 ANSI 解码，中文全变 mojibake，读文件会以为 GitHub 上的内容坏了 | 用 Python `subprocess` 读 bytes 再 `decode('utf-8')`，或 `[IO.File]::ReadAllText(path, UTF8NoBOM)` |
+| `gh api` 的 `--jq` 带空格/多表达式 | `gh: accepts at most 1 arg(s)` / `function not defined` | 把 jq 表达式写进文件用 `--jq "$env:TEMP\q.jq"`，或者干脆用 Python 解析 |
+| GraphQL 的 `number` 参数 | `discussions(numbers: [...])` 不存在；要 `d1: discussion(number: N)` 别名逐个取 | 见 §32.6 的查询写法 |
+| `.agents/tasks/*.md` 的验收命令 | `node --test tests/*.test.js` → `tests 0 / pass 0` 且 exit 1 | 忽略该行，跑 `node tests/fresh-machine.mjs --no-overlay` |
+| `agy` 传长 prompt | `--print=$text` 被 PowerShell 按空格拆成多个参数，报 `unexpected argument "Your"` | 用 stdin：`$text \| & agy --model ... --effort high` |
+| `pet-v0.9.0` 与 `pet-v1.0.0` 都在 | 容易贴错链接 | 对外一律用 `pet-v1.0.0`；0.9.0 已是被取代的旧资产，且**不可变** |

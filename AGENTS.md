@@ -75,6 +75,7 @@ for f in reporters/*.js; do node --check "$f"; done   # per file: node --check o
 node --check tests/fresh-machine.mjs
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
+python tools/check_docs_links.py   # every relative path and #anchor in the docs we maintain
 
 # 3. Production build
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
@@ -136,6 +137,7 @@ Two conventions in those commands are load-bearing, not style:
 | What is planned, and why? | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | How did we get here? (runbooks §13–§27) | [docs/HANDOVER.md](docs/HANDOVER.md) |
 | I am picking this up from someone else. What is pending, what must not be edited, what looks redundant but is not? | [docs/HANDOVER.md](docs/HANDOVER.md) §28 (handover checklist) |
+| I am working on GitHub email, commit identity, signing or account settings | [docs/HANDOVER.md](docs/HANDOVER.md) §34 — the measured identity table, and the one irreversible decision (rewriting history) |
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |
 | I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/LAUNCH.md](docs/LAUNCH.md) — the only place outward-facing copy lives, with the measured numbers it must not exceed |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
