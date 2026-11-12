@@ -2643,13 +2643,15 @@ author（`git filter-repo`），**必须在动手前明确这是不可逆的**�
 
 ### 34.4 与邮箱/账号相关、但属于本仓库的待办（按优先级）
 
-| 优先级 | 事 | 为什么与「邮箱/账号」有关 |
+> **2026-11-12 更新**：前两条已落地，第 3 条**刻意不做**，第 4–5 条仍待办。细节见 §35.5。
+
+| 优先级 | 事 | 状态 |
 |---|---|---|
-| **高** | 确认 `git config user.email` 是否改成 id 形式，然后决定要不要重写历史 | 决定所有已发布 tag 的提交归属；`dsh-plugin-v*` 与 `pet-v*` 的 11 个 tag 都指向现有提交 |
-| **中** | 给提交**加签名**（`git commit -S`，ssh 签名最便宜） | 现在 60 次 run 里所有提交都是 `verified: false`；签名与邮箱是同一个「提交者身份」话题 |
-| **中** | 把 GitHub profile 的 `email` 设成能收信的真实地址（现在两个字段都是 null） | 影响别人能否联系到你、也影响 GitHub 的隐私规则（公开与否） |
-| **低** | 清理 token scope：现在缺 `user`；如果将来要读通知/邮箱，得加 | 见 34.3 第 4 条 |
-| **低** | DSH #8202 那条「用不用大模型回复」的追问 | 声誉，不属于代码 |
+| **高** | `git config user.email` 改成 id 形式；要不要重写 118 个提交的历史 | ✅ **已完成，且决定不重写**：`user.email` = `236163329+jjjjjjjjnnjnn@users.noreply.github.com`（仓库内生效，全局仍是旧地址，因为别的项目没有这个账号的 id）；重写会改掉每一个 sha 并让 11 个已发布 tag 与索引里钉的 `source.commit` 指空，所以不做 |
+| **中** | 给提交加签名 | ✅ **已完成**：SSH 签名（`gpg.format=ssh`、`user.signingkey=~/.ssh/id_ed25519_signing.pub`、`commit.gpgsign`/`tag.gpgsign` = true），公钥以 `user/ssh_signing_keys` id `1325600` 挂在账号上；`gh api .../commits/main` 已实测 `verified: true / reason: valid` |
+| **中** | 把 GitHub profile 的 `email` 设成能收信的真实地址 | ⏸ **刻意不做**：公开邮箱是垃圾邮件入口，而上表的 `rongjiajun701` 已经证明这类地址会收到什么；noreply 形式仍然归属正确，也仍然能在 issue 里被 @ 到。想改随时可以，但要先想清楚公开的代价 |
+| **低** | 清理 token scope：现在缺 `user`（如果将来要读通知/邮箱，得加） | ⏳ 仍缺；`gh auth refresh -h github.com -s user` 是唯一正规做法。（`admin:ssh_signing_key` 已于 2026-11-12 加上，那是挂签名公钥所必需的） |
+| **低** | DSH #8202 那条「用不用大模型回复」的追问 | ⏳ 未处理（声誉，不属于代码） |
 
 ### 34.5 下会话的开工口令（按顺序，先证明起点干净）
 
