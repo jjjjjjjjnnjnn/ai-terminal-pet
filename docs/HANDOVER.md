@@ -3096,7 +3096,7 @@ python tools/check_docs_links.py            # 11 份文档全解
 - **npm**：`dist-tags.latest` = **1.2.8**；`npm pack` 取回的 tarball 与 Release 资产逐字节相同。
 - **awesome-dsh-plugin**：1.2.7 的跟进 PR [#14688](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14688)
   仍 open；1.2.8 的跟进 PR [#14718](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14718)
-  已开、MERGEABLE、check 在跑。**上游仓库里的 `tarball` 仍是 1.2.6**——合并前不会变，别以为 PR 开了就等于收录。
+  已开、MERGEABLE，**两个 check（`check` 与 `Submission gate`）都已 SUCCESS**，等人工合并。**上游仓库里的 `tarball` 仍是 1.2.6**——合并前不会变，别以为 PR 开了就等于收录。
 - **dshopen**：线上 `index.json` 仍渲染 1.2.4，等它自己重建。
 - **四家人工目录**（dshbase / dsh.so / dsh-plugin.org / AllDSH）仍 open、0 评论，不要再投。
 - **下载数**（发版后约 15 分钟）：`pet-v1.0.2` = 0、`dsh-plugin-v1.2.8` = 0；对照 `pet-v1.0.1` = 5、
