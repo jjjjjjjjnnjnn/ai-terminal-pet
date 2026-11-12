@@ -1,9 +1,11 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -219,5 +221,58 @@ func TestDecodeConfigSoundDefaults(t *testing.T) {
 	}
 	if got := (Config{SoundVolume: -1}).Normalize(); got.SoundVolume != DefaultSoundVolume {
 		t.Fatalf("negative volume became %d, want default", got.SoundVolume)
+	}
+}
+
+func TestThemeAndAppearanceDefaults(t *testing.T) {
+	// A config written by 1.0.1 has no theme field at all; decoding it must land
+	// on slate rather than an empty string, which is what keeps an upgrade from
+	// silently changing the panel's colours.
+	var old Config
+	if err := json.Unmarshal([]byte(`{"opacity":235,"language":"auto"}`), &old); err != nil {
+		t.Fatalf("legacy config: %v", err)
+	}
+	normalized := old.Normalize()
+	if normalized.Theme != DefaultTheme {
+		t.Fatalf("legacy config theme = %q, want %q", normalized.Theme, DefaultTheme)
+	}
+	if normalized.PerSourceColor || normalized.HiddenAtLaunch {
+		t.Fatal("a legacy config must not turn on the new appearance options")
+	}
+	if got := Default().Theme; got != ThemeSlate {
+		t.Fatalf("Default().Theme = %q, want slate", got)
+	}
+}
+
+func TestValidTheme(t *testing.T) {
+	for _, name := range Themes {
+		if got := ValidTheme(name); got != name {
+			t.Errorf("ValidTheme(%q) = %q", name, got)
+		}
+		if got := ValidTheme("  " + strings.ToUpper(name) + " "); got != name {
+			t.Errorf("ValidTheme(%q, upper) = %q", name, got)
+		}
+	}
+	for _, bad := range []string{"", "nonsense", "dark", "light"} {
+		if got := ValidTheme(bad); got != DefaultTheme {
+			t.Errorf("ValidTheme(%q) = %q, want the default %q", bad, got, DefaultTheme)
+		}
+	}
+}
+
+func TestNormalizeRepairsAnUnknownTheme(t *testing.T) {
+	c := Default()
+	c.Theme = "dark-mode"
+	if got := c.Normalize().Theme; got != DefaultTheme {
+		t.Fatalf("Normalize left theme = %q", got)
+	}
+	// A hand-edited file that turned on the new options must keep them.
+	c = Default()
+	c.Theme = ThemePaper
+	c.PerSourceColor = true
+	c.HiddenAtLaunch = true
+	normalized := c.Normalize()
+	if normalized.Theme != ThemePaper || !normalized.PerSourceColor || !normalized.HiddenAtLaunch {
+		t.Fatalf("Normalize dropped appearance settings: %+v", normalized)
 	}
 }

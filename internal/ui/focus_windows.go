@@ -161,7 +161,7 @@ func drawCompactJump(target *canvas, current session.Session, lang i18n.Lang) {
 	// A neutral pill with a state-coloured arrow and label. The old solid
 	// amber bar dominated the whole compact strip; this is a control, not an
 	// alert, so the colour belongs to the icon and the verb only.
-	target.fillRounded(left, top, w, h, maxInt(h/3, 1), colorRaised)
+	target.fillRounded(left, top, w, h, maxInt(h/3, 1), colors.Raised)
 	outline := accent
 	outline.A = 135
 	target.outlineRounded(left, top, w, h, maxInt(h/3, 1), 1, outline)
@@ -186,7 +186,7 @@ func drawCompactJump(target *canvas, current session.Session, lang i18n.Lang) {
 
 // drawExpandedFocusButton renders the per-row arrow button.
 func drawExpandedFocusButton(target *canvas, left, top, size int, accent rgba) {
-	target.fillRounded(left, top, size, size, maxInt(size/4, 1), colorRaised)
+	target.fillRounded(left, top, size, size, maxInt(size/4, 1), colors.Raised)
 	outline := accent
 	outline.A = 120
 	target.outlineRounded(left, top, size, size, maxInt(size/4, 1), 1, outline)

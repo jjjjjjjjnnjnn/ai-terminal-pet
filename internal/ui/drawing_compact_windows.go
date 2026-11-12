@@ -90,6 +90,14 @@ type renderedKey struct {
 	approveSec int64
 	// clock is what makes a time-driven frame differ from the last one.
 	clock int64
+	// theme is the palette name the frame was rasterised with. It belongs in
+	// the key for the same reason lang does: assigning colors changes no
+	// other field, so without this a theme switch would be skipped by the
+	// "same key, same pixels" guard and the panel would keep its old colours.
+	theme string
+	// perSource colors the expanded rows' source names by terminal, so toggling
+	// it has to repaint too.
+	perSource bool
 	// waitMinute is the minute bucket of the compact strip's duration, and 0
 	// when the strip is not showing one. It has to be separate from clock:
 	// purePulseFrame deliberately ignores clock (the breath is expressed as
@@ -99,7 +107,7 @@ type renderedKey struct {
 	waitMinute int64
 }
 
-func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64) renderedKey {
+func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64, theme string, perSource bool) renderedKey {
 	key := renderedKey{
 		width:      width,
 		height:     height,
@@ -112,6 +120,8 @@ func frameKey(width, height int, digest uint64, state session.State, count int, 
 		tuck:       int32(math.Round(tuck * 1000)),
 		lang:       lang,
 		approveSec: approveSec,
+		theme:      normalizeTheme(theme),
+		perSource:  perSource,
 	}
 	// The compact strip prints a duration only while somebody is waiting, and it
 	// is minute-grained, so one repaint per minute is enough. This is the same
@@ -170,20 +180,20 @@ func drawVerticalPanel(target *canvas, state panelState) {
 	if state.Pressed {
 		inset = 1
 	}
-	panel := colorPanel
-	raised := colorRaised
+	panel := colors.Panel
+	raised := colors.Raised
 	// Hover is the only cue that the panel is a control and not just a
 	// picture. Lifting the fill as well as the outline matters because in the
 	// alert states the outline is tinted, so an outline-only cue was invisible
 	// exactly when the panel most wanted to be clicked.
 	if state.Hovered {
-		panel = colorPanelHover
+		panel = colors.PanelHover
 	}
 	radius := minInt(width/2, 24)
 	target.fillRounded(inset, inset, width-inset*2, height-inset*2, radius, panel)
 	// The outline is a hairline, not a coloured frame: a fully saturated
 	// amber border made the whole compact strip look like a warning light.
-	border := colorBorder
+	border := colors.Border
 	if aggregate == session.StateWaitingPermission || aggregate == session.StateError {
 		border = accent
 		border.A = 120
@@ -239,7 +249,7 @@ func drawDockedTab(target *canvas, state session.State, dock dockSide, sliver in
 	target.setAlphaScale(tuck)
 	accent := stateColor(state)
 	target.fillRounded(spineLeft, top, spineWidth, spineHeight, radius, accent)
-	core := colorPrimary
+	core := colors.Primary
 	core.A = 110
 	target.fillRounded(spineLeft+spineWidth/4, top, maxInt(spineWidth/2, 1), spineHeight, radius, core)
 	target.setAlphaScale(1)
@@ -268,15 +278,15 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 	// strip reads 12m / 3 sessions / Waiting / <project>. Everything busy keeps
 	// the original count-then-noun pair, unchanged.
 	if waited, ok := compactWait(items, now, lang); ok {
-		target.text(value(4), value(50), width-value(8), value(26), target.fitText(waited, value(16), 700, width-value(8)), value(16), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		target.text(value(4), value(50), width-value(8), value(26), target.fitText(waited, value(16), 700, width-value(8)), value(16), 700, colors.Primary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 		noun := fmt.Sprintf(i18n.T(lang, i18n.KeySummarySessions), len(items))
-		target.text(value(4), value(76), width-value(8), value(12), target.fitText(noun, value(9), 400, width-value(8)), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		target.text(value(4), value(76), width-value(8), value(12), target.fitText(noun, value(9), 400, width-value(8)), value(9), 400, colors.Secondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 	} else {
-		target.text(value(4), value(50), width-value(8), value(26), compactCount(len(items)), value(22), 700, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-		target.text(value(4), value(76), width-value(8), value(12), i18n.T(lang, i18n.KeyPanelSessions), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		target.text(value(4), value(50), width-value(8), value(26), compactCount(len(items)), value(22), 700, colors.Primary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		target.text(value(4), value(76), width-value(8), value(12), i18n.T(lang, i18n.KeyPanelSessions), value(9), 400, colors.Secondary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 	}
 
-	target.fillRect(value(12), value(96), width-value(24), 1, colorDivider)
+	target.fillRect(value(12), value(96), width-value(24), 1, colors.Divider)
 
 	target.text(value(2), value(102), width-value(4), value(16), stateLabel(state, lang), value(11), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 
@@ -374,16 +384,16 @@ func shortElapsed(delta time.Duration, lang i18n.Lang) string {
 // strip read as one amber smear instead of two distinct facts.
 func compactSubject(items []session.Session, state session.State, lang i18n.Lang) (string, rgba) {
 	if len(items) == 0 {
-		return i18n.T(lang, i18n.KeyPanelWaiting), colorMuted
+		return i18n.T(lang, i18n.KeyPanelWaiting), colors.Muted
 	}
 	if state == session.StateWaitingPermission || state == session.StateError {
 		for _, current := range items {
 			if current.State == session.StateWaitingPermission || current.State == session.StateError {
-				return projectLabel(current, lang), colorPrimary
+				return projectLabel(current, lang), colors.Primary
 			}
 		}
 	}
-	return projectLabel(items[0], lang), colorSecondary
+	return projectLabel(items[0], lang), colors.Secondary
 }
 
 func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba, lang i18n.Lang, countdown map[string]approvalView) {
@@ -395,7 +405,7 @@ func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time
 	}
 
 	// Header: title, live state, close.
-	target.text(value(14), value(13), width-value(120), value(22), i18n.T(lang, i18n.KeyPanelTitle), value(13), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(value(14), value(13), width-value(120), value(22), i18n.T(lang, i18n.KeyPanelTitle), value(13), 700, colors.Primary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 	pillWidth := value(74)
 	pillX := width - pillWidth - value(40)
 	pillY := value(13)
@@ -406,11 +416,11 @@ func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time
 
 	closeX, closeY, closeSize := expandedCloseButtonRect(width)
 	target.fillEllipse(closeX, closeY, closeSize, closeSize, raised)
-	target.line(closeX+value(6), closeY+value(6), closeX+closeSize-value(6), closeY+closeSize-value(6), 1, colorSecondary)
-	target.line(closeX+closeSize-value(6), closeY+value(6), closeX+value(6), closeY+closeSize-value(6), 1, colorSecondary)
+	target.line(closeX+value(6), closeY+value(6), closeX+closeSize-value(6), closeY+closeSize-value(6), 1, colors.Secondary)
+	target.line(closeX+closeSize-value(6), closeY+value(6), closeX+value(6), closeY+closeSize-value(6), 1, colors.Secondary)
 
-	target.fillRect(value(14), value(expandedHeaderHeight-6), width-value(28), 1, colorDivider)
-	target.text(value(14), value(expandedHeaderHeight), width-value(28), value(expandedSummaryHeight), summaryLine(items, lang), value(9), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.fillRect(value(14), value(expandedHeaderHeight-6), width-value(28), 1, colors.Divider)
+	target.text(value(14), value(expandedHeaderHeight), width-value(28), value(expandedSummaryHeight), summaryLine(items, lang), value(9), 400, colors.Secondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 
 	top := value(expandedHeaderHeight + expandedSummaryHeight)
 	if len(items) == 0 {
@@ -423,24 +433,24 @@ func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time
 		}
 		if hidden := len(items) - rows; hidden > 0 {
 			y := top + rows*value(expandedRowHeight)
-			target.text(value(14), y, width-value(28), value(expandedOverflowHeight), fmt.Sprintf(i18n.T(lang, i18n.KeyPanelMore), hidden), value(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+			target.text(value(14), y, width-value(28), value(expandedOverflowHeight), fmt.Sprintf(i18n.T(lang, i18n.KeyPanelMore), hidden), value(8), 400, colors.Muted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 		}
 	}
 
 	// The footer teaches the controls once, so the panel does not need a
 	// visible handle or a chevron to advertise that it is interactive.
 	footerTop := height - value(expandedFooterHeight)
-	softDivider := colorDivider
+	softDivider := colors.Divider
 	softDivider.A = 58
 	target.fillRect(value(14), footerTop-value(6), width-value(28), 1, softDivider)
 	hint := target.fitText(i18n.T(lang, i18n.KeyPanelHint), value(8), 400, width-value(24))
-	target.text(value(12), footerTop, width-value(24), value(expandedFooterHeight), hint, value(8), 400, colorMuted, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+	target.text(value(12), footerTop, width-value(24), value(expandedFooterHeight), hint, value(8), 400, colors.Muted, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }
 
 func drawExpandedEmpty(target *canvas, top, width int, scale func(int) int, lang i18n.Lang) {
 	// The summary line already says there are no sessions, so this block
 	// carries the actionable half instead of repeating it.
-	target.text(scale(16), top+scale(6), width-scale(32), scale(34), i18n.T(lang, i18n.KeyPanelEmpty), scale(9), 400, colorMuted, dtVCenter|dtCenter|dtNoPrefix|dtWordBreak)
+	target.text(scale(16), top+scale(6), width-scale(32), scale(34), i18n.T(lang, i18n.KeyPanelEmpty), scale(9), 400, colors.Muted, dtVCenter|dtCenter|dtNoPrefix|dtWordBreak)
 }
 
 func drawStatusOrb(target *canvas, centerX, top, size int, state session.State, now time.Time, pressed bool) {
@@ -462,7 +472,7 @@ func drawStatusOrb(target *canvas, centerX, top, size int, state session.State, 
 	}
 	target.fillEllipse(centerX-size/2, top, size, size, ring)
 	inner := size - 4
-	target.fillEllipse(centerX-inner/2, top+2, inner, inner, colorOrbInner)
+	target.fillEllipse(centerX-inner/2, top+2, inner, inner, colors.OrbInner)
 	target.text(centerX-inner/2, top+2, inner, inner, statusGlyph(state), maxInt(size/2, 11), 700, accent, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }
 
@@ -485,7 +495,7 @@ func lookupCountdown(countdown map[string]approvalView, current session.Session)
 // right half becomes the ticking Allow (Ns) plus a draining bar, so the
 // user sees exactly how long they have to veto.
 func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int, lang i18n.Lang, view approvalView, hasCountdown bool) {
-	target.fillRounded(left, top, width, height, 6, colorRaisedRow)
+	target.fillRounded(left, top, width, height, 6, colors.RaisedRow)
 	accent := stateColor(current.State)
 	// The rail is the one place a row uses a large patch of colour. Keeping it
 	// slightly translucent stops it from overpowering the neutral panel.
@@ -500,16 +510,31 @@ func drawVerticalSession(target *canvas, current session.Session, left, top, wid
 	focusX, focusY, focusSize := expandedRowFocusRect(target.width, top, height)
 	stateX := left + width - stateWidth - focusSize - scale(8)
 
-	target.text(textLeft, top+scale(3), stateX-textLeft-scale(6), scale(12), projectLabel(current, lang), scale(10), 700, colorPrimary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(textLeft, top+scale(3), stateX-textLeft-scale(6), scale(12), projectLabel(current, lang), scale(10), 700, colors.Primary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 	target.text(stateX, top+scale(3), stateWidth, scale(12), stateLabel(current.State, lang), scale(8), 700, accent, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 
 	detail := fmt.Sprintf("%s · %s", current.Source, reasonLabel(current, lang))
-	target.text(textLeft, top+scale(17), stateX-textLeft-scale(6), scale(10), detail, scale(8), 400, colorSecondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	detailWidth := stateX - textLeft - scale(6)
+	if perSourceColors && current.Source != "" {
+		// Two draws instead of one: the source name takes its provenance
+		// colour, the reason stays neutral. The split width comes from the
+		// same measure() the ellipsis uses, so a long source name still
+		// truncates instead of pushing the reason off the right edge.
+		source := target.fitText(current.Source, scale(8), 400, detailWidth)
+		sourceWidth := target.measure(source, scale(8), 400)
+		target.text(textLeft, top+scale(17), sourceWidth+scale(4), scale(10), source, scale(8), 700, sourceColor(current.Source), dtSingleLine|dtVCenter|dtNoPrefix)
+		rest := fmt.Sprintf(" · %s", reasonLabel(current, lang))
+		if remain := detailWidth - sourceWidth; remain > scale(10) {
+			target.text(textLeft+sourceWidth, top+scale(17), remain, scale(10), target.fitText(rest, scale(8), 400, remain), scale(8), 400, colors.Secondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+		}
+	} else {
+		target.text(textLeft, top+scale(17), detailWidth, scale(10), detail, scale(8), 400, colors.Secondary, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	}
 	stamp := relativeTime(current.UpdatedAt, now, lang)
 	if hasCountdown {
 		stamp = fmt.Sprintf(i18n.T(lang, i18n.KeyApproveCountdown), view.RemainingSec)
 	}
-	target.text(stateX, top+scale(17), stateWidth, scale(10), stamp, scale(8), 400, colorMuted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+	target.text(stateX, top+scale(17), stateWidth, scale(10), stamp, scale(8), 400, colors.Muted, dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 	if hasCountdown && view.Fraction > 0 {
 		barWidth := int(float64(width-scale(18)) * view.Fraction)
 		if barWidth > 0 {

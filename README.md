@@ -4,7 +4,7 @@ Stop glancing across terminal windows to track agent states. It costs one small 
 
 ![ai-terminal-pet](docs/assets/hero.png)
 
-![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Go](https://img.shields.io/badge/go-1.23-00ADD8) ![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Go](https://img.shields.io/badge/go-1.23-00ADD8) ![Version](https://img.shields.io/badge/version-1.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green) ![Size](https://img.shields.io/badge/size-4.17%20MiB-blue) ![Dependencies](https://img.shields.io/badge/dependencies-3-informational) ![Tests](https://img.shields.io/badge/tests-206-brightgreen) ![npm](https://img.shields.io/npm/v/dsh-ai-terminal-pet?label=dsh%20plugin)
 
 > 🇬🇧 [English](#english) &nbsp;·&nbsp; 🇨🇳 [中文](#中文)
@@ -112,15 +112,15 @@ There are three ways in. Pick the one that matches how you got here.
 dsh plugin add dsh-ai-terminal-pet
 ```
 
-The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.7), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
+The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.8), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
 
 **B. Everyone else — download a package, no Go toolchain**
 
 Two packages are published for this release: a self-extracting `pet-setup.exe` and a portable zip. Both install the same 11 artifacts into the same directory; the zip additionally lets you look inside before running anything.
 
-1. Download one of them from the [`pet-v1.0.1` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.1):
+1. Download one of them from the [`pet-v1.0.2` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.2):
    - **`pet-setup.exe`** (13.5 MB): double-click it. It verifies its own payload against `SHA256SUMS.txt` **before** writing anything, then runs the installer inside itself. `pet-setup.exe --verify` re-checks the installed files at any time, `--uninstall` removes them, `--add-to-path` puts the commands on your PATH.
-   - **`ai-terminal-pet-1.0.1-win-x64.zip`** (4.98 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
+   - **`ai-terminal-pet-1.0.2-win-x64.zip`** (4.99 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
 2. Verify that the installation works:
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -192,14 +192,14 @@ Writing your own reporter for a tool that is not listed here needs no source rea
 
 The Harness side is a host-only Cordis bundle: it holds no pipe-name, state-set or snapshot logic of its own, it loads the protocol from `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` and delegates everything to it.
 
-The Harness side has a second, self-contained option since `dsh-ai-terminal-pet` `1.1.0`: a standalone DSH plugin package at [`packages/dsh-ai-terminal-pet`](packages/dsh-ai-terminal-pet), also shipped as a GitHub Release asset. The package is now **1.2.7** (tag `dsh-plugin-v1.2.7`, asset `dsh-ai-terminal-pet-1.2.7.tgz`); 1.2.6, 1.2.5, 1.2.4, 1.2.3, 1.2.2, 1.2.1, 1.2.0 and 1.1.0 stay published and immutable but are superseded. 1.2.7 ships the 1.0.1 overlay, whose compact strip now answers the product's own question - "which terminal is blocked, and for how long" - without expanding the panel. 1.2.5 is the first version that works on a machine that never ran the overlay: it declares `vendor/package.json` as CommonJS (without it, `require()` of the shipped protocol returned a namespace with no `sendStatus`, so a `DSH_PET_NO_BOOTSTRAP=1` install silently reported nothing), it reads the project path, lineage and start time from the session header instead of `process.cwd()` (the desktop Harness starts from the install directory, so every session was attributed to one wrong path), and its de-duplication signature now covers state, reason, tool, project, title and parent session instead of state alone. 1.2.4 was a wording fix (one market install read as if it covered every terminal, and it does not - the bundle mirrors **Harness** sessions out of the box, while OpenCode, Claude Code and Antigravity sessions appear only after each of those terminals gets its own reporter); 1.2.3 added the `dsh.marketplace` block a third-party storefront reads before offering a plugin to its desktop client, and 1.2.2 moved the installer from the repository root into `scripts/`, which edits Go comments, which changes the source digest `vendor/manifest.json` records. Release assets cannot be edited, so a wording or manifest fix costs a version - shipping different bytes under an unchanged version is exactly the drift this repository removes. The three install forms are verified end to end, and the 1.2.4 assets were installed again from three fresh directories after the release went out: the release tarball in **1.8 s**, the tag-pinned git source in **3.7 s**, and the repository URL in **6.5 s**, all rc=0, with the unpacked bytes matching `git show ff7f6de:` file for file (a bare `add dsh-ai-terminal-pet` still waits on the npm release described below):
+The Harness side has a second, self-contained option since `dsh-ai-terminal-pet` `1.1.0`: a standalone DSH plugin package at [`packages/dsh-ai-terminal-pet`](packages/dsh-ai-terminal-pet), also shipped as a GitHub Release asset. The package is now **1.2.8** (tag `dsh-plugin-v1.2.8`, asset `dsh-ai-terminal-pet-1.2.8.tgz`); 1.2.7, 1.2.6, 1.2.5, 1.2.4, 1.2.3, 1.2.2, 1.2.1, 1.2.0 and 1.1.0 stay published and immutable but are superseded. 1.2.7 shipped the 1.0.1 overlay, whose compact strip answers "which terminal is blocked, and for how long" without expanding the panel; 1.2.8 ships 1.0.2, where the look itself is a setting - three named palettes, an optional per-terminal tint on each row's source name, and "start hidden". 1.2.5 is the first version that works on a machine that never ran the overlay: it declares `vendor/package.json` as CommonJS (without it, `require()` of the shipped protocol returned a namespace with no `sendStatus`, so a `DSH_PET_NO_BOOTSTRAP=1` install silently reported nothing), it reads the project path, lineage and start time from the session header instead of `process.cwd()` (the desktop Harness starts from the install directory, so every session was attributed to one wrong path), and its de-duplication signature now covers state, reason, tool, project, title and parent session instead of state alone. 1.2.4 was a wording fix (one market install read as if it covered every terminal, and it does not - the bundle mirrors **Harness** sessions out of the box, while OpenCode, Claude Code and Antigravity sessions appear only after each of those terminals gets its own reporter); 1.2.3 added the `dsh.marketplace` block a third-party storefront reads before offering a plugin to its desktop client, and 1.2.2 moved the installer from the repository root into `scripts/`, which edits Go comments, which changes the source digest `vendor/manifest.json` records. Release assets cannot be edited, so a wording or manifest fix costs a version - shipping different bytes under an unchanged version is exactly the drift this repository removes. The three install forms are verified end to end, and the 1.2.4 assets were installed again from three fresh directories after the release went out: the release tarball in **1.8 s**, the tag-pinned git source in **3.7 s**, and the repository URL in **6.5 s**, all rc=0, with the unpacked bytes matching `git show ff7f6de:` file for file (a bare `add dsh-ai-terminal-pet` still waits on the npm release described below):
 
 ```powershell
 # from the release tarball: no git clone, no build step
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.7/dsh-ai-terminal-pet-1.2.7.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.8/dsh-ai-terminal-pet-1.2.8.tgz
 
 # from git, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.7&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.8&path:/packages/dsh-ai-terminal-pet"
 
 # from the repository URL: resolves through the root manifest shim
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -219,7 +219,7 @@ Because the plugin index format accepts a git source pinned to a commit, this re
 https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json
 ```
 
-[`docs/market-index.json`](docs/market-index.json) is one entry, `dsh-ai-terminal-pet` `1.2.7`, whose install spec is the same `git+...#<commit>&path:/packages/dsh-ai-terminal-pet` form that was installed end to end in 3.7 s above, pinned to `a4f21af`, the commit the `dsh-plugin-v1.2.7` tag points at. It is validated with the host's own `parseMarketIndex` from `@deepseek-ai/dsh-plugin-market-index`: `format: 1`, `en` localized text, declared category and label ids, an https icon pinned to the release commit, and an exact SemVer with a Unix-seconds `publishTimestamp`. The git source stays even though npm now carries the same bytes: it pins a commit, so the index keeps working for a host that cannot reach the registry.
+[`docs/market-index.json`](docs/market-index.json) is one entry, `dsh-ai-terminal-pet` `1.2.7`, whose install spec is the same `git+...#<commit>&path:/packages/dsh-ai-terminal-pet` form that was installed end to end in 3.7 s above, pinned to `a4f21af`, the commit the `dsh-plugin-v1.2.8` tag points at. It is validated with the host's own `parseMarketIndex` from `@deepseek-ai/dsh-plugin-market-index`: `format: 1`, `en` localized text, declared category and label ids, an https icon pinned to the release commit, and an exact SemVer with a Unix-seconds `publishTimestamp`. The git source stays even though npm now carries the same bytes: it pins a commit, so the index keeps working for a host that cannot reach the registry.
 
 Run `node reporters/generic.js` directly to report from any other CLI or script:
 
@@ -272,7 +272,7 @@ The `--json` command never blocks on a GUI process because it reads session snap
 
 ### Settings and where everything lives
 
-Right-click the overlay for a quick menu (show/hide, reset position, notifications, sound and its volume, always-on-top, edge retract, auto-approve, language, start with Windows, quit) — or `Settings…` in that menu, or `ai-terminal-pet --settings`, for the full window. There are three tabs and no OK button: every change applies as soon as you make it, except **Auto-approve timeout**, which is read once at startup.
+Right-click the overlay for a quick menu (show/hide, reset position, notifications, sound and its volume, always-on-top, edge retract, auto-approve, language, start with Windows, quit) — or `Settings…` in that menu, or `ai-terminal-pet --settings`, for the full window. There are four tabs (General, Sound, Sessions, Look) and no OK button: every change applies as soon as you make it, except **Auto-approve timeout**, which is read once at startup.
 
 | Tab | Setting | `config.json` key | Default | What it does |
 |---|---|---|---|---|
@@ -291,6 +291,9 @@ Right-click the overlay for a quick menu (show/hide, reset position, notificatio
 | Sessions | Auto-approve | `autoApprove` | `false` | Off by default; see Safety below |
 | Sessions | Auto-approve timeout | `autoApproveTimeoutSec` | `5` | Veto window, 1–60 s; **needs a restart** |
 | Sessions | Reset window position | *(immediate)* | — | Same as `--reset` |
+| Look | Theme | `theme` | `slate` | `slate` (dark, the one in every screenshot), `paper` (light) or `contrast` (black with saturated state colours); applies to the panel and the settings window |
+| Look | Colour by terminal | `perSourceColor` | `false` | Tints each expanded row's source name by which CLI it came from; the state colour is left alone |
+| Look | Start hidden | `hiddenAtLaunch` | `false` | Begin in the tray; a reporter or `--show` brings the panel back. Startup only - the tray entry point stays authoritative afterwards |
 
 The remaining keys in `config.json` are runtime state, not settings: `placed`, `x`, `y`, `zoom`, `expanded`. The overlay writes them so it reopens where you left it; editing them by hand is harmless but pointless.
 
@@ -351,7 +354,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 Shipped after v0.9.0: the wire protocol specification ([docs/PROTOCOL.md](docs/PROTOCOL.md)) and the `ai-terminal-pet --doctor` self-check command, so both items previously listed here as pending are now available.
 
-Shipped after v0.9.0 as a distribution channel, not just a repository: the Harness bridge is now also a standalone DSH plugin package (`dsh-ai-terminal-pet` 1.2.7, GitHub Release tag `dsh-plugin-v1.2.7`, replacing the superseded 1.2.6, 1.2.5, 1.2.4, 1.2.3, 1.2.2, 1.2.1, 1.2.0 and 1.1.0). 1.2.5 is the first version that works on a machine that never ran the overlay: it marks the vendored tree CommonJS so `require()` of the shipped protocol returns `sendStatus`, reads the project path, lineage and start time from the session header instead of `process.cwd()`, and de-duplicates on state, reason, tool, project, title and parent session rather than state alone. 1.2.4 was the wording fix: the market copy overpromised, because the package mirrors Harness sessions on install while OpenCode, Claude Code and Antigravity sessions arrive only once each of those terminals gets its own reporter, and the packaged README plus the `dsh.catalog` summary now say so. It also declares `dsh.marketplace.profiles` so a desktop-facing storefront offers it to the desktop profile instead of hiding it. It installs from the release tarball, from git pinned to that tag, from the repository URL through the root manifest shim, or by bare package name from npm, and it describes itself to storefronts through `dsh.catalog`. Its registry entry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) was merged on 2026-11-10, and the upstream README already lists the entry under "Notifications & Integrations"; the maintainer trimmed one sentence while merging, because for a Harness session the panel only mirrors state and jumps to the Harness window - approvals still happen inside DSH. Merged into `main` is not the same as visible in a market - but visibility did arrive: the catalogue page returned 404 at 16:16Z and 200 after the upstream site build finished at 16:39:27Z, and `plugins.json` (`count` 10119 to 10230, 10,304 when re-read after the merge) lists this repository; the `install` command in that file is rendered from the entry's `tarball` field at build time, which is why each version needs its own follow-up pull request ([#14076](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14076) carried 1.2.2, [#14089](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14089) carried 1.2.3, [#14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385) carried 1.2.5 and merged at 2026-11-11T17:20:15Z, and [#14439](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14439) carried 1.2.6 and merged at 20:12:31Z, after which the rebuilt `plugins.json` renders 1.2.6). Two more reviewed catalogues list the entry: [imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins) merged the catalog file in [PR #902](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/902) at 21:49:53Z, and [zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) merged it in [PR #97](https://github.com/zhu1090093659/dsh-community-plugins/pull/97) at 2026-11-11T05:06:32Z; the 1024 Store page behind the first of those answers 200. The topic/keyword path needs no application at all, and the DSH-Plugins-Marketplace index picked this repository up on its own: its 18:08:44Z rebuild records `bundle-plugin` plus `risk_tier: "safe"` with an empty `risk_flags`, because the scanner only ever fetched the repository-root `install.ps1` and the installer had moved into `scripts/` by the time it looked. Both preconditions the DSH in-app Discover index requires are satisfied: a commit-pinned git source (this repository's own index, above) and an npm release (`dist-tags.latest` is 1.2.7).
+Shipped after v0.9.0 as a distribution channel, not just a repository: the Harness bridge is now also a standalone DSH plugin package (`dsh-ai-terminal-pet` 1.2.7, GitHub Release tag `dsh-plugin-v1.2.8`, replacing the superseded 1.2.6, 1.2.5, 1.2.4, 1.2.3, 1.2.2, 1.2.1, 1.2.0 and 1.1.0). 1.2.5 is the first version that works on a machine that never ran the overlay: it marks the vendored tree CommonJS so `require()` of the shipped protocol returns `sendStatus`, reads the project path, lineage and start time from the session header instead of `process.cwd()`, and de-duplicates on state, reason, tool, project, title and parent session rather than state alone. 1.2.4 was the wording fix: the market copy overpromised, because the package mirrors Harness sessions on install while OpenCode, Claude Code and Antigravity sessions arrive only once each of those terminals gets its own reporter, and the packaged README plus the `dsh.catalog` summary now say so. It also declares `dsh.marketplace.profiles` so a desktop-facing storefront offers it to the desktop profile instead of hiding it. It installs from the release tarball, from git pinned to that tag, from the repository URL through the root manifest shim, or by bare package name from npm, and it describes itself to storefronts through `dsh.catalog`. Its registry entry ([PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)) was merged on 2026-11-10, and the upstream README already lists the entry under "Notifications & Integrations"; the maintainer trimmed one sentence while merging, because for a Harness session the panel only mirrors state and jumps to the Harness window - approvals still happen inside DSH. Merged into `main` is not the same as visible in a market - but visibility did arrive: the catalogue page returned 404 at 16:16Z and 200 after the upstream site build finished at 16:39:27Z, and `plugins.json` (`count` 10119 to 10230, 10,304 when re-read after the merge) lists this repository; the `install` command in that file is rendered from the entry's `tarball` field at build time, which is why each version needs its own follow-up pull request ([#14076](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14076) carried 1.2.2, [#14089](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14089) carried 1.2.3, [#14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385) carried 1.2.5 and merged at 2026-11-11T17:20:15Z, and [#14439](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14439) carried 1.2.6 and merged at 20:12:31Z, after which the rebuilt `plugins.json` renders 1.2.6). Two more reviewed catalogues list the entry: [imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins) merged the catalog file in [PR #902](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/902) at 21:49:53Z, and [zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) merged it in [PR #97](https://github.com/zhu1090093659/dsh-community-plugins/pull/97) at 2026-11-11T05:06:32Z; the 1024 Store page behind the first of those answers 200. The topic/keyword path needs no application at all, and the DSH-Plugins-Marketplace index picked this repository up on its own: its 18:08:44Z rebuild records `bundle-plugin` plus `risk_tier: "safe"` with an empty `risk_flags`, because the scanner only ever fetched the repository-root `install.ps1` and the installer had moved into `scripts/` by the time it looked. Both preconditions the DSH in-app Discover index requires are satisfied: a commit-pinned git source (this repository's own index, above) and an npm release (`dist-tags.latest` is 1.2.7).
 
 ### Non-goals
 
@@ -488,7 +491,7 @@ dsh plugin add dsh-ai-terminal-pet
 
 包里已经带了预编译好的浮窗与本项目自己的 `protocol.js`。首次加载时插件会把它们**只在缺失时**复制到
 `%LOCALAPPDATA%\AI-Terminal-Pet\`，所以永远不会覆盖你自己维护的安装。装完即用：下一条会话就在
-面板上了。它同时发布于 npm（[`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.7）；
+面板上了。它同时发布于 npm（[`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.8）；
 想从 GitHub Release 的 tarball、钉 tag 的 git 源或仓库地址装也一样（`dsh plugin add <路径或 git 地址>`），
 跑的都是同一套 bootstrap。
 
@@ -496,9 +499,9 @@ dsh plugin add dsh-ai-terminal-pet
 
 这一版发布两个包：自解压的 `pet-setup.exe` 与便携 zip。两者装的是**同一份 11 件制品、同一个目录**；zip 的额外好处是你可以在运行前先拆开看。
 
-1. 从 [`pet-v1.0.1` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.1) 下载其中一个：
+1. 从 [`pet-v1.0.2` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.2) 下载其中一个：
    - **`pet-setup.exe`**（13.5 MB）：双击即可。它会先拿自带的 `SHA256SUMS.txt` 校验自己的载荷，**全部吻合才动手**，然后调用内嵌的安装脚本。`pet-setup.exe --verify` 随时复核已装文件，`--uninstall` 卸载，`--add-to-path` 加进 PATH。
-   - **`ai-terminal-pet-1.0.1-win-x64.zip`**（4.98 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
+   - **`ai-terminal-pet-1.0.2-win-x64.zip`**（4.99 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
 2. 验证安装输出：
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -581,14 +584,14 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/
 
 Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状态集与快照逻辑，它从 `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` 加载协议，全部委托给这份 protocol.js。
 
-自 `dsh-ai-terminal-pet` `1.1.0` 起，Harness 这一侧多了第二种自带电池的接法：独立 DSH 插件包 [`packages/dsh-ai-terminal-pet`](packages/dsh-ai-terminal-pet)，同时以 GitHub Release 资产对外分发。当前版本是 **1.2.7**（tag `dsh-plugin-v1.2.7`，资产 `dsh-ai-terminal-pet-1.2.7.tgz`）；1.2.6、1.2.5、1.2.4、1.2.3、1.2.2、1.2.1、1.2.0 与 1.1.0 保持已发布、不可变，但都已被取代。1.2.7 带的是 1.0.1 的浮窗：紧凑态不用展开就能回答产品自己那个问题——哪个终端卡住了、卡了多久。1.2.5 是第一个「在从没跑过浮窗的机器上也能用」的版本：vendor 目录被标成 CommonJS（否则 `require()` 自带的协议文件返回的是一个没有 `sendStatus` 的模块命名空间，`DSH_PET_NO_BOOTSTRAP=1` 的安装就此静默什么都不发），项目路径、上级会话与起始时间改从会话头读取（桌面版 Harness 从安装目录启动，原先每条会话都被标成同一个错误路径），去重签名也从只看 state 改为覆盖 state、reason、tool、project、title 与 parentSession。1.2.4 改的是文案，不是代码：原先「装一次市场条目就能看到所有终端」的读法并不成立——这个 bundle 开箱即用地映射的是 **Harness** 自己的会话，而 OpenCode、Claude Code 与 Antigravity 的会话，要先给各自那个终端装好上报端才会出现；包内 README 与两份清单里的 `dsh.catalog` 摘要现在都把这一点写明。清单层面的上一改是 1.2.3（`dsh.marketplace` 块，第三方商店拿它决定要不要把插件摆到桌面客户端面前），字节层面的上一改是 1.2.2（安装脚本从仓库根移进 `scripts/`，改到 Go 源码注释，而 `vendor/manifest.json` 记录的正是这些源码的摘要，所以 vendor 里那份浮窗必须重新记账、整包重打）。Release 资产不能改写，因此连改一句措辞同样要耗掉一个版本号。四种装法都端到端实测通过（Release 资产、钉 tag 的 git 源、仓库地址，以及 npm 上的裸包名），1.2.4 的资产发出去之后又从三个全新目录各装了一遍：Release 资产 **1.8 s**、钉 tag 的 git 源 **3.7 s**、仓库地址 **6.5 s**，全部 rc=0，装出来的字节与 `git show ff7f6de:` 逐文件一致。
+自 `dsh-ai-terminal-pet` `1.1.0` 起，Harness 这一侧多了第二种自带电池的接法：独立 DSH 插件包 [`packages/dsh-ai-terminal-pet`](packages/dsh-ai-terminal-pet)，同时以 GitHub Release 资产对外分发。当前版本是 **1.2.8**（tag `dsh-plugin-v1.2.8`，资产 `dsh-ai-terminal-pet-1.2.8.tgz`）；1.2.7、1.2.6、1.2.5、1.2.4、1.2.3、1.2.2、1.2.1、1.2.0 与 1.1.0 保持已发布、不可变，但都已被取代。1.2.7 带的是 1.0.1 的浮窗：紧凑态不用展开就能回答产品自己那个问题——哪个终端卡住了、卡了多久；1.2.8 带的是 1.0.2：外观本身成了设置，三套命名调色板、可选的「按终端着色」、以及「启动时隐藏」。1.2.5 是第一个「在从没跑过浮窗的机器上也能用」的版本：vendor 目录被标成 CommonJS（否则 `require()` 自带的协议文件返回的是一个没有 `sendStatus` 的模块命名空间，`DSH_PET_NO_BOOTSTRAP=1` 的安装就此静默什么都不发），项目路径、上级会话与起始时间改从会话头读取（桌面版 Harness 从安装目录启动，原先每条会话都被标成同一个错误路径），去重签名也从只看 state 改为覆盖 state、reason、tool、project、title 与 parentSession。1.2.4 改的是文案，不是代码：原先「装一次市场条目就能看到所有终端」的读法并不成立——这个 bundle 开箱即用地映射的是 **Harness** 自己的会话，而 OpenCode、Claude Code 与 Antigravity 的会话，要先给各自那个终端装好上报端才会出现；包内 README 与两份清单里的 `dsh.catalog` 摘要现在都把这一点写明。清单层面的上一改是 1.2.3（`dsh.marketplace` 块，第三方商店拿它决定要不要把插件摆到桌面客户端面前），字节层面的上一改是 1.2.2（安装脚本从仓库根移进 `scripts/`，改到 Go 源码注释，而 `vendor/manifest.json` 记录的正是这些源码的摘要，所以 vendor 里那份浮窗必须重新记账、整包重打）。Release 资产不能改写，因此连改一句措辞同样要耗掉一个版本号。四种装法都端到端实测通过（Release 资产、钉 tag 的 git 源、仓库地址，以及 npm 上的裸包名），1.2.4 的资产发出去之后又从三个全新目录各装了一遍：Release 资产 **1.8 s**、钉 tag 的 git 源 **3.7 s**、仓库地址 **6.5 s**，全部 rc=0，装出来的字节与 `git show ff7f6de:` 逐文件一致。
 
 ```powershell
 # 用 Release 资产：不需要 clone，也不需要构建
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.7/dsh-ai-terminal-pet-1.2.7.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.8/dsh-ai-terminal-pet-1.2.8.tgz
 
 # 用 git 源：钉住 Release 的那个 tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.7&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.8&path:/packages/dsh-ai-terminal-pet"
 
 # 用仓库地址：靠仓库根的清单 shim 解析过去
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -608,7 +611,7 @@ dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
 https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json
 ```
 
-[`docs/market-index.json`](docs/market-index.json) 只有一条 `dsh-ai-terminal-pet` `1.2.7`，安装 spec 就是上文中 3.7 秒装通的那条 `git+…#<commit>&path:/packages/dsh-ai-terminal-pet`，现在钉在 `a4f21af`——也就是 `dsh-plugin-v1.2.7` 那个 tag 指向的提交。它用宿主自带的 `@deepseek-ai/dsh-plugin-market-index` 的 `parseMarketIndex` 校验通过：`format: 1`、有 `en` 文案、category 与 label 都引用了已声明的 id、图标是钉在发版 commit 上的 https 地址、版本是精确 SemVer 且 `publishTimestamp` 为 Unix 秒。即使 npm 上已有同样的字节，这条 git 源仍然保留：它钉的是 commit，所以连不上 registry 的宿主也照样能装。
+[`docs/market-index.json`](docs/market-index.json) 只有一条 `dsh-ai-terminal-pet` `1.2.7`，安装 spec 就是上文中 3.7 秒装通的那条 `git+…#<commit>&path:/packages/dsh-ai-terminal-pet`，现在钉在 `a4f21af`——也就是 `dsh-plugin-v1.2.8` 那个 tag 指向的提交。它用宿主自带的 `@deepseek-ai/dsh-plugin-market-index` 的 `parseMarketIndex` 校验通过：`format: 1`、有 `en` 文案、category 与 label 都引用了已声明的 id、图标是钉在发版 commit 上的 https 地址、版本是精确 SemVer 且 `publishTimestamp` 为 Unix 秒。即使 npm 上已有同样的字节，这条 git 源仍然保留：它钉的是 commit，所以连不上 registry 的宿主也照样能装。
 
 针对 Antigravity CLI，推荐将状态栏命令直接指向编译好的原生二进制 `pet-statusline.exe`。在开启杀毒软件的机器上，原生 shim 能够消除频繁启动 Node 运行时的进程创建延迟。
 
@@ -641,7 +644,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --autostart` | 查询当前的开机自启状态 |
 | `ai-terminal-pet --autostart=on` | 设置为登录时自动启动 |
 | `ai-terminal-pet --autostart=off` | 取消开机自启设置 |
-| `ai-terminal-pet --version` | 打印版本信息（v1.0.1） |
+| `ai-terminal-pet --version` | 打印版本信息（v1.0.2） |
 | `ai-terminal-pet --help` | 输出命令行帮助信息 |
 
 通过 `--json` 参数读取当前状态时，返回的会话数据结构示例如下：
@@ -659,7 +662,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 ### 设置项与文件位置
 
-右键浮窗会弹出快捷菜单（显示/隐藏、重置位置、通知、声音与音量、置顶、贴边收起、自动同意、语言、开机自启、退出）；要完整设置就点菜单里的「设置…」或执行 `ai-terminal-pet --settings`。三个页签、没有「确定」按钮：改完立即生效，**唯一例外是自动同意倒计时**，它在启动时读一次，改完要重启浮窗。
+右键浮窗会弹出快捷菜单（显示/隐藏、重置位置、通知、声音与音量、置顶、贴边收起、自动同意、语言、开机自启、退出）；要完整设置就点菜单里的「设置…」或执行 `ai-terminal-pet --settings`。四个页签（常规 / 声音 / 会话 / 外观）、没有「确定」按钮：改完立即生效，**唯一例外是自动同意倒计时**，它在启动时读一次，改完要重启浮窗。
 
 | 页签 | 设置项 | `config.json` 键 | 默认值 | 作用 |
 |---|---|---|---|---|
@@ -678,6 +681,9 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | 会话 | 自动同意 | `autoApprove` | `false` | 默认关，见下一节「安全边界」 |
 | 会话 | 自动同意倒计时 | `autoApproveTimeoutSec` | `5` | 否决窗口 1–60 秒；**改完需重启** |
 | 会话 | 重置窗口位置 | *（立即执行）* | — | 等同 `--reset` |
+| 外观 | 配色主题 | `theme` | `slate` | `slate`（深色，仓库里所有截图用的就是它）、`paper`（浅色）、`contrast`（纯黑 + 高饱和状态色）；面板与设置窗口同时生效 |
+| 外观 | 按终端着色 | `perSourceColor` | `false` | 给展开行里的来源名按终端上色；状态色不动 |
+| 外观 | 启动时隐藏 | `hiddenAtLaunch` | `false` | 启动后先进托盘，上报端或 `--show` 会把面板拉回来；只作用于启动，之后托盘菜单说了算 |
 
 `config.json` 里剩下的键是运行期状态而不是设置：`placed`、`x`、`y`、`zoom`、`expanded`。浮窗写它们是为了「下次在原来的位置、原来的缩放打开」，手改无害但没意义。
 
@@ -731,7 +737,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 v0.9.0 之后已交付：线协议规范文档 [docs/PROTOCOL.md](docs/PROTOCOL.md)（第三方可据此编写合规上报端）与 `ai-terminal-pet --doctor` 自检命令，原先列在此处的两项待办均已完成。
 
-v0.9.0 之后还多了一条分发渠道，而不只是仓库里的代码：Harness 桥接现在是独立 DSH 插件包 `dsh-ai-terminal-pet` 1.2.7（GitHub Release tag `dsh-plugin-v1.2.7`，取代已发布的 1.2.6、1.2.5、1.2.4、1.2.3、1.2.2、1.2.1、1.2.0 与 1.1.0）。1.2.5 是第一个「在从没跑过浮窗的机器上也能用」的版本：它把 vendor 目录标成 CommonJS（否则 `require()` 自带的协议文件会返回一个没有 `sendStatus` 的命名空间，`DSH_PET_NO_BOOTSTRAP=1` 的安装因此静默什么都不发），把项目路径、上级会话与起始时间改从会话头读取（桌面版 Harness 从安装目录启动，原先每条会话都被标成同一个错误路径），去重签名也从只看 state 改为覆盖 state/reason/tool/project/title/parentSession。1.2.4 是纯文案修正：商店文案把能力说满了——装上这个包立刻映射的是 Harness 自己的会话，而 OpenCode、Claude Code 与 Antigravity 的会话要等各自终端装好上报端才出现——包内 README 与 `dsh.catalog` 摘要现在都写明了这一点。它还声明了 `dsh.marketplace.profiles`，于是在桌面端商店里会被摆到 desktop profile 面前，而不是被过滤掉。可用 Release 资产、钉 tag 的 git 源、仓库地址（`github:jjjjjjjjnnjnn/ai-terminal-pet`，靠仓库根的清单 shim 解析）或 npm 上的裸包名四种方式安装，并通过 `dsh.catalog` 向商店自述。
+v0.9.0 之后还多了一条分发渠道，而不只是仓库里的代码：Harness 桥接现在是独立 DSH 插件包 `dsh-ai-terminal-pet` 1.2.7（GitHub Release tag `dsh-plugin-v1.2.8`，取代已发布的 1.2.6、1.2.5、1.2.4、1.2.3、1.2.2、1.2.1、1.2.0 与 1.1.0）。1.2.5 是第一个「在从没跑过浮窗的机器上也能用」的版本：它把 vendor 目录标成 CommonJS（否则 `require()` 自带的协议文件会返回一个没有 `sendStatus` 的命名空间，`DSH_PET_NO_BOOTSTRAP=1` 的安装因此静默什么都不发），把项目路径、上级会话与起始时间改从会话头读取（桌面版 Harness 从安装目录启动，原先每条会话都被标成同一个错误路径），去重签名也从只看 state 改为覆盖 state/reason/tool/project/title/parentSession。1.2.4 是纯文案修正：商店文案把能力说满了——装上这个包立刻映射的是 Harness 自己的会话，而 OpenCode、Claude Code 与 Antigravity 的会话要等各自终端装好上报端才出现——包内 README 与 `dsh.catalog` 摘要现在都写明了这一点。它还声明了 `dsh.marketplace.profiles`，于是在桌面端商店里会被摆到 desktop profile 面前，而不是被过滤掉。可用 Release 资产、钉 tag 的 git 源、仓库地址（`github:jjjjjjjjnnjnn/ai-terminal-pet`，靠仓库根的清单 shim 解析）或 npm 上的裸包名四种方式安装，并通过 `dsh.catalog` 向商店自述。
 
 它的注册表条目（[PR #13937](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13937)）已于 2026-11-10 由评审人合并，上游 README 的「Notifications & Integrations」小节已列出该条目（维护者合并时删掉了原稿里「也能在面板上直接放行审批」一句，因为对 Harness 会话来说面板只做状态映射与跳转，审批仍在 DSH 里完成）。「合并进 `main`」与「在市场里可见」曾经是两件事，现在后者也成立：条目页在 16:16Z 仍是 404，上游站点构建 16:39:27Z 结束后变成 200，DSH 应用内 Market 加载的 `plugins.json`（`count` 从 10119 涨到 10230）里也已收录本仓库；那里面的 `install` 命令是构建时按条目里的 `tarball` 字段渲染的，所以每个版本都需要一个只改那个字段的跟进 PR（[#14076](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14076) 带到 1.2.2、[#14089](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14089) 带到 1.2.3、[#14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385) 带 1.2.5 并于 2026-11-11T17:20:15Z 合并、[#14439](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14439) 带 1.2.6 并于同日 20:12:31Z 合并，站点重建后 `plugins.json` 已渲染 1.2.6）。另有两家评审制目录也收录了本条目：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins) 的 [PR #902](https://github.com/imsai-sh/awesome-deepseek-harness-plugins/pull/902) 于 21:49:53Z 合并（那家商店只从 npm 安装，所以在发版前以 browse-only 形式列出），[zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) 的 [PR #97](https://github.com/zhu1090093659/dsh-community-plugins/pull/97) 于 2026-11-11T05:06:32Z 合并；前者背后的 1024 Store 详情页返回 200。topic/关键词那条路不需要提交申请，而 [DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) 2026-11-10 18:08:44Z 那次重建已经把本条目改判为 `bundle-plugin`，风险档位也从「没有该字段」变成了 `risk_tier: "safe"` 且 `risk_flags` 为空——那不是白名单给的结果：那个扫描器只抓仓库根的同名脚本、整文正则匹配，而 `install.ps1` 已移到 `scripts/`，两条规则从此失去输入。DSH 应用内 Discover 索引需要的两个前置现在都成立：钉 40 位 commit 的 git 源（本仓库自建索引）与 npm 发布（`dist-tags.latest` 是 1.2.7，17 个文件，tarball 与 Release 资产逐字节相同）。
 

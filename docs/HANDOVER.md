@@ -4,33 +4,34 @@
 > 下一位 AI 直接从 §1「当前状态」开始读，然后按 §13–§27 的时间序读 runbook，不必回溯长上下文。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-12 午；浮窗 **1.0.1**、插件包 **1.2.7**，两个 Release 与 npm 都已发布）
+## 1. 当前状态（2026-11-12 下午；浮窗 **1.0.2**、插件包 **1.2.8**，两个 Release 与 npm 都已发布）
 
 > 接手请先读本节与文末 §28「交接清单」，那两节给出「现在在哪、下一步做什么」；§27 是插件包分发的完整 runbook。
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.1`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.7`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`pet-v1.0.1` 与 `dsh-plugin-v1.2.6`/`dsh-plugin-v1.2.7`。
-  **`pet-v1.0.1` 与 `dsh-plugin-v1.2.7` 是本轮新打的**，资产见 §36；`pet-v1.0.0` 与 `dsh-plugin-v1.2.6`
-  仍然有效且不可变。查当前 CI 用 `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，
-  因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**206 个** `func Test`，
+- **版本**：浮窗 **`1.0.2`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.8`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`pet-v1.0.1`/`pet-v1.0.2` 与 `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`。
+  **`pet-v1.0.2` 与 `dsh-plugin-v1.2.8` 是本轮新打的**，资产见 §37；`pet-v1.0.0`、`pet-v1.0.1`、
+  `dsh-plugin-v1.2.6` 与 `v1.2.7` 仍然有效且不可变。查当前 CI 用 `gh run list --limit 1`，
+  查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**218 个** `func Test`，
   11 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` 11 份文档全解；
   `scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；`--doctor` **9 ok / 0 warn / 0 fail**。
-- **规模**：Go 非测试源码 **35 文件 / 12,584 行**、测试 **30 文件 / 5,603 行**（206 个 `func Test`，
+- **规模**：Go 非测试源码 **35 文件 / 13,031 行**、测试 **32 文件 / 5,943 行**（218 个 `func Test`，
   外加 `cmd/pet-setup` 的 20 个）、JS **12 文件 / 4,346 行**；
-  `bin/AI-Terminal-Pet.exe` **4,377,600 B**（1.0.1）、`bin/pet-statusline.exe` **3,664,896 B**、
-  `bin/pet-hook.exe` **3,697,152 B**、`dist/pet-setup.exe` **14,125,568 B**
+  `bin/AI-Terminal-Pet.exe` **4,391,424 B**（1.0.2）、`bin/pet-statusline.exe` **3,664,896 B**、
+  `bin/pet-hook.exe` **3,697,152 B**、`dist/pet-setup.exe` **14,145,024 B**
   （均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.7**（发布后核对 `dist-tags.latest`、17 个文件、tarball 与 Release 资产
-    逐字节相同）；`dsh-plugin-v1.2.7` 的 Release 资产 `dsh-ai-terminal-pet-1.2.7.tgz`
-    **1,919,625 B / shasum `efa49bef…`**；钉 tag 的 git 源；仓库根的清单 shim。
-  - 浮窗线：`pet-v1.0.1` 的 Release 带两个资产——`ai-terminal-pet-1.0.1-win-x64.zip`
-    **4,985,803 B / sha256 `849A3AA9…`** 与 `pet-setup.exe` **14,131,200 B / sha256 `8389B426…`**
-    （本机 `scripts/package.ps1` 产出，见 §36）；`pet-v1.0.0` 与 `pet-v0.9.0` 仍在（不可变，已被取代）。
+  - 插件线：npm `latest` = **1.2.8**（发布后核对 `dist-tags.latest`、17 个文件、tarball 与 Release 资产
+    逐字节相同）；`dsh-plugin-v1.2.8` 的 Release 资产 `dsh-ai-terminal-pet-1.2.8.tgz`
+    **1,926,796 B / shasum `922f42ce…`**；钉 tag 的 git 源；仓库根的清单 shim。
+  - 浮窗线：`pet-v1.0.2` 的 Release 带两个资产——`ai-terminal-pet-1.0.2-win-x64.zip`
+    **4,992,775 B / sha256 `EA3A4EC3…`** 与 `pet-setup.exe` **14,145,024 B / sha256 `1531AE8B…`**
+    （本机 `scripts/package.ps1` 产出，见 §37）；`pet-v1.0.1`、`pet-v1.0.0` 与 `pet-v0.9.0` 仍在
+    （不可变，已被取代）。
   - 三个资产都**从公网 URL 下载回来复验过**：`pet-setup.exe --version` 打印 `pet-setup 1.0.0`；
     沙箱（自带 `LOCALAPPDATA`/`USERPROFILE`）里 install → 11 件哈希全对 → `--verify` 11 件全对 →
     `--uninstall`（输 yes）目录归零；zip 解出 17 个文件；`npm pack dsh-ai-terminal-pet@1.2.6`
@@ -2947,3 +2948,80 @@ npm pack（1.2.7）                             17 files / shasum efa49bef…
 | 上游 | [awesome-dsh-plugin #14688](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14688)：只改 `tarball` 一行，MERGEABLE，等 check 与人工合并（中文描述逐字节未动，用 base64 上传避开 PowerShell 5.1 的 ANSI 解码陷阱） |
 | 公网复验 | 两个浮窗资产都从公开 URL 下载回来重新哈希（与上表一致）；zip 解到带独立 `LOCALAPPDATA`/`USERPROFILE` 的沙箱里 `install.cmd` → 11/11、`--doctor` 8 ok / 1 warn / 0 fail（唯一 warn 是「running binary 不是这份安装」，因为是从解压目录跑的）、`-Uninstall` 目录归零；`pet-setup.exe --version` 打印 `pet-setup 1.0.1` |
 
+
+## 37. 外观成为设置：三套调色板、按终端着色、启动时隐藏（2026-11-12，1.0.2 / 1.2.8）
+
+### 37.1 这一轮做了什么
+
+三件事，互不阻塞，但共用一次发版：
+
+| 设置 | `config.json` 键 | 默认 | 它解决什么 |
+|---|---|---|---|
+| 配色主题 | `theme` | `slate` | 深色看腻了或者要用浅色桌面的人，现在有 `paper`（浅）与 `contrast`（纯黑 + 高饱和状态色） |
+| 按终端着色 | `perSourceColor` | `false` | 展开行里的**来源名**按终端上色，回答「这是哪个工具」；状态色不动 |
+| 启动时隐藏 | `hiddenAtLaunch` | `false` | 上报端会按需拉起浮窗，想要「登录后先待托盘」的人不必每次手动隐藏 |
+
+设置窗口新增第四个页签**外观（Look）**。`slate` 是默认值，所以**从未打开这个设置的人，面板字节与 1.0.1 相同**
+——这是「默认档不许改」那条规矩的直接后果，也是为什么 `docs/assets/` 里的截图只需按同一份代码重出、构图不变。
+
+### 37.2 为什么调色板是包级变量而不是穿参
+
+20 个颜色要穿过 `drawVerticalPanel` → `drawVerticalCompact` / `drawVerticalExpanded` → `drawVerticalSession`
+等六七个签名，只为让一个外观开关能改颜色。而**所有栅格化都跑在 UI 线程**（`canvas_windows.go` 里字体缓存那段
+注释早就写明了这一点），所以「进程级一份调色板，启动时与切换时各赋一次」与原来的常量一样安全，
+而且调用点从 `colorPanel` 变成 `colors.Panel` 只是机械替换（本轮改动了 106 处引用，全部在 `internal/ui`）。
+
+代价是**必须把主题进帧 key**：帧复用规则是「key 相同 = 像素相同」，只赋 `colors` 而不动 key，切换主题会被
+当成没变化。这与 1.0.1 的「时长冻结」是同一类 bug，所以 `renderedKey` 增加了 `theme` 与 `perSource` 两个字段，
+并断言「未知主题名归一化成 slate 之后 key 不应变化」（否则每次读盘都会白重绘一次）。
+
+### 37.3 浅色调色板最容易做错的一件事
+
+深色主题的「次要文字」是浅灰（`170,180,196`），在浅底上它**必须变暗**而不是继续变亮，否则小字直接消失。
+`TestEveryThemeKeepsItsTextReadableOnItsOwnPanel` 对三套调色板逐对比较「每种文字 vs 它自己那块底色」的
+相对亮度，也检查六个状态色相对底色都要 ≥2.5:1。这里**刻意不断言 WCAG 4.5:1**：面板是半透明浮在别人的桌面上，
+拿一个对自己的桌面成立的比值去声称「符合无障碍标准」是过度声明；能说的是「每种文字与它自己底色分得开」。
+
+### 37.4 一处有意的重复
+
+`config.ValidTheme` 与 `ui.normalizeTheme` 是两份实现，因为 `internal/ui` 不 import `internal/config`
+（文件路径与文件格式归 app 层，`ui.DefaultSettings` 的注释写明了）。两份清单因此可能漂移，
+所以 `internal/app/appearance_test.go` 的 `TestThemeListsAgree` 把「主题名集合与顺序一致」钉住。
+同一文件还钉住 `applyUISettings` 会把三个新字段写进 `config.json`——**它忘了字段，就等于「设置窗口能选、
+重启就丢」**，这类 bug 只有测试能抓。
+
+### 37.5 这一轮的实测
+
+```
+gofmt -l . / go vet ./...                     干净 / 0
+go test -count=1 ./...                        12 个包全 ok，218 个 func Test（新增 12）
+node tests/fresh-machine.mjs --no-overlay     PASS 162/162
+三个 verify.mjs + vendor --check             全 PASS
+scripts\install.cmd -VerifyOnly               11/11
+--doctor（安装 1.0.2 之后）                    7 ok / 2 warn / 0 fail（warn 是浮窗没在跑）
+scripts\package.ps1                           zip 4,992,775 B / 17 files；pet-setup.exe 14,145,024 B
+npm pack（1.2.8）                             17 files / shasum 922f42ce…
+vendor/manifest.json                          overlay 4,391,424 B / sha256 f7788a9a…；protocol 未变
+```
+
+**素材**：`docs/assets/` 由同一份光栅器输出重出（几何未变，构图不变），并新增设置窗口「外观」页的两张预览
+（`settings-appearance*.png` 属于 `PET_PREVIEW_DIR` 的产物，不进仓库）。插件包的 `screenshots/` 同步替换。
+
+### 37.6 发布记录（按 §28.6 的固定套路）
+
+| 步骤 | 结果 |
+|---|---|
+| A 提交 | 本批：`Version` → 1.0.2、调色板与三套主题、`perSourceColor`、`hiddenAtLaunch`、第四页签、12 个新测试、三二进制重编 + `npm run vendor`（overlay `f7788a9a…`）、两份清单与索引前移到 1.2.8、README/CHANGELOG/HANDOVER 口径、素材重出 |
+| tag | `pet-v1.0.2` 与 `dsh-plugin-v1.2.8`（都打在同一提交上，SSH 签名） |
+| Release | `pet-v1.0.2`：zip **4,992,775 B / sha256 `EA3A4EC3…`**、`pet-setup.exe` **14,145,024 B / sha256 `1531AE8B…`**；`dsh-plugin-v1.2.8`：tgz **1,926,796 B / sha256 `F0B9CDA0…`** |
+| npm | `dsh-ai-terminal-pet@1.2.8`，`dist-tags.latest` = **1.2.8**，`npm pack` 回来的 tarball 与 Release 资产逐字节相同（sha256 二者都是 `F0B9CDA0…`） |
+| B 提交 | 索引 `source.commit` 与 `icon` 钉到 A 的 sha（git 无法在提交里引用自己） |
+| 上游 | awesome-dsh-plugin 的 `bump-tarball-1.2.8` 跟进 PR（只改 `tarball` 一行，用 base64 上传） |
+| 公网复验 | 两个浮窗资产从公开 URL 下载重哈希一致；沙箱 install → `-VerifyOnly` 11/11 → `--doctor` 8 ok / 1 warn / 0 fail → `-Uninstall` 目录归零；`pet-setup.exe --version` 打印 `pet-setup 1.0.2` |
+
+### 37.7 已知取舍
+
+- 三套调色板是**手挑的值**，没有自动从桌面取色。自动主题涉及读系统主题、再算对比度，是另一件事。
+- `perSourceColor` 只改**来源名**，不改左侧状态脊与状态词：那两处是信号本身。
+- 未知上报端取中性色（`Secondary`），不猜。新终端要显示自己的颜色，得在 `sourceColor` 里加一行。
+- `hiddenAtLaunch` 只作用于启动。托盘菜单、`--show`、`--toggle` 之后仍然是权威——它不是「隐藏模式」。

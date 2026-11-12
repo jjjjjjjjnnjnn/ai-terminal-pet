@@ -93,6 +93,7 @@ const (
 	settingsTabGeneral
 	settingsTabSound
 	settingsTabSessions
+	settingsTabAppearance
 	settingsClose
 
 	settingsNotifications
@@ -110,6 +111,10 @@ const (
 	settingsSoundFinish
 	settingsPreview
 
+	settingsTheme
+	settingsPerSource
+	settingsHiddenAtLaunch
+
 	settingsAutoApprove
 	settingsApproveDown
 	settingsApproveUp
@@ -123,6 +128,8 @@ func settingsTabControl(index int) settingsControl {
 		return settingsTabSound
 	case 2:
 		return settingsTabSessions
+	case 3:
+		return settingsTabAppearance
 	default:
 		return settingsTabGeneral
 	}
@@ -135,10 +142,17 @@ func settingsTabIndex(control settingsControl) int {
 		return 1
 	case settingsTabSessions:
 		return 2
+	case settingsTabAppearance:
+		return 3
 	default:
 		return 0
 	}
 }
+
+// settingsTabCount is how many sidebar entries exist. It is a constant rather
+// than len(geometry.tabs) so the geometry, the labels and the tests cannot
+// disagree about how many tabs a build has.
+const settingsTabCount = 4
 
 // settingsRow is one line of the right-hand column.
 type settingsRow struct {
@@ -176,6 +190,9 @@ type settingsView struct {
 	ApproveTimeout int
 	Scheme         string
 	Language       string
+	Theme          string
+	PerSource      bool
+	HiddenAtLaunch bool
 }
 
 type settingsRect struct {
@@ -207,7 +224,7 @@ type settingsGeometry struct {
 	// rebuilt to pick the new labels up.
 	lang  i18n.Lang
 	close settingsRect
-	tabs  [3]settingsRect
+	tabs  [settingsTabCount]settingsRect
 	tab   int
 	rows  []settingsRow
 	// frames is the clickable band of each row (the whole line, so a label is
@@ -241,7 +258,7 @@ func settingsGeometryFor(dpi uint32, tab int, rows []settingsRow) settingsGeomet
 		Width:  closeSize,
 		Height: closeSize,
 	}
-	for index := 0; index < 3; index++ {
+	for index := 0; index < settingsTabCount; index++ {
 		geometry.tabs[index] = settingsRect{
 			Left:   s(settingsMargin),
 			Top:    s(settingsTabsTop) + index*s(settingsTabHeight+settingsTabGap),
@@ -400,6 +417,9 @@ func (a *App) settingsView() settingsView {
 		ApproveTimeout: a.approveSeconds(),
 		Scheme:         validSoundScheme(settings.SoundScheme),
 		Language:       settings.Language,
+		Theme:          normalizeTheme(settings.Theme),
+		PerSource:      settings.PerSourceColor,
+		HiddenAtLaunch: settings.HiddenAtLaunch,
 	}
 }
 
@@ -418,8 +438,33 @@ func (a *App) settingsRows() []settingsRow {
 		return soundRows(a.lang)
 	case 2:
 		return sessionRows(a.lang)
+	case 3:
+		return appearanceRows(a.lang)
 	default:
 		return generalRows(a.lang)
+	}
+}
+
+// appearanceRows is the look of the product: palette, provenance colour, and
+// whether the panel starts in the tray.
+func appearanceRows(lang i18n.Lang) []settingsRow {
+	return []settingsRow{
+		{control: settingsTheme, kind: rowSegment,
+			title: i18n.T(lang, i18n.KeySettingsTheme),
+			hint:  i18n.T(lang, i18n.KeySettingsThemeHint),
+			options: []string{
+				i18n.T(lang, i18n.KeyThemeSlate),
+				i18n.T(lang, i18n.KeyThemePaper),
+				i18n.T(lang, i18n.KeyThemeContrast),
+			}},
+		{control: settingsPerSource, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsPerSource),
+			hint:  i18n.T(lang, i18n.KeySettingsPerSourceHint)},
+		{control: settingsHiddenAtLaunch, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsHiddenAtLaunch),
+			hint:  i18n.T(lang, i18n.KeySettingsHiddenAtLaunchHint)},
+		{control: settingsNone, kind: rowNote,
+			title: i18n.T(lang, i18n.KeySettingsAppearanceNote)},
 	}
 }
 
@@ -515,8 +560,20 @@ func settingsSegmentIndex(row settingsRow, view settingsView) int {
 		return settingsSchemeIndex(view.Scheme)
 	case settingsLanguage:
 		return settingsLanguageIndex(view.Language)
+	case settingsTheme:
+		return settingsThemeIndex(view.Theme)
 	}
 	return -1
+}
+
+// settingsThemeIndex maps the persisted palette onto the segment index.
+func settingsThemeIndex(name string) int {
+	for index, candidate := range ThemeNames {
+		if candidate == normalizeTheme(name) {
+			return index
+		}
+	}
+	return 0
 }
 
 // settingsSliderValueFor is the 0..1 position a slider row should show.
@@ -563,6 +620,10 @@ func settingsToggleState(row settingsRow, view settingsView) bool {
 		return view.NotifyOnFinish
 	case settingsAutoApprove:
 		return view.AutoApprove
+	case settingsPerSource:
+		return view.PerSource
+	case settingsHiddenAtLaunch:
+		return view.HiddenAtLaunch
 	}
 	return false
 }
@@ -614,18 +675,18 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 	width, height := geometry.width, geometry.height
 
 	target.clear()
-	target.fillRounded(0, 0, width, height, s(settingsPanelRadius), colorPanel)
-	target.outlineRounded(0, 0, width, height, s(settingsPanelRadius), 1, colorBorder)
+	target.fillRounded(0, 0, width, height, s(settingsPanelRadius), colors.Panel)
+	target.outlineRounded(0, 0, width, height, s(settingsPanelRadius), 1, colors.Border)
 
 	// Header.
 	target.text(s(settingsMargin), s(12), width-s(settingsMargin)*2-s(40), s(26),
-		i18n.T(lang, i18n.KeySettingsTitle), s(15), 600, colorPrimary,
+		i18n.T(lang, i18n.KeySettingsTitle), s(15), 600, colors.Primary,
 		dtSingleLine|dtVCenter|dtNoPrefix)
 	subtitleWidth := s(150)
 	target.text(width-s(settingsMargin)-s(30)-subtitleWidth, s(12), subtitleWidth, s(26),
-		i18n.T(lang, i18n.KeySettingsSubtitle), s(10), 400, colorMuted,
+		i18n.T(lang, i18n.KeySettingsSubtitle), s(10), 400, colors.Muted,
 		dtSingleLine|dtVCenter|dtRight|dtNoPrefix)
-	target.fillRect(s(settingsMargin), s(settingsHeaderHeight), width-s(settingsMargin)*2, 1, colorDivider)
+	target.fillRect(s(settingsMargin), s(settingsHeaderHeight), width-s(settingsMargin)*2, 1, colors.Divider)
 	drawSettingsClose(target, geometry, hover == settingsClose || pressed == settingsClose)
 
 	// Sidebar.
@@ -635,26 +696,26 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 		selected := index == geometry.tab
 		fill := rgba{}
 		if selected {
-			fill = colorRaised
+			fill = colors.Raised
 		} else if hover == control {
-			fill = rgba{colorRaised.R, colorRaised.G, colorRaised.B, 120}
+			fill = rgba{colors.Raised.R, colors.Raised.G, colors.Raised.B, 120}
 		}
 		if fill.A != 0 {
 			target.fillRounded(rect.Left, rect.Top, rect.Width, rect.Height, s(8), fill)
 		}
 		if selected {
-			target.fillRounded(rect.Left+s(1), rect.Top+s(9), s(2), rect.Height-s(18), s(1), colorAccent)
+			target.fillRounded(rect.Left+s(1), rect.Top+s(9), s(2), rect.Height-s(18), s(1), colors.Accent)
 		}
-		color := colorSecondary
+		color := colors.Secondary
 		if selected {
-			color = colorPrimary
+			color = colors.Primary
 		}
 		label := settingsTabLabel(index, lang)
 		target.text(rect.Left+s(14), rect.Top, rect.Width-s(18), rect.Height, label, s(12), 500, color,
 			dtSingleLine|dtVCenter|dtNoPrefix)
 	}
 	dividerX := s(settingsContentLeft) - s(18)
-	target.fillRect(dividerX, s(settingsRowsTop)-s(6), 1, height-s(settingsRowsTop)-s(settingsMargin)+s(6), colorDivider)
+	target.fillRect(dividerX, s(settingsRowsTop)-s(6), 1, height-s(settingsRowsTop)-s(settingsMargin)+s(6), colors.Divider)
 
 	// Rows.
 	for index, row := range geometry.rows {
@@ -662,7 +723,7 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 		control := geometry.controls[index]
 		hot := hover == row.control || hover == row.alt
 		if row.kind == rowNote {
-			target.text(frame.Left, frame.Top, frame.Width, frame.Height, row.title, s(10), 400, colorHint,
+			target.text(frame.Left, frame.Top, frame.Width, frame.Height, row.title, s(10), 400, colors.Hint,
 				dtWordBreak|dtNoPrefix)
 			continue
 		}
@@ -677,10 +738,10 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 		case rowSlider:
 			titleWidth = frame.Width - s(52)
 		}
-		target.text(frame.Left, frame.Top, titleWidth, s(20), row.title, s(12), 500, colorPrimary,
+		target.text(frame.Left, frame.Top, titleWidth, s(20), row.title, s(12), 500, colors.Primary,
 			dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 		if row.hint != "" {
-			target.text(frame.Left, frame.Top+s(19), frame.Width, s(16), row.hint, s(10), 400, colorHint,
+			target.text(frame.Left, frame.Top+s(19), frame.Width, s(16), row.hint, s(10), 400, colors.Hint,
 				dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 		}
 
@@ -689,7 +750,7 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 			drawSettingsToggle(target, control, settingsToggleState(row, view), hot, pressed == row.control)
 		case rowSlider:
 			label := settingsValueLabel(row, view)
-			target.text(frame.right()-s(52), frame.Top, s(52), s(20), label, s(11), 500, colorSecondary,
+			target.text(frame.right()-s(52), frame.Top, s(52), s(20), label, s(11), 500, colors.Secondary,
 				dtSingleLine|dtVCenter|dtRight|dtNoPrefix)
 			drawSettingsSlider(target, control, settingsSliderValueFor(row, view), hot, s(14))
 		case rowSegment:
@@ -697,18 +758,18 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 		case rowStepper:
 			drawSettingsStepper(target, geometry, index, row, view, hover, pressed)
 		case rowButton:
-			fill := colorRaised
+			fill := colors.Raised
 			if hot {
-				fill = colorPanelHover
+				fill = colors.PanelHover
 			}
 			if pressed == row.control {
-				fill = colorControlBg
+				fill = colors.ControlBg
 			}
 			target.fillRounded(control.Left, control.Top, control.Width, control.Height, s(8), fill)
-			target.outlineRounded(control.Left, control.Top, control.Width, control.Height, s(8), 1, colorBorder)
-			labelColor := colorPrimary
+			target.outlineRounded(control.Left, control.Top, control.Width, control.Height, s(8), 1, colors.Border)
+			labelColor := colors.Primary
 			if hot {
-				labelColor = colorPrimary
+				labelColor = colors.Primary
 			}
 			target.text(control.Left, control.Top, control.Width, control.Height, row.action, s(11), 500, labelColor,
 				dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
@@ -722,6 +783,8 @@ func settingsTabLabel(index int, lang i18n.Lang) string {
 		return i18n.T(lang, i18n.KeySettingsTabSound)
 	case 2:
 		return i18n.T(lang, i18n.KeySettingsTabSessions)
+	case 3:
+		return i18n.T(lang, i18n.KeySettingsTabAppearance)
 	default:
 		return i18n.T(lang, i18n.KeySettingsTabGeneral)
 	}
@@ -733,11 +796,11 @@ func drawSettingsClose(target *canvas, geometry settingsGeometry, hot bool) {
 	s := geometry.scale
 	rect := geometry.close
 	if hot {
-		target.fillRounded(rect.Left, rect.Top, rect.Width, rect.Height, s(7), colorRaised)
+		target.fillRounded(rect.Left, rect.Top, rect.Width, rect.Height, s(7), colors.Raised)
 	}
-	color := colorSecondary
+	color := colors.Secondary
 	if hot {
-		color = colorPrimary
+		color = colors.Primary
 	}
 	inset := rect.Width / 3
 	left, top := rect.Left+inset, rect.Top+inset
@@ -748,13 +811,13 @@ func drawSettingsClose(target *canvas, geometry settingsGeometry, hot bool) {
 }
 
 func drawSettingsToggle(target *canvas, rect settingsRect, on, hot, pressed bool) {
-	track := colorTrackOff
+	track := colors.TrackOff
 	if on {
-		track = colorAccent
+		track = colors.Accent
 	}
 	if hot && !on {
 		track = rgba{track.R, track.G, track.B, 255}
-		track = rgba{colorSecondary.R, colorSecondary.G, colorSecondary.B, 210}
+		track = rgba{colors.Secondary.R, colors.Secondary.G, colors.Secondary.B, 210}
 	}
 	if pressed {
 		track.A = 230
@@ -767,14 +830,14 @@ func drawSettingsToggle(target *canvas, rect settingsRect, on, hot, pressed bool
 	if on {
 		knobLeft = rect.right() - gap - knob
 	}
-	target.fillEllipse(knobLeft, rect.Top+gap, knob, knob, colorPrimary)
+	target.fillEllipse(knobLeft, rect.Top+gap, knob, knob, colors.Primary)
 }
 
 func drawSettingsSlider(target *canvas, track settingsRect, fraction float64, hot bool, knobSize int) {
-	target.fillRounded(track.Left, track.Top, track.Width, track.Height, track.Height/2, colorControlBg)
+	target.fillRounded(track.Left, track.Top, track.Width, track.Height, track.Height/2, colors.ControlBg)
 	filled := int(math.Round(float64(track.Width) * fraction))
 	if filled > 0 {
-		target.fillRounded(track.Left, track.Top, filled, track.Height, track.Height/2, colorAccent)
+		target.fillRounded(track.Left, track.Top, filled, track.Height, track.Height/2, colors.Accent)
 	}
 	knobLeft := track.Left + filled - knobSize/2
 	if knobLeft < track.Left-knobSize/2 {
@@ -784,32 +847,32 @@ func drawSettingsSlider(target *canvas, track settingsRect, fraction float64, ho
 		knobLeft = track.right() - knobSize/2
 	}
 	knobTop := track.Top + track.Height/2 - knobSize/2
-	ring := colorBorder
+	ring := colors.Border
 	if hot {
-		ring = colorAccent
+		ring = colors.Accent
 	}
 	target.fillEllipse(knobLeft, knobTop, knobSize, knobSize, ring)
-	target.fillEllipse(knobLeft+2, knobTop+2, knobSize-4, knobSize-4, colorPrimary)
+	target.fillEllipse(knobLeft+2, knobTop+2, knobSize-4, knobSize-4, colors.Primary)
 }
 
 func drawSettingsSegment(target *canvas, geometry settingsGeometry, index int, row settingsRow, view settingsView, hover settingsControl, hoverIndex int) {
 	s := geometry.scale
 	rect := geometry.controls[index]
-	target.fillRounded(rect.Left, rect.Top, rect.Width, rect.Height, s(8), colorControlBg)
-	target.outlineRounded(rect.Left, rect.Top, rect.Width, rect.Height, s(8), 1, colorDivider)
+	target.fillRounded(rect.Left, rect.Top, rect.Width, rect.Height, s(8), colors.ControlBg)
+	target.outlineRounded(rect.Left, rect.Top, rect.Width, rect.Height, s(8), 1, colors.Divider)
 	count := len(row.options)
 	selected := settingsSegmentIndex(row, view)
 	for option := 0; option < count; option++ {
 		cell := settingsSegmentRect(rect, count, option).inset(s(2))
 		if option == selected {
-			target.fillRounded(cell.Left, cell.Top, cell.Width, cell.Height, s(6), colorRaised)
-			target.outlineRounded(cell.Left, cell.Top, cell.Width, cell.Height, s(6), 1, colorAccent)
+			target.fillRounded(cell.Left, cell.Top, cell.Width, cell.Height, s(6), colors.Raised)
+			target.outlineRounded(cell.Left, cell.Top, cell.Width, cell.Height, s(6), 1, colors.Accent)
 		} else if hover == row.control && hoverIndex == option {
-			target.fillRounded(cell.Left, cell.Top, cell.Width, cell.Height, s(6), colorRaisedRow)
+			target.fillRounded(cell.Left, cell.Top, cell.Width, cell.Height, s(6), colors.RaisedRow)
 		}
-		color := colorSecondary
+		color := colors.Secondary
 		if option == selected {
-			color = colorPrimary
+			color = colors.Primary
 		}
 		weight := 400
 		if option == selected {
@@ -836,19 +899,19 @@ func drawSettingsStepper(target *canvas, geometry settingsGeometry, index int, r
 		{minus, row.alt, "−"},
 		{plus, row.control, "+"},
 	} {
-		fill := colorRaised
+		fill := colors.Raised
 		if hover == item.control {
-			fill = colorPanelHover
+			fill = colors.PanelHover
 		}
 		if pressed == item.control {
-			fill = colorControlBg
+			fill = colors.ControlBg
 		}
 		target.fillRounded(item.rect.Left, item.rect.Top, item.rect.Width, item.rect.Height, s(6), fill)
-		target.text(item.rect.Left, item.rect.Top, item.rect.Width, item.rect.Height, item.glyph, s(12), 500, colorPrimary,
+		target.text(item.rect.Left, item.rect.Top, item.rect.Width, item.rect.Height, item.glyph, s(12), 500, colors.Primary,
 			dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 	}
 	target.text(value.Left, value.Top, value.Width, value.Height, itoa(view.ApproveTimeout)+"s",
-		s(11), 600, colorPrimary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
+		s(11), 600, colors.Primary, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }
 
 // ------------------------------------------------------------------- window
@@ -1330,8 +1393,24 @@ func (a *App) settingsApply(control settingsControl, index int) {
 		a.lang = i18n.Resolve(i18n.Setting(settings.Language), i18n.SystemLocale())
 		a.updateTooltip()
 		a.postRefresh()
+	case settingsTheme:
+		if index >= 0 && index < len(ThemeNames) {
+			settings.Theme = ThemeNames[index]
+			applyAppearance(settings.Theme, settings.PerSourceColor)
+			a.postRefresh()
+			// The settings window shares the palette, so it repaints too.
+			_ = a.paintSettings()
+		}
+	case settingsPerSource:
+		settings.PerSourceColor = !settings.PerSourceColor
+		applyAppearance(settings.Theme, settings.PerSourceColor)
+		a.postRefresh()
+	case settingsHiddenAtLaunch:
+		settings.HiddenAtLaunch = !settings.HiddenAtLaunch
 	case settingsReset:
 		a.applyDefaultSettings()
+		applyAppearance(a.options.Settings.Theme, a.options.Settings.PerSourceColor)
+		a.postRefresh()
 	}
 	a.publishSettings()
 	_ = a.paintSettings()
@@ -1369,6 +1448,9 @@ func (a *App) applyDefaultSettings() {
 	current.Language = defaults.Language
 	current.AutoApprove = defaults.AutoApprove
 	current.AutoApproveTimeoutSec = defaults.AutoApproveTimeoutSec
+	current.Theme = defaults.Theme
+	current.PerSourceColor = defaults.PerSourceColor
+	current.HiddenAtLaunch = defaults.HiddenAtLaunch
 	a.options.Settings = current
 	a.options.Opacity = uint8(defaults.Opacity)
 	setSoundVolume(current.SoundVolume)

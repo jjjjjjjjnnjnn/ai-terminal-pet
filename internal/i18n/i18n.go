@@ -173,14 +173,15 @@ const (
 	// terse one-liners, the window has room for a hint under each row.
 	KeyTraySettings = "tray.settings"
 
-	KeySettingsTitle       = "settings.title"
-	KeySettingsSubtitle    = "settings.subtitle"
-	KeySettingsTabGeneral  = "settings.tab.general"
-	KeySettingsTabSound    = "settings.tab.sound"
-	KeySettingsTabSessions = "settings.tab.sessions"
-	KeySettingsClose       = "settings.close"
-	KeySettingsOn          = "settings.on"
-	KeySettingsOff         = "settings.off"
+	KeySettingsTitle         = "settings.title"
+	KeySettingsSubtitle      = "settings.subtitle"
+	KeySettingsTabGeneral    = "settings.tab.general"
+	KeySettingsTabSound      = "settings.tab.sound"
+	KeySettingsTabSessions   = "settings.tab.sessions"
+	KeySettingsTabAppearance = "settings.tab.appearance"
+	KeySettingsClose         = "settings.close"
+	KeySettingsOn            = "settings.on"
+	KeySettingsOff           = "settings.off"
 
 	KeySettingsNotify        = "settings.notify"
 	KeySettingsNotifyHint    = "settings.notify.hint"
@@ -210,6 +211,18 @@ const (
 	KeySettingsPreview          = "settings.preview"
 	KeySettingsPreviewHint      = "settings.preview.hint"
 	KeySettingsPreviewPlay      = "settings.preview.play"
+
+	KeySettingsTheme              = "settings.theme"
+	KeySettingsThemeHint          = "settings.theme.hint"
+	KeySettingsPerSource          = "settings.perSource"
+	KeySettingsPerSourceHint      = "settings.perSource.hint"
+	KeySettingsHiddenAtLaunch     = "settings.hiddenAtLaunch"
+	KeySettingsHiddenAtLaunchHint = "settings.hiddenAtLaunch.hint"
+	KeySettingsAppearanceNote     = "settings.appearance.note"
+
+	KeyThemeSlate    = "theme.slate"
+	KeyThemePaper    = "theme.paper"
+	KeyThemeContrast = "theme.contrast"
 
 	KeySettingsAutoApprove        = "settings.autoApprove"
 	KeySettingsAutoApproveHint    = "settings.autoApprove.hint"
@@ -289,14 +302,15 @@ var dictEn = map[string]string{
 
 	KeyTraySettings: "Settings…",
 
-	KeySettingsTitle:       "Settings",
-	KeySettingsSubtitle:    "AI Terminal Pet",
-	KeySettingsTabGeneral:  "General",
-	KeySettingsTabSound:    "Sound",
-	KeySettingsTabSessions: "Sessions",
-	KeySettingsClose:       "Close",
-	KeySettingsOn:          "On",
-	KeySettingsOff:         "Off",
+	KeySettingsTitle:         "Settings",
+	KeySettingsSubtitle:      "AI Terminal Pet",
+	KeySettingsTabGeneral:    "General",
+	KeySettingsTabSound:      "Sound",
+	KeySettingsTabSessions:   "Sessions",
+	KeySettingsTabAppearance: "Look",
+	KeySettingsClose:         "Close",
+	KeySettingsOn:            "On",
+	KeySettingsOff:           "Off",
 
 	KeySettingsNotify:        "Status alerts",
 	KeySettingsNotifyHint:    "Balloon when a session waits or fails",
@@ -326,6 +340,18 @@ var dictEn = map[string]string{
 	KeySettingsPreview:          "Audition",
 	KeySettingsPreviewHint:      "Play the tone selected above",
 	KeySettingsPreviewPlay:      "Play",
+
+	KeySettingsTheme:              "Theme",
+	KeySettingsThemeHint:          "Palette for the panel and this window",
+	KeySettingsPerSource:          "Colour by terminal",
+	KeySettingsPerSourceHint:      "Tint each row's source name",
+	KeySettingsHiddenAtLaunch:     "Start hidden",
+	KeySettingsHiddenAtLaunchHint: "Begin in the tray; a reporter brings it back",
+	KeySettingsAppearanceNote:     "The palette applies to the panel and to this window. Every screenshot in the repository uses Slate.",
+
+	KeyThemeSlate:    "Slate",
+	KeyThemePaper:    "Paper",
+	KeyThemeContrast: "Contrast",
 
 	KeySettingsAutoApprove:        "Auto-approve permissions",
 	KeySettingsAutoApproveHint:    "Approve when the countdown runs out",
@@ -405,14 +431,15 @@ var dictZhCN = map[string]string{
 
 	KeyTraySettings: "设置…",
 
-	KeySettingsTitle:       "设置",
-	KeySettingsSubtitle:    "AI Terminal Pet",
-	KeySettingsTabGeneral:  "通用",
-	KeySettingsTabSound:    "声音",
-	KeySettingsTabSessions: "会话",
-	KeySettingsClose:       "关闭",
-	KeySettingsOn:          "开",
-	KeySettingsOff:         "关",
+	KeySettingsTitle:         "设置",
+	KeySettingsSubtitle:      "AI Terminal Pet",
+	KeySettingsTabGeneral:    "通用",
+	KeySettingsTabSound:      "声音",
+	KeySettingsTabSessions:   "会话",
+	KeySettingsTabAppearance: "外观",
+	KeySettingsClose:         "关闭",
+	KeySettingsOn:            "开",
+	KeySettingsOff:           "关",
 
 	KeySettingsNotify:        "状态提醒",
 	KeySettingsNotifyHint:    "会话等待确认或出错时弹出气泡",
@@ -442,6 +469,18 @@ var dictZhCN = map[string]string{
 	KeySettingsPreview:          "试听音效",
 	KeySettingsPreviewHint:      "播放当前选中的音效",
 	KeySettingsPreviewPlay:      "播放",
+
+	KeySettingsTheme:              "配色主题",
+	KeySettingsThemeHint:          "面板与本设置窗口共用的调色板",
+	KeySettingsPerSource:          "按终端着色",
+	KeySettingsPerSourceHint:      "给每行的来源名加上该终端的颜色",
+	KeySettingsHiddenAtLaunch:     "启动时隐藏",
+	KeySettingsHiddenAtLaunchHint: "启动后先进托盘，有会话上报再出现",
+	KeySettingsAppearanceNote:     "调色板同时作用于面板与这个设置窗口。仓库里所有截图用的都是「石板」。",
+
+	KeyThemeSlate:    "石板",
+	KeyThemePaper:    "纸白",
+	KeyThemeContrast: "高对比",
 
 	KeySettingsAutoApprove:        "自动同意权限",
 	KeySettingsAutoApproveHint:    "倒计时结束仍未响应时自动允许",

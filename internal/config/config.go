@@ -64,7 +64,34 @@ const (
 	SoundSchemePulse = "pulse"
 
 	DefaultSoundScheme = SoundSchemeChime
+
+	// Themes are named palettes, not colour values: the overlay owns the actual
+	// hues (internal/ui), because the only thing that has to stay true across a
+	// theme is that every pair of colours in it is readable against its own
+	// background. Slate is the original dark look and stays the default, so a
+	// machine that never touches this setting sees no change at all.
+	ThemeSlate    = "slate"
+	ThemePaper    = "paper"
+	ThemeContrast = "contrast"
+
+	DefaultTheme = ThemeSlate
 )
+
+// Themes is the complete, user-visible set of palettes, in the order the
+// settings window offers them.
+var Themes = []string{ThemeSlate, ThemePaper, ThemeContrast}
+
+// ValidTheme normalises an unknown or empty theme to the default, so a
+// hand-edited config.json cannot render the panel in a palette that does not
+// exist (which would leave every colour at its zero value: transparent black).
+func ValidTheme(value string) string {
+	for _, theme := range Themes {
+		if strings.EqualFold(strings.TrimSpace(value), theme) {
+			return theme
+		}
+	}
+	return DefaultTheme
+}
 
 // SoundSchemes is the complete, user-visible set of alert timbres.
 var SoundSchemes = []string{SoundSchemeChime, SoundSchemeBell, SoundSchemeSoft, SoundSchemePulse}
@@ -128,6 +155,23 @@ type Config struct {
 	// AutoApproveTimeoutSec is the countdown length for AutoApprove.
 	// Clamped to MinAutoApproveTimeoutSec..MaxAutoApproveTimeoutSec.
 	AutoApproveTimeoutSec int `json:"autoApproveTimeoutSec"`
+	// Theme picks one of the named palettes; see ValidTheme. The default
+	// ("slate") is the palette every screenshot in this repository was taken
+	// with, so choosing another one is always an explicit act.
+	Theme string `json:"theme"`
+	// PerSourceColor colours the source name in each expanded row by which
+	// terminal it came from - claude-hook, opencode, antigravity or
+	// deepseek-harness - instead of leaving it neutral. It is deliberately
+	// separate from the state colour: the state is the signal, the source is
+	// the provenance, and recolouring the signal by tool would defeat the whole
+	// point of the strip.
+	PerSourceColor bool `json:"perSourceColor"`
+	// HiddenAtLaunch starts the panel in the tray. Reporters launch the overlay
+	// on demand, so someone who wants it out of the way until a session needs
+	// attention should not have to hide it again after every logon. It is a
+	// startup preference only: --show, --toggle and the tray entry point stay
+	// authoritative afterwards.
+	HiddenAtLaunch bool `json:"hiddenAtLaunch"`
 }
 
 // Default returns the settings used when config.json is absent or unreadable.
@@ -138,6 +182,7 @@ func Default() Config {
 		NotifyOnFinish: true, AlwaysOnTop: true, EdgeRetract: true,
 		Opacity: 235, Language: "auto", AutoApprove: false,
 		AutoApproveTimeoutSec: DefaultAutoApproveTimeoutSec,
+		Theme:                 DefaultTheme, PerSourceColor: false,
 	}
 }
 
@@ -162,6 +207,7 @@ func (c Config) Normalize() Config {
 	if c.AutoApproveTimeoutSec < MinAutoApproveTimeoutSec || c.AutoApproveTimeoutSec > MaxAutoApproveTimeoutSec {
 		c.AutoApproveTimeoutSec = Default().AutoApproveTimeoutSec
 	}
+	c.Theme = ValidTheme(c.Theme)
 	return c
 }
 

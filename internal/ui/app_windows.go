@@ -104,6 +104,17 @@ type Settings struct {
 	AutoApproveTimeoutSec int
 	// Opacity is the layered window's constant alpha, 1..255.
 	Opacity int
+	// Theme picks one of the named palettes (see ThemeNames). It is a name,
+	// not a colour value: the ui package owns the hues.
+	Theme string
+	// PerSourceColor colours each expanded row's source name by which terminal
+	// it came from. Off by default, because the state colour is the one signal
+	// the strip exists for and provenance is secondary.
+	PerSourceColor bool
+	// HiddenAtLaunch starts with the panel in the tray: the reporters start the
+	// overlay, and someone who wants it out of the way until a session needs
+	// attention should not have to hide it every logon.
+	HiddenAtLaunch bool
 }
 
 // DefaultSettings is what "restore defaults" puts back, and what the overlay
@@ -125,6 +136,9 @@ func DefaultSettings() Settings {
 		AutoApprove:           false,
 		AutoApproveTimeoutSec: 5,
 		Opacity:               235,
+		Theme:                 themeSlate,
+		PerSourceColor:        false,
+		HiddenAtLaunch:        false,
 	}
 }
 
@@ -310,6 +324,9 @@ func New(values *store.Store, options Options) *App {
 	}
 	setSoundVolume(options.Settings.SoundVolume)
 	setSoundScheme(options.Settings.SoundScheme)
+	// Before anything is rasterised: a palette applied after the first paint
+	// would mean the very first frame is drawn in the previous theme.
+	applyAppearance(options.Settings.Theme, options.Settings.PerSourceColor)
 	zoom := options.Initial.Zoom
 	if math.IsNaN(zoom) || zoom < 0.65 || zoom > 1.6 {
 		zoom = 1
@@ -411,6 +428,10 @@ func (a *App) applyQueuedSettings(value Settings) {
 		a.approveTimeout = time.Duration(value.AutoApproveTimeoutSec) * time.Second
 	}
 	a.lang = i18n.Resolve(i18n.Setting(value.Language), i18n.SystemLocale())
+	// Reading config.json again after the settings window wrote it must not
+	// double-apply the palette; applyTheme is idempotent and cheap, and the
+	// frame key below is what makes the repaint happen exactly once.
+	applyAppearance(value.Theme, value.PerSourceColor)
 	a.setTopmost()
 	a.syncTuck()
 	a.updateTooltip()
@@ -532,7 +553,18 @@ func (a *App) Run() error {
 	if err := a.present(); err != nil {
 		return fmt.Errorf("present: %w", err)
 	}
-	win.ShowWindow(created, win.SW_SHOW)
+	// HiddenAtLaunch is applied exactly here, once: after the first paint (so
+	// the DIB exists and a later SW_SHOW has something to show), after
+	// setTopmost, and before the message loop. `--show`, `--toggle` and the tray
+	// entry point all stay authoritative afterwards - this is a startup
+	// preference, not a mode.
+	if a.options.Settings.HiddenAtLaunch && !a.options.OpenSettings {
+		a.hideToTray()
+	} else {
+		win.ShowWindow(created, win.SW_SHOW)
+	}
+	// A hidden panel still needs its topmost flag ready for the moment it comes
+	// back; hiding does not touch it, so set it either way.
 	a.setTopmost()
 	// The idle check used to fire every 500 ms and destroy the window after
 	// just five quiet seconds. Combined with heartbeat-based TTLs that made
@@ -1766,7 +1798,7 @@ func (a *App) present() error {
 	// on every statusline render and most pushes repeat the same state - which
 	// used to mean a full GDI repaint of the panel several times a second for
 	// nothing.
-	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now, a.lang, a.approvals.maxRemainingSeconds(now))
+	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now, a.lang, a.approvals.maxRemainingSeconds(now), a.options.Settings.Theme, a.options.Settings.PerSourceColor)
 	if key == a.lastFrame && a.surface != nil {
 		return nil
 	}

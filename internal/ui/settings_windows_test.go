@@ -14,7 +14,7 @@ import (
 // when a row is added: nothing may hang below the panel, and the sidebar may not
 // run into the content column.
 func TestSettingsLayoutFitsTheWindow(t *testing.T) {
-	for _, tab := range []int{0, 1, 2} {
+	for _, tab := range []int{0, 1, 2, 3} {
 		rows := settingsRowsFor(t, tab)
 		for _, dpi := range []uint32{96, 120, 144, 192} {
 			geometry := settingsGeometryFor(dpi, tab, rows)
@@ -53,7 +53,7 @@ func TestSettingsLayoutFitsTheWindow(t *testing.T) {
 // drawn but unclickable: for every interactive row the centre of the drawn
 // sub-rect must resolve back to that row's control.
 func TestSettingsHitTestFindsEveryControl(t *testing.T) {
-	for _, tab := range []int{0, 1, 2} {
+	for _, tab := range []int{0, 1, 2, 3} {
 		rows := settingsRowsFor(t, tab)
 		geometry := settingsGeometryFor(96, tab, rows)
 		for index, row := range rows {
@@ -174,8 +174,72 @@ func settingsRowsIn(tab int, lang i18n.Lang) []settingsRow {
 		return soundRows(lang)
 	case 2:
 		return sessionRows(lang)
+	case 3:
+		return appearanceRows(lang)
 	default:
 		return generalRows(lang)
+	}
+}
+
+// TestAppearanceTabIsLaidOutLikeEveryOtherTab pins the fourth tab into the same
+// geometry contract as the other three: every row fits the window, every control
+// is hit-testable at its drawn centre, and the sidebar entry maps back to the tab
+// it names.
+func TestAppearanceTabIsLaidOutLikeEveryOtherTab(t *testing.T) {
+	for _, lang := range []i18n.Lang{i18n.LangZhCN, i18n.LangEn} {
+		rows := appearanceRows(lang)
+		for _, dpi := range []uint32{96, 120, 144, 192} {
+			geometry := settingsGeometryFor(dpi, 3, rows)
+			last := geometry.frames[len(geometry.frames)-1]
+			if bottom := last.bottom(); bottom > geometry.height-geometry.scale(settingsMargin)/2 {
+				t.Fatalf("%v dpi %d: appearance tab overflows the panel (%d > %d)", lang, dpi, bottom, geometry.height)
+			}
+			for index, row := range rows {
+				// A rowNote is a caption, not a control: it owns no hit target
+				// by design, which is why the loop skips it rather than
+				// asserting something the geometry never promised.
+				if row.control == settingsNone {
+					continue
+				}
+				rect := geometry.controls[index]
+				control, _, _, ok := geometry.hit(rect.Left+rect.Width/2, rect.Top+rect.Height/2)
+				if !ok || control != row.control {
+					t.Fatalf("%v dpi %d row %d: hit %d, want %d", lang, dpi, index, control, row.control)
+				}
+			}
+			if tab := settingsTabControl(3); tab != settingsTabAppearance {
+				t.Fatalf("sidebar entry 3 maps to %d, want settingsTabAppearance", tab)
+			}
+			if index := settingsTabIndex(settingsTabAppearance); index != 3 {
+				t.Fatalf("settingsTabAppearance maps to index %d, want 3", index)
+			}
+		}
+	}
+	if settingsTabCount != 4 {
+		t.Fatalf("settingsTabCount = %d, want 4", settingsTabCount)
+	}
+}
+
+// TestThemeSegmentMatchesTheThemeList keeps the segment order and the palette
+// list from drifting: the index the user clicks has to be the palette it names.
+func TestThemeSegmentMatchesTheThemeList(t *testing.T) {
+	rows := appearanceRows(i18n.LangEn)
+	var theme settingsRow
+	for _, row := range rows {
+		if row.control == settingsTheme {
+			theme = row
+		}
+	}
+	if len(theme.options) != len(ThemeNames) {
+		t.Fatalf("theme segment offers %d options, ThemeNames has %d", len(theme.options), len(ThemeNames))
+	}
+	for index, name := range ThemeNames {
+		if got := settingsThemeIndex(name); got != index {
+			t.Fatalf("settingsThemeIndex(%q) = %d, want %d", name, got, index)
+		}
+	}
+	if got := settingsThemeIndex("nonsense"); got != 0 {
+		t.Fatalf("unknown theme selected segment %d, want 0", got)
 	}
 }
 
@@ -198,6 +262,10 @@ func TestRenderSettingsPreview(t *testing.T) {
 		AutoApprove: false, AutoStart: false,
 		Opacity: 235, Volume: 85, ApproveTimeout: 5,
 		Scheme: config.SoundSchemeChime, Language: "zh-CN",
+		// The previews must show the shipped default, so the theme here is
+		// slate and the provenance switch is off. The appearance tab is rendered
+		// separately below, once per palette.
+		Theme: config.ThemeSlate,
 	}
 	cases := []struct {
 		name    string
@@ -212,6 +280,8 @@ func TestRenderSettingsPreview(t *testing.T) {
 		{"settings-sound", 1, i18n.LangZhCN, settingsScheme, 2, settingsNone},
 		{"settings-sound-en", 1, i18n.LangEn, settingsVolume, -1, settingsNone},
 		{"settings-sessions", 2, i18n.LangZhCN, settingsApproveUp, -1, settingsNone},
+		{"settings-appearance", 3, i18n.LangZhCN, settingsPerSource, -1, settingsNone},
+		{"settings-appearance-en", 3, i18n.LangEn, settingsTheme, 1, settingsNone},
 	}
 	for _, tc := range cases {
 		rows := settingsRowsIn(tc.tab, tc.lang)

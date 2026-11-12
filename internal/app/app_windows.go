@@ -21,12 +21,11 @@ import (
 
 // Version is reported by `ai-terminal-pet --version`.
 //
-// 1.0.1 rather than 1.0.0: the compact strip now answers "how long" as well as
-// "how many" - the one fact the whole product exists for ("which terminal is
-// blocked, and for how long") used to require expanding the panel. Same
-// silhouette, same geometry; the biggest type on the strip changes subject
-// while somebody waits.
-const Version = "1.0.1"
+// 1.0.2 rather than 1.0.1: the look is now a setting. Three named palettes
+// (slate stays the default, so nothing changes unless you ask), a switch that
+// tints each row's source name by terminal, and "start hidden" for people who
+// want the strip in the tray until a session needs them.
+const Version = "1.0.2"
 
 func Run() error {
 	return RunWith(false)
@@ -133,6 +132,9 @@ func RunWith(openSettings bool) error {
 			AutoApprove:           settings.AutoApprove,
 			AutoApproveTimeoutSec: settings.AutoApproveTimeoutSec,
 			Opacity:               settings.Opacity,
+			Theme:                 settings.Theme,
+			PerSourceColor:        settings.PerSourceColor,
+			HiddenAtLaunch:        settings.HiddenAtLaunch,
 		},
 		AutoStart:             autostartEnabled,
 		AutoApproveTimeoutSec: settings.AutoApproveTimeoutSec,
@@ -248,6 +250,9 @@ func RunWith(openSettings bool) error {
 			AutoApprove:           current.AutoApprove,
 			AutoApproveTimeoutSec: current.AutoApproveTimeoutSec,
 			Opacity:               current.Opacity,
+			Theme:                 current.Theme,
+			PerSourceColor:        current.PerSourceColor,
+			HiddenAtLaunch:        current.HiddenAtLaunch,
 		})
 	})
 	if err := window.Run(); err != nil {
@@ -503,6 +508,13 @@ func applyUISettings(target *config.Config, value ui.Settings) {
 	target.Language = value.Language
 	target.AutoApprove = value.AutoApprove
 	target.AutoApproveTimeoutSec = value.AutoApproveTimeoutSec
+	// ValidTheme is the second line of defence: the ui package already
+	// normalises an unknown name to slate, but config.json is a documented
+	// hand-editable file, and a value written by hand must not read back as
+	// a palette that does not exist.
+	target.Theme = config.ValidTheme(value.Theme)
+	target.PerSourceColor = value.PerSourceColor
+	target.HiddenAtLaunch = value.HiddenAtLaunch
 	if value.Opacity > 0 {
 		target.Opacity = value.Opacity
 	}
