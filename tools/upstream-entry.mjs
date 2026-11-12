@@ -178,7 +178,15 @@ export function tarballValue(text) {
 // --------------------------------------------------------------- repo inputs
 
 function runGit(args, options = {}) {
-  return execFileSync('git', args, { encoding: 'utf8', ...options })
+  try {
+    return execFileSync('git', args, { encoding: 'utf8', ...options })
+  } catch (error) {
+    // execFileSync's message is just the command line. Git's own explanation -
+    // the reason a commit was refused, or which file it refused to touch - is
+    // in stderr, and losing it turns a fixable failure into a mystery.
+    const stderr = String(error.stderr || '').trim()
+    throw new Error(stderr || error.message)
+  }
 }
 
 function readPackage() {
@@ -367,7 +375,12 @@ async function write({ version, branch, pr, commentOut, dryRun }) {
   const identityValue = identity()
   const work = mkdtempSync(path.join(tmpdir(), 'ai-terminal-pet-entry-'))
   try {
-    runGit(['clone', '--quiet', '--depth=1', '--branch', 'main',
+    // --no-checkout, because the configuration that decides line endings has
+    // to be in place BEFORE the working tree is written. Cloning normally writes
+    // the tree with this machine's global core.autocrlf, so a repo that sets it
+    // to false afterwards sees every file as modified - which is exactly how
+    // the first run of this tool reported 200 changed files instead of one.
+    runGit(['clone', '--quiet', '--depth=1', '--branch', 'main', '--no-checkout',
       `https://github.com/${UPSTREAM_REPO}.git`, work])
     // LF only, and no automatic conversion: the file we write is the file git
     // hashes, and autocrlf=true would silently break the byte-for-byte proof.
@@ -381,16 +394,25 @@ async function write({ version, branch, pr, commentOut, dryRun }) {
       runGit(['config', 'commit.gpgsign', 'true'], { cwd: work })
     }
     runGit(['remote', 'add', 'fork', `https://github.com/${ENTRY_OWNER}/${UPSTREAM_REPO.split('/')[1]}.git`], { cwd: work })
-    runGit(['checkout', '--quiet', '-B', branch], { cwd: work })
+    // Check out main into a branch of the same content, with the line-ending
+    // configuration above already in effect - this is the step that would
+    // otherwise re-expand every file to CRLF on a machine whose global setting
+    // differs from upstream's.
+    runGit(['checkout', '--quiet', '-B', branch, 'origin/main'], { cwd: work })
 
     writeFileSync(path.join(work, 'data', 'plugins', file), rebuilt, 'utf8')
+    // Stage it. Without this, `git commit` has nothing to record and fails with
+    // "no changes added to commit" - the file is on disk but not in the index,
+    // and both diff checks below would still pass because they read the
+    // working tree.
+    runGit(['add', '--', `data/plugins/${file}`], { cwd: work })
 
-    const changed = runGit(['diff', '--name-only'], { cwd: work })
+    const changed = runGit(['diff', '--cached', '--name-only'], { cwd: work })
       .split('\n').map((value) => value.trim()).filter(Boolean)
     if (changed.length !== 1 || changed[0] !== `data/plugins/${file}`) {
       throw new Error(`expected exactly one changed file, got: ${changed.join(', ') || '(none)'}`)
     }
-    const numstat = runGit(['diff', '--numstat'], { cwd: work }).trim()
+    const numstat = runGit(['diff', '--cached', '--numstat'], { cwd: work }).trim()
     if (numstat !== `1\t1\tdata/plugins/${file}`) {
       throw new Error(`expected a one-line change, got: ${numstat}`)
     }
