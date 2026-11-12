@@ -108,6 +108,7 @@ def flat_panels(preview: Path) -> dict[str, Image.Image]:
         "expanded": "expanded-waiting.png",
         "expanded-en": "expanded-waiting-en.png",
         "expanded-many": "expanded-many.png",
+        "expanded-unread": "expanded-unread.png",
         "auto-approve": "expanded-approve-zh.png",
     }
     missing = [name for name in sources.values() if not (preview / name).is_file()]

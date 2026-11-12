@@ -17,7 +17,7 @@ Run this and paste the whole output:
 & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor
 ```
 
-Nine checks answer the nine usual causes (missing install files, no runtime directory, corrupt config, nobody listening on the pipe, Node missing, no autostart entry). A failing line names the thing to fix; a green report means the overlay is healthy and the problem is on the terminal side — in that case say which terminal and which hook you configured.
+Ten checks answer the usual causes (missing install files, no runtime directory, corrupt config, nobody listening on the pipe, Node missing, no autostart entry, and the last alert decision). A failing line names the thing to fix; a green report means the overlay is healthy and the problem is on the terminal side — in that case say which terminal and which hook you configured.
 
 Two environment traps that look like product bugs and are not:
 

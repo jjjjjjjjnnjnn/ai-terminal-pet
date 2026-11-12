@@ -39,8 +39,12 @@ reporters/*.js  ──[named pipe / JSON-lines]──►  cmd/ai-terminal-pet (G
   eyeballed. `cmd/pet-statusline` deliberately keeps single-shot delivery and a 5-minute ignore on a
   future `startedAt`; both are documented in its header.
 - `internal/ui/`: Win32 layered overlay — GDI canvas rasterization (`CreateDIBSection` +
-  `UpdateLayeredWindow`, **no GDI+**), panel layout, tray icon, click/drag/wheel gestures, three-tab
-  settings window, synthesized alert tones, per-session alerts, auto-approve countdown, jump-to-terminal.
+  `UpdateLayeredWindow`, **no GDI+**), panel layout, tray icon, click/drag/wheel gestures, a four-tab
+  settings window, synthesized alert tones, auto-approve countdown, jump-to-terminal, and the alert layer:
+  `attention.go` is the pure policy (`Decide` / `PlanAlerts`, no window, file or clock), `attention_windows.go`
+  samples the desktop off the UI thread, `mute_windows.go` and `receipt_windows.go` hold the per-session
+  marks and the decision record. `internal/session/attention.go` derives *what* a blocked session is asking
+  for (approval / question / plan) from the reason reporters already send — the wire protocol did not move.
 - `cmd/pet-setup/`: the single-file installer (`pet-setup.exe`) the release ships. It embeds the
   staged payload, verifies it against `SHA256SUMS.txt` **before** writing anything, then runs the
   `scripts/install.ps1` that ships inside it — so `install.ps1` stays the only implementation of
@@ -102,7 +106,7 @@ node tests/fresh-machine.mjs --no-overlay
 # 4. Install, then let the shipped binary prove the install
 .\scripts\install.cmd                 # cmd wrapper: RemoteSigned refuses a downloaded .ps1
 .\scripts\install.cmd -VerifyOnly     # per-file SHA256; exit 0 only when everything matches
-& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 9 checks; exit 1 on any failure
+& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 10 checks; exit 1 on any failure
 .\scripts\install.cmd -AddToPath      # optional: adds the install dir to HKCU Path
 .\scripts\install.cmd -Uninstall      # needs `yes` at the prompt, or -Force
 

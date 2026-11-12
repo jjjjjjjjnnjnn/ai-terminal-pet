@@ -32,7 +32,7 @@ The table below contrasts the everyday workflow before and after using the overl
 ### What it looks like
 
 ![Demo](docs/assets/demo.gif)
-*The actual sequence: a session blocks on a permission prompt and the strip breathes, hovering unfolds the session list, and clicking the waiting row brings that terminal forward. Frames are rasterized from the shipped renderer; the ring stands in for the click, since a layered window draws no cursor.*
+*The actual sequence: a session blocks on a permission prompt and the strip breathes, hovering unfolds the session list, and clicking the arrow at the end of the waiting row brings that terminal forward. Frames are rasterized from the shipped renderer; the ring stands in for the click, since a layered window draws no cursor.*
 
 ![Compact strip](docs/assets/overlay-compact.png)
 *Compact strip: pulsing state orb with status glyph, session count, state word, and waiting project name.*
@@ -62,9 +62,12 @@ The table below outlines the core capabilities and exact runtime parameters of t
 | Whole-panel gestures | Click anywhere toggles compact and expanded views, drag anywhere moves 1:1 with the cursor, and mouse wheel adjusts zoom between 65% and 160%. |
 | Edge retract | Slides mostly off-screen when docked at an edge leaving a thin sliver; hovering restores it, while waiting_permission or error states override retraction to remain visible. |
 | Tray menu | Right-click tray menu toggles visibility, resets position and zoom, opens settings, switches language, toggles autostart, and configures auto-approve. |
-| Settings window | Native three-tab window (General, Sound, Sessions) where every change persists immediately to `config.json` without an OK button. |
+| Settings window | Native four-tab window (General, Sound, Sessions, Look) where every change persists immediately to `config.json` without an OK button. |
 | Synthesized alert tones | Generates 44.1 kHz 16-bit mono PCM WAV tones in memory across four sound schemes (`chime`, `bell`, `soft`, `pulse`), with separate gates for waiting, error, and finish. |
-| Per-session alerts | Fires Windows tray notification balloons and audio alerts on transitions into `waiting_permission`, `error`, or finish states. |
+| Per-session alerts | Fires Windows tray notification balloons and audio alerts when a session starts waiting for you, fails, or finishes — one pure policy decides (see below), so a prompt you are already reading does not also pop a balloon. |
+| Attentiveness | An alert depends on what the session is asking for and whether you are looking: approval / question / plan review are told apart from the reason reporters already send, keyboard-and-mouse idle time is read from the OS, and the window that owns the session is resolved with the same ranking jump-to-terminal uses. Unmeasurable facts alert rather than stay quiet. |
+| Per-session mute and unread | Right-click a session row to mute or unmute that conversation; a suppressed alert still marks its row unread, cleared by jumping to it, by it running again, or by it disappearing. Muting never silences the auto-approve countdown, which is a safety control, not a notification. |
+| Alert receipt | The last alert decision is written to `runtime/alerts.json`, printed by `--json` under `alerts`, and summarised by the tenth `--doctor` check, so "why was I not told" has an answer instead of folklore. |
 | Auto-approve and denylist | Provides a 5-second veto window on permission prompts where a tap denies and silence approves; blocks commands matching the dangerous-command denylist. |
 | Jump to terminal | Walks session process ancestry and matches window titles to bring the waiting terminal window or tab to the foreground. |
 | Scriptable CLI | Outputs structured session state via `ai-terminal-pet --json` by reading disk snapshots, avoiding blocking on GUI processes. |
@@ -112,15 +115,15 @@ There are three ways in. Pick the one that matches how you got here.
 dsh plugin add dsh-ai-terminal-pet
 ```
 
-The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.8), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
+The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.9), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
 
 **B. Everyone else — download a package, no Go toolchain**
 
 Two packages are published for this release: a self-extracting `pet-setup.exe` and a portable zip. Both install the same 11 artifacts into the same directory; the zip additionally lets you look inside before running anything.
 
-1. Download one of them from the [`pet-v1.0.2` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.2):
+1. Download one of them from the [`pet-v1.0.3` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.3):
    - **`pet-setup.exe`** (13.5 MB): double-click it. It verifies its own payload against `SHA256SUMS.txt` **before** writing anything, then runs the installer inside itself. `pet-setup.exe --verify` re-checks the installed files at any time, `--uninstall` removes them, `--add-to-path` puts the commands on your PATH.
-   - **`ai-terminal-pet-1.0.2-win-x64.zip`** (4.99 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
+   - **`ai-terminal-pet-1.0.3-win-x64.zip`** (4.99 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
 2. Verify that the installation works:
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -136,7 +139,7 @@ That prompt is a certificate the project does not have, not a problem with the f
 After installing, `--doctor` should look like this (paths shortened here, everything else is the program's own output):
 
 ![--doctor on a healthy install](docs/assets/doctor-green.png)
-*Nine checks, and the one that matters when you see an empty panel is `instance` — if it says a live instance is listening, the overlay is healthy and the missing piece is the terminal's reporter, not the install.*
+*Ten checks, and the one that matters when you see an empty panel is `instance` — if it says a live instance is listening, the overlay is healthy and the missing piece is the terminal's reporter, not the install.*
 
 **C. Developers — build from source (Go 1.23+)**
 
@@ -196,10 +199,10 @@ The Harness side has a second, self-contained option since `dsh-ai-terminal-pet`
 
 ```powershell
 # from the release tarball: no git clone, no build step
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.8/dsh-ai-terminal-pet-1.2.8.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.9/dsh-ai-terminal-pet-1.2.9.tgz
 
 # from git, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.8&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.9&path:/packages/dsh-ai-terminal-pet"
 
 # from the repository URL: resolves through the root manifest shim
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -413,7 +416,7 @@ ai-terminal-pet 在屏幕边缘贴上一条 56 像素宽的状态带。你无需
 以下截图均由真实的 Win32 渲染引擎在版式测试中直接光栅化生成，与程序运行时的像素布局完全一致：
 
 ![动图](docs/assets/demo.gif)
-*真实交互顺序：有会话卡在权限确认时状态带开始呼吸，悬停展开会话列表，点击等待中的那一行就把对应终端带到前台。每一帧都出自发布用的同一个光栅器；点击那一拍用一圈扩散代替光标——分层窗口本身不画光标。*
+*真实交互顺序：有会话卡在权限确认时状态带开始呼吸，悬停展开会话列表，点等待中那一行的行尾箭头就把对应终端带到前台。每一帧都出自发布用的同一个光栅器；点击那一拍用一圈扩散代替光标——分层窗口本身不画光标。*
 
 ![紧凑态](docs/assets/overlay-compact.png)
 *紧凑态：展示呼吸脉动的状态球、当前纳管会话总数、最高紧急度的状态词，以及正在等待确认的项目名。*
@@ -423,6 +426,9 @@ ai-terminal-pet 在屏幕边缘贴上一条 56 像素宽的状态带。你无需
 
 ![会话很多时](docs/assets/overlay-expanded-many.png)
 *会话很多时：超过 6 行后自适应纵向拉长面板，并在列表末尾清晰呈现"还有 N 个会话"溢出行。*
+
+![未读行](docs/assets/overlay-expanded-unread.png)
+*未读行：你不在时到的那条提醒留下了标记而不是气泡。那个点是未读；被静音的行改用整体压暗表示，两种都不占行的宽度。*
 
 ![5 秒否决倒计时](docs/assets/overlay-auto-approve.png)
 *5 秒否决倒计时：权限请求行展示"允许（5 秒）"倒计时与渐退进度条，在倒计时结束前点击面板即可立即否决。*
@@ -447,7 +453,7 @@ ai-terminal-pet 在屏幕边缘贴上一条 56 像素宽的状态带。你无需
 | 危险命令黑名单 | 自动同意严格校验命令内容，遇到匹配 `rm -rf`、`rd /s`、`git push --force`、`format`、`del ... \Windows` 等规则的高危命令时强制退回人工确认。 |
 | 合成提示音方案 | 内存合成 44.1 kHz 16 位单声道 PCM 音效，提供清脆、钟声、柔和、脉冲四套方案；等待确认、出错、完成三种状态可独立设置声音开关。 |
 | 逐会话系统通知 | 进入等待确认或出错状态时弹出系统托盘气泡；气泡与提示音共用会话与状态去重逻辑，点击气泡可快速聚焦浮窗。 |
-| 托盘与三页设置 | 托盘菜单包含显示隐藏、重置位置、置顶和语言切换；三页设置窗口（通用、声音、会话）调整参数即刻生效，无需点击确认按钮。 |
+| 托盘与设置窗口 | 托盘菜单包含显示隐藏、重置位置、置顶和语言切换；四页设置窗口（通用、声音、会话、外观）调整参数即刻生效，无需点击确认按钮。 |
 | 存活判定 | 终端是否还在，靠操作系统观测进程表和窗口标题，不依赖上报端心跳；静默的会话不会被误判成已关闭。 |
 | 单实例运行 | 具名互斥体保证第二次启动只是唤醒已经运行的浮窗，不会再起一个进程。 |
 | 连接容量 | 管道服务最多接受 32 路并发连接，读超时 5 秒，IPC 不占用 UI 线程。 |
@@ -499,9 +505,9 @@ dsh plugin add dsh-ai-terminal-pet
 
 这一版发布两个包：自解压的 `pet-setup.exe` 与便携 zip。两者装的是**同一份 11 件制品、同一个目录**；zip 的额外好处是你可以在运行前先拆开看。
 
-1. 从 [`pet-v1.0.2` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.2) 下载其中一个：
+1. 从 [`pet-v1.0.3` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.3) 下载其中一个：
    - **`pet-setup.exe`**（13.5 MB）：双击即可。它会先拿自带的 `SHA256SUMS.txt` 校验自己的载荷，**全部吻合才动手**，然后调用内嵌的安装脚本。`pet-setup.exe --verify` 随时复核已装文件，`--uninstall` 卸载，`--add-to-path` 加进 PATH。
-   - **`ai-terminal-pet-1.0.2-win-x64.zip`**（4.99 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
+   - **`ai-terminal-pet-1.0.3-win-x64.zip`**（4.99 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
 2. 验证安装输出：
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -519,7 +525,7 @@ dsh plugin add dsh-ai-terminal-pet
 装完之后 `--doctor` 应该长这样（路径已缩短，其余都是程序自己的输出）：
 
 ![健康安装下的 --doctor](docs/assets/doctor-green.png)
-*九项检查。面板是空的时候真正要看的是 `instance` 那一行：如果它说有实例在监听管道，说明浮窗本身是健康的，缺的是终端那边的上报端，不是安装。*
+*十项检查。面板是空的时候真正要看的是 `instance` 那一行：如果它说有实例在监听管道，说明浮窗本身是健康的，缺的是终端那边的上报端，不是安装。*
 
 **C. 开发者 —— 从源码构建（需要 Go 1.23+）**
 
@@ -558,11 +564,11 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/
 
 `scripts\install.ps1` 之所以放在 `scripts/` 而不是仓库根：市场索引器会按文件名抓根目录的 `install.ps1` 并整文正则扫描，而它确实要提到 `HKCU` 的 Run 键与 `-Recurse -Force` 清理；下沉一级就去掉了这两条误报，行为一个字没改。
 
-装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性以及开机自启项共 9 项。需要清理已部署的制品时运行 `.\scripts\install.cmd -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 11 file(s) match the repository, 0 warning(s)` 并以 0 退出（11 项 = 主程序 + 状态栏 shim + `pet-hook.exe` + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
+装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性、开机自启项以及最近一次提醒判定共 10 项。需要清理已部署的制品时运行 `.\scripts\install.cmd -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 11 file(s) match the repository, 0 warning(s)` 并以 0 退出（11 项 = 主程序 + 状态栏 shim + `pet-hook.exe` + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
 
 第 5 步是可选的：`-AddToPath` 只写 `HKCU\Environment\Path`（绝不碰 `HKLM`），写入前先把原值备份到 `<安装目录>\path-backup.txt`，目录已在 PATH 中时不做任何改动；**改完要新开一个终端**才生效；`-Uninstall` 卸载时会一并移除这条 PATH 记录（原值同样先备份，备份位置改为 `%TEMP%`），不会留下指向已删目录的死条目。不加这个开关时安装脚本不会动 PATH，请继续用全路径 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
 
-装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性以及开机自启项共 9 项。需要清理已部署的制品时运行 `.\scripts\install.cmd -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。
+装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性、开机自启项以及最近一次提醒判定共 10 项。需要清理已部署的制品时运行 `.\scripts\install.cmd -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。
 
 安装完成后浮窗与状态栏 shim 已部署就绪，但终端默认不会自动推送事件；你必须按照下一节的说明，为正在使用的终端环境配置对应的上报端。
 
@@ -588,10 +594,10 @@ Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状�
 
 ```powershell
 # 用 Release 资产：不需要 clone，也不需要构建
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.8/dsh-ai-terminal-pet-1.2.8.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.9/dsh-ai-terminal-pet-1.2.9.tgz
 
 # 用 git 源：钉住 Release 的那个 tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.8&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.9&path:/packages/dsh-ai-terminal-pet"
 
 # 用仓库地址：靠仓库根的清单 shim 解析过去
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -637,14 +643,14 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --show` | 唤出并显示正在运行的浮窗 |
 | `ai-terminal-pet --toggle` | 在紧凑态与展开态之间切换 |
 | `ai-terminal-pet --reset` | 重置位置并以 100% 缩放重新贴靠屏幕边缘 |
-| `ai-terminal-pet --settings` | 打开三页设置窗口 |
+| `ai-terminal-pet --settings` | 打开四页设置窗口 |
 | `ai-terminal-pet --quit` | 退出正在运行的浮窗进程 |
 | `ai-terminal-pet --json` | 打印当前会话状态 JSON（可加 `--pretty`） |
-| `ai-terminal-pet --doctor` | 运行 9 项环境与安装自检，任一失败时退出码为 1。同样需要安装目录在 PATH 中，否则请用全路径调用 |
+| `ai-terminal-pet --doctor` | 运行 10 项环境与安装自检，任一失败时退出码为 1。同样需要安装目录在 PATH 中，否则请用全路径调用 |
 | `ai-terminal-pet --autostart` | 查询当前的开机自启状态 |
 | `ai-terminal-pet --autostart=on` | 设置为登录时自动启动 |
 | `ai-terminal-pet --autostart=off` | 取消开机自启设置 |
-| `ai-terminal-pet --version` | 打印版本信息（v1.0.2） |
+| `ai-terminal-pet --version` | 打印版本信息（v1.0.3） |
 | `ai-terminal-pet --help` | 输出命令行帮助信息 |
 
 通过 `--json` 参数读取当前状态时，返回的会话数据结构示例如下：
@@ -677,7 +683,15 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | 声音 | 音量 | `soundVolume` | `85` | 0–100 |
 | 声音 | 等待确认提示音 | `soundOnWaiting` | `true` | 需要授权时响 |
 | 声音 | 出错提示音 | `soundOnError` | `true` | 会话出错时响 |
-| 声音 | 完成提醒 | `notifyOnFinish` | `true` | 忙碌会话转为空闲时响一声音色更柔的提示 |
+| 声音 | 完成提醒 | `notifyOnFinish` | `true` | 旧的两态视图，等价于「`donePolicy` 是否等于 `off`」；精确控制在上表「回复完成时」 |
+| 声音 | 试发「需要你处理」 | *（立即执行）* | — | 走与真实审批相同的路径弹气泡并响提示音，不挂到任何会话上 |
+| 声音 | 试发「回复完成」 | *（立即执行）* | — | 用当前「回复完成」设置的音色发一条完成气泡 |
+| 会话 | 只在我不看着时提醒 | `foregroundAware` | `true` | 正在看的那个会话不再额外弹气泡，只标未读 |
+| 会话 | 静止多久算离开 | `idleMinutes` | `3` | 窗口在前台但多久没有键鼠输入就不再算你在看；`0` 只看窗口焦点 |
+| 会话 | 回复完成时 | `donePolicy` | `background` | `background` 仅后台 / `off` 从不 / `always` 每次 |
+| 会话 | 正在看的会话保持安静 | `quietCurrent` | `true` | 同一会话不弹气泡、留未读标记；错误与提示音不受影响 |
+| 会话 | 子会话不提醒 | `quietSubagents` | `true` | 声明了上级会话的（`parentSessionId`）默认不提醒 |
+| 会话 | 静音列表 | `mutedSessions` | `[]` | 逐会话静音；右键点会话行即可增删，设置页可一键清空 |
 | 会话 | 自动同意 | `autoApprove` | `false` | 默认关，见下一节「安全边界」 |
 | 会话 | 自动同意倒计时 | `autoApproveTimeoutSec` | `5` | 否决窗口 1–60 秒；**改完需重启** |
 | 会话 | 重置窗口位置 | *（立即执行）* | — | 等同 `--reset` |
@@ -692,6 +706,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `%LOCALAPPDATA%\AI-Terminal-Pet\config.json` | 上表全部设置 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\state.json` | 窗口位置与缩放（运行期那些键） |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\` | 每条存活会话一个 JSON 快照；浮窗与 `--json` 都读这里 |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\alerts.json` | 最近一次提醒判定的记录：每个会话为什么响 / 为什么没响。`--json` 的 `alerts` 与 `--doctor` 的第 10 项读它 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\approvals\` | `pending-*.json` 与用户点「否决」时浮窗写的 `.deny` 兄弟文件 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` | 所有上报端加载的线协议 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\error.log` | 轮转的崩溃日志；`--doctor` 会告诉你它是否存在 |

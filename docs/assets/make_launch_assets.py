@@ -183,7 +183,7 @@ def demo_gif(preview: Path) -> Path:
         ("A session is waiting. The strip breathes.", MUTED),
         ("Hover: it unfolds into the session list.", MUTED),
         ("Which project, which state, how long.", INK),
-        ("Click that row: the terminal comes forward.", ACCENT),
+        ("Click the arrow at the row end: that terminal comes forward.", ACCENT),
     ]
 
     def frame(panel: Image.Image, caption: str, colour, x: int, opacity: float = 1.0) -> Image.Image:

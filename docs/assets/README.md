@@ -11,11 +11,12 @@ layout. Nothing here is hand-drawn or mocked up.
 | `overlay-compact.png` | 168x468 | README, *What it looks like* | Compact strip with the pulsing orb, session count and the waiting project name |
 | `overlay-expanded.png` | 400x424 | README, *What it looks like* | Expanded list with three sessions (project, state, source, relative time) |
 | `overlay-expanded-many.png` | 400x676 | README, *What it looks like* | Six rows plus the overflow line, from the `6 rows + more` layout test |
+| `overlay-expanded-unread.png` | 400x424 | README, *What it looks like* | Expanded list with an unread mark on the waiting row - the alert that was suppressed because the user was elsewhere, and the mark left instead |
 | `overlay-auto-approve.png` | 400x424 | README, *What it looks like* | Auto-approve countdown with the draining bar and `Allow (5s)` |
 | `overlay-compact-en.png` | 168x468 | not referenced | Same compact strip under the English locale, kept for localization checks |
 | `overlay-compact-hover.png` | 168x468 | not referenced | Compact strip in the hovered state (raised background and stroke) |
 | `overlay-expanded-en.png` | 400x424 | not referenced | Expanded list under the English locale, kept for localization checks |
-| `demo.gif` | 760x600, 56 frames | launch posts (X, HN) | Breathe → hover → expand → row click, one caption per beat |
+| `demo.gif` | 760x600, 56 frames | launch posts (X, HN) | Breathe → hover → expand → a click on the row-end arrow, one caption per beat |
 | `desktop-scene.png` | 1500x860 | launch posts | The panel beside two terminals, so the strip is shown in context |
 | `smartscreen-unsigned.png` | 1320x560 | README install path B, launch posts | The two SmartScreen states an unsigned build produces - **a mockup, see below** |
 | `doctor-green.png` | 1798x358 | README install path B | `--doctor` output from a real healthy install, redacted and typeset |

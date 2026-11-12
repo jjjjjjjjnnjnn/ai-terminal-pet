@@ -1,7 +1,7 @@
 # HANDOVER — ai-terminal-pet 交接文档
 
 > 交接时间：2026-09-24（UTC+8 下午）；2026-11-09 刷新到 v0.9.0；2026-11-10 补记 v0.9.0 之后未发版的工作，含 DSH 插件包 1.2.3 与市场条目合并；2026-11-11 刷新到插件包 1.2.4（只改文案）并补齐三家已合并的目录；**2026-11-11 10:30 +0100 交接整理**——同步到 `bb00e58`、记入 dshopen 收录、新增 §28 交接清单。
-> 下一位 AI 直接从 §1「当前状态」与 **§39「交接：上游目录条目 sync」** 开始读，然后按 §13–§27 的时间序读
+> 下一位 AI 直接从 §1「当前状态」与 **§40「交接：提醒层」**（产品能力）以及 **§39「交接：上游目录条目 sync」**（上架机制）开始读，然后按 §13–§27 的时间序读
 > runbook，不必回溯长上下文；§35–§38 是 2026-11-12 这一天四轮工作的施工记录，§39 是同日晚上把「上架」
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
@@ -3115,6 +3115,63 @@ python tools/check_docs_links.py            # 11 份文档全解
 | 中文段落被合并坏掉 | `462dca2` 把两版中文段落首尾相接，留下一个从句中开始的残句；第一次修的时候又把故事讲了两遍 | 改中文长段前先数「同一事实出现几次」；重复检测用探针字符串 |
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
+
+## 40. 交接：提醒层（2026-11-12 晚，第 40 轮；浮窗 1.0.3 / 插件 1.2.9）
+
+### 40.1 一句话：决定「要不要打扰」的代码只剩一处，而且它不读窗口、不读文件、不读时钟
+
+上一版把这条规则散在 `alertOnTransitions` 的 if 链里，后果有两个，都是真 bug：
+
+- 账本按 `state` 记：答掉一个权限请求、立刻又被提问，两次都是 `waiting_permission`，于是**一声不响**。
+  「答完就问」是 agent 最常见的节奏。
+- 其余问题（你在不在看、这个会话是不是静音、完成算哪一档）**没有地方放**，只能变成又一个 if，或者干脆不问。
+  「你正在读的请求还额外弹一个气泡」就是这个结果。
+
+现在 `internal/ui/attention.go` 的 `Decide()` 是纯函数，规则顺序固定，且每条都有表驱动测试：
+静音 > 子会话 > 完成三档（含 15 秒合并）> 紧急请求（只在「你正看着它」时才可以不弹，且仍标未读）> **测不准就当没在看**。
+
+### 40.2 「要什么」是派生的，不是新字段
+
+`waiting_permission` 里其实混着三种请求：审批、提问、方案确认。加字段会让**所有已装的上报端**整条 payload 被
+`DisallowUnknownFields` 拒掉，这是拿协议换排版。所以 `internal/session/attention.go` 从 `reason` 里派生出
+`Kind`，认不出来的词保守地归为「审批」——**沉默在真有阻塞时是最贵的错**。
+
+### 40.3 六条施工教训（这一轮踩出来的）
+
+| 教训 | 具体表现 |
+|---|---|
+| 静态与会话的键不能混用 | 静音/未读的键必须是 `source + sessionId`，**不能含 pid**：hook 上报端的 pid 是每进程一个的合成哈希，键在 pid 上会让每条静音在下一次上报时失效。`config.SessionMuteKey` 与 `session.Identity` 是跨包约定，由 `internal/app` 的测试钉住 |
+| 新画的东西必须进 `renderedKey` | 未读位、静音位、悬停行都进了；1.0.1 的时长冻结与 1.0.2 的主题不重绘都是「同一个 key = 同一张位图」造成的 |
+| 采样绝不上 UI 线程 | 枚举别人的窗口会卡在挂起的窗口上，那正是 Windows 报 AppHang 的形状。采样器是独立 goroutine，8 秒一次，复用 `Presence` 的缓存 |
+| 不占宽度的标记才是好标记 | 第一版用「未读」「已静音」两个字，把 reason 挤掉了一半。改成**一个点**（未读）+ **整行压暗**（静音） |
+| 纯函数里也要写「没变化就沉默」 | 调用方已经过滤了没变化的会话；但这条规则放进 `Decide` 之后，任何调用方都不可能再造出「驻留的等待请求每 8 秒响一次」 |
+| 默认值只改一处，且必须明说 | 唯一改变老用户体感的是「回复完成时」从「总是」变成「仅后台」。旧配置 `notifyOnFinish: true` 读成 `always`，不是 `background`——用户当初点的就是「完成要提醒」 |
+
+### 40.4 这一轮的实测（2026-11-12 22:1x）
+
+```
+gofmt -l .                         # 空
+go vet ./...                       # 0
+go test -count=1 ./...             # 12 个包全 ok，279 个 func Test（上一版 218）
+node packages/dsh-ai-terminal-pet/verify.mjs                     # VERIFY PASSED
+node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check     # 两个 vendor 文件吻合（摘要 afca3441…）
+node integrations/deepseek-harness/verify.mjs                    # VERIFY PASSED
+node tests/fresh-machine.mjs --no-overlay                        # 162/162
+python tools/check_docs_links.py                                 # 12 份文档全解
+node --test tools/upstream-entry.test.mjs                        # 8 tests pass
+node tools/upstream-entry.mjs --check                            # 1.2.9 尚未发布 → SKIP（不是红）
+```
+
+**未改绘制的 15 张预览图逐字节未变**（用改造前后两次渲染的 sha256 对比过），只有新增的三张（未读/静音/悬停）
+是新的。`bin/AI-Terminal-Pet.exe` 4,495,360 B、`vendor/AI-Terminal-Pet.exe` 与它逐字节相同。
+
+### 40.5 下一轮开工前要知道的两件事
+
+1. **上架用工具，不要手改**：`node tools/upstream-entry.mjs --version 1.2.9 --write --branch bump-tarball-1.2.9 --pr <号>`。
+   `#14718`（1.2.8）当时已重建为单提交、单文件、`MERGEABLE`；它和 `#14688`（1.2.7）改的是同一行，
+   **后合的那个会再冲突一次**，同样用工具再来一遍。
+2. **F8（点击会话行复制项目路径）仍然没做**，方案在 ROADMAP §4 与 §38.3 里，三条约束不变。
+   这一轮新增的 `rows_windows.go`（`expandedRowRect` / `expandedRowHit`）正好是它的地基。
 
 ## 39. 交接：上游目录条目 sync（2026-11-12 晚，第 39 轮）
 
