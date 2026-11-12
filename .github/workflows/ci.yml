@@ -21,6 +21,17 @@ concurrency:
 permissions:
   contents: read
 
+# Every action here is on a major that declares `using: node24`. The previous
+# majors (checkout@v4, setup-go@v5, setup-node@v4, setup-python@v5,
+# upload-artifact@v4) are node20 and GitHub annotates every run telling us they
+# are being force-run on node24 - a deprecation notice that will eventually
+# become a failure. Verified before bumping, not assumed: each action's own
+# action.yml was read for both the runtime line and the inputs this workflow
+# passes (checkout: fetch-depth, setup-go: go-version-file/cache, setup-node:
+# node-version, setup-python: python-version, upload-artifact:
+# path/if-no-files-found/retention-days). upload-artifact is why v6 exists at
+# all - v5 is still node20 - and v7 is used to keep one major line.
+
 jobs:
   verify:
     name: build and verify
@@ -37,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # gofmt and go vet only need the tree; no history, no tags.
           fetch-depth: 1
@@ -47,7 +58,7 @@ jobs:
       # dependency bumping it (e.g. to 1.24) must move CI in the same commit.
       # setup-go still installs the newest 1.23 patch release, never a preview.
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -57,7 +68,7 @@ jobs:
       # "cache: npm" here on purpose - there is no lockfile to key it on (the
       # Node artifacts in this repository are dependency-free).
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -65,7 +76,7 @@ jobs:
       # interpreter is cheaper than discovering that the runner image's Python
       # moved a version and the script's f-strings changed behaviour.
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -224,7 +235,7 @@ jobs:
           PET_PACKAGE_SKIP_VENDOR_CHECK: '1'
 
       - name: Upload the portable zip and the setup exe
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ai-terminal-pet-win-x64
           path: |
@@ -253,7 +264,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -262,7 +273,7 @@ jobs:
       # runner's Go aged out would be a false alarm on a quiet repository.
       # A scanner major/minor bump is still a deliberate commit below.
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 'stable'
           cache: true
