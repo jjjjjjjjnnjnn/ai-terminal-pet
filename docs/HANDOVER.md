@@ -4,7 +4,7 @@
 > 下一位 AI 直接从 §1「当前状态」开始读，然后按 §13–§27 的时间序读 runbook，不必回溯长上下文。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-12 午；浮窗 **1.0.1**、插件包 **1.2.7**、两个成品包已就绪待发布）
+## 1. 当前状态（2026-11-12 午；浮窗 **1.0.1**、插件包 **1.2.7**，两个 Release 与 npm 都已发布）
 
 > 接手请先读本节与文末 §28「交接清单」，那两节给出「现在在哪、下一步做什么」；§27 是插件包分发的完整 runbook。
 
@@ -2935,12 +2935,15 @@ npm pack（1.2.7）                             17 files / shasum efa49bef…
 `screenshots/compact.png` 同步替换（`screenshots.json` 条目不变）。`desktop-scene.png` 与 `demo.gif`
 的图注仍然写明「终端窗口是画的、面板是真实光栅器输出」。
 
-### 36.6 发布形状
+### 36.6 发布记录（按 §28.6 的固定套路，全部已落地）
 
-- **A 提交**（本批）：`Version` → 1.0.1、`internal/ui` 与 `internal/i18n` 的改动、新测试、
-  三个二进制重编 + `npm run vendor`（摘要与 overlay 哈希重算）、两份清单与根 shim 的 1.2.7、
-  `docs/market-index.json` 的 `version` 与 `publishTimestamp`、README/CHANGELOG 的版本口径、全部素材。
-- **tag**：`pet-v1.0.1`、`dsh-plugin-v1.2.7`；两个 Release 各带其资产；`npm publish`。
-- **B 提交**：把索引的 `source.commit` 与 `icon` 钉到 A 的真实 sha（git 无法在提交里引用自己）。
-- 上游：awesome-dsh-plugin 的 `bump-tarball-1.2.7` 跟进 PR（只改 `tarball`/`icon`）。
+| 步骤 | 结果 |
+|---|---|
+| A 提交 | `a4f21af`：`Version` → 1.0.1、`internal/ui` 与 `internal/i18n` 的改动、`internal/ui/wait_label_test.go`（5 个新测试）、三二进制重编 + `npm run vendor`（摘要 `ab16b003…`、overlay `59f1cfcf…`）、两份清单与根 shim 的 1.2.7、索引的 `version`/`publishTimestamp`、README/CHANGELOG/ROADMAP 口径、全部素材 |
+| tag | `pet-v1.0.1` 与 `dsh-plugin-v1.2.7` 都指向 `a4f21af`，两个都通过 `git verify-tag`（SSH 签名） |
+| Release | [`pet-v1.0.1`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.1) 带 zip `4,985,803 B / sha256 849A3AA9…` 与 `pet-setup.exe` `14,131,200 B / sha256 8389B426…`；[`dsh-plugin-v1.2.7`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/dsh-plugin-v1.2.7) 带 tgz `1,919,625 B / sha256 8CB907E9…` |
+| npm | `dsh-ai-terminal-pet@1.2.7` 已发布，`dist-tags.latest` = **1.2.7**；`npm pack` 取回的 tarball 与 Release 资产**逐字节相同**（同为 `8CB907E9…`） |
+| B 提交 | `7f3d4b6`：索引 `source.commit` 与 `icon` 钉到 `a4f21af`，README 两段同步写上这个 sha |
+| 上游 | [awesome-dsh-plugin #14688](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14688)：只改 `tarball` 一行，MERGEABLE，等 check 与人工合并（中文描述逐字节未动，用 base64 上传避开 PowerShell 5.1 的 ANSI 解码陷阱） |
+| 公网复验 | 两个浮窗资产都从公开 URL 下载回来重新哈希（与上表一致）；zip 解到带独立 `LOCALAPPDATA`/`USERPROFILE` 的沙箱里 `install.cmd` → 11/11、`--doctor` 8 ok / 1 warn / 0 fail（唯一 warn 是「running binary 不是这份安装」，因为是从解压目录跑的）、`-Uninstall` 目录归零；`pet-setup.exe --version` 打印 `pet-setup 1.0.1` |
 
