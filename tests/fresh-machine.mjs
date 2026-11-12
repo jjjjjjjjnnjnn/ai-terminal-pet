@@ -230,6 +230,52 @@ function runExe(exe, argv, env, timeout = 60000) {
 }
 
 /**
+ * One line about a finished child process, for a failing check's detail.
+ *
+ * `check()` used to receive `result.stdout` alone, so a process killed by the
+ * spawn timeout reported "FAIL: " and nothing else - a blank detail reads
+ * exactly like a tool that ran and printed nothing, which is a different bug.
+ * That happened for real on 2026-11-12: three consecutive runs at 162/162,
+ * then one run at 161/162 whose only failure was S5's doctor check with an
+ * empty detail, while the same binaries passed the other three runs. Naming
+ * the exit status, the signal and the spawn error makes the difference
+ * visible instead of requiring a reproduction.
+ */
+function describeRun(result) {
+  const parts = ['status=' + result.status]
+  if (result.signal) parts.push('signal=' + result.signal)
+  if (result.error) parts.push('error=' + (result.error.code || result.error.message))
+  if (result.retried) parts.push('retried=' + result.retried)
+  const out = String(result.stdout || '').replace(/\s+/g, ' ').trim()
+  const err = String(result.stderr || '').replace(/\s+/g, ' ').trim()
+  parts.push('stdout=' + (out ? out.slice(0, 1200) : '<empty>'))
+  if (err) parts.push('stderr=' + err.slice(0, 300))
+  return parts.join(' ')
+}
+
+/**
+ * `--doctor` in a sandbox, with the one retry the overlay itself would make.
+ *
+ * The overlay already retries its own node probe once, because a cold start
+ * under an AV scanner can miss a deadline that a warm start meets easily
+ * (internal/app/doctor_windows.go, checkNode). Spawning the fresh 4.4 MB exe
+ * for the first time in a sandbox is the same situation, so the first timeout
+ * here is retried at twice the budget. The retry is only honest if the result
+ * says it happened, hence the note that `describeRun` prints.
+ */
+function runDoctor(exe, env, budgetMs = 30000) {
+  const first = runExe(exe, ['--doctor'], env, budgetMs)
+  if (!first.error || first.error.code !== 'ETIMEDOUT') return first
+  const retry = runExe(exe, ['--doctor'], env, budgetMs * 2)
+  if (retry.error && retry.error.code === 'ETIMEDOUT') {
+    retry.retried = 'the retry timed out too'
+    return retry
+  }
+  retry.retried = 'the first spawn hit the ' + budgetMs + ' ms deadline'
+  return retry
+}
+
+/**
  * The named pipe this sandbox's overlay listens on.
  *
  * Same algorithm as reporters/protocol.js and internal/pipeserver: sha256 over
@@ -475,10 +521,10 @@ function scenarioFreshMachine(sandbox, overlayExe) {
   section('S1 empty machine: CLI and doctor')
   check('no AI-Terminal-Pet directory yet', !existsSync(sandbox.petDir))
 
-  const doctor = runExe(overlayExe, ['--doctor'], sandbox.env, 30000)
+  const doctor = runDoctor(overlayExe, sandbox.env)
   equal('doctor exits 1 on an uninstalled machine', doctor.status, 1)
-  check('doctor names the missing install', /install files/.test(doctor.stdout || ''), doctor.stdout)
-  check('doctor prints a summary', /doctor: \d+ ok, \d+ warn, \d+ fail/.test(doctor.stdout || ''), doctor.stdout)
+  check('doctor names the missing install', /install files/.test(doctor.stdout || ''), describeRun(doctor))
+  check('doctor prints a summary', /doctor: \d+ ok, \d+ warn, \d+ fail/.test(doctor.stdout || ''), describeRun(doctor))
 
   const info = runExe(overlayExe, ['--json'], sandbox.env, 15000)
   equal('--json works without a running overlay', info.status, 0)
@@ -916,8 +962,8 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
     verify.stdout,
   )
 
-  const doctor = runExe(overlayExe, ['--doctor'], sandbox.env, 30000)
-  check('doctor reports no failures after a standalone install', /doctor: \d+ ok, \d+ warn, 0 fail/.test(doctor.stdout || ''), doctor.stdout)
+  const doctor = runDoctor(overlayExe, sandbox.env)
+  check('doctor reports no failures after a standalone install', /doctor: \d+ ok, \d+ warn, 0 fail/.test(doctor.stdout || ''), describeRun(doctor))
 
   const hook = spawnSync(path.join(sandbox.petDir, 'pet-hook.exe'), ['--mode=claude'], {
     input: JSON.stringify({
@@ -1119,7 +1165,8 @@ function scenarioUninstall(sandbox, overlayExe) {
   check('uninstall succeeds', uninstall.status === 0, uninstall.stdout + uninstall.stderr)
   check('the install directory is gone', !existsSync(sandbox.petDir), 'still present')
   check('uninstall reports completion', /uninstall: done/.test(uninstall.stdout || ''), uninstall.stdout)
-  equal('doctor fails again on the cleaned machine', runExe(overlayExe, ['--doctor'], sandbox.env, 30000).status, 1)
+  const doctor = runDoctor(overlayExe, sandbox.env)
+  check('doctor fails again on the cleaned machine', doctor.status === 1, describeRun(doctor))
 }
 
 main().catch((error) => {

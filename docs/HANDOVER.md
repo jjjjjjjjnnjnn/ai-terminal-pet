@@ -100,13 +100,15 @@
   Antigravity（`bin/pet-statusline.exe` + `reporters/antigravity-hook.js`）、DeepSeek Harness
   （两种：老的 host-only bridge bundle `integrations/deepseek-harness/ai-terminal-pet-bridge`，
   与新的独立插件包 `packages/dsh-ai-terminal-pet`，见 §27）、任意 CLI（`reporters/generic.js`）。
-- **未跑项**：`go test -race`（缺 gcc/cgo）、`govulncheck` / `gosec`（未安装）。
+- **未跑项**：`go test -race`（缺 gcc/cgo）。`govulncheck` 与 `gosec` 不需要 C 工具链，已于 2026-11-12
+  补进 CI（`govulncheck@v1.9.0` 0 条被实际调用的漏洞、`gosec@v2.30.0` 在 high/high 上 0 条），
+  排除的规则族与理由写在 `.github/workflows/ci.yml`，见 §35。
 
 > **历史内容去哪了**：2026-09-24「项目全局停用」时期的停用态描述（原 §1、§2、§4、§9、§10 的旧正文）、
 > 以及原 §3 架构速览、§5 已知残留、§6 关键修复、§7 验证基线、§8 常用命令、§11 残留风险、§12 重启用记录，
 > 已整体搬迁到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)
 > （章节号与正文逐字保留，未删任何技术细节）。因此本文件的章节号从 §13 起续接，§3–§12 有意留空。
-> 当前有效 runbook = 本文 §2 + §13–§27（§26 是 v0.9.0 之后的批次，§27 是 DSH 插件包分发）。
+> 当前有效 runbook = 本文 §2 + §13–§35（§26 是 v0.9.0 之后的批次，§27 是 DSH 插件包分发，§35 是 2026-11-12 的门禁加固与账号/签名交接）。
 
 ## 2. 关键路径
 
@@ -151,7 +153,7 @@ DIB 画布与命中缓冲复用（去掉每帧 GDI 分配）；watchdog 限 3 �
 （每次工具调用约 1 s 进程创建税），仅保留 `statusLine`；备份
 `~/.gemini/antigravity-cli/settings.json.bak-20260925-pet-hooks`。
 
-**完整取证 / 验证矩阵见 `docs/archive/BASELINE-20260925.md`。** 遗留：`-race`/govulncheck/gosec 仍缺工具链。
+**完整取证 / 验证矩阵见 `docs/archive/BASELINE-20260925.md`。** 遗留：`-race` 仍缺工具链（`govulncheck` / `gosec` 已于 2026-11-12 补上，见 §35）。
 
 ## 14. 打磨迭代 2026-09-25 夜（v0.2.0）
 
@@ -190,8 +192,8 @@ DPI 感知探针实测：冷启动可见+响应 60x285（150% 缩放下的 40x19
 - 单实例互斥体：跑任何测试二进制前必须先 `taskkill AI-Terminal-Pet.exe`，
   否则测试进程静默退出、探针探到的是生产实例的窗口。
 
-**遗留**：`docs/ROADMAP.md` §6 列出的未修项（`-race`/govulncheck/gosec 缺工具链、UI 无视觉回归、
-管道抢占只做缓解）。
+**遗留**：`docs/ROADMAP.md` §6 列出的未修项（`-race` 缺工具链、UI 无视觉回归、
+管道抢占只做缓解）；`govulncheck` / `gosec` 已不在其中（2026-11-12 补进 CI，见 §35）。
 
 ## 15. F3/F4/F7 落地 2026-09-26（v0.3.0）
 
@@ -2348,7 +2350,8 @@ node tests/fresh-machine.mjs --no-overlay   # 160/160；去掉 --no-overlay 是 
 - **dshbase #322 / dsh.so #24 / alldsh #2 / AdamPlatin123/dsh-plugin-radar #1255**：截至
   2026-11-12 07:40 **四家全是 open、0 评论、updated_at 还停在 08:1x–08:4x**。等对方，不要再投。
 - **dshmarketplace.dev**：公开搜索 `/api/v1/plugins?q=ai-terminal-pet` 仍回 `{"total":0}`。
-- **`go test -race` / `govulncheck` / `gosec`** 仍缺工具链（无 gcc），§6 已记录，不要假装跑过。
+- **`go test -race`** 仍缺工具链（Windows 上的 `-race` 要 gcc/cgo），§6 已记录，不要假装跑过。
+  `govulncheck` / `gosec` **已跑**（2026-11-12 进 CI，见 §35），不要再写成「未安装」。
 - **CI 有两条 `failure`（不是 cancelled）**，都已修复且现行全绿，查历史时不要误判：
   `43030375577`（2026-11-11T13:34Z）挂在 **Fresh-machine end-to-end suite**（当时刚加进 CI 的 S 系列）；
   `42894142140`（2026-11-10T20:19Z）挂在 **Verify the DSH plugin package**
@@ -2696,3 +2699,127 @@ python tools/check_docs_links.py            # 11 份文档全解
 | `.agents/tasks/*.md` 的验收命令 | `node --test tests/*.test.js` → `tests 0 / pass 0` 且 exit 1 | 忽略该行，跑 `node tests/fresh-machine.mjs --no-overlay` |
 | `agy` 传长 prompt | `--print=$text` 被 PowerShell 按空格拆成多个参数，报 `unexpected argument "Your"` | 用 stdin：`$text \| & agy --model ... --effort high` |
 | `pet-v0.9.0` 与 `pet-v1.0.0` 都在 | 容易贴错链接 | 对外一律用 `pet-v1.0.0`；0.9.0 已是被取代的旧资产，且**不可变** |
+
+## 35. 交接：2026-11-12 的门禁加固、两个扫描器与提交身份（本次会话）
+
+### 35.1 这一次做了什么（一句话）
+
+**没有换任何版本号，没有改任何一个产品源码的字节**：这一轮只动 `.gitignore`、`CHANGELOG.md`、
+`README.md`、`docs/*`、`.github/workflows/ci.yml` 与 `tests/fresh-machine.mjs`。
+`vendor/manifest.json` 的源码摘要因此保持 `edd584c6…` 不变（`vendor.mjs --check` 跑过，两个文件都 matches），
+插件包仍是 1.2.6、浮窗仍是 1.0.0、npm `latest` 仍是 1.2.6。
+
+### 35.2 为什么能「零版本代价」（这条规则要记住）
+
+`vendor.mjs` 的源码摘要覆盖 `cmd/` 与 `internal/` 下**所有非 `_test.go` 的 `.go`**，
+排除 `cmd/pet-hook/`、`cmd/pet-setup/`、`cmd/pet-statusline/`、`internal/reporter/`。
+于是：
+
+| 改这些东西 | 摘要变吗 | 要换插件版本号吗 |
+|---|---|---|
+| `internal/**`、`cmd/ai-terminal-pet/` 里的**非测试** `.go` | **变** | **要**（`vendor/AI-Terminal-Pet.exe` 与 `manifest.json` 都得重写） |
+| `internal/**/*_test.go`、`tests/*.mjs`、`.github/`、`.md`、`reporters/` 之外的 JS | 不变 | 不要 |
+| `reporters/protocol.js` | 摘要不变，但 `vendor/protocol.js` 是逐字节比对的 | 要（且所有上报端必须同时改） |
+
+所以「先做一个不加功能的稳定批」与「后面加功能」必须分开发版——否则 1.0.0 会为了一个 CI 修复被迫前移。
+
+### 35.3 这一轮发现的那个偶发红（161/162）
+
+2026-11-12 交接时第一次跑 `node tests/fresh-machine.mjs --no-overlay` 得到 **161/162**：
+
+```
+== S5 standalone install and native hooks ==
+   FAIL doctor reports no failures after a standalone install
+FAIL: 161/162 checks in 149.8s
+```
+
+随后连跑四次都是 **162/162**（25.0s / 27.2s / 28.0s / 28.5s）。同一批二进制、同一个沙箱模型。
+
+**当时的失败信息是空的**，因为那条检查的 detail 只传了 `doctor.stdout`，而 `spawnSync` 在超时时
+`stdout` 是空串——「超时被杀」与「进程正常退出但一行没打印」在报告里长得一模一样。
+这正是它难查的原因：一次真实的偶发红留下了一行比没留还误导的证据。
+
+**这一轮的修法（只改测试，不改产品）**：
+
+1. 新增 `describeRun(result)`：一格放进 `status` / `signal` / `error.code` / `retried` 与两段输出，
+   空 stdout 会被写成 `<empty>` 而不是一片空白。
+2. 新增 `runDoctor(exe, env, budgetMs = 30000)`：**只在 `ETIMEDOUT` 时**用双倍预算重试一次，
+   并把「重试过了」写进结果（`retried=…`），由 `describeRun` 打印。理由与浮窗自己给 node 探针
+   加重试的理由是同一条（`internal/app/doctor_windows.go` 的 `checkNode`）：冷启动被 AV 扫描
+   拖过 deadline 与「真的卡住」必须分开，否则每次都是一次假警报。
+3. 三处 `--doctor` 调用（S1 空机、S5 安装后、S8 卸载后）统一走 `runDoctor` + `describeRun`。
+
+**没有做的事**：没有把预算从 30 s 往上调（那样只会掩盖真卡住）；没有放宽断言（`0 fail` 仍然照旧断言）。
+如果它再红一次，现在的输出会直接指出是超时还是九项里的哪一项失败了。
+
+### 35.4 两个新门禁：`govulncheck` 与 `gosec`
+
+交接时 `docs/ROADMAP.md` §6 写的是「`-race` / `govulncheck` / `gosec` 缺 gcc 未跑」。**前一条是真的，
+后两条是错的**：两者都是纯 Go 程序，`go run` 就能跑，不需要 C 工具链。
+
+| 工具 | 版本（钉死） | 结果 | 触发条件 |
+|---|---|---|---|
+| `golang.org/x/vuln/cmd/govulncheck` | `v1.9.0` | 代码受影响 **0** 条（另有 2 条在 import 的包、14 条在依赖模块里，但本代码调不到） | 任何「被实际调用」的已知漏洞 → 红 |
+| `github.com/securego/gosec/v2/cmd/gosec` | `v2.30.0` | 全量 159 条，其中 high/high **0** 条（12 条 G703、84 条 G115 被排除） | high+high 的任何其他发现 → 红 |
+
+**为什么是两个规则族被排除、而不是逐行 `#nosec`**：`#nosec` 会改 `internal/**` 的 Go 源码，
+摘要一变就要重新 vendor 并吃掉一个插件版本号。而这两族的命中全是本代码有意为之：
+
+- **G115**（84 条）＝ Win32 消息与 `uintptr`/`uint32` 之间的转换：`lParam` 解包、DPI 相关字段、菜单 ID。
+  这些值是消息负载与指针，不是参与算术的量。
+- **G703**（12 条）＝ 由 `%LOCALAPPDATA%` 经 `filepath.Join` 拼出的路径。信任边界就是「用户自己的目录」。
+
+排除写在 `.github/workflows/ci.yml` 的步骤注释里，**不是**写在 `gosec` 的配置里——这样下一次有人想放宽，
+必须先读那段理由。剩下 43 条 LOW（`G103`/`G104`：`unsafe` 与未检查返回值的 Win32 调用）按设计不进门禁：
+它们在这类 Win32 代码里是常态，做成红线只会训练人忽略红线。
+
+**为什么独立成一个 `scan` 作业**：`golang.org/x/vuln@v1.9.0` 与 `gosec@v2.30.0` 各自的 `go.mod` 都写着
+`go 1.26.0`，而 `verify` 作业按本仓库 `go.mod` 的下限装的是最新的 1.23.x。把两条 `go run` 放在同一个作业里，
+Go 要么隐式换工具链（`GOTOOLCHAIN=auto` 会额外下载一整套 Go，既慢又多了一种变红的方式），要么直接拒绝构建。
+所以：**构建作业继续钉在 1.23**（这正是「同一份源码构建出同一份字节」的前提），扫描作业用 `go-version: stable`。
+这是两个作业，不是一个作业里两段——写在这里，是因为「为什么不能省一个作业」以后还会被问到。
+
+**不要把这说成「全量安全扫描」**：`-race` 仍缺 gcc/cgo。对外只能说「静态扫描 + 依赖漏洞扫描通过」。
+
+### 35.5 提交身份：只改未来，不重写历史（本会话已执行）
+
+§34 把这件事留成决策。本会话按「只改未来」执行，理由是已发布内容不可变：
+
+| 项 | 之前 | 现在 |
+|---|---|---|
+| `user.email`（仓库内） | `jjjjjjjjnnjnn@users.noreply.github.com`（旧式 noreply，账号改名后失去归属） | `236163329+jjjjjjjjnnjnn@users.noreply.github.com`（带账号 id 的形式） |
+| 提交签名 | 无，`verified: false / reason: unsigned` | SSH 签名：`gpg.format=ssh`、`user.signingkey=~/.ssh/id_ed25519_signing.pub`、`commit.gpgsign=true`、`tag.gpgsign=true` |
+| GitHub 侧 | 没有 SSH 签名密钥 | `user/ssh_signing_keys` id `1325600`，标题 `ai-terminal-pet commit signing (2026-11-12)` |
+| 118 个历史提交 / 11 个 tag | 旧式 noreply、未签名 | **一字未改**（这是刻意的） |
+
+**为什么不重写**：邮箱是提交对象的一部分，改了邮箱等于改了每一个 commit 的 sha。
+11 个已发布 tag、`docs/market-index.json` 里钉的 `source.commit`、第三方目录记的 `verifiedCommit`
+全都指向现有 sha；重写要么让它们指向不可达对象，要么逼着删掉并重打 tag——两条都违反 AGENTS.md 第 6 条。
+而收益只有「历史提交里的邮箱也带 id」，对以中立身份发布的项目没有实际价值。
+
+**要读邮箱列表或改邮箱**仍然需要 `user` scope（当前 token 只有
+`admin:ssh_signing_key, gist, read:org, repo, workflow`）。`gh auth refresh -h github.com -s user` 是唯一正规做法。
+
+### 35.6 外部世界与数字（2026-11-12 08:5x +0100 实读）
+
+| 对象 | 状态 |
+|---|---|
+| npm | `dist-tags.latest` = **1.2.6** |
+| awesome-dsh-plugin 站点 `plugins.json` | `count` **10,581**，本条目 `version: 1.2.6`、`tarball` 指向 `dsh-plugin-v1.2.6` 的资产 —— **追平了** |
+| dshopen `index.json` | **1,219** 条，本包仍是 **1.2.4**（落后两版，等它自己重建） |
+| Release 下载数 | `pet-v1.0.0` = **4**（与 24 小时前相同）、`dsh-plugin-v1.2.6` = **7**、`v1.2.5` = 13、`v1.2.3` = **47** |
+| DSH Discussions #13001 | upvote **1**、评论 **0**（发帖后约 22 小时） |
+| star / fork / watcher | 1 / 0 / 0；30 天浏览 7 views / 2 uniques（数据有滞后） |
+| 四家人工目录（dshbase / dsh.so / dsh-plugin.org / AllDSH） | 仍 open、0 评论；不要重复投 |
+
+**结论**：发声之后的可见增量接近 0（`pet-v1.0.0` 的下载数 24 小时没动），而条目侧能做的
+（把已有条目推到最新版）**已经做完**（awesome 已渲染 1.2.6）。剩下的杠杆只有一个：产品本身。
+这也是为什么下一步排的是功能批次（F9 → 配色 → F8），而不是再发帖、再投目录。
+
+### 35.7 这一轮没有再碰的东西
+
+- `.agents/tasks/` 那五张工单仍然不重开（§34.6 的核对结论不变），本轮只把 `.agents/` 加进 `.gitignore`。
+- `README.md` 里所有「当前版本」口径已改成 1.2.6 / `df4fcf6`；`CHANGELOG.md` 的两个 `[Unreleased]`
+  改成了带年份的批次标题（它们记录的两批工作随 1.0.0 / 1.2.6 发出）。
+- `docs/ROADMAP.md` §6 与 README 的门禁列表同步到两个新扫描器；`docs/LAUNCH.md` 未动（它对外，
+  且这一轮没有新的对外事实需要改口）。

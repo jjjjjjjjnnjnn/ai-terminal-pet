@@ -232,3 +232,66 @@ jobs:
             dist/*.exe
           if-no-files-found: error
           retention-days: 7
+
+  # The two scanners live in their own job for one concrete reason: both
+  # `golang.org/x/vuln@v1.9.0` and `gosec@v2.30.0` declare `go 1.26.0` in their
+  # own go.mod, while the build job installs the newest 1.23.x patch because
+  # setup-go reads this repository's go.mod floor. Running them next to the
+  # build would make Go switch toolchains implicitly (GOTOOLCHAIN=auto downloads
+  # a whole second Go - minutes of runner time, and one more way to go red) or
+  # refuse outright. Keeping the build job on 1.23 exactly preserves the point
+  # that "the same source builds the same bytes"; the scanners get a toolchain
+  # that matches what they ask for.
+  #
+  # Neither scanner needs gcc/cgo, which is why they can run at all here -
+  # `go test -race` does need them on Windows and stays a documented gap
+  # (docs/ROADMAP.md §6).
+  scan:
+    name: vulnerability and static analysis
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # 'stable' rather than a pinned minor: the scanners' own floor moves
+      # forward (1.26 today), and a scan that refuses to run because the
+      # runner's Go aged out would be a false alarm on a quiet repository.
+      # A scanner major/minor bump is still a deliberate commit below.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Show toolchain versions
+        shell: bash
+        run: go version
+
+      # govulncheck answers the question that matters for a distributed binary:
+      # does any *called* function have a known vulnerability? It reports zero
+      # today, while listing 14 module-level advisories this code cannot reach.
+      # The vulnerability database is fetched over the network, so this is the
+      # one step in CI that can fail for a reason outside the repository -
+      # re-run before believing a red result here.
+      - name: Vulnerability scan (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+      # gosec is gated at high severity AND high confidence on purpose. Every
+      # lower threshold flags things this code does on purpose:
+      #   G115 (84 hits) - integer conversions between uintptr/uint32 in the
+      #     Win32 message plumbing and lParam extraction; those values are
+      #     pointer and message payloads, not arithmetic.
+      #   G703 (12 hits) - file paths built from %LOCALAPPDATA% through
+      #     filepath.Join; the trust boundary is "the user's own profile".
+      # Both are excluded as rule families rather than silenced line by line:
+      # a `#nosec` annotation would be an edit to the overlay's Go sources,
+      # which changes vendor/manifest.json's source digest and would force a
+      # re-vendor - and therefore a new plugin version - for a zero-behaviour
+      # change. The exclusions are named here so a future reviewer can
+      # re-judge them; every other rule at high/high still fails this job.
+      - name: Static analysis (gosec)
+        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -severity high -confidence high -exclude G115,G703 ./...

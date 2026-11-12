@@ -27,7 +27,7 @@ zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，�
 | **Show HN** | 高 | 一条 URL 提交 + 作者首楼技术补充 | ✅ 你已发布。周一–周四 08:00–10:00 ET；周五与周日几乎必沉 |
 | **X（英文线程）** | 高 | 5 条，链接放最后一条 | ✅ 你已发布。不做「RT/关注」诱导；GIF 挂在第 1 条 |
 | **X（中文线程）** | 中高 | 5 条，同一批事实，中文原生表达 | ✅ 你已发布。与英文线程**同一天内**发，不要隔周 |
-| **DSH 生态（GitHub 目录）** | 中但最确定 | 注册表条目跟进 PR、topic 采集、自建索引 | 实测证据：`v1.2.3` 的 tarball 被下载 **47** 次，而 `v1.2.4`/`v1.2.5` 只有 4/5 次——**把已有条目推到最新版比发帖更有效**。现状见 §1.1 |
+| **DSH 生态（GitHub 目录）** | 中但最确定 | 注册表条目跟进 PR、topic 采集、自建索引 | 实测证据：`v1.2.3` 的 tarball 被下载 **47** 次，而 `v1.2.4`/`v1.2.5` 只有 4/5 次（2026-11-12 复读：`v1.2.5` 已追到 13、`v1.2.6` 是 7）——**把已有条目推到最新版比发帖更有效**。现状见 §1.1 |
 | r/ClaudeAI / r/ChatGPTCoding | 中 | 英文帖改写为问答体 | 你已说明不发 |
 | V2EX / 掘金 / 少数派 | 中 | 中文长文（带 GIF） | 你已说明不发 |
 
@@ -57,13 +57,13 @@ zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，�
 
 另外两处补充是评审加的、也确实该有：`56×156`（原稿只写了 56）、以及 Release 直链。
 
-### 1.1 已经投出去的那批，现在的真实状态（2026-11-11T21:05Z 复查）
+### 1.1 已经投出去的那批，现在的真实状态（2026-11-11T21:05Z 复查，2026-11-12 08:5xZ 更新）
 
 **「投了」不等于「有人看」**，下面这批是同一轮提交，状态差别很大（四家已收录，四家仍在排队）：
 
 | 目标 | 状态 | 说明 |
 |---|---|---|
-| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | ✅ **两次合并都完成**：#14385（17:20:15Z，`70581cc`）→ 1.2.5；**#14439（20:12:31Z，`475a48e`）→ 1.2.6** | 仓库里 `data/plugins/*.yml` 的 `tarball` 已是 **1.2.6**；**站点 `plugins.json`（`count` 10,578）仍渲染 1.2.5**，等它下一次构建 |
+| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | ✅ **两次合并都完成**：#14385（17:20:15Z，`70581cc`）→ 1.2.5；**#14439（20:12:31Z，`475a48e`）→ 1.2.6** | 仓库里 `data/plugins/*.yml` 的 `tarball` 已是 **1.2.6**；**站点 `plugins.json` 也已渲染 1.2.6**（2026-11-12 实测 `count` 10,581，该条目 `version: 1.2.6`、`tarball` 指向 `dsh-plugin-v1.2.6` 的资产）——这处「合并 vs 渲染」的延迟终于追平 |
 | [dshopen](https://github.com/polang233/dsh-plugin-index/issues/423) | ✅ **已收录并已渲染** | `dshopen.org/index.json` **1,207 条**含本包 **1.2.4**（commit `ff7f6de`），`labels: verified + updated-recent`；**落后两个版本**，要等它下一次构建 |
 | [YELEBAI/dsh-plugin-marketplace](https://github.com/YELEBAI/dsh-plugin-marketplace) | ✅ **自动采集，已收录** | `registry/plugins.json` 第 8,729 条：`version: 1.2.5`、`verifiedCommit: 584bc2f`、`install.spec` = `github:jjjjjjjjnnjnn/ai-terminal-pet#584bc2f`、`profiles: [desktop, headless, web]`、`verifiedAt` 17:54:34Z。**无需申请**，它按 topic 自动扫 |
 | [bradeGithub/DSH-Plugins-Marketplace](https://github.com/bradeGithub/DSH-Plugins-Marketplace) | ✅ **自动采集，已收录** | `registry.json` 第 13,128 条：`pkg_name`/`npm_pkg_name` = `dsh-ai-terminal-pet`、`version: 1.2.4`、topics 15 个、`stars_delta_30d` 也在记。issue #367 只是留证，可关 |
@@ -76,8 +76,7 @@ zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，�
 
 **结论（也是发给人的那句）**：**已收录的有四家**——awesome-dsh-plugin（仓库侧已 1.2.6）、
 imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 topic 自动采的，不用申请）。
-**两家的版本号还落后**：awesome-dsh-plugin 的站点 `plugins.json` 仍渲染 1.2.5，dshopen 仍是 1.2.4——
-「合并」与「渲染」、以及「采到了」与「渲染成最新版」，始终是两件事。
+**版本号还落后的只剩一家**：dshopen 仍是 1.2.4（2026-11-12 复读 `index.json` 1,219 条，本包版本未动）——awesome-dsh-plugin 的站点已经渲染 1.2.6。「合并」与「渲染」、以及「采到了」与「渲染成最新版」，始终是两件事。
 四家人工提交的目录（dshbase / dsh.so / dsh-plugin.org / AllDSH）截至 21:05Z 仍是 **open、0 评论**，
 `dshmarketplace.dev` 的公开搜索仍回 `{"total":0}`。
 
@@ -270,13 +269,13 @@ files alone does not wire it. The connect table in the README has one line per t
 
 没有遥测，所以只能看代理指标：
 
-| 指标 | 怎么读 | 基线（2026-11-11 21:10Z） |
+| 指标 | 怎么读 | 基线（2026-11-12 08:5xZ） |
 |---|---|---|
-| Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.0` = **4**（zip 2 + setup 2）／`pet-v0.9.0` = 3／`v1.2.6` = 1／`v1.2.5` = 13／`v1.2.4` = 4 |
+| Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.0` = **4**（发帖后约 22 小时未变）／`pet-v0.9.0` = 3／`v1.2.6` = **7**（发帖时是 1）／`v1.2.5` = 13／`v1.2.4` = 4／`v1.2.3` = 47 |
 | 仓库浏览 | `gh api .../traffic/views` | 30 天 7 views / 2 uniques（发帖前，尚未刷新） |
 | star / fork | `gh repo view` | 1 / 0 |
 | npm | `npm view dsh-ai-terminal-pet version` | **1.2.6**（`dist-tags.latest`） |
-| DSH Discussions | 帖子 #13001 的 upvote 与回复数 | 0 / 0（刚发） |
+| DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后约 22 小时） |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条 |
 

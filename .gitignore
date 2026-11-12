@@ -33,6 +33,9 @@ harness-out.json
 
 # Agent working memory (machine-local, not project source)
 .workbuddy-ai/
+# Auto-dispatched task tickets from the personal KB hub. Machine-local, and the
+# tickets are a template: docs/HANDOVER.md §34.6 records why they are not work.
+.agents/
 
 # Generated panel preview (see README: "Seeing a layout change without a window")
 panel-preview.png
