@@ -668,9 +668,10 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 - `go test -race` 仍未跑（Windows 上的 `-race` 需要 gcc/cgo，本机没有）。**`govulncheck` 与 `gosec` 已于
   2026-11-12 补上**（两者都是纯 Go 程序，不需要 C 工具链）：`govulncheck@v1.9.0` 报「没有被实际调用的漏洞」
   （代码受影响 0 条；另有 2 条在 import 的包、14 条在依赖模块里，但本代码调不到），
-  `gosec@v2.30.0` 在 high severity + high confidence 上是 **0 条**，两条已排除的规则族与理由写在
-  `.github/workflows/ci.yml` 的注释里（G115 = Win32 消息与 `uintptr` 之间的整数转换，G703 = 路径由用户
-  自己的 `%LOCALAPPDATA%` 拼出）。**不是「全量安全扫描」**，别把这两条说成后者。
+  `gosec@v2.30.0` 在 high severity + high confidence 上是 **0 条**，排除方式与理由写在
+  `.github/workflows/ci.yml` 的注释里：`G115` 按**规则族**排除（Win32 消息与 `uintptr` 之间的整数转换，
+  全部命中都是这一种形态），`G703` 只按**路径**在那四个有命中的文件上排除（由用户自己的
+  `%LOCALAPPDATA%` 拼出的路径）——别的文件里出现路径污点仍然会让 `scan` 变红。**不是「全量安全扫描」**，别把这两条说成后者。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
 - DSH 插件包的 npm 发布**已完成**（1.2.4 于 2026-11-11T12:10:46Z、1.2.5 于 14:58:53Z，1.2.6 于同日随发版上线，2026-11-12 复读 `latest` = **1.2.6**），因此**按包名安装**与 npm-only 目录的两个前置都成立；
   在此之前可用的三条路（git 源、Release tarball、仓库地址）与自建 format-1 索引不受影响。注册表条目 PR #13937 已于

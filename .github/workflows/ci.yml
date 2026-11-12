@@ -268,10 +268,14 @@ jobs:
         with:
           fetch-depth: 1
 
-      # 'stable' rather than a pinned minor: the scanners' own floor moves
-      # forward (1.26 today), and a scan that refuses to run because the
-      # runner's Go aged out would be a false alarm on a quiet repository.
-      # A scanner major/minor bump is still a deliberate commit below.
+      # 'stable' rather than a pinned minor, and this is the one place a
+      # toolchain is deliberately NOT pinned: the scanners' own `go` floor moves
+      # forward (1.26 today), so a pinned minor would eventually refuse to build
+      # them and the failure would say nothing about this repository's code.
+      # This job only ever runs the scanners - the build, the tests and the
+      # binaries stay on go.mod's floor in `verify` - so floating here cannot
+      # change a shipped byte. The scanner versions below are the thing that is
+      # pinned, and moving them is a deliberate commit.
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
@@ -295,14 +299,22 @@ jobs:
       # lower threshold flags things this code does on purpose:
       #   G115 (84 hits) - integer conversions between uintptr/uint32 in the
       #     Win32 message plumbing and lParam extraction; those values are
-      #     pointer and message payloads, not arithmetic.
-      #   G703 (12 hits) - file paths built from %LOCALAPPDATA% through
+      #     pointer and message payloads, not arithmetic. Excluded as a rule
+      #     family, because every hit is that pattern.
+      #   G703 (12 hits, 4 files) - file paths built from %LOCALAPPDATA% through
       #     filepath.Join; the trust boundary is "the user's own profile".
-      # Both are excluded as rule families rather than silenced line by line:
-      # a `#nosec` annotation would be an edit to the overlay's Go sources,
-      # which changes vendor/manifest.json's source digest and would force a
-      # re-vendor - and therefore a new plugin version - for a zero-behaviour
-      # change. The exclusions are named here so a future reviewer can
-      # re-judge them; every other rule at high/high still fails this job.
+      #     Excluded BY PATH on exactly those four files, not as a rule family:
+      #     a taint finding anywhere else - a new reporter, a new pipe handler,
+      #     a path that arrives from the wire - still fails this job. Verified
+      #     both ways: the four-file rule suppresses all 12, and removing one
+      #     file from the pattern lets 7 through.
+      # Neither exclusion is a per-line `#nosec` annotation: that would edit the
+      # overlay's Go sources, change vendor/manifest.json's source digest, and
+      # force a re-vendor - hence a new plugin version - for a zero-behaviour
+      # change. The reasons live here so a future reviewer can re-judge them.
       - name: Static analysis (gosec)
-        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -severity high -confidence high -exclude G115,G703 ./...
+        run: >-
+          go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0
+          -severity high -confidence high -exclude G115
+          -exclude-rules "(cmd/ai-terminal-pet/main|internal/app/app_windows|internal/ui/app_windows|internal/reporter/approval)\.go:G703"
+          ./...
