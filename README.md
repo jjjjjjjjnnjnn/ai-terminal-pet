@@ -219,7 +219,7 @@ Because the plugin index format accepts a git source pinned to a commit, this re
 https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json
 ```
 
-[`docs/market-index.json`](docs/market-index.json) is one entry, `dsh-ai-terminal-pet` `1.2.7`, whose install spec is the same `git+...#<commit>&path:/packages/dsh-ai-terminal-pet` form that was installed end to end in 3.7 s above, pinned to `a4f21af`, the commit the `dsh-plugin-v1.2.8` tag points at. It is validated with the host's own `parseMarketIndex` from `@deepseek-ai/dsh-plugin-market-index`: `format: 1`, `en` localized text, declared category and label ids, an https icon pinned to the release commit, and an exact SemVer with a Unix-seconds `publishTimestamp`. The git source stays even though npm now carries the same bytes: it pins a commit, so the index keeps working for a host that cannot reach the registry.
+[`docs/market-index.json`](docs/market-index.json) is one entry, `dsh-ai-terminal-pet` `1.2.7`, whose install spec is the same `git+...#<commit>&path:/packages/dsh-ai-terminal-pet` form that was installed end to end in 3.7 s above, pinned to `0050d0a`, the commit the `dsh-plugin-v1.2.8` tag points at. It is validated with the host's own `parseMarketIndex` from `@deepseek-ai/dsh-plugin-market-index`: `format: 1`, `en` localized text, declared category and label ids, an https icon pinned to the release commit, and an exact SemVer with a Unix-seconds `publishTimestamp`. The git source stays even though npm now carries the same bytes: it pins a commit, so the index keeps working for a host that cannot reach the registry.
 
 Run `node reporters/generic.js` directly to report from any other CLI or script:
 
@@ -611,7 +611,7 @@ dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
 https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/main/docs/market-index.json
 ```
 
-[`docs/market-index.json`](docs/market-index.json) 只有一条 `dsh-ai-terminal-pet` `1.2.7`，安装 spec 就是上文中 3.7 秒装通的那条 `git+…#<commit>&path:/packages/dsh-ai-terminal-pet`，现在钉在 `a4f21af`——也就是 `dsh-plugin-v1.2.8` 那个 tag 指向的提交。它用宿主自带的 `@deepseek-ai/dsh-plugin-market-index` 的 `parseMarketIndex` 校验通过：`format: 1`、有 `en` 文案、category 与 label 都引用了已声明的 id、图标是钉在发版 commit 上的 https 地址、版本是精确 SemVer 且 `publishTimestamp` 为 Unix 秒。即使 npm 上已有同样的字节，这条 git 源仍然保留：它钉的是 commit，所以连不上 registry 的宿主也照样能装。
+[`docs/market-index.json`](docs/market-index.json) 只有一条 `dsh-ai-terminal-pet` `1.2.8`，安装 spec 就是上文中 3.7 秒装通的那条 `git+…#<commit>&path:/packages/dsh-ai-terminal-pet`，现在钉在 `0050d0a`——也就是 `dsh-plugin-v1.2.8` 那个 tag 指向的提交。它用宿主自带的 `@deepseek-ai/dsh-plugin-market-index` 的 `parseMarketIndex` 校验通过：`format: 1`、有 `en` 文案、category 与 label 都引用了已声明的 id、图标是钉在发版 commit 上的 https 地址、版本是精确 SemVer 且 `publishTimestamp` 为 Unix 秒。即使 npm 上已有同样的字节，这条 git 源仍然保留：它钉的是 commit，所以连不上 registry 的宿主也照样能装。
 
 针对 Antigravity CLI，推荐将状态栏命令直接指向编译好的原生二进制 `pet-statusline.exe`。在开启杀毒软件的机器上，原生 shim 能够消除频繁启动 Node 运行时的进程创建延迟。
 
