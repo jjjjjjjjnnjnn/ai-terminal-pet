@@ -125,15 +125,20 @@ node tools/upstream-entry.mjs --version 1.2.9 --write `
 `tools/upstream-entry.test.mjs`（`node --test tools/upstream-entry.test.mjs`）把上面这些拒绝条件
 全部钉成单测，纯函数、不联网、不碰 git。
 
-**CI 里怎么跑**：`.github/workflows/ci.yml` 的 `verify` 作业跑
-`node tools/upstream-entry.mjs --check --version <package.json 的版本>`。
-它的三种结果都是**故意的**：
+**CI 里怎么跑**：`.github/workflows/ci.yml` 的 `verify` 作业跑 `node tools/upstream-entry.mjs --check`
+（版本默认取 `packages/dsh-ai-terminal-pet/package.json`）。它读三个外部来源：本版本的 Release 资产 URL、
+上游 `main` 的条目文件、以及「有没有针对这个版本的 `bump-tarball-*` PR 开着」。四种结论都是**故意的**：
 
 - `OK`：上游已经指到我们这个版本；
-- `OK（in flight）`：上游还旧，但有针对这个版本的 `bump-tarball-*` PR 开着——计入成功，因为
-  **上架要等维护者合并，不是我们能控制的事**，把它做成红灯只会训练我们忽略红灯；
-- `STALE and NOTHING PENDING`：发版了却没人推上游 → **红灯**，这正是「忘了同步」；
-- `SKIP`：没有 tag / 读不到上游 / `gh` 不可用。**skip 不是 pass**，它在输出里明写。
+- `OK（in flight）`：上游还旧，但有对应 PR 开着——计入成功，因为**上架要等维护者合并，不是我们能这一侧
+  控制的事**，把它做成红灯只会训练人忽略红灯；
+- `STALE and NOTHING PENDING`：**发了版、上游还旧、而且没人开 PR** → **红灯**，这正是「忘了同步」；
+- `SKIP`：版本还没发布（资产 404）/ 读不到上游 / 读不到 GitHub API（网络或权限）。
+  **skip 不是 pass**，输出里明写，不会假装通过。
+
+判断「有没有 PR 开着」用的是公开 REST（`GET /pulls?head=<owner>:<branch>`），**不依赖本机 `gh`**：
+CI 里没有 gh 登录，一个仓库范围的 token 也不保证能读别人的仓库；有 `GH_TOKEN` / `GITHUB_TOKEN` 就带上
+（只是提高限速额度），没有也照常工作。
 
 ---
 
