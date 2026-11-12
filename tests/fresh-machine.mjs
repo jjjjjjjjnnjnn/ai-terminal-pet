@@ -106,6 +106,61 @@ function killSandboxProcesses(sandboxRoot) {
 }
 
 /**
+ * Every running overlay, with the path it came from.
+ *
+ * Why this exists: the single-instance mutex is
+ * `Local\AI-Terminal-Pet-v1-SingleInstance`, which is global to the Windows
+ * session, NOT to the sandbox. The suite stops the real overlay before the
+ * overlay scenarios for exactly that reason - but a host CLI's reporter
+ * relaunches it on its very next hook event, so the sandbox copy can lose the
+ * mutex race and exit with code 0 without ever creating its pipe. Measured
+ * 2026-11-12: with a real overlay alive, a freshly spawned sandbox overlay
+ * exited 0 within a second and never answered; with none alive, it answered in
+ * under 250 ms. That makes S4/S4b look like product failures when the cause is
+ * this suite racing the developer's own host. Printing the evidence turns a
+ * mystery into one line.
+ */
+function otherOverlayInstances(sandboxRoot) {
+  const script =
+    'Get-CimInstance Win32_Process -Filter "Name=\'AI-Terminal-Pet.exe\'" -ErrorAction SilentlyContinue | ' +
+    'ForEach-Object { "{0}`t{1}`t{2}" -f $_.ProcessId, $_.CreationDate, $_.ExecutablePath }'
+  const result = spawnSync(windowsPowerShell(), ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 60000 })
+  const lines = String(result.stdout || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const inside = lines.filter((line) => line.toLowerCase().includes(sandboxRoot.toLowerCase()))
+  const outside = lines.filter((line) => !line.toLowerCase().includes(sandboxRoot.toLowerCase()))
+  return { inside, outside }
+}
+
+/**
+ * The one line a liveness failure needs: which pipe was asked, with which binary.
+ *
+ * `check` only prints its detail when it fails, and "the overlay answers on its
+ * own pipe" is useless without naming the pipe - a missing listener and a wrong
+ * pipe name look identical otherwise.
+ */
+function describeRunForOverlay(installed, env) {
+  return 'pipe=' + pipePathFor(env) + ', exe=' + installed
+}
+
+/** Print the mutex explanation plus who else is running, when S4 cannot see its pipe. */
+function reportOverlayRace(sandbox, installed) {
+  const { inside, outside } = otherOverlayInstances(sandbox.root)
+  console.log('   note: the single-instance mutex is Local\\AI-Terminal-Pet-v1-SingleInstance,')
+  console.log('         which is per Windows session, not per sandbox; a second instance therefore')
+  console.log('         makes the sandbox copy exit 0 without creating its pipe.')
+  console.log('   running overlays inside the sandbox: ' + (inside.length ? inside.join(' | ') : 'none'))
+  console.log('   running overlays outside it (these win the mutex): ' + (outside.length ? outside.join(' | ') : 'none'))
+  console.log('   spawn target: ' + installed)
+  if (outside.length) {
+    console.log('   verdict: the overlay scenarios raced a real instance; a host CLI reporter relaunches it,')
+    console.log('            so a full (non --no-overlay) run is only meaningful on a machine with no host hooks.')
+  }
+}
+
+/**
  * Windows PowerShell, by absolute path when it is where it should be.
  *
  * `powershell` on PATH is whatever the host put there, and on a CI runner that
@@ -272,6 +327,11 @@ function runDoctor(exe, env, budgetMs = 30000) {
     return retry
   }
   retry.retried = 'the first spawn hit the ' + budgetMs + ' ms deadline'
+  // Say it out loud, not only in a failure detail: `check()` prints its detail
+  // on failure only, so a retry that rescued the run would otherwise be
+  // invisible - which is the opposite of honest. A 30 s stall is a fact about
+  // the machine that a reader needs before quoting this suite's duration.
+  console.log('   note: ' + retry.retried + '; the retry at ' + budgetMs * 2 + ' ms answered')
   return retry
 }
 
@@ -816,7 +876,7 @@ async function scenarioOverlayResilience(sandbox) {
   check('the reporter filed its snapshot before launching', Boolean(snapshotFor(sandbox, 'ses-coldstart')))
 
   const up = await waitForOverlay(installed, sandbox.env, 25000)
-  check('the overlay comes back on its own', up)
+  check('the overlay comes back on its own', up, up ? '' : describeRunForOverlay(installed, sandbox.env))
   if (up) {
     const report = readOverlaySessions(installed, sandbox.env)
     const ids = new Set((report?.sessions || []).map((item) => item.sessionId))
@@ -880,8 +940,11 @@ async function scenarioOverlayBoots(sandbox) {
   const child = spawn(installed, [], { detached: true, stdio: 'ignore', env: sandbox.env })
   child.unref()
   const up = await waitForOverlay(installed, sandbox.env)
-  check('the overlay answers on its own pipe', up)
-  if (!up) return child
+  check('the overlay answers on its own pipe', up, up ? '' : describeRunForOverlay(installed, sandbox.env))
+  if (!up) {
+    reportOverlayRace(sandbox, installed)
+    return child
+  }
 
   const report = readOverlaySessions(installed, sandbox.env)
   check('--json returns a document', report !== null)

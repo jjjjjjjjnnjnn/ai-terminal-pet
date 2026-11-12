@@ -37,6 +37,53 @@
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 原先写在这一段的「浮窗停在 0.9.0、插件包 1.2.5」是当时的事实，现在是历史。
 
+## 门禁加固批 — 2026-11-12（同样没占版本号，字节与 1.0.0 / 1.2.6 相同）
+
+这一批只动测试、CI 与文档，**没有改任何一个非测试的 `.go` 文件**，所以 `vendor/manifest.json` 的源码摘要
+保持 `edd584c6…` 不变，插件包仍 1.2.6、浮窗仍 1.0.0——`vendor.mjs --check` 与
+`scripts\install.cmd -VerifyOnly` 都当场跑过。
+
+### Added
+
+- **CI 新增 `scan` 作业**：`govulncheck@v1.9.0` 与 `gosec@v2.30.0`，都钉版本。它独立成一个作业，是因为
+  两者的 `go.mod` 都要求比本模块下限更新的 Go（`go 1.26.0`）：构建作业继续按 `go.mod` 的 1.23 走
+  （「同一份源码构建出同一份字节」的前提），扫描作业用 `go-version: stable`，不让 `GOTOOLCHAIN=auto`
+  在构建作业里偷偷多下载一整套 Go。结果：`govulncheck` 代码受影响 **0** 条（14 条依赖模块级公告调不到）、
+  `gosec` 在 high severity + high confidence 上 **0** 条。
+  `G115`（84 条，Win32 的 `uintptr`/`uint32` 转换）与 `G703`（12 条，由自己的 `%LOCALAPPDATA%` 拼出的路径）
+  按**规则族**排除，理由写在 workflow 注释里；不用逐行 `#nosec`，因为那会改产品源码、改摘要、逼着换版本号。
+- **`tests/fresh-machine.mjs` 的失败信息**：新增 `describeRun()`（`status` / `signal` / 生成错误 / 是否重试 /
+  输出，空 stdout 写成 `<empty>`）与 `runDoctor()`（**只在 `ETIMEDOUT` 时**用双倍预算重试一次，并把
+  「重试过」写进结果）。起因见下方 Fixed。
+- **`.agents/` 进 `.gitignore`**：个人知识库中枢派发的工单属于机器本地材料，不是项目源码（§34.6 记录过
+  为什么那五张工单不是新工作）。
+- **`docs/HANDOVER.md` §35**：这一批的施工记录、两个扫描器、偶发红事件、以及「只改未来的提交身份」的决策。
+
+### Fixed
+
+- **一次 161/162 的偶发红，失败信息是空的**。S5 的 `doctor reports no failures after a standalone install`
+  失败时 detail 只传了 `doctor.stdout`，而 `spawnSync` 超时被杀时 stdout 是空串——「被超时杀掉」与
+  「正常退出但一行没打印」在报告里长得一模一样。修法见 Added；随后连跑四次都是 162/162，
+  断言一条都没放宽（仍是 `0 fail`，预算仍是 30 s）。
+- **CI 的五个 action 还停在 node20**。GitHub 每次运行都在注解里提示 `checkout@v4`、`setup-go@v5`、
+  `setup-node@v4`、`setup-python@v5`、`upload-artifact@v4` 正被强跑到 node24。逐个读过它们发布的
+  `action.yml` 才换（确认 `using: node24`，且本 workflow 用到的输入都还在），现在都在 v7
+  ——`upload-artifact` 的 node24 第一个主版本是 v6，v5 仍是 node20，这里取 v7 只为保持一条主版本线。
+
+### Changed
+
+- **对外口径按 2026-11-12 的实读结果修正**：npm `latest` = 1.2.6；`docs/market-index.json` 钉的是
+  `df4fcf6`；awesome-dsh-plugin 的站点 `plugins.json` 已渲染 1.2.6（`count` 10,581）；README 里
+  「`1.2.4` 尚未发布 / `npm view` 仍是 E404」与「#14385 等人工合并」两处旧事实换成了实测结果，
+  中文段一处被合并坏掉的句子（从句中开始、缺主语）也补回了主语。
+- `CHANGELOG.md` 两个 `[Unreleased]` 标题改成带年份的批次标题：它们记录的工作随 1.0.0 / 1.2.6 一起发出，
+  留 `[Unreleased]` 会和本文件开头的「已全部发版」自相矛盾。
+- `docs/ROADMAP.md` §6 与 `README.md` 的门禁清单：`govulncheck` / `gosec` 从「因缺 gcc 未跑」改为「已进 CI」，
+  `go test -race` 仍是缺 C 工具链的真实缺口——对外**不能说**「全量安全扫描」。
+- 提交身份：`user.email` 与签名只作用于**未来的提交**（`236163329+jjjjjjjjnnjnn@users.noreply.github.com`
+  + SSH 签名）。118 个历史提交与 11 个已发布 tag **刻意不重写**：邮箱是提交对象的一部分，重写会改掉每一个
+  sha，而 `docs/market-index.json` 与第三方目录已经按现有 sha 钉过版本。
+
 ## 宣传准备批 — 2026-11-11（随 1.0.0 / 1.2.6 交付，批次本身没占版本号）
 
 这一批同样不换版本号，但它把「非 Harness 用户怎么拿到这个东西」这条断掉的漏斗接上了。

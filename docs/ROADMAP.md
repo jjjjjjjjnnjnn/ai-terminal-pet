@@ -672,11 +672,11 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
   `.github/workflows/ci.yml` 的注释里（G115 = Win32 消息与 `uintptr` 之间的整数转换，G703 = 路径由用户
   自己的 `%LOCALAPPDATA%` 拼出）。**不是「全量安全扫描」**，别把这两条说成后者。
 - 同用户命名管道抢占只做了「互斥体先行」缓解，未做 `FILE_FLAG_FIRST_PIPE_INSTANCE` 独占。
-- DSH 插件包的 npm 发布**已完成**（1.2.4 于 2026-11-11T12:10:46Z、1.2.5 于 14:58:53Z，`latest` = 1.2.5），因此**按包名安装**与 npm-only 目录的两个前置都成立；
+- DSH 插件包的 npm 发布**已完成**（1.2.4 于 2026-11-11T12:10:46Z、1.2.5 于 14:58:53Z，1.2.6 于同日随发版上线，2026-11-12 复读 `latest` = **1.2.6**），因此**按包名安装**与 npm-only 目录的两个前置都成立；
   在此之前可用的三条路（git 源、Release tarball、仓库地址）与自建 format-1 索引不受影响。注册表条目 PR #13937 已于
   2026-11-10T14:33:04Z 合并、上游 README 已列出；站点页与 `plugins.json` 的延迟在 run `42844452013`（16:39:27Z
   success）之后消失，条目页 200 且 `plugins.json` 已收录本仓库——但目录里的 `install` 是构建时按 `tarball` 渲染的，
-  合并后那版仍是 1.2.0；#14076 已换成 1.2.2（19:59:37Z 合并）、#14089 再推到 1.2.3（2026-11-10T21:10:15Z 合并）、**#14385 带 1.2.5 且两个 check 已 SUCCESS、等人工合并**；另有两家目录已合并收录本仓库：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins) PR #902（2026-11-10T21:49:53Z，只从 npm 装，故在此之前是 browse-only）与 [zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) PR #97（2026-11-11T05:06:32Z）；1024 Store 详情页已返回 200（8,753 B）。
+  合并后那版仍是 1.2.0；#14076 已换成 1.2.2（19:59:37Z 合并）、#14089 再推到 1.2.3（2026-11-10T21:10:15Z 合并）、**#14385 带 1.2.5 已于 2026-11-11T17:20:15Z 合并、#14439 带 1.2.6 已于同日 20:12:31Z 合并，站点 `plugins.json` 重建后已渲染 1.2.6**；另有两家目录已合并收录本仓库：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins) PR #902（2026-11-10T21:49:53Z，只从 npm 装，故在此之前是 browse-only）与 [zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) PR #97（2026-11-11T05:06:32Z）；1024 Store 详情页已返回 200（8,753 B）。
   发版之后又投了五家（都是「public repo + `dsh-plugin` topic + 人工复核」）：
   [dshbase #322](https://github.com/ylwl1997/dshbase/issues/322)、[dsh.so #24](https://github.com/dsh-so/dsh-plugin-submissions/issues/24)、
   [dsh-plugin.org #735](https://github.com/dshplugin/dsh-plugin-hub/issues/735)、[AllDSH #2](https://github.com/alldsh/submissions/issues/2)
