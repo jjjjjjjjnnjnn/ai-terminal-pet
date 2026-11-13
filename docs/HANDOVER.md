@@ -3269,7 +3269,11 @@ tombstone 全部按上报进程记账——这是**协议层身份**，不能动
 要等对方站点重建，读 `plugins.json` 而不是 PR 页面）。
 
 **市场索引**：A 提交 `1efca5a` 带 1.2.12 与 `publishTimestamp`，A2 提交 `05fc1fb` 把它改成 1.2.13
-（`publishTimestamp` 同时更新），B 提交把 `source.commit` 与 `icon` 钉到 `05fc1fb` 的完整 sha。
+（`publishTimestamp` 同时更新），B 提交 `22a9211` 把 `source.commit` 与 `icon` 钉到 `05fc1fb` 的完整 sha。
+
+**本机已就地升级到 1.0.6**（先 `--quit` 再 `scripts\install.ps1`，因为运行中的 exe 会被锁）：
+`-VerifyOnly` **11/11**，`--version` 打印 1.0.6，`--doctor` **10 ok / 0 warn / 0 fail**。
+这一步不能省——本轮修的是"提醒响错"，而用户面板里跑的如果是旧 exe，改完代码他也感觉不到。
 
 ### 43.7 没做的事 / 下一步
 
