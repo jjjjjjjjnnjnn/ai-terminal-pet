@@ -67,7 +67,7 @@ The table below outlines the core capabilities and exact runtime parameters of t
 | Per-session alerts | Fires Windows tray notification balloons and audio alerts when a session starts waiting for you, fails, or finishes — one pure policy decides (see below), so a prompt you are already reading does not also pop a balloon. |
 | Attentiveness | An alert depends on what the session is asking for and whether you are looking: approval / question / plan review are told apart from the reason reporters already send, keyboard-and-mouse idle time is read from the OS, and the window that owns the session is resolved with the same ranking jump-to-terminal uses. Unmeasurable facts alert rather than stay quiet. |
 | Per-session mute and unread | Right-click a session row to mute or unmute that conversation; a suppressed alert still marks its row unread, cleared by jumping to it, by it running again, or by it disappearing. Muting never silences the auto-approve countdown, which is a safety control, not a notification. |
-| Alert receipt | The last alert decision is written to `runtime/alerts.json`, printed by `--json` under `alerts`, and summarised by the tenth `--doctor` check, so "why was I not told" has an answer instead of folklore. |
+| Alert receipt | The last alert decision is written to `alerts.json` beside `config.json` - not in `runtime/`, where every `*.json` is a reporter snapshot and the scanner deletes what it cannot parse - and printed by `--json` under `alerts` and summarised by the tenth `--doctor` check, so "why was I not told" has an answer instead of folklore. |
 | Auto-approve and denylist | Provides a 5-second veto window on permission prompts where a tap denies and silence approves; blocks commands matching the dangerous-command denylist. |
 | Jump to terminal | Walks session process ancestry and matches window titles to bring the waiting terminal window or tab to the foreground. |
 | Scriptable CLI | Outputs structured session state via `ai-terminal-pet --json` by reading disk snapshots, avoiding blocking on GUI processes. |
@@ -115,15 +115,15 @@ There are three ways in. Pick the one that matches how you got here.
 dsh plugin add dsh-ai-terminal-pet
 ```
 
-The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.9), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
+The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.10), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
 
 **B. Everyone else — download a package, no Go toolchain**
 
 Two packages are published for this release: a self-extracting `pet-setup.exe` and a portable zip. Both install the same 11 artifacts into the same directory; the zip additionally lets you look inside before running anything.
 
-1. Download one of them from the [`pet-v1.0.3` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.3):
+1. Download one of them from the [`pet-v1.0.4` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.4):
    - **`pet-setup.exe`** (13.5 MB): double-click it. It verifies its own payload against `SHA256SUMS.txt` **before** writing anything, then runs the installer inside itself. `pet-setup.exe --verify` re-checks the installed files at any time, `--uninstall` removes them, `--add-to-path` puts the commands on your PATH.
-   - **`ai-terminal-pet-1.0.3-win-x64.zip`** (4.99 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
+   - **`ai-terminal-pet-1.0.4-win-x64.zip`** (4.99 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
 2. Verify that the installation works:
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -199,10 +199,10 @@ The Harness side has a second, self-contained option since `dsh-ai-terminal-pet`
 
 ```powershell
 # from the release tarball: no git clone, no build step
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.9/dsh-ai-terminal-pet-1.2.9.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.10/dsh-ai-terminal-pet-1.2.10.tgz
 
 # from git, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.9&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.10&path:/packages/dsh-ai-terminal-pet"
 
 # from the repository URL: resolves through the root manifest shim
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -505,9 +505,9 @@ dsh plugin add dsh-ai-terminal-pet
 
 这一版发布两个包：自解压的 `pet-setup.exe` 与便携 zip。两者装的是**同一份 11 件制品、同一个目录**；zip 的额外好处是你可以在运行前先拆开看。
 
-1. 从 [`pet-v1.0.3` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.3) 下载其中一个：
+1. 从 [`pet-v1.0.4` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.4) 下载其中一个：
    - **`pet-setup.exe`**（13.5 MB）：双击即可。它会先拿自带的 `SHA256SUMS.txt` 校验自己的载荷，**全部吻合才动手**，然后调用内嵌的安装脚本。`pet-setup.exe --verify` 随时复核已装文件，`--uninstall` 卸载，`--add-to-path` 加进 PATH。
-   - **`ai-terminal-pet-1.0.3-win-x64.zip`**（4.99 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
+   - **`ai-terminal-pet-1.0.4-win-x64.zip`**（4.99 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
 2. 验证安装输出：
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -594,10 +594,10 @@ Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状�
 
 ```powershell
 # 用 Release 资产：不需要 clone，也不需要构建
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.9/dsh-ai-terminal-pet-1.2.9.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.10/dsh-ai-terminal-pet-1.2.10.tgz
 
 # 用 git 源：钉住 Release 的那个 tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.9&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.10&path:/packages/dsh-ai-terminal-pet"
 
 # 用仓库地址：靠仓库根的清单 shim 解析过去
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -650,7 +650,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --autostart` | 查询当前的开机自启状态 |
 | `ai-terminal-pet --autostart=on` | 设置为登录时自动启动 |
 | `ai-terminal-pet --autostart=off` | 取消开机自启设置 |
-| `ai-terminal-pet --version` | 打印版本信息（v1.0.3） |
+| `ai-terminal-pet --version` | 打印版本信息（v1.0.4） |
 | `ai-terminal-pet --help` | 输出命令行帮助信息 |
 
 通过 `--json` 参数读取当前状态时，返回的会话数据结构示例如下：
@@ -706,7 +706,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `%LOCALAPPDATA%\AI-Terminal-Pet\config.json` | 上表全部设置 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\state.json` | 窗口位置与缩放（运行期那些键） |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\` | 每条存活会话一个 JSON 快照；浮窗与 `--json` 都读这里 |
-| `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\alerts.json` | 最近一次提醒判定的记录：每个会话为什么响 / 为什么没响。`--json` 的 `alerts` 与 `--doctor` 的第 10 项读它 |
+| `%LOCALAPPDATA%\AI-Terminal-Pet\alerts.json` | 最近一次提醒判定的记录：每个会话为什么响 / 为什么没响。`--json` 的 `alerts` 与 `--doctor` 的第 10 项读它。**不放在 `runtime/` 里**——那里每个 `*.json` 都是一条上报快照，扫描器会把解析不了的删掉 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\approvals\` | `pending-*.json` 与用户点「否决」时浮窗写的 `.deny` 兄弟文件 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` | 所有上报端加载的线协议 |
 | `%LOCALAPPDATA%\AI-Terminal-Pet\error.log` | 轮转的崩溃日志；`--doctor` 会告诉你它是否存在 |

@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13；浮窗 **1.0.3**、插件包 **1.2.9**，两个 Release、npm 与上游条目都已落地）
+## 1. 当前状态（2026-11-13；浮窗 **1.0.4**、插件包 **1.2.10**，两个 Release、npm 与上游条目都已落地）
 
 > 接手请先读本节与文末 **§40「交接：提醒层」**（这一轮的产品能力）和 **§39「交接：上游目录条目 sync」**
 > （上架机制，读它再读 §28 的清单形状）；§28 是更早一版的清单（分发状态已过期，只保留它的清单形状），
@@ -15,19 +15,19 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.3`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.9`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3` 与 `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`。
-  **`pet-v1.0.3` 与 `dsh-plugin-v1.2.9` 是 2026-11-12 晚上新打的**，资产见 §40；`pet-v1.0.2`、`pet-v1.0.1`、
+- **版本**：浮窗 **`1.0.4`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.10`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4` 与 `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`。
+  **`pet-v1.0.4` 与 `dsh-plugin-v1.2.10` 是本轮新打的**，资产见 §41；`pet-v1.0.2`、`pet-v1.0.1`、
   `pet-v1.0.0`、`pet-v0.9.0` 与 `dsh-plugin-v1.2.6`…`v1.2.8` 仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**282 个** `func Test`，
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**283 个** `func Test`，
   12 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
   `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
   `--doctor` **10 项**（沙箱实测 9 ok / 1 warn / 0 fail，那条 warn 是「还没跑过浮窗，所以没有判定记录」）。
-- **规模**：Go 非测试源码 **42 文件 / 15,180 行**、测试 **42 文件 / 7,569 行**（282 个 `func Test`，
+- **规模**：Go 非测试源码 **42 文件 / 15,180 行**、测试 **43 文件 / 7,607 行**（283 个 `func Test`，
   外加 `cmd/pet-setup` 的 20 个）、JS **12 文件 / 4,346 行**；
-  `bin/AI-Terminal-Pet.exe` **4,495,360 B**（1.0.3，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
+  `bin/AI-Terminal-Pet.exe`（1.0.4，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，字节数见 §41）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**、
   `dist/pet-setup.exe` **14,248,960 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
   第三方依赖 3 个。
@@ -3155,6 +3155,7 @@ python tools/check_docs_links.py            # 11 份文档全解
 | 不占宽度的标记才是好标记 | 第一版用「未读」「已静音」两个字，把 reason 挤掉了一半。改成**一个点**（未读）+ **整行压暗**（静音） |
 | 纯函数里也要写「没变化就沉默」 | 调用方已经过滤了没变化的会话；但这条规则放进 `Decide` 之后，任何调用方都不可能再造出「驻留的等待请求每 8 秒响一次」 |
 | 默认值只改一处，且必须明说 | 唯一改变老用户体感的是「回复完成时」从「总是」变成「仅后台」。旧配置 `notifyOnFinish: true` 读成 `always`，不是 `background`——用户当初点的就是「完成要提醒」 |
+| **判定记录不能放进 `runtime/`** | 那个目录里每个 `*.json` 都被 `internal/store` 当作一条上报快照，解析不成会话就**删掉**。第一版把 `alerts.json` 放在那里，一个 5 秒扫描周期内它就消失了——`--json` 报「没有记录」、`--doctor` 报「从未扫描」，正好是这份记录要解决的两种沉默。单测只验证了「写得进去、读得回来」，**没验证「放对了地方」**；装到沙箱里跑一次才看见。现在它在 `config.json` 旁边，`internal/store/runtime_contract_test.go` 从目录一侧把规则钉住 |
 
 ### 40.4 这一轮的实测（2026-11-12 22:1x）
 
@@ -3170,6 +3171,10 @@ python tools/check_docs_links.py                                 # 12 份文档�
 node --test tools/upstream-entry.test.mjs                        # 8 tests pass
 node tools/upstream-entry.mjs --check                            # 1.2.9 尚未发布 → SKIP（不是红）
 ```
+
+装出来的浮窗在沙箱里跑过一遍端到端：上报端推 working → idle，`alerts.json` 落在**应用目录**（不是 `runtime/`），
+`--json --pretty` 能看到 `alerts` 对象，`--doctor` 的第 10 项打印 `presence=away, balloon=probe · generic,
+decisions=done/done-away`。
 
 **未改绘制的 15 张预览图逐字节未变**（用改造前后两次渲染的 sha256 对比过），只有新增的三张（未读/静音/悬停）
 是新的。`bin/AI-Terminal-Pet.exe` 4,495,360 B、`vendor/AI-Terminal-Pet.exe` 与它逐字节相同。

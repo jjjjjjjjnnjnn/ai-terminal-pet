@@ -24,10 +24,10 @@ func TestAlertReceiptRoundTrip(t *testing.T) {
 	if path == "" {
 		t.Fatal("the receipt path must be derivable from LOCALAPPDATA")
 	}
-	if want := filepath.Join(root, "AI-Terminal-Pet", "runtime", "alerts.json"); path != want {
+	if want := filepath.Join(root, "AI-Terminal-Pet", "alerts.json"); path != want {
 		t.Fatalf("receipt path = %q, want %q", path, want)
 	}
-	if _, err := os.Stat(filepath.Join(root, "AI-Terminal-Pet", "runtime")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, "AI-Terminal-Pet")); err == nil {
 		t.Fatal("nothing should have been created before the first write")
 	}
 
@@ -96,7 +96,7 @@ func TestAlertReceiptUsesTheAtomicWriter(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("LOCALAPPDATA", root)
 	writeAlertRecord(alertRecord{Presence: "present"})
-	entries, err := os.ReadDir(filepath.Join(root, "AI-Terminal-Pet", "runtime"))
+	entries, err := os.ReadDir(filepath.Join(root, "AI-Terminal-Pet"))
 	if err != nil {
 		t.Fatal(err)
 	}

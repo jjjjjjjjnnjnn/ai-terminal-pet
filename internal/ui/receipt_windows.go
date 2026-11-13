@@ -56,15 +56,25 @@ type alertRecordSession struct {
 	Unread   bool   `json:"unread,omitempty"`
 }
 
-// alertReceiptPath is runtime/alerts.json, next to the reporter snapshots so a
-// `--json` reader finds it without a second directory convention.
+// alertReceiptPath is alerts.json in the app directory, NOT in runtime/.
+//
+// runtime/ holds one *.json per reporter snapshot, and internal/store treats
+// every *.json in there as one: a file it cannot parse as a session payload is
+// dead evidence and gets deleted. The first version of this feature wrote the
+// receipt there, and a single 5-second scan cycle removed it - so --json said
+// "no receipt" and --doctor said the overlay had never scanned, which is the
+// exact failure this file exists to prevent. internal/store's
+// runtime_contract_test.go pins the rule from the other side.
 func alertReceiptPath() string {
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {
 		return ""
 	}
-	return filepath.Join(base, "AI-Terminal-Pet", "runtime", "alerts.json")
+	return filepath.Join(base, "AI-Terminal-Pet", alertReceiptName)
 }
+
+// alertReceiptName is deliberately not a directory that anything scans.
+const alertReceiptName = "alerts.json"
 
 // writeAlertRecord persists the receipt. Every failure is ignored on purpose:
 // the receipt is diagnostics, and a machine with a read-only runtime directory

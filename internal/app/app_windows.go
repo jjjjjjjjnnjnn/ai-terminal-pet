@@ -26,7 +26,7 @@ import (
 // (slate stays the default, so nothing changes unless you ask), a switch that
 // tints each row's source name by terminal, and "start hidden" for people who
 // want the strip in the tray until a session needs them.
-const Version = "1.0.3"
+const Version = "1.0.4"
 
 func Run() error {
 	return RunWith(false)
@@ -621,8 +621,11 @@ func Snapshot() (Report, error) {
 	}
 	// The alert receipt is read here rather than fetched from the live window:
 	// --json must never depend on a GUI process, and this file is written by
-	// the overlay for exactly this purpose.
-	alerts := readAlertReport(filepath.Join(localAppData, "AI-Terminal-Pet", "runtime"))
+	// the overlay for exactly this purpose. It lives beside config.json and
+	// NOT in runtime/, because every *.json in runtime/ is a reporter snapshot
+	// and the store scanner deletes the ones it cannot parse (see
+	// internal/store/runtime_contract_test.go).
+	alerts := readAlertReport(filepath.Join(localAppData, "AI-Terminal-Pet"))
 	return Report{
 		SchemaVersion: session.SchemaVersion,
 		State:         session.Aggregate(items),
@@ -633,9 +636,10 @@ func Snapshot() (Report, error) {
 	}, nil
 }
 
-// readAlertReport reads runtime/alerts.json. A missing or unreadable file is
-// null, not a failure: an overlay that has not run since the upgrade has no
-// receipt, and that is not a fault in the reporter a script is asking about.
+// readAlertReport reads alerts.json from the app directory. A missing or
+// unreadable file is null, not a failure: an overlay that has not run since the
+// upgrade has no receipt, and that is not a fault in the reporter a script is
+// asking about.
 func readAlertReport(directory string) *AlertReport {
 	path := filepath.Join(directory, "alerts.json")
 	data, err := os.ReadFile(path)

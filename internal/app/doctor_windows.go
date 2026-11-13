@@ -238,7 +238,7 @@ func checkAlerts(env doctorEnv) DoctorCheck {
 	if env.localAppData == "" {
 		return DoctorCheck{Status: doctorWarn, Detail: "LOCALAPPDATA is not set, so runtime/alerts.json cannot be located"}
 	}
-	directory := filepath.Join(env.localAppData, installDirectoryName, "runtime")
+	directory := filepath.Join(env.localAppData, installDirectoryName)
 	path := filepath.Join(directory, "alerts.json")
 	record := readAlertReport(directory)
 	if record == nil {
