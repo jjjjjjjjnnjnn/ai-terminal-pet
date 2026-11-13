@@ -79,6 +79,19 @@
 沙箱里拿**装出来的** 1.0.5 用 `PostMessage` 点第一行：`Get-Clipboard` 拿到的就是那个完整路径；
 点页脚仍然收起（200 px → 56 px）；紧凑条左半复制、右半不碰剪贴板。
 
+发布资产（都从本机产物算出，并从公网 URL 下载回来复验过）：
+
+| 资产 | 大小 | sha256 |
+|---|---|---|
+| `ai-terminal-pet-1.0.5-win-x64.zip`（17 文件） | **5,039,878 B** | `AB0218D03F69E1784C49763B464A95FDAA307E254066F8CAF743CEEF149F1BC7` |
+| `pet-setup.exe` | **14,267,904 B** | `A5B9025A6E6A6519D305BC6F1BBAAD6D005C20A3D348B3FD61F75F385B0A5C09` |
+| `dsh-ai-terminal-pet-1.2.11.tgz`（18 文件） | **1,988,410 B** | `C3FA49B4659FBBD0A820420F095936C7E31C2BC79B01174693B8D04E6FBCC07D` |
+
+沙箱复验（在公网资产上重跑过）：zip → `install.cmd`（11 件制品）→ `-VerifyOnly` 11/11 → 装出来的 1.0.5
+`--doctor` **8 ok / 2 warn / 0 fail**（两条 warn 是「浮窗已退出」与「没有活实例」，都不是故障）→
+点行复制 → `-Uninstall` 目录归零。npm 上 `dsh-ai-terminal-pet@1.2.11` 已发布，`npm pack` 取回的 tarball
+与 Release 资产**逐字节相同**（sha256 相同）。
+
 ## [1.0.4] — 2026-11-13（浮窗：判定记录搬家）
 
 ### Fixed
