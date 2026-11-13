@@ -30,9 +30,9 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-未发布版本：**第 44 轮（2026-11-13 深夜）是未发版的一批**——设置窗口的字号、可读性与那个点不进去的
-外观页签，版本常量仍是 1.0.6、插件包仍是 1.2.13。除此之外**已全部发版**：浮窗本体 **1.0.6**
-（tag `pet-v1.0.6`），插件包 **1.2.13**（tag `dsh-plugin-v1.2.13`）；下面几段原本标着 `[Unreleased]`/批次标题的段落记录的是 1.0.2 之前的
+已发版到 **1.0.7**（tag `pet-v1.0.7`）/ **1.2.14**（tag `dsh-plugin-v1.2.14`）：这一批是设置窗口的
+可读性、可用性，以及那个点不进去的外观页签（见下面的 `[1.0.7]` 一节）。此前浮窗本体 **1.0.6**
+（tag `pet-v1.0.6`）、插件包 **1.2.13**（tag `dsh-plugin-v1.2.13`）都已发布且不可变；下面几段原本标着 `[Unreleased]`/批次标题的段落记录的是 1.0.2 之前的
 三批工作，它们分别在 1.0.0 / 1.2.6 那次换版本号（`df4fcf6`）与 2026-11-12 的无版本号批次里交付
 （`[Unreleased]` 只能属于「还没发出去的东西」，留着它会和本段第一句直接矛盾）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
@@ -40,7 +40,7 @@
 两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
-## [未发布] — 2026-11-13 深夜（第 44 轮：设置窗口可读、可用、外观页签终于能点）
+## [1.0.7] — 2026-11-13（第 44 轮：设置窗口可读、可用、外观页签终于能点）
 
 用户报了两件事：**"外观这个部分点不进去"** 和 **"设置界面字太小之类的"**。前者是一个漏掉的 `case`，
 后者是字号梯子整体低于系统基线——两者都在真机/渲染图上确认过，而不是靠读代码下结论。
@@ -97,6 +97,36 @@
 - 测试：`settings_tabs_windows_test.go`（8 条：页签真的切换、梯子不塌、字号真的改变窗口、
   矮屏降档、说明不丢字、焦点顺序完整、键盘是可选、换行不丢字）+ `internal/app/settings_window_test.go`
   （新偏好经过 `applyUISettings` 与 `config.json` 往返仍在）。
+
+### Numbers
+
+`gofmt -l .` 无输出 / `go vet ./...` 0 / `go test -count=1 ./...` 12 包全过（**326** 个 `func Test`，其中
+`cmd/pet-setup` 11 个）/ 上报端逐个 `node --check` 15 个文件全过 / `node --test reporters/opencode-events.test.mjs`
+**8/8** / 三个 `verify.mjs` 全 PASS / `vendor.mjs --check` 两个文件吻合 / `tests/fresh-machine.mjs --no-overlay`
+**162/162** / `tools/check_docs_links.py` **12 份**文档全解 / `tools/upstream-entry.test.mjs` 8/8。
+`node tools/upstream-entry.mjs --check` 在打 tag 之前是 **SKIP**（1.2.14 的资产还没上传，404 是预期），
+打完 tag 后必须重跑成 `OK` 或 `OK（in flight）`。
+
+规模：Go 非测试源码 **47 文件 / 16,882 行**、测试 **51 文件 / 8,884 行**；
+`bin/AI-Terminal-Pet.exe` **4,554,240 B**、`bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**。
+
+真机验收（第 44 轮发布前补做的那条，§44.7 曾记为"原因未明"）：在本机装好的构建上开设置窗口，
+点外观页签 → 窗口高度 826 → 586；点「纸白」→ **不到 1 秒** `config.json` 里 `theme` 变成 `paper`；
+点「字号 大」→ `settingsTextSize` 变成 `large`、窗口 750×586 → 900×701、层级与换行都没塌；随后点回
+「石板」「标准」两值复原。所以沙箱里那次"没写回"是**进程被 kill**（写盘在 `configSaver` 的守护协程里，
+正常退出才走 `defer flush()`），不是 bug。
+
+发布资产（本机 `scripts/package.ps1` 与 `npm pack` 实测）：
+
+| 资产 | 大小 | sha256 |
+|---|---|---|
+| `ai-terminal-pet-1.0.7-win-x64.zip`（17 文件） | **5,053,946 B** | `F3D049619BAEFD355E8481CDAF718175792B8C3B0022A3A9408960F99603E9DA` |
+| `pet-setup.exe` | **14,307,840 B** | `AE3E2DE769A47A5D87A22FC0D19E1D7617548DBC03F8E5FAAFB7B39AE15C8A6B` |
+| `dsh-ai-terminal-pet-1.2.14.tgz`（18 文件） | **2,000,539 B** | `EBD6CE82B653EF5C54FAA01888533D78A79DED4CFEA3137031FCD2E46A3D3FDE` |
+
+`npm pack` 之后把包里的 `README.md` 解出来核对过：两处安装命令都是 `dsh-plugin-v1.2.14`，
+`package.json` 与 `vendor/manifest.json` 的摘要也是本次构建的（`source.sha256`
+`a841b09b52bba55d…`、`overlay.sha256` `01b42dc27c06413b…`）。
 
 ## [1.0.6] — 2026-11-13（第 43 轮：三个"假提醒"的根因，OpenCode 上报端对齐 2.x）
 

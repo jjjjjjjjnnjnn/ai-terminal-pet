@@ -91,10 +91,10 @@ tarball, or by pinning the release tag. All three are verified end to end:
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # release tarball: same bytes as the npm release, straight from the GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.13/dsh-ai-terminal-pet-1.2.13.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.14/dsh-ai-terminal-pet-1.2.14.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.13&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.14&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Those three differ only in transport. The npm path is the shortest and the one a

@@ -6,11 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13 深夜；浮窗 **1.0.6**、插件包 **1.2.13** 已发版，**第 44 轮已提交、未发版**）
+## 1. 当前状态（2026-11-13 傍晚；浮窗 **1.0.7**、插件包 **1.2.14** 已发版）
 
-> 接手请先读本节与文末 **§44「交接：设置窗口可读、可用」**（最新一轮，**未发版**）、
-> **§43「交接：三个假提醒的根因 + OpenCode 2.x」**（上一轮，已发版）、
-> **§42「交接：点行复制路径」**（上一轮，已发版）、**§41「交接：判定记录搬家」**（上一轮）、
+> 接手请先读本节与文末 **§45「交接：把第 44 轮发出去 —— 1.0.7 / 1.2.14」**（最新一轮，只做发版与验收，
+> 没有改代码）、**§44「交接：设置窗口可读、可用」**（1.0.7 的代码就是它）、
+> **§43「交接：三个假提醒的根因 + OpenCode 2.x」**（上一轮）、
+> **§42「交接：点行复制路径」**、**§41「交接：判定记录搬家」**、
 > **§40「交接：提醒层」**（产品能力）和 **§39「交接：上游目录条目 sync」**
 > （上架机制，读它再读 §28 的清单形状）；§28 是更早一版的清单（分发状态已过期，只保留它的清单形状），
 > §27 是插件包分发的完整 runbook，而上游目录条目的规则、八步发版顺序与「合并 ≠ 可见」的判断方式在
@@ -18,14 +19,12 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.6`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.13`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`。
-  **`pet-v1.0.6` 与 `dsh-plugin-v1.2.13` 是第 43 轮打的**（1.2.12 因包内 README 指向 1.2.11 被 1.2.13 取代），
-  资产与沙箱复验见 §43。
-  **工作区比 tag 领先一个批次**：第 44 轮（设置窗口，见 §44）已在 `821226a` 提交并推送、CI 绿，
-  但**没有升版本、没有打 tag**——所以 `bin/` 与 `vendor/` 里的二进制比 `pet-v1.0.6` 的资产新
-  （4,554,240 B 对 4,520,448 B）。下次发版要把它们一起发出去。
+- **版本**：浮窗 **`1.0.7`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.14`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7` 与
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`。
+  **`pet-v1.0.7` 与 `dsh-plugin-v1.2.14` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）。
+  **工作区与 tag 已经同步**：`bin/`、`packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的
+  `AI-Terminal-Pet.exe` 三份逐字节相同（**4,554,240 B**，sha256 `01B42DC2…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**326 个** `func Test`，
@@ -33,33 +32,25 @@
   三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
   `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
-  `--doctor` **10 项**（本机 10 ok / 0 warn / 0 fail；沙箱里跑完浮窗后是 8 ok / 2 warn / 0 fail，
-  那两条 warn 是「浮窗已退出」与「没有活实例」，不是故障）。
-- **规模**：Go 非测试源码 **47 文件 / 16,880 行**、测试 **51 文件 / 8,884 行**（326 个 `func Test`，
+  `--doctor` **10 项**（本机 10 ok / 0 warn / 0 fail）。
+- **规模**：Go 非测试源码 **47 文件 / 16,882 行**、测试 **51 文件 / 8,884 行**（326 个 `func Test`，
   外加 `cmd/pet-setup` 的 11 个）；
-  `bin/AI-Terminal-Pet.exe` **4,554,240 B**（含第 44 轮，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同；
-  已发布的 1.0.6 是 4,520,448 B）、`bin/pet-statusline.exe` **3,664,896 B**、
-  `bin/pet-hook.exe` **3,697,152 B**；`dist/` 里仍是 1.0.6 的产物（`pet-setup.exe` 14,274,048 B），
-  源码已前进，所以**下次 `scripts/package.ps1` 会产出不同字节**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
+  `bin/AI-Terminal-Pet.exe` **4,554,240 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
+  `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**；
+  `dist/` 里是 1.0.7 的产物（`ai-terminal-pet-1.0.7-win-x64.zip` 5,053,946 B、
+  `pet-setup.exe` 14,307,840 B），均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.13**（`npm view` 核对）；`dsh-plugin-v1.2.13` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.13.tgz` **1,990,629 B / sha256 `FB809C2B…` / shasum `dbfc774d…`**（18 个文件），
-    从公网下载回来逐字节相同，包内 README 的安装命令是 1.2.13；`npm pack` 解包后与 Release 资产
-    **逐文件相同**（npm 会重打包，`.tgz` 字节不同是正常的，见 §43.6）；
-    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` = `05fc1fb`，`icon` 同一 sha）。
-  - 浮窗线：`pet-v1.0.6` 的 Release 带两个资产——`ai-terminal-pet-1.0.6-win-x64.zip`
-    **5,041,100 B / sha256 `5E2762A2…`**（17 个文件）与 `pet-setup.exe` **14,274,048 B / sha256 `39BC505C…`**
-    （本机 `scripts/package.ps1` 产出）；`pet-v1.0.5` 及更早的每一个 tag 仍在（不可变，已被取代）。
-  - 三个资产都**从公网 URL 下载回来复验过**（2026-11-13 早上）：沙箱里 zip → install → `-VerifyOnly`
-    **11/11** → 装出来的 1.0.4 `--doctor` **0 fail** → `-Uninstall` 目录归零；沙箱里起浮窗 + 上报端推
-    `working` → `idle`，`alerts.json` 存活两个扫描周期、`--json` 的 `alerts` 有内容、`--doctor` 第 10 项读到它；
-    `npm pack dsh-ai-terminal-pet@1.2.10` 与 Release 资产逐字节相同。
-  - **上游条目**：`main` 的 `tarball` 仍指向 **1.2.9**；1.2.13 的
-    [PR #14990](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14990)（分支 `bump-tarball-1.2.13`，
-    单文件单行）已开、`MERGEABLE`，`node tools/upstream-entry.mjs --check` = `OK (in flight)`。
-    同一作者的 #14899（1.2.10）、#14945（1.2.11）仍开着、已留「被 #14990 取代」的说明；
-    #14986（1.2.12）已关。**合并 ≠ 可见**：判断可见性读对方站点索引文件，不读 PR 页面。
+  - 插件线：npm `latest` = **1.2.14**（`npm view` 核对）；`dsh-plugin-v1.2.14` 的 Release 资产
+    `dsh-ai-terminal-pet-1.2.14.tgz` **2,000,539 B / sha256 `EBD6CE82…` / shasum `b95b20c7…`**（18 个文件），
+    包内 README 的安装命令是 1.2.14；
+    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §45，`icon` 同一 sha）。
+  - 浮窗线：`pet-v1.0.7` 的 Release 带两个资产——`ai-terminal-pet-1.0.7-win-x64.zip`
+    **5,053,946 B / sha256 `F3D04961…`**（17 个文件）与 `pet-setup.exe` **14,307,840 B / sha256 `AE3E2DE7…`**；
+    `pet-v1.0.6` 及更早的每一个 tag 仍在（不可变，已被取代）。
+  - **上游条目**：`main` 的 `tarball` 仍指向 **1.2.9**；1.2.14 的跟进 PR 号与状态见 §45（合并仍要人工，
+    `node tools/upstream-entry.mjs --check` 只认 `OK` / `OK（in flight）`）。
+    **合并 ≠ 可见**：判断可见性读对方站点索引文件，不读 PR 页面。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
@@ -3140,7 +3131,73 @@ python tools/check_docs_links.py            # 11 份文档全解
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
 
-## 44. 交接：设置窗口可读、可用、外观页签终于能点（2026-11-13 深夜，第 44 轮；**未发版**）
+## 45. 交接：把第 44 轮发出去 —— 1.0.7 / 1.2.14（2026-11-13 傍晚，第 45 轮）
+
+这一轮**没有改代码**：第 44 轮的实现与测试已经在 `821226a` 上、CI 绿，缺的只是发版仪式。本轮做的是
+**发版前的一条真机验收** + [docs/UPSTREAM.md](UPSTREAM.md) §2 的八步。
+
+### 45.1 发版前补做的那条验收：设置窗口的改动真的落盘了吗
+
+§44.7 留了一句「沙箱里点完控件 `config.json` 没有被重写，原因未定」。发版前在本机装好的构建上重做了一次
+（本机安装目录里的 exe 与 `bin/` 那份**逐字节相同**，所以验的就是要发的这版）：
+
+| 动作 | 结果 |
+|---|---|
+| 点侧栏「外观」 | 窗口高 **826 → 586**，字号 / 配色主题 / 按终端着色 / 启动时隐藏都在 |
+| 点「纸白」 | **不到 1 秒** `config.json` 里 `"theme": "paper"` |
+| 点「字号 大」 | `"settingsTextSize": "large"`，窗口 750×586 → **900×701**，层级与换行都没塌 |
+| 点回「石板」「标准」 | 两值复原为 `slate` / `standard` |
+
+所以原因不是 bug：写盘在 `configSaver` 的守护协程里，**进程被 kill 就不会走 `defer flush()`**，
+沙箱里那次是提前杀进程。以后验这类"点了之后有没有写盘"，**必须让进程正常退出**（关窗 + `--quit`），
+或者等守护协程跑完再看文件。
+
+### 45.2 发版清单（按 docs/UPSTREAM.md §2 的顺序，逐条落地）
+
+1. 版本前移：`internal/app/app_windows.go:29` → **1.0.7**（那段注释也重写成这一版的理由，不再停在 1.0.2）、
+   根 `package.json` 与 `packages/dsh-ai-terminal-pet/package.json` → **1.2.14**、
+   `docs/market-index.json` 的 `versions[0].version` 与 `publishTimestamp`（`1794584809`）。
+2. 三个二进制按 `-trimpath -buildvcs=false -ldflags "-s -w"` 重建 → `node …/scripts/vendor.mjs` → `--check`
+   （源码摘要 `a841b09b…`、overlay `01b42dc2…`；**源码改了就必须重 vendor**，否则 CI 红）。
+3. `scripts/package.ps1` 打 zip 与 `pet-setup.exe`；`npm pack` 取 tarball，并把包里的 `README.md` 解出来
+   核对两处安装命令已经是 `dsh-plugin-v1.2.14`（§43.6 的教训）。
+4. 全门禁：见 §1「健康」那一行；发版前 `node tools/upstream-entry.mjs --check` 是 **SKIP**（资产还没上传，
+   `SKIP 不是 pass`），打完 tag 后重跑成 `OK` / `OK（in flight）`。
+5. A 提交（版本 + 两份清单 + 索引版本/时间戳 + CHANGELOG + README/ROADMAP/HANDOVER）→
+   `pet-v1.0.7` 与 `dsh-plugin-v1.2.14` → 两个 Release → `npm publish`。
+6. B 提交把 `docs/market-index.json` 的 `source.commit` 与 `icon` 钉到 A 的 sha。
+7. `node tools/upstream-entry.mjs --version 1.2.14 --write --branch bump-tarball-1.2.14` → 开 PR →
+   关掉被取代的旧版本 PR。
+8. 三个资产从公网 URL 下载回来复验字节；沙箱 `install → -VerifyOnly → --doctor → -Uninstall`；
+   本机 `scripts\install.cmd` 升到 1.0.7 后 `--doctor` 应 10 项 0 fail。
+
+### 45.3 发布资产（本机产物实测）
+
+| 资产 | 大小 | sha256 |
+|---|---|---|
+| `ai-terminal-pet-1.0.7-win-x64.zip`（17 文件） | **5,053,946 B** | `F3D049619BAEFD355E8481CDAF718175792B8C3B0022A3A9408960F99603E9DA` |
+| `pet-setup.exe` | **14,307,840 B** | `AE3E2DE769A47A5D87A22FC0D19E1D7617548DBC03F8E5FAAFB7B39AE15C8A6B` |
+| `dsh-ai-terminal-pet-1.2.14.tgz`（18 文件） | **2,000,539 B** | `EBD6CE82B653EF5C54FAA01888533D78A79DED4CFEA3137031FCD2E46A3D3FDE` |
+
+### 45.4 顺带修掉的三处文档失准
+
+发版要改版本号，于是把"读起来像事实"的地方都核了一遍，发现三处已经不是事实：
+
+- `README.md` 的版本徽章停在 **1.0.2**（1.0.2 之后三次发版都没跟着走）；
+- README 中英两段「插件包当前版本」都写着 **1.2.8**，而 npm 上是 1.2.13——现在统一成 1.2.14，并把
+  1.2.9–1.2.14 各自带的浮窗版本与那句话该说明的事（提醒判定、回执搬家、点行复制、三个假提醒、设置窗口）
+  逐条补上，英文与中文逐句对应；
+- `docs/ROADMAP.md` 的基线表里，`--version` 徽章、二进制字节、单测数量（302 → 326）与逐包分布、
+  代码行数（16,880 → 16,882）都过期了。
+
+### 45.5 没做的事
+
+- **没有新功能**：这一轮的产物是"上一轮的代码到了用户手上"。功能候选取自 ROADMAP §4（UIA 无障碍、
+  设置窗口滚动、`--json` 走 IPC），都不应塞进发版轮。
+- **`go test -race` 仍未跑**：缺 gcc/cgo，属环境，不是代码。
+- **上游仍要人工合并**：我们只能保证"随时可合、检查跑过、只改一行"，可见性以对方站点索引文件为准。
+
+## 44. 交接：设置窗口可读、可用、外观页签终于能点（2026-11-13 深夜，第 44 轮；**已随 1.0.7 发版**）
 
 用户两句话：**"外观这个部分点不进去"**、**"设置界面字太小之类的"**。第一句是一个漏掉的 `case`，
 第二句是字号梯子整体低于系统基线。两句都在渲染图和真机窗口上确认过之后才动手。
@@ -3219,20 +3276,19 @@ python tools/check_docs_links.py            # 11 份文档全解
 - 渲染图：96dpi 与 144dpi 下四页都渲染出来看过；外观页的备注换行、行首禁则、"标准"高亮都是看图才发现的。
 - 真机：沙箱里 `--settings` 起真窗口，用 `PostMessage` 点侧栏第三个页签，窗口高度 **826 → 586**
   两次都复现（点关闭按钮窗口隐藏，证明消息通路是通的）。
-- **没观察到的**：沙箱里 `config.json` 没有被重写，原因未查明（进程被 kill 早于合并写入、或沙箱环境差异），
+- **没观察到的**（**§45.1 已查清**）：沙箱里 `config.json` 没有被重写，原因未查明（进程被 kill 早于合并写入、或沙箱环境差异），
   所以这条改由 `applyUISettings` + `Save`/`Load` 的往返测试覆盖。下次做真机点击验证时值得再查一次。
 
 ### 44.8 没做的事
 
-- **没发版**：版本仍是 1.0.6 / 1.2.13。这是一个有用户可见行为的批次（新设置项、界面变化），
-  下次发版按 §27 与 [docs/UPSTREAM.md](UPSTREAM.md) 走。
+- **没发版**（**已由 §45 完成**）：本轮的代码随后作为 1.0.7 / 1.2.14 发布，版本前移与八步清单见 §45。
 - **`vendor/` 必须重新 vendor**：源码变了，`vendor.mjs --check` 的源码摘要会失配。顺序永远是
   `go build` → `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs` → `--check`（见 §43.7）。
 - **无障碍（UIA）没有做**：这个窗口是自绘的分层表面，屏幕阅读器看不到任何控件。这是一整轮的工作，不是顺手。
 - **设置窗口没有滚动**：按 44.4 改成了降档。如果以后真的需要滚动，`settingsGeometry` 已经带了
   `contentHeight`，加偏移是局部改动。
 
-### 44.9 下一个会话从这里开始（发 1.0.7 / 1.2.14）
+### 44.9 下一个会话从这里开始（发 1.0.7 / 1.2.14 —— **已完成，见 §45**）
 
 一句话：**代码和测试已经好了，缺的是发版仪式。** 工作区干净、`821226a` 已推送、CI 绿，
 第 44 轮的改动全部在 `main` 上，只是没有升版本、没有 tag。

@@ -22,11 +22,13 @@ import (
 
 // Version is reported by `ai-terminal-pet --version`.
 //
-// 1.0.2 rather than 1.0.1: the look is now a setting. Three named palettes
-// (slate stays the default, so nothing changes unless you ask), a switch that
-// tints each row's source name by terminal, and "start hidden" for people who
-// want the strip in the tray until a session needs them.
-const Version = "1.0.6"
+// 1.0.7 rather than 1.0.6: the settings window became readable and usable. The
+// type ramp now lands on four distinct sizes instead of two (GDI snaps a
+// requested height to its own step, so 11/12/13 px all drew the same 8 px em),
+// hints wrap to two lines instead of losing text to an ellipsis, the window
+// reads its own DPI and follows WM_DPICHANGED, and the Look tab - which was
+// drawn, hovered and highlighted but wired to nothing - finally switches.
+const Version = "1.0.7"
 
 func Run() error {
 	return RunWith(false)
