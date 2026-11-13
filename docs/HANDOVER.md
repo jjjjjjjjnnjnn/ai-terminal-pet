@@ -6,30 +6,33 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13；浮窗 **1.0.4**、插件包 **1.2.10**，两个 Release、npm 与上游条目都已落地）
+## 1. 当前状态（2026-11-13 下午；浮窗 **1.0.5**、插件包 **1.2.11**，两个 Release 与 npm 已落地，上游 PR 在等合并）
 
-> 接手请先读本节与文末 **§41「交接：判定记录搬家」**（最新一轮）、**§40「交接：提醒层」**（产品能力）和 **§39「交接：上游目录条目 sync」**
+> 接手请先读本节与文末 **§42「交接：点行复制路径」**（最新一轮）、**§41「交接：判定记录搬家」**（上一轮）、
+> **§40「交接：提醒层」**（产品能力）和 **§39「交接：上游目录条目 sync」**
 > （上架机制，读它再读 §28 的清单形状）；§28 是更早一版的清单（分发状态已过期，只保留它的清单形状），
 > §27 是插件包分发的完整 runbook，而上游目录条目的规则、八步发版顺序与「合并 ≠ 可见」的判断方式在
 > [docs/UPSTREAM.md](UPSTREAM.md)。
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.4`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.10`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4` 与 `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`。
-  **`pet-v1.0.4` 与 `dsh-plugin-v1.2.10` 是本轮新打的**，资产见 §41；`pet-v1.0.2`、`pet-v1.0.1`、
-  `pet-v1.0.0`、`pet-v0.9.0` 与 `dsh-plugin-v1.2.6`…`v1.2.8` 仍然有效且不可变。查当前 CI 用
+- **版本**：浮窗 **`1.0.5`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.11`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5` 与
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`。
+  **`pet-v1.0.5` 与 `dsh-plugin-v1.2.11` 是本轮新打的**，提交 `885bdd4`，资产见 §42；
+  更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**283 个** `func Test`，
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**302 个** `func Test`，
   12 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
   `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
-  `--doctor` **10 项**（沙箱实测 9 ok / 1 warn / 0 fail，那条 warn 是「还没跑过浮窗，所以没有判定记录」）。
-- **规模**：Go 非测试源码 **42 文件 / 15,180 行**、测试 **43 文件 / 7,607 行**（283 个 `func Test`，
-  外加 `cmd/pet-setup` 的 20 个）、JS **12 文件 / 4,346 行**；
-  `bin/AI-Terminal-Pet.exe`（1.0.4，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，字节数见 §41）、
+  `--doctor` **10 项**（本机 10 ok / 0 warn / 0 fail；沙箱里跑完浮窗后是 8 ok / 2 warn / 0 fail，
+  那两条 warn 是「浮窗已退出」与「没有活实例」，不是故障）。
+- **规模**：Go 非测试源码 **45 文件 / 15,860 行**、测试 **46 文件 / 8,112 行**（302 个 `func Test`，
+  外加 `cmd/pet-setup` 的 11 个）、JS **14 文件**；
+  `bin/AI-Terminal-Pet.exe` **4,514,304 B**（1.0.5，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**、
-  `dist/pet-setup.exe` **14,248,960 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
+  `dist/pet-setup.exe` **14,267,904 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
   - 插件线：npm `latest` = **1.2.10**（`npm view` 核对；`npm pack` 取回的 tarball 与 Release 资产**逐字节相同**，
@@ -3129,6 +3132,93 @@ python tools/check_docs_links.py            # 11 份文档全解
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
 
+## 42. 交接：点行复制路径（2026-11-13 下午，第 42 轮；浮窗 1.0.5 / 插件 1.2.11）
+
+### 42.1 一句话：这一轮没有改协议，因为要用的数据早就在线上
+
+`session.Project` 里装的就是上报端给的**完整工作目录**（`docs/PROTOCOL.md` §4 写的是「项目路径 / 工作目录」，
+上限 1024），面板行只是用 `filepath.Base` 把它截成名字。所以 F8 剩下的确实是三件事：剪贴板、回执、
+以及一个新命中区——**没有新字段，没有任何已装上报端需要升级**。这一条在第一轮读代码时就确认了，
+后来的施工与验收都建立在这个事实上。
+
+### 42.2 交互规则写成纯函数，顺序是排过的
+
+`internal/ui/tap_windows.go` 的 `decideTap`：
+
+```
+跳转箭头 / 紧凑条右半  >  紧凑条左半（复制）  >  auto-approve 否决（仅倒计时武装时）  >  展开态行（复制）  >  收起
+```
+
+**否决排在行复制之前是有意的**：自动放行倒计时在跑的那几秒里，「别放行」是最贵的一次点击；
+用一次剪贴板写入来回答它，等于静默放行。这条规则有表驱动测试（`tap_windows_test.go`），
+因为「点哪儿会发生什么」是用户唯一真的能感觉到的部分。
+
+### 42.3 五条施工约束（三条是旧的，两条是新的）
+
+| 约束 | 具体 |
+|---|---|
+| 命中与绘制同源 | `expandedRowRect`/`expandedRowHit`（1.0.3 落好）与新的 `compactActionRects` 同时喂给光栅化与命中；紧凑条两半有「不重叠、中点各归各位」的单测 |
+| 新画的进 `renderedKey` | 回执有自己的三元组 `toastRow`/`toastTick`/`toastFailed`，**不挂 `clock`**：呼吸路径刻意忽略 `clock`，挂在上面就是 1.0.1 时长冻结的翻版 |
+| 回执复用 `syncAnimation` | 不新开常驻计时器；`syncAnimation` 现在就问 `toast.frame(...)` 而不是 `toast.active(...)`，这样「行换主人」时立刻停止付费 |
+| **回执是关于某个会话的断言**（新） | 面板会随上报重排，所以 `copyToast` 记 `session.Identity`：那一行换了主人、或紧凑条的最紧急会话变了，回执立刻消失，而不是把「已复制」留在别人的项目上 |
+| **失败不假装成功**（新） | `copyToClipboard` 只在 `SetClipboardData` 真的成功后返回 true，失败时回执写「复制失败」并响一声，且**不**落到「收起」——被忽略的点击和没收到的点击看起来一样 |
+
+**剪贴板本身的顺序也换了**：先 `GlobalAlloc` 拷贝、再 `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`。
+直觉顺序（先开、先清、再分配）在分配失败时会留下**一个空剪贴板**——用户上一次复制的内容没了，
+而「复制失败」与「点了没反应」还长得一样。现在最坏情况是「什么都没变」。
+
+### 42.4 紧凑条：一个胶囊两个控件
+
+56×156 的条子上没有第二行可用，所以跳转条被**横着分成两半**：左半 17 单位是复制图标
+（两个重叠的方片，用线条画，不依赖字体），右半是原来的箭头 + 动词，中间一条分隔线说明「这里是两个控件」。
+外轮廓仍由 `compactFocusRect` 定义，所以面板剪影没变。三条守卫：
+
+- 没有可复制的会话（没有跳转目标、或 project 为空）→ **不分**，整条仍是跳转键；
+- 设备像素太小（65% 缩放以下）→ 不分，宁可没有复制也不给一个四像素的陷阱；
+- 动词放不下时不画省略号：`Jump` 在 56 单位上量出来是 17 px，而右半只有 ~20 px，
+  `fitText` 会把整句变成「…」，读起来像坏掉的标签。
+
+### 42.5 这一轮的实测
+
+```
+gofmt -l .                     # 空
+go vet ./...                   # 0
+go test -count=1 ./...         # 12 包全 ok，302 个 func Test（1.0.4 是 283）
+node packages/dsh-ai-terminal-pet/verify.mjs / scripts/vendor.mjs --check / integrations/…/verify.mjs   # 全 PASS
+node tests/fresh-machine.mjs --no-overlay   # 162/162
+python tools/check_docs_links.py            # 12 份
+node --test tools/upstream-entry.test.mjs   # 8/8
+PET_PREVIEW_DIR=… go test ./internal/ui -run 'TestRenderPreview|TestRenderSettingsPreview'   # 31 张
+```
+
+**交付形态上验过三遍**（这是本轮最花时间的部分，也是最值钱的部分）：
+
+1. `PET_CLIPBOARD_PROBE=1` 的桌面探针：写一次、用剪贴板 API 读回、再写一次确认是**替换**而不是追加；
+2. 沙箱里跑**本机构建**的 1.0.5，用 `PostMessage` 发真实的 `WM_LBUTTONDOWN`/`WM_LBUTTONUP`：
+   点第一行后 `Get-Clipboard` 就是那个完整路径，点页脚仍然收起（200 px → 56 px），
+   紧凑条左半复制、右半不碰剪贴板；
+3. 从**公网下载**回来的 `ai-terminal-pet-1.0.5-win-x64.zip` 重跑一遍：`install.cmd` 11 件制品 →
+   `-VerifyOnly` 11/11 → 装出来的 `--doctor` **8 ok / 2 warn / 0 fail** → 同一个手势 → `-Uninstall` 目录归零。
+
+发布：`pet-v1.0.5`（zip **5,039,878 B / AB0218D0…**、`pet-setup.exe` **14,267,904 B / A5B9025A…**）与
+`dsh-plugin-v1.2.11`（tgz **1,988,410 B / C3FA49B4…**，18 文件）都已从公网下载回来复验；npm `latest` = **1.2.11**，
+`npm pack` 取回的 tarball 与 Release 资产逐字节相同。B 提交把索引钉到 A 提交 `885bdd4`。
+
+### 42.6 交接要点
+
+- 上游跟进：[PR #14945](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14945)（`bump-tarball-1.2.11`），
+  工具生成、单文件单行（`+1/−1`）、`MERGEABLE`，`check` 排队中。合并后 `node tools/upstream-entry.mjs --check` 会变 OK。
+  **注意**：`#14899`（1.2.10）仍开着，两者改同一行，先合哪个都行，后合的那个会再冲突一次——那时**重新用工具从 `main` 建**。
+- **B 提交之后 CI 会红一次**，设计如此（`--check` 在「已发布、上游还是旧、且没有 PR 开着」时报红，而 B 提交早于 PR）。
+  本轮实测：重跑那一次即 success。**这条是第二次遇到了，下次别再怀疑自己。**
+- **本机已就地升级到 1.0.5**：`scripts\install.ps1` → `-VerifyOnly` 11/11 → `--doctor` 10 ok / 0 warn / 0 fail。
+  交接前顺手核对一次本机版本与最新 tag（留着旧版会让「本机实测」与文档打架）。
+- **`bump-tarball` 分支不能复用**：本轮先推过一次同名分支，第二次 `--force-with-lease` 被 GitHub 判 stale
+  （force-with-lease 的期望 sha 是本地旧引用）。做法是 `gh api -X DELETE .../git/refs/heads/<branch>` 再重跑，
+  或干脆换一个分支名。工具没有自动处理这件事，**这是它的一个缺口**。
+- 剩下的候选见 [docs/ROADMAP.md](ROADMAP.md) §4：`I1-δ`（代码签名 / MSI，唯一需要外部输入的一段）、
+  `E3` 跨平台、`L2` 体积（4.29 MiB → 2.5 MiB 目标）、`F2` 键盘导航（`Esc` 已有，缺方向键与 `Enter`）。
+
 ## 41. 交接：判定记录搬家（2026-11-13 早上，第 41 轮；浮窗 1.0.4 / 插件 1.2.10）
 
 ### 41.1 一句话：1.0.3 装的「可回答性」在装出来之后是坏的，而坏法正是它想消除的那种
@@ -3186,15 +3276,12 @@ python tools/check_docs_links.py            # 12 份
 - **B 提交之后 CI 会红一次**，这是设计的：`--check` 在「已发布、上游还是旧、且没有 PR 开着」时故意报红，
   而 B 提交发生在 PR 开出来之前。**重跑那一次即可**（本轮实测：重跑后 success）。
   这条写在这里，是因为下一次还会遇到，而且看起来像真失败。
-- F8（点击会话行复制项目路径）仍未开工，地基（`expandedRowRect` / `expandedRowHit`、行悬停高亮）已在。
+- ~~F8（点击会话行复制项目路径）仍未开工~~ —— **已在 1.0.5 交付**，见 §42；地基（`expandedRowRect` / `expandedRowHit`、行悬停高亮）确实在 1.0.3 就落好了。
 - **本机也在跑 1.0.4 了**：交接时本机装的还是 1.0.3（`4,495,360 B`），已用 `scripts\install.ps1` 就地升级到
   1.0.4（`4,494,848 B`），`-VerifyOnly` 11/11、`--doctor` **10 ok / 0 warn / 0 fail**（浮窗在场），
   `alerts.json` 由装出来的这一版真的写出来了。**交接前请顺手核对本机版本与最新 tag 一致**——
   浮窗是本机在用的东西，留着旧版会让「本机实测」与文档不一致。
-- **一个小瑕疵，留给下一轮**：判定记录里 `"kind":""` 表示「这个会话不在要什么」（正常在忙的会话），
-  但空字符串读起来像缺字段。下一轮把它写成 `"none"`（`Kind.Label()` 对 `KindNone` 返回空串），
-  顺便给 `--doctor` 那行的 `decisions=/not-asking` 补上同样的词。**不值得为此单独发一版**，
-  跟 F8 或下一个功能一起走。
+- ~~**一个小瑕疵，留给下一轮**~~ —— 已随 1.0.5 修掉：`Kind.Label()` 把空 kind 写成 `none`，`--doctor` 的 `decisions=` 因此从 `/not-asking` 变成 `none/not-asking`。见 §42.5。
 
 ## 40. 交接：提醒层（2026-11-12 晚，第 40 轮；浮窗 1.0.3 / 插件 1.2.9）
 
