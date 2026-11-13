@@ -32,23 +32,23 @@
   `dist/pet-setup.exe` **14,248,960 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.9**（`npm view` 核对；`npm pack` 取回的 tarball 与 Release 资产**逐字节相同**，
-    sha256 `3AAB0175…`、18 个文件）；`dsh-plugin-v1.2.9` 的 Release 资产 `dsh-ai-terminal-pet-1.2.9.tgz`
-    **1,974,535 B / sha256 `3AAB017511ED8810D9FC430F3A61995BCF82239C913B74D3B9C9CBCC42214369`**；
-    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` = `e1a2a76`）。
-  - 浮窗线：`pet-v1.0.3` 的 Release 带两个资产——`ai-terminal-pet-1.0.3-win-x64.zip`
-    **5,031,975 B / sha256 `4D9E9280D4D33E8C14B481C758CF3BB17404D611D34EC6644AAFD9DC8516A3AF`**（17 个文件）与
-    `pet-setup.exe` **14,248,960 B / sha256 `F7BDDDEE3775027EE57C9B88BB998926ED5618AE3C5E2B8211E4275AECAEC4F2`**
-    （本机 `scripts/package.ps1` 产出）；`pet-v1.0.2`、`v1.0.1`、`v1.0.0` 与 `pet-v0.9.0` 仍在（不可变，已被取代）。
-  - 三个资产都**从公网 URL 下载回来复验过**（2026-11-13 早上）：`pet-setup.exe --version` 打印
-    `pet-setup 1.0.3`；沙箱（自带 `LOCALAPPDATA`/`USERPROFILE`）里 zip → install → `-VerifyOnly` **11 件全对** →
-    `--doctor` **0 fail** → `-Uninstall` 目录归零；`pet-setup.exe` 装完 `--verify` **11 件全对**、
-    `--uninstall`（输 yes）目录归零；`npm pack dsh-ai-terminal-pet@1.2.9` 与 Release 资产逐字节相同。
-  - **上游条目已合并**：awesome-dsh-plugin 的
-    [PR #14784](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14784) 于 2026-11-12T22:12Z
-    合并（`check` 与 `Submission gate` 都 SUCCESS），`main` 上的 `tarball` 现在指向 `dsh-plugin-v1.2.9`，
-    `node tools/upstream-entry.mjs --check` 实测返回 `OK`。1.2.8 的 #14718 按「被取代」处理：先评论说明、再关闭。
-    站点 `plugins.json` 的重建要等它自己跑——「合并 ≠ 已渲染」。
+  - 插件线：npm `latest` = **1.2.10**（`npm view` 核对；`npm pack` 取回的 tarball 与 Release 资产**逐字节相同**，
+    sha256 `676F41EC…`、18 个文件）；`dsh-plugin-v1.2.10` 的 Release 资产 `dsh-ai-terminal-pet-1.2.10.tgz`
+    **1,974,423 B / sha256 `676F41ECC95D511AABA443F7EA41ABC942AB646146ACB79D49B1A0EB270E9F69`**；
+    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` = `4491856`）。
+  - 浮窗线：`pet-v1.0.4` 的 Release 带两个资产——`ai-terminal-pet-1.0.4-win-x64.zip`
+    **5,031,986 B / sha256 `B490A2BBF2EAAB7C91F41D76D971BE12F7493092D0E1538B28CB8D3CC145CC76`**（17 个文件）与
+    `pet-setup.exe` **14,248,448 B / sha256 `96D9189FD35BC1DB712F0BF6CA239D36B1480824E4597A96F7B5B8EC06E331C5`**
+    （本机 `scripts/package.ps1` 产出）；`pet-v1.0.3`、`v1.0.2`、`v1.0.1`、`v1.0.0` 与 `pet-v0.9.0` 仍在（不可变，已被取代）。
+  - 三个资产都**从公网 URL 下载回来复验过**（2026-11-13 早上）：沙箱里 zip → install → `-VerifyOnly`
+    **11/11** → 装出来的 1.0.4 `--doctor` **0 fail** → `-Uninstall` 目录归零；沙箱里起浮窗 + 上报端推
+    `working` → `idle`，`alerts.json` 存活两个扫描周期、`--json` 的 `alerts` 有内容、`--doctor` 第 10 项读到它；
+    `npm pack dsh-ai-terminal-pet@1.2.10` 与 Release 资产逐字节相同。
+  - **上游条目**：1.2.9 的 [PR #14784](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14784) **已合并**
+    （两个 check 都 SUCCESS），`main` 的 `tarball` 当时指向 1.2.9；1.2.10 的
+    [PR #14899](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14899) 已开、`MERGEABLE`、
+    **`check` 与 `Submission gate` 都已 SUCCESS**，等人工合并。合并前上游仍是 1.2.9——「PR 开 = 已收录」不成立，
+    判断可见性读站点索引文件。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
