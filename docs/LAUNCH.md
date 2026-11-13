@@ -9,10 +9,10 @@
 ## 0. 发布顺序（**已全部就绪**）
 
 ```
-P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.7 / 1.2.15）──► ✅ 现在可以发声
+P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.7 / 1.2.16）──► ✅ 现在可以发声
 ```
 
-**前提条件全部满足，可以发了。** 浮窗 1.0.7、插件 1.2.15、npm `latest` = 1.2.15、`pet-v1.0.7` 的
+**前提条件全部满足，可以发了。** 浮窗 1.0.7、插件 1.2.16、npm `latest` = 1.2.16、`pet-v1.0.7` 的
 zip 与 `pet-setup.exe` 都在线上，并且都从公网下载回来逐字节复验过（sha256 与 CHANGELOG 记的一致）。
 发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.7` 这个链接。
 
@@ -275,7 +275,7 @@ files alone does not wire it. The connect table in the README has one line per t
 | Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.0` = **4**（发帖后约 22 小时未变）／`pet-v0.9.0` = 3／`v1.2.6` = **7**（发帖时是 1）／`v1.2.5` = 13／`v1.2.4` = 4／`v1.2.3` = 47 |
 | 仓库浏览 | `gh api .../traffic/views` | 30 天 7 views / 2 uniques（发帖前，尚未刷新） |
 | star / fork | `gh repo view` | 1 / 0 |
-| npm | `npm view dsh-ai-terminal-pet version` | **1.2.15**（`dist-tags.latest`，2026-11-13 复读） |
+| npm | `npm view dsh-ai-terminal-pet version` | **1.2.16**（`dist-tags.latest`，2026-11-13 复读） |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后约 22 小时） |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条 |

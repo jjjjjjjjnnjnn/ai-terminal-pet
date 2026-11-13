@@ -26,8 +26,9 @@
  *             (network failure is a skip, not a failure: it depends on another
  *             repository, and CI must not go red for the internet)
  *   --write   rebuilds the entry FROM upstream main, replaces only the tarball
- *             line, asserts that reverting that one string reproduces main
- *             byte-for-byte, commits it signed, and force-pushes the branch
+ *             line (and, with --description, the two description scalars),
+ *             asserts that reverting exactly those reproduces main byte-for-byte,
+ *             commits it signed, and force-pushes the branch
  *
  * Everything that decides anything is a pure function, exported for
  * `tools/upstream-entry.test.mjs`. The CLI is the thin part: git and fetch.
@@ -38,6 +39,8 @@
  *   node tools/upstream-entry.mjs --version 1.2.9            # URL + asset probe only
  *   node tools/upstream-entry.mjs --version 1.2.9 --write \
  *        --branch bump-tarball-1.2.9 --pr 14718 --comment-out .local/comment.md
+ *   node tools/upstream-entry.mjs --version 1.2.16 --write \
+ *        --branch bump-tarball-1.2.16 --description .local/description.json
  *
  * Exit codes: 0 ok (including a documented skip), 1 stale entry or failed
  * write, 2 usage error. Nothing here writes to this repository.
@@ -156,23 +159,98 @@ export function entryIsStale(listed, expected) {
  * Proven, not asserted: undo the one string we changed and the result must be
  * byte-identical to upstream's file.
  */
-export function rebuildVerdict({ before, after }) {
+export function rebuildVerdict({ before, after, description }) {
   const originalUrl = tarballValue(before)
   const changed = after !== before
-  if (!changed) return { changed: false, onlyTarball: false }
+  if (!changed) return { changed: false, onlyTarball: false, onlyOurs: false }
+  const originalDescription = descriptionLines(before)
+  if (description && originalDescription === null) {
+    // We rewrote a description whose upstream shape we could not read back, so
+    // the proof below cannot be made. Refuse instead of pushing on faith.
+    return { changed: true, onlyTarball: false, onlyOurs: false }
+  }
+  let tarballReverted
+  try {
+    tarballReverted = rewriteTarball(after, originalUrl)
+  } catch {
+    return { changed: true, onlyTarball: false, onlyOurs: false }
+  }
+  // onlyTarball answers "is the tarball line the only thing that moved", which
+  // is a different question from "is every changed line ours".
+  const onlyTarball = tarballReverted === before
+  if (!description) return { changed: true, onlyTarball, onlyOurs: onlyTarball }
   let reverted
   try {
-    reverted = rewriteTarball(after, originalUrl)
+    reverted = rewriteDescription(tarballReverted, originalDescription.values)
   } catch {
-    return { changed: true, onlyTarball: false }
+    return { changed: true, onlyTarball, onlyOurs: false }
   }
-  return { changed: true, onlyTarball: reverted === before }
+  return { changed: true, onlyTarball, onlyOurs: reverted === before }
 }
 
 /** The bare value of the entry's `tarball:` line, or '' when absent. */
 export function tarballValue(text) {
   const line = tarballLine(text)
   return line ? line.slice('tarball:'.length).trim() : ''
+}
+
+/** The two description scalars the entry currently carries, or null. */
+export function descriptionLines(text) {
+  const lines = text.split('\n')
+  const indexes = []
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index].startsWith('description:')) indexes.push(index)
+  }
+  if (indexes.length !== 1) return null
+  const at = indexes[0]
+  const en = lines[at + 1]
+  const zh = lines[at + 2]
+  if (en === undefined || zh === undefined) return null
+  if (!/^\s+en: '.*'$/.test(en) || !/^\s+zh: '.*'$/.test(zh)) return null
+  return { at, en, zh, values: { en: singleQuotedValue(en), zh: singleQuotedValue(zh) } }
+}
+
+function singleQuotedValue(line) {
+  const start = line.indexOf("'")
+  const end = line.lastIndexOf("'")
+  return line.slice(start + 1, end).replaceAll("''", "'")
+}
+
+function quoteForYaml(value) {
+  if (/[\r\n]/.test(value)) {
+    throw new Error('a description must stay on one line: the entry uses single-quoted scalars')
+  }
+  if (value.trim() === '') throw new Error('a description may not be empty')
+  return `'${value.replaceAll("'", "''")}'`
+}
+
+/**
+ * Replace the entry's `description:` pair.
+ *
+ * The entry keeps its description as two single-quoted, single-line scalars, one
+ * per language. Anything else - a block scalar (`|`/`>`), a missing language,
+ * two `description:` keys, a reformatted list - is refused rather than guessed
+ * at, because the site renders exactly these two lines: a silent reformat would
+ * change what a visitor reads while every other assertion still passed.
+ */
+export function rewriteDescription(text, description) {
+  if (text.includes('\r')) {
+    throw new Error('refusing a CRLF file: the upstream entry is LF, and a byte-for-byte revert cannot hold on CRLF')
+  }
+  if (!description || typeof description.en !== 'string' || typeof description.zh !== 'string') {
+    throw new Error('a description needs both an `en` and a `zh` string')
+  }
+  const found = descriptionLines(text)
+  if (found === null) {
+    throw new Error(
+      'expected one `description:` line followed by single-quoted `en:` and `zh:` scalars; ' +
+        'refusing to guess at a block scalar or a reformatted entry'
+    )
+  }
+  const lines = text.split('\n')
+  lines[found.at + 1] = `  en: ${quoteForYaml(description.en)}`
+  lines[found.at + 2] = `  zh: ${quoteForYaml(description.zh)}`
+  return lines.join('\n')
 }
 
 // --------------------------------------------------------------- repo inputs
@@ -338,7 +416,7 @@ async function check({ version }) {
 
 // ---------------------------------------------------------------------- write
 
-async function write({ version, branch, pr, commentOut, dryRun }) {
+async function write({ version, branch, pr, commentOut, dryRun, description }) {
   const pkg = readPackage()
   const file = entryFileName(ENTRY_OWNER, ENTRY_REPO, ENTRY_DIRECTORY)
   const url = expectedTarball({
@@ -355,20 +433,36 @@ async function write({ version, branch, pr, commentOut, dryRun }) {
 
   const upstream = await readUpstreamEntry()
   if (!upstream.ok) throw new Error(`could not read upstream main: HTTP ${upstream.status}`)
-  const rebuilt = rewriteTarball(upstream.text, url)
-  const verdict = rebuildVerdict({ before: upstream.text, after: rebuilt, url })
+  let rebuilt = rewriteTarball(upstream.text, url)
+  if (description) rebuilt = rewriteDescription(rebuilt, description)
+  const verdict = rebuildVerdict({ before: upstream.text, after: rebuilt, description })
   if (!verdict.changed) {
     console.log(`upstream entry: main already lists ${TAG_PREFIX}${listedVersion(upstream.text)}. Nothing to do.`)
     return 0
   }
-  if (!verdict.onlyTarball) {
-    throw new Error('rebuild would change more than the tarball line; refusing to push')
+  if (!verdict.onlyOurs) {
+    throw new Error(
+      description
+        ? 'rebuild would change more than the tarball line and the two description scalars; refusing to push'
+        : 'rebuild would change more than the tarball line; refusing to push'
+    )
   }
 
+  // One line for the bump, two more when the description is rewritten. The
+  // numstat is asserted rather than eyeballed: a rebuild that carries somebody
+  // else's edit is the one outcome a maintainer would bounce.
+  const expectedLines = description ? 3 : 1
+
   if (dryRun) {
-    console.log(`upstream entry: would rewrite one line in data/plugins/${file}`)
+    console.log(`upstream entry: would rewrite ${expectedLines} line(s) in data/plugins/${file}`)
     console.log(`  - ${tarballLine(upstream.text).slice(0, 160)}`)
     console.log(`  + tarball: ${url}`)
+    if (description) {
+      const current = descriptionLines(upstream.text)
+      console.log(`  - ${current === null ? '(no readable description)' : current.en.slice(0, 160)}`)
+      console.log(`  +   en: '${description.en.slice(0, 160)}…'`)
+      console.log('  (and the zh scalar, same treatment)')
+    }
     return 0
   }
 
@@ -413,24 +507,55 @@ async function write({ version, branch, pr, commentOut, dryRun }) {
       throw new Error(`expected exactly one changed file, got: ${changed.join(', ') || '(none)'}`)
     }
     const numstat = runGit(['diff', '--cached', '--numstat'], { cwd: work }).trim()
-    if (numstat !== `1\t1\tdata/plugins/${file}`) {
-      throw new Error(`expected a one-line change, got: ${numstat}`)
+    if (numstat !== `${expectedLines}\t${expectedLines}\tdata/plugins/${file}`) {
+      throw new Error(`expected a ${expectedLines}-line change, got: ${numstat}`)
+    }
+    // Every changed line has to be one we meant to change. Without this a
+    // reformat or a stray whitespace edit elsewhere in the file would still add
+    // up to three changed lines and slip through the numstat check above.
+    const allowed = [/^-tarball:/, /^\+tarball:/, /^[-+] {2}en: '/, /^[-+] {2}zh: '/]
+    const changedLines = runGit(['diff', '--cached', '--unified=0'], { cwd: work })
+      .split('\n')
+      .filter((line) => /^[-+]/.test(line) && !/^(\+\+\+|---)/.test(line))
+    const stray = changedLines.filter((line) => !allowed.some((pattern) => pattern.test(line)))
+    if (stray.length > 0) {
+      throw new Error(
+        `refusing to push a change outside tarball/description: ${stray.map((line) => line.slice(0, 80)).join(' | ')}`
+      )
     }
 
-    const body = [
-      `Bump the ai-terminal-pet entry to ${TAG_PREFIX}${version}`,
-      '',
-      'Rebuilt on top of current main instead of merged into the previous branch: main',
-      'rewrote this entry by its own hand between our bump and the merge, and a three-',
-      'way merge on the same tarball line is what leaves the pull request conflicted',
-      'and its checks unrun.',
-      '',
-      'The tarball line is the only change. Every precondition and default main states',
-      'is kept verbatim in both languages, and reverting this one string reproduces',
-      "main's file byte-for-byte.",
-      '',
-      `Release: https://github.com/${ENTRY_OWNER}/${ENTRY_REPO}/releases/tag/${TAG_PREFIX}${version}`,
-    ].join('\n')
+    const body = description
+      ? [
+          `Bump the ai-terminal-pet entry to ${TAG_PREFIX}${version}, and rewrite its description`,
+          '',
+          'Rebuilt on top of current main instead of merged into the previous branch: main',
+          'rewrote this entry by its own hand between our bump and the merge, and a three-',
+          'way merge on the same tarball line is what leaves the pull request conflicted',
+          'and its checks unrun.',
+          '',
+          'Three lines change, all of them ours: `tarball:` to the new release, and the two',
+          '`description` scalars. The new copy leads with the question the overlay answers',
+          'and then states only behaviour the code implements - which terminals report on',
+          'install, that a click copies a path while the arrow jumps, that it rings only on',
+          'real events, and that approvals stay in DSH. `category`, `icon`, `url` and `name`',
+          'are main as it stands; revert the three lines and the file is byte-for-byte main.',
+          '',
+          `Release: https://github.com/${ENTRY_OWNER}/${ENTRY_REPO}/releases/tag/${TAG_PREFIX}${version}`,
+        ].join('\n')
+      : [
+          `Bump the ai-terminal-pet entry to ${TAG_PREFIX}${version}`,
+          '',
+          'Rebuilt on top of current main instead of merged into the previous branch: main',
+          'rewrote this entry by its own hand between our bump and the merge, and a three-',
+          'way merge on the same tarball line is what leaves the pull request conflicted',
+          'and its checks unrun.',
+          '',
+          'The tarball line is the only change. Every precondition and default main states',
+          'is kept verbatim in both languages, and reverting this one string reproduces',
+          "main's file byte-for-byte.",
+          '',
+          `Release: https://github.com/${ENTRY_OWNER}/${ENTRY_REPO}/releases/tag/${TAG_PREFIX}${version}`,
+        ].join('\n')
     const commitArgs = ['commit', '--quiet', '-m', body]
     if (identityValue.signingKey) commitArgs.splice(1, 0, '-S')
     runGit(commitArgs, { cwd: work })
@@ -447,9 +572,9 @@ async function write({ version, branch, pr, commentOut, dryRun }) {
         '',
         '- started from `main` and kept it as it is: both descriptions, every precondition',
         '  and default it states, `category`, `icon`, `url`, `name`;',
-        `- the one line a version bump needs, \`tarball:\` to \`${TAG_PREFIX}${version}\`, with an`,
-        "  assertion that reverting that single string reproduces `main`'s file byte-for-byte",
-        '  and that the diff is exactly one line;',
+        `- the ${description ? 'three lines' : 'one line'} a version bump needs: \`tarball:\` to \`${TAG_PREFIX}${version}\`${description ? ', and the two `description` scalars' : ''}, with an`,
+        "  assertion that reverting " + (description ? 'those three lines' : 'that single string') + " reproduces `main`'s file byte-for-byte",
+        `  and that the diff is exactly ${description ? 'three lines' : 'one line'};`,
         '- the release asset was probed before pointing at it, so the link is live.',
         '',
         `Release notes: https://github.com/${ENTRY_OWNER}/${ENTRY_REPO}/releases/tag/${TAG_PREFIX}${version}`,
@@ -487,7 +612,7 @@ async function write({ version, branch, pr, commentOut, dryRun }) {
 function usage() {
   console.log(`usage: node tools/upstream-entry.mjs --check
        node tools/upstream-entry.mjs --version <plugin version> [--write --branch <name>]
-            [--pr <number>] [--comment-out <file>] [--dry-run]`)
+            [--pr <number>] [--comment-out <file>] [--description <file.json>] [--dry-run]`)
 }
 
 function main(argv) {
@@ -535,12 +660,22 @@ function main(argv) {
     return 0
   }
   const branch = flags.get('branch') || `bump-tarball-${version}`
+  let description
+  if (flags.get('description')) {
+    const file = flags.get('description')
+    const parsed = JSON.parse(readFileSync(path.isAbsolute(file) ? file : path.join(repoDir, file), 'utf8'))
+    if (typeof parsed.en !== 'string' || typeof parsed.zh !== 'string') {
+      throw new Error(`${file} must hold {"en": "...", "zh": "..."}`)
+    }
+    description = { en: parsed.en, zh: parsed.zh }
+  }
   return write({
     version,
     branch,
     pr: flags.get('pr') || '',
     commentOut: flags.get('comment-out') || '',
     dryRun: flags.has('dry-run'),
+    description,
   })
 }
 

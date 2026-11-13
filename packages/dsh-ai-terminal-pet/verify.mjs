@@ -284,6 +284,19 @@ async function caseManifest() {
   check(manifest.exports?.['./icon'] === './icon.png', 'exports["./icon"] is that same PNG')
   check(manifest.files.includes('screenshots.json'), 'the screenshot declaration ships in the tarball')
   check(manifest.files.includes('screenshots'), 'the screenshots themselves ship in the tarball')
+  // Catalogues that render a plugin README pick the file from a directory
+  // listing and decide its language by sniffing the text for CJK; a second
+  // readme-shaped file is what turns a catalogue's "only an English version
+  // exists" note into a real Chinese page. Both the shipping and the language
+  // are pinned here, so a translation that quietly turns back into English, or
+  // stops shipping, fails a check instead of the marketplace page.
+  check(manifest.files.includes('README.zh.md'), 'the tarball ships the Chinese README')
+  const zhReadme = readFileSync(path.join(packageDir, 'README.zh.md'), 'utf8')
+  const cjkCount = (zhReadme.match(/[\u4e00-\u9fff]/g) ?? []).length
+  check(
+    cjkCount > zhReadme.length / 10,
+    `README.zh.md reads as Chinese under a CJK sniff (${cjkCount} CJK characters)`
+  )
   check(manifest.dsh?.bundle?.patch === './cordis.patch.yml', 'dsh.bundle.patch is declared')
   check(JSON.stringify(manifest.dsh?.bundle?.platforms) === '["win32"]', 'the bundle is Windows only')
   // Third-party registries (YELEBAI/dsh-plugin-marketplace, and any other that

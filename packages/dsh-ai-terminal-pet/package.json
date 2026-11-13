@@ -1,6 +1,6 @@
 {
   "name": "dsh-ai-terminal-pet",
-  "version": "1.2.15",
+  "version": "1.2.16",
   "description": "DeepSeek Harness Cordis bundle that mirrors session state into the AI Terminal Pet desktop overlay (Windows).",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,7 @@
     "screenshots",
     "screenshots.json",
     "README.md",
+    "README.zh.md",
     "LICENSE",
     "cordis.patch.yml"
   ],
@@ -38,8 +39,8 @@
     "catalog": {
       "category": "tool",
       "summary": {
-        "en": "A floating overlay for Windows. DeepSeek Harness sessions show up as soon as you install this bundle; OpenCode, Claude Code and Antigravity sessions join the same panel once each of those terminals has its reporter installed.",
-        "zh": "Windows 桌面浮窗。装上本插件后 DeepSeek Harness 的会话立刻出现在置顶面板里；OpenCode、Claude Code 与 Antigravity 的会话要先各自装好该终端的上报端，才会汇总进同一个面板。"
+        "en": "Which of your agents is waiting on you? One always-on-top Windows panel for DeepSeek Harness, Claude Code, OpenCode and Antigravity sessions: it rings only for real events, and the arrow at a row's end jumps to that terminal.",
+        "zh": "哪个 agent 在等你？一块置顶的 Windows 面板汇总 DeepSeek Harness、Claude Code、OpenCode 与 Antigravity 的会话：只在真事件上响，点行尾箭头即可跳到对应终端。"
       },
       "capabilities": [
         "windows-overlay",

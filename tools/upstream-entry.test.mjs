@@ -14,7 +14,9 @@ import {
   entryIsStale,
   expectedTarball,
   listedVersion,
+  descriptionLines,
   rebuildVerdict,
+  rewriteDescription,
   rewriteTarball,
   tarballLine,
   tarballValue,
@@ -104,20 +106,20 @@ test('the rebuild verdict only allows a tarball-only change', () => {
     assetName: assetNameFor('dsh-ai-terminal-pet', '1.2.8'),
   })
   const clean = rewriteTarball(ENTRY, url)
-  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: clean }), { changed: true, onlyTarball: true })
+  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: clean }), { changed: true, onlyTarball: true, onlyOurs: true })
 
   // Something else moved as well (a maintainer's edit we did not intend to
   // carry): the revert no longer reproduces upstream, so the push must be
   // refused.
   const dirty = clean.replace('category: notify', 'category: ui')
-  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: dirty }), { changed: true, onlyTarball: false })
+  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: dirty }), { changed: true, onlyTarball: false, onlyOurs: false })
 
   // Nothing changed at all: not stale, not a rebuild.
-  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: ENTRY }), { changed: false, onlyTarball: false })
+  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: ENTRY }), { changed: false, onlyTarball: false, onlyOurs: false })
 
   // The tarball line was removed rather than replaced.
   const removed = ENTRY.replace(tarballLine(ENTRY) + '\n', '')
-  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: removed }), { changed: true, onlyTarball: false })
+  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: removed }), { changed: true, onlyTarball: false, onlyOurs: false })
 })
 
 test('a CRLF copy is refused rather than rewritten', () => {
@@ -127,5 +129,66 @@ test('a CRLF copy is refused rather than rewritten', () => {
   const crlf = ENTRY.split('\n').join('\r\n')
   assert.throws(() => rewriteTarball(crlf, 'https://example.com/x.tgz'), /CRLF/)
   assert.deepEqual(rebuildVerdict({ before: crlf, after: rewriteTarball(ENTRY, 'https://example.com/x.tgz') }),
-    { changed: true, onlyTarball: false })
+    { changed: true, onlyTarball: false, onlyOurs: false })
+})
+
+// ------------------------------------------------- entry description (--description)
+
+const DESCRIPTION = {
+  en: "Your agent's turn is done; the arrow at the end of its row jumps there.",
+  zh: '你的 agent 那一轮结束了；点那一行的行尾箭头就能跳过去。',
+}
+
+test('the description pair is found by shape, not by position in the file', () => {
+  const found = descriptionLines(ENTRY)
+  assert.equal(found.values.en, 'A floating desktop overlay for Windows. Click the arrow at the end of a row to jump to that terminal.')
+  assert.match(found.values.zh, /^Windows 上的桌面浮窗/)
+  // A block scalar is not this shape, and guessing at one is how a rewrite
+  // silently reformats what visitors read.
+  assert.equal(descriptionLines('description:\n  en: |\n    one line\n  zh: >\n    two\n'), null)
+  assert.equal(descriptionLines('description:\n  en: plain\n  zh: plain\n'), null)
+  assert.equal(descriptionLines('description:\n  en: \'only english\'\n'), null)
+})
+
+test('rewriting the description touches exactly the two scalars and escapes quotes', () => {
+  const rewritten = rewriteDescription(ENTRY, DESCRIPTION)
+  const before = ENTRY.split('\n')
+  const after = rewritten.split('\n')
+  assert.equal(after.length, before.length)
+  const changed = before.map((line, index) => (line === after[index] ? null : index)).filter((index) => index !== null)
+  assert.equal(changed.length, 2)
+  // YAML single-quoted scalars escape a quote by doubling it.
+  assert.match(rewritten, /^ {2}en: 'Your agent''s turn is done/m)
+  assert.match(rewritten, /^ {2}zh: '你的 agent 那一轮结束了/m)
+  assert.deepEqual(descriptionLines(rewritten).values, DESCRIPTION)
+})
+
+test('a description that cannot be reverted is refused rather than guessed at', () => {
+  assert.throws(() => rewriteDescription(ENTRY, { en: 'only english' }), /both an `en` and a `zh`/)
+  assert.throws(() => rewriteDescription(ENTRY, { en: '', zh: '空的' }), /may not be empty/)
+  assert.throws(() => rewriteDescription(ENTRY, { en: 'two\nlines', zh: '两行' }), /one line/)
+  assert.throws(() => rewriteDescription('no description here\n', DESCRIPTION), /refusing to guess/)
+  assert.throws(() => rewriteDescription(ENTRY.split('\n').join('\r\n'), DESCRIPTION), /CRLF/)
+})
+
+test('with a description the verdict allows three lines and still refuses a stray edit', () => {
+  const url = expectedTarball({
+    owner: 'jjjjjjjjnnjnn', repo: 'ai-terminal-pet', version: '1.2.16',
+    assetName: assetNameFor('dsh-ai-terminal-pet', '1.2.16'),
+  })
+  const rebuilt = rewriteDescription(rewriteTarball(ENTRY, url), DESCRIPTION)
+  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: rebuilt, description: DESCRIPTION }),
+    { changed: true, onlyTarball: false, onlyOurs: true })
+
+  // A maintainer's unrelated edit riding along must still fail: reverting ours
+  // cannot reproduce their file.
+  const dirty = rebuilt.replace('category: notify', 'category: ui')
+  assert.deepEqual(rebuildVerdict({ before: ENTRY, after: dirty, description: DESCRIPTION }),
+    { changed: true, onlyTarball: false, onlyOurs: false })
+
+  // Asking for a description rewrite on an entry whose description we cannot
+  // read is refused instead of producing an unprovable diff.
+  const block = ENTRY.replace(/description:\n {2}en: .*\n {2}zh: .*\n/, 'description: |\n  one block\n')
+  assert.deepEqual(rebuildVerdict({ before: block, after: block.replace('category: notify', 'category: ui'), description: DESCRIPTION }),
+    { changed: true, onlyTarball: false, onlyOurs: false })
 })

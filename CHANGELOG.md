@@ -40,6 +40,48 @@
 两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
+## [1.2.16] — 2026-11-13 深夜（DSH 插件包：中文 README + 市场文案重写）
+
+用户给了插件详情页的链接，两条反馈：**"缺少 readme 中文版"** 与 **"描述不够爆款"**。两条都不改代码，
+只改包里的文档与自述字段。
+
+### 中文 README
+
+目录页渲染的 README 来自仓库目录，语言由**内容嗅探（CJK 占比）**决定——
+`awesome-dsh-plugin` 的 `scripts/probe-readmes.mjs` 会列一次插件目录，挑一个 readme 形状的文件，
+再用 `langOf()` 按中日韩字符比例判语言，缺另一种语言时页面上写「该插件的 README 只有英文版本」（我们页面上
+当时就是这句）。所以：
+
+- 新增 `packages/dsh-ai-terminal-pet/README.zh.md`（英文 README 的完整逐节翻译，安装命令与要求都同步到本版）。
+- 英文 README 顶部加了 `English · 中文` 切换行。
+- `files` 加上它，随 tarball 一起分发。
+- `verify.mjs` 加了两条断言：tarball 必须带 `README.zh.md`，且它的 CJK 字符占比必须高于 10%
+  ——这正好把目录那边的嗅探规则钉在我们自己的 CI 里，将来翻译退回英文会先在这里红。
+
+### 市场文案
+
+原来的 `dsh.catalog` 摘要是一段"这包是什么"的说明。改成先给那个问题、再给答案：
+
+> **en**: Which of your agents is waiting on you? One always-on-top Windows panel for DeepSeek Harness,
+> Claude Code, OpenCode and Antigravity sessions: it rings only for real events, and the arrow at a row's
+> end jumps to that terminal.
+>
+> **zh**: 哪个 agent 在等你？一块置顶的 Windows 面板汇总 DeepSeek Harness、Claude Code、OpenCode
+> 与 Antigravity 的会话：只在真事件上响，点行尾箭头即可跳到对应终端。
+
+`docs/market-index.json` 的 `description`（Discover 卡片与详情页读它）用更长一版：先问「哪个 agent 在等你」，
+再给"每行写着进行中/等待确认/出错/完成"、"收起时显示卡了多久"、"点箭头跳转、点行复制项目路径"、
+"只在真事件上响、授权仍在 DSH 完成"、"Harness 装上即接、另外三家要装上报端"。
+
+**每一条都能在代码里指出落点**（`internal/i18n` 的状态与短时长键、`tap_windows.go` 的点击规则、
+`attention.go` 的静默判定），没有加形容词，也没有承诺面板里放行审批——那是上游维护者上次合并时删掉的
+那句话，删得对。
+
+### 兼容范围没变
+
+`engines.dsh` 仍是 `>=0.2.0-0 <0.3.0-0`、`engines.node` 仍是 `>=24.9.0`（1.2.15 的定义），
+浮窗仍是 1.0.7。这一版只有文档与自述字段，但**资产不可变**，所以仍然是一个新版本号。
+
 ## [1.2.15] — 2026-11-13（DSH 插件包：适配 DSH 0.2.x）
 
 DSH 更新到 **0.2.2-rc.3**（本机桌面版是 `@deepseek-ai/dsh-desktop` 0.2.2-rc.3、更新通道 nightly），

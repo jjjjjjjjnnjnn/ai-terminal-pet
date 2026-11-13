@@ -6,9 +6,9 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13 深夜；浮窗 **1.0.7**、插件包 **1.2.15** 已发版）
+## 1. 当前状态（2026-11-13 深夜；浮窗 **1.0.7**、插件包 **1.2.16** 已发版）
 
-> 接手请先读本节与文末 **§49「上架巡检：十家目录现在各指哪里」**（最新一轮；只读 + 一处源头修正）、
+> 接手请先读本节与文末 **§50「中文 README 与市场文案」**（最新一轮）与 **§49「上架巡检：十家目录现在各指哪里」**、
 > **§48「交接：适配 DSH 0.2.x」**（1.2.15 的兼容声明）、
 > **§47「维护：工作区整理」**（只删可再生产物）、
 > **§46「交接：把两个流程缺口变成门禁」**（工具与测试）、
@@ -23,11 +23,12 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.7`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.15`**。
+- **版本**：浮窗 **`1.0.7`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.16`**。
   两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`。
-  **`pet-v1.0.7` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）；**`dsh-plugin-v1.2.15` 是第 48 轮打的**，
-  只改兼容声明（`engines.dsh` / `engines.node`），浮窗一个字节没动，见 §48。
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`。
+  **`pet-v1.0.7` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）；**`dsh-plugin-v1.2.15` 是第 48 轮打的**
+  （只改兼容声明），**`dsh-plugin-v1.2.16` 是第 50 轮打的**（中文 README + 市场文案，同样没动代码，
+  见 §50）。
   **工作区与 tag 已经同步**：`bin/`、`packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的
   `AI-Terminal-Pet.exe` 三份逐字节相同（**4,554,240 B**，sha256 `01B42DC2…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
@@ -48,9 +49,9 @@
   均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.15**（`npm view` 核对）；`dsh-plugin-v1.2.15` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.15.tgz` **2,000,898 B / sha256 `F6D85F76…` / shasum `27c20674…`**（18 个文件），
-    包内 README 的安装命令是 1.2.15；
+  - 插件线：npm `latest` = **1.2.16**（`npm view` 核对）；`dsh-plugin-v1.2.16` 的 Release 资产
+    `dsh-ai-terminal-pet-1.2.16.tgz` **2,005,718 B / sha256 `9CAEE39D…` / shasum `98e7bc0a…`**（19 个文件，
+    含中英两份 README），包内 README 的安装命令是 1.2.16；
     钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §48，`icon` 同一 sha；
     索引里的 `engines.dsh` 与包内声明一致，`verify.mjs` 断言这一点）。
   - 浮窗线：`pet-v1.0.7` 的 Release 带两个资产——`ai-terminal-pet-1.0.7-win-x64.zip`
@@ -3248,6 +3249,72 @@ python tools/check_docs_links.py            # 11 份文档全解
 
 - **文档里的版本号会独立腐烂** → `tools/check_versions.mjs`（CI 步骤 + 24 条规则测试）。
 - **"点了没写盘"要先问进程是怎么退出的** → `internal/app/config_saver_test.go` 三条测试 + AGENTS.md 第 9 条。
+
+## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
+
+用户直接给了详情页链接，两条反馈：**"缺少 readme 中文版"**、**"描述不够爆款"**。两条都先查清"那边到底读什么"，
+再改我们这一侧——详情页不是我们渲染的，改错地方等于白改。
+
+### 50.1 详情页的 README 是怎么来的（读他们的代码，不是猜）
+
+`awesome-dsh-plugin` 的 `scripts/probe-readmes.mjs`：
+
+- 用 GitHub API **列一次插件目录**，从文件名里挑一个 readme 形状的文件
+  （`/^readme([._-].+)?\.(md|markdown|rst|txt)$/i`）；
+- 语言**不由文件名决定**，而是对内容做 CJK 嗅探（`langOf`，中日韩字符占比）；
+- 另一种语言的候选名是一张名单：`README.zh.md`、`README.zh-CN.md`、`README_zh.md`… 都认；
+- 只有一种语言时，页面写一句「该插件的 README 只有英文版本」——**我们页面上当时就是这句**。
+
+所以我们缺的不是"把中文贴到某个表单里"，而是**目录里第二个 readme 文件，内容是中文**。
+
+### 50.2 做了什么
+
+- 新增 `packages/dsh-ai-terminal-pet/README.zh.md`：英文 README 的完整逐节翻译（含安装三种形态、
+  市场索引那张表、磁盘上写什么、要求与限制），安装命令与兼容范围都对齐到本版。
+- 英文 README 顶部加 `English · 中文` 切换行；`files` 里加上中文那份，随 tarball 分发。
+- `verify.mjs` 加两条断言，把**目录那边的嗅探规则钉进我们自己的 CI**：tarball 必须带 `README.zh.md`，
+  且它的 CJK 字符占比必须 > 10%（实测 2,055 个 CJK 字符）。将来谁把翻译改回英文，或者把它从 `files` 里删掉，
+  会先在这里红，而不是在别人的目录页上变成一句话。
+
+### 50.3 文案：先给问题，再给答案
+
+原来的 `dsh.catalog.summary` 是"这包是什么"。改成两段，各自都短：
+
+> **en**（225 字符）: Which of your agents is waiting on you? One always-on-top Windows panel for
+> DeepSeek Harness, Claude Code, OpenCode and Antigravity sessions: it rings only for real events, and
+> the arrow at a row's end jumps to that terminal.
+>
+> **zh**（110 字符）: 哪个 agent 在等你？一块置顶的 Windows 面板汇总 DeepSeek Harness、Claude Code、
+> OpenCode 与 Antigravity 的会话：只在真事件上响，点行尾箭头即可跳到对应终端。
+
+`docs/market-index.json` 的 `description`（Discover 的卡片与详情页读它）是长一版：每一行写着什么状态、
+收起时显示卡了多久、点箭头跳转、点行复制项目路径、只在真事件上响、授权仍在 DSH 完成、
+Harness 装上即接而另外三家要装上报端。
+
+**每一条都能在代码里指出落点**：状态与短时长键在 `internal/i18n`，点击规则在 `internal/ui/tap_windows.go`，
+"只在真事件上响"在 `internal/ui/attention.go` 的静默判定（`internal/session/attention.go` 说明它要什么）。
+没有加形容词，也没有承诺"面板里放行审批"——那是上游维护者上次合并时删掉的一句，删得对。
+
+### 50.4 为什么这也值一个版本号
+
+`dsh.catalog` 在 `package.json` 里，`files` 也变了，所以 **tarball 变了**；资产不可变，
+于是走一个新版本号（1.2.16），而不是改已发布的 1.2.15。浮窗仍是 1.0.7，`engines` 不变，`lib/index.js` 一行没改。
+
+**发布结果**（当场核对）：
+
+- 资产 `dsh-ai-terminal-pet-1.2.16.tgz` **2,005,718 B / sha256 `9CAEE39D…` / shasum `98e7bc0a…`**，19 个文件（多出 `README.zh.md`）。
+- 真的装进 **0.2.2-rc.3** 宿主：`add` 成功、`--dump-config` 有我们的层，装出来的目录里
+  `README.md` 与 `README.zh.md` 都在。
+- 市场侧：`docs/market-index.json` 的 `description` 与 `summary` 已是新版；上游条目那条
+  `description`（详情页真正显示的那段）要等 PR 合并，见 §50.5。
+
+### 50.5 还没到位的那一半
+
+详情页上的**描述**来自上游 `data/plugins/<我们>.yml` 的 `description.en/zh`，那是别人仓库里的一行。
+`tools/upstream-entry.mjs` 原来只会换 `tarball`（并断言"只改一行"），所以这一轮给它加了
+`--description` 支持：从一份两行文件里取 en/zh，重建 `description:` 块，并**同时**断言
+"只有我们这一个文件、只有 tarball 与 description 这几行变了、把这两处都还原回去与上游逐字节相同"。
+只有这样才能一个 PR 同时带"新版本 + 新文案"，而不是让两个 PR 改同一行互相冲突。
 
 ## 49. 上架巡检：十家目录现在各指哪里（2026-11-13 深夜，第 49 轮）
 

@@ -1,5 +1,7 @@
 # dsh-ai-terminal-pet
 
+**English** · [中文](./README.zh.md)
+
 A DeepSeek Harness (DSH) Cordis bundle that mirrors Harness session state onto
 the [AI Terminal Pet](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet) desktop
 overlay: a small always-on-top Win32 pet that shows which sessions are working,
@@ -91,10 +93,10 @@ tarball, or by pinning the release tag. All three are verified end to end:
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # release tarball: same bytes as the npm release, straight from the GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.15/dsh-ai-terminal-pet-1.2.15.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.16/dsh-ai-terminal-pet-1.2.16.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.15&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.16&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Those three differ only in transport. The npm path is the shortest and the one a
