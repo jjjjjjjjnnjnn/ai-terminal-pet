@@ -6,40 +6,49 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-12 下午；浮窗 **1.0.2**、插件包 **1.2.8**，两个 Release 与 npm 都已发布）
+## 1. 当前状态（2026-11-13；浮窗 **1.0.3**、插件包 **1.2.9**，两个 Release、npm 与上游条目都已落地）
 
-> 接手请先读本节与文末 **§39「交接：上游目录条目 sync」**（上架机制，读它再读 §28 的清单形状）；
-> §28 是更早一版的清单（分发状态已过期，只保留它的清单形状），§27 是插件包分发的完整 runbook，
-> 而上游目录条目的规则、八步发版顺序与「合并 ≠ 可见」的判断方式在 [docs/UPSTREAM.md](UPSTREAM.md)。
+> 接手请先读本节与文末 **§40「交接：提醒层」**（这一轮的产品能力）和 **§39「交接：上游目录条目 sync」**
+> （上架机制，读它再读 §28 的清单形状）；§28 是更早一版的清单（分发状态已过期，只保留它的清单形状），
+> §27 是插件包分发的完整 runbook，而上游目录条目的规则、八步发版顺序与「合并 ≠ 可见」的判断方式在
+> [docs/UPSTREAM.md](UPSTREAM.md)。
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.2`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.8`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`pet-v1.0.1`/`pet-v1.0.2` 与 `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`。
-  **`pet-v1.0.2` 与 `dsh-plugin-v1.2.8` 是本轮新打的**，资产见 §37；`pet-v1.0.0`、`pet-v1.0.1`、
-  `dsh-plugin-v1.2.6` 与 `v1.2.7` 仍然有效且不可变。查当前 CI 用 `gh run list --limit 1`，
-  查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**218 个** `func Test`，
-  11 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
-  `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` 11 份文档全解；
-  `scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；`--doctor` **9 ok / 0 warn / 0 fail**。
-- **规模**：Go 非测试源码 **35 文件 / 13,031 行**、测试 **32 文件 / 5,943 行**（218 个 `func Test`，
+- **版本**：浮窗 **`1.0.3`**（`internal/app/app_windows.go` 的 `const Version`），插件包 **`1.2.9`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3` 与 `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`。
+  **`pet-v1.0.3` 与 `dsh-plugin-v1.2.9` 是 2026-11-12 晚上新打的**，资产见 §40；`pet-v1.0.2`、`pet-v1.0.1`、
+  `pet-v1.0.0`、`pet-v0.9.0` 与 `dsh-plugin-v1.2.6`…`v1.2.8` 仍然有效且不可变。查当前 CI 用
+  `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**282 个** `func Test`，
+  12 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
+  `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
+  `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
+  `--doctor` **10 项**（沙箱实测 9 ok / 1 warn / 0 fail，那条 warn 是「还没跑过浮窗，所以没有判定记录」）。
+- **规模**：Go 非测试源码 **42 文件 / 15,180 行**、测试 **42 文件 / 7,569 行**（282 个 `func Test`，
   外加 `cmd/pet-setup` 的 20 个）、JS **12 文件 / 4,346 行**；
-  `bin/AI-Terminal-Pet.exe` **4,391,424 B**（1.0.2）、`bin/pet-statusline.exe` **3,664,896 B**、
-  `bin/pet-hook.exe` **3,697,152 B**、`dist/pet-setup.exe` **14,145,024 B**
-  （均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；第三方依赖 3 个。
+  `bin/AI-Terminal-Pet.exe` **4,495,360 B**（1.0.3，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
+  `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**、
+  `dist/pet-setup.exe` **14,248,960 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
+  第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.8**（发布后核对 `dist-tags.latest`、17 个文件、tarball 与 Release 资产
-    逐字节相同）；`dsh-plugin-v1.2.8` 的 Release 资产 `dsh-ai-terminal-pet-1.2.8.tgz`
-    **1,926,796 B / shasum `922f42ce…`**；钉 tag 的 git 源；仓库根的清单 shim。
-  - 浮窗线：`pet-v1.0.2` 的 Release 带两个资产——`ai-terminal-pet-1.0.2-win-x64.zip`
-    **4,992,775 B / sha256 `EA3A4EC3…`** 与 `pet-setup.exe` **14,145,024 B / sha256 `1531AE8B…`**
-    （本机 `scripts/package.ps1` 产出，见 §37）；`pet-v1.0.1`、`pet-v1.0.0` 与 `pet-v0.9.0` 仍在
-    （不可变，已被取代）。
-  - 三个资产都**从公网 URL 下载回来复验过**：`pet-setup.exe --version` 打印 `pet-setup 1.0.0`；
-    沙箱（自带 `LOCALAPPDATA`/`USERPROFILE`）里 install → 11 件哈希全对 → `--verify` 11 件全对 →
-    `--uninstall`（输 yes）目录归零；zip 解出 17 个文件；`npm pack dsh-ai-terminal-pet@1.2.6`
-    取回的 tarball 与 Release 资产逐字节相同。
+  - 插件线：npm `latest` = **1.2.9**（`npm view` 核对；`npm pack` 取回的 tarball 与 Release 资产**逐字节相同**，
+    sha256 `3AAB0175…`、18 个文件）；`dsh-plugin-v1.2.9` 的 Release 资产 `dsh-ai-terminal-pet-1.2.9.tgz`
+    **1,974,535 B / sha256 `3AAB017511ED8810D9FC430F3A61995BCF82239C913B74D3B9C9CBCC42214369`**；
+    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` = `e1a2a76`）。
+  - 浮窗线：`pet-v1.0.3` 的 Release 带两个资产——`ai-terminal-pet-1.0.3-win-x64.zip`
+    **5,031,975 B / sha256 `4D9E9280D4D33E8C14B481C758CF3BB17404D611D34EC6644AAFD9DC8516A3AF`**（17 个文件）与
+    `pet-setup.exe` **14,248,960 B / sha256 `F7BDDDEE3775027EE57C9B88BB998926ED5618AE3C5E2B8211E4275AECAEC4F2`**
+    （本机 `scripts/package.ps1` 产出）；`pet-v1.0.2`、`v1.0.1`、`v1.0.0` 与 `pet-v0.9.0` 仍在（不可变，已被取代）。
+  - 三个资产都**从公网 URL 下载回来复验过**（2026-11-13 早上）：`pet-setup.exe --version` 打印
+    `pet-setup 1.0.3`；沙箱（自带 `LOCALAPPDATA`/`USERPROFILE`）里 zip → install → `-VerifyOnly` **11 件全对** →
+    `--doctor` **0 fail** → `-Uninstall` 目录归零；`pet-setup.exe` 装完 `--verify` **11 件全对**、
+    `--uninstall`（输 yes）目录归零；`npm pack dsh-ai-terminal-pet@1.2.9` 与 Release 资产逐字节相同。
+  - **上游条目已合并**：awesome-dsh-plugin 的
+    [PR #14784](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14784) 于 2026-11-12T22:12Z
+    合并（`check` 与 `Submission gate` 都 SUCCESS），`main` 上的 `tarball` 现在指向 `dsh-plugin-v1.2.9`，
+    `node tools/upstream-entry.mjs --check` 实测返回 `OK`。1.2.8 的 #14718 按「被取代」处理：先评论说明、再关闭。
+    站点 `plugins.json` 的重建要等它自己跑——「合并 ≠ 已渲染」。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
@@ -3152,7 +3161,7 @@ python tools/check_docs_links.py            # 11 份文档全解
 ```
 gofmt -l .                         # 空
 go vet ./...                       # 0
-go test -count=1 ./...             # 12 个包全 ok，279 个 func Test（上一版 218）
+go test -count=1 ./...             # 12 个包全 ok，282 个 func Test（上一版 218）
 node packages/dsh-ai-terminal-pet/verify.mjs                     # VERIFY PASSED
 node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check     # 两个 vendor 文件吻合（摘要 afca3441…）
 node integrations/deepseek-harness/verify.mjs                    # VERIFY PASSED

@@ -93,6 +93,13 @@
   「声音」页签新增两行试发。
 - 已完成状态的字幕、气球文案都带上项目名：「任务完成了」原来对哪个会话都同一句话，读了也不知道该回哪个。
 
+### Numbers
+
+`gofmt -l .` 无输出 / `go vet ./...` 0 / `go test -count=1 ./...` 12 个包全 ok（**282 个** `func Test`，上一版 218）；
+三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两文件吻合；`fresh-machine --no-overlay` **162/162**；
+`check_docs_links.py` **12 份**；`upstream-entry.test.mjs` 8/8。**未改绘制的 15 张预览图逐字节未变**——
+这一轮是重构加新元素，不是重画旧面板。
+
 ## [1.0.2] — 2026-11-12（浮窗：外观成为设置）
 
 ### Added
