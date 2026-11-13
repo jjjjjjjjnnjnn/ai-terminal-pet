@@ -8,7 +8,7 @@
 
 ## 1. 当前状态（2026-11-13；浮窗 **1.0.4**、插件包 **1.2.10**，两个 Release、npm 与上游条目都已落地）
 
-> 接手请先读本节与文末 **§40「交接：提醒层」**（这一轮的产品能力）和 **§39「交接：上游目录条目 sync」**
+> 接手请先读本节与文末 **§41「交接：判定记录搬家」**（最新一轮）、**§40「交接：提醒层」**（产品能力）和 **§39「交接：上游目录条目 sync」**
 > （上架机制，读它再读 §28 的清单形状）；§28 是更早一版的清单（分发状态已过期，只保留它的清单形状），
 > §27 是插件包分发的完整 runbook，而上游目录条目的规则、八步发版顺序与「合并 ≠ 可见」的判断方式在
 > [docs/UPSTREAM.md](UPSTREAM.md)。
@@ -3124,6 +3124,65 @@ python tools/check_docs_links.py            # 11 份文档全解
 | 中文段落被合并坏掉 | `462dca2` 把两版中文段落首尾相接，留下一个从句中开始的残句；第一次修的时候又把故事讲了两遍 | 改中文长段前先数「同一事实出现几次」；重复检测用探针字符串 |
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
+
+## 41. 交接：判定记录搬家（2026-11-13 早上，第 41 轮；浮窗 1.0.4 / 插件 1.2.10）
+
+### 41.1 一句话：1.0.3 装的「可回答性」在装出来之后是坏的，而坏法正是它想消除的那种
+
+1.0.3 的 `--doctor` 第 10 项在**刚装好的机器上**打印「还没有判定记录」，而 `--json` 的 `alerts` 在一次真实气泡
+之后仍是 `null`。原因不是它没写，是**它写错了地方**：`alerts.json` 放在 `runtime/`，而那个目录里每个 `*.json`
+都被 `internal/store` 当成一条上报快照，**解析不成会话就删掉**。一个 5 秒的扫描周期内文件就没了。
+
+于是「这一层跑过、没什么好说」和「这一层没跑」还是一模一样——正是这份记录存在的理由。
+
+### 41.2 为什么单测没抓到
+
+单测验证的是「写得进去、读得回来」，全绿。它没有验证「**扫描器跑过之后它还在**」。抓到它的是把发布出来的
+1.0.4 装进沙箱、让上报端推一次 `working` → `idle`、再等两个扫描周期。**这一类错误只能在交付形态上验证**，
+所以现在多了一条从目录一侧出发的测试：`internal/store/runtime_contract_test.go` 钉住「runtime/ 里只放快照，
+任何解析不了的 JSON 都会被删」，下一个想在快照旁边放 JSON 的功能会在 CI 里发现。
+
+### 41.3 修法
+
+| 项 | 现在 |
+|---|---|
+| 位置 | `%LOCALAPPDATA%\AI-Terminal-Pet\alerts.json`（`config.json` 旁边），不在 `runtime/` |
+| 安静时 | **也写一条**，`skipped` 为 `first-load`（首次播种）或 `unchanged`（没有会话变化） |
+| `--json` | `alerts` 对象照旧；没有记录时是 `null`（从未跑过的新机器不是故障） |
+| `--doctor` | 一行给出时间、在场状态、气球目标、逐会话判定；没有记录时是 `[ok]` |
+
+沙箱实测（**装出来之后**）：
+
+```
+上报端 working → idle，等两个扫描周期
+alerts.json 仍在：{"at":"…","sessions":[{"identity":"probe · generic","state":"idle","kind":"done","decision":"done-away"}],
+                  "balloon":"probe · generic","tone":"finished","presence":"present","present":true}
+--doctor：alerts: last scan …, presence=present, balloon=probe · generic, decisions=done/done-away
+```
+
+### 41.4 这一轮的实测
+
+```
+gofmt -l .                         # 空
+go vet ./...                       # 0
+go test -count=1 ./...             # 12 包全 ok，283 个 func Test
+node packages/dsh-ai-terminal-pet/verify.mjs / vendor.mjs --check / integrations/verify.mjs   # 全 PASS
+node tests/fresh-machine.mjs --no-overlay   # 162/162
+python tools/check_docs_links.py            # 12 份
+```
+
+发布与分发：`pet-v1.0.4`（zip **5,031,986 B / B490A2BB…**、`pet-setup.exe` **14,248,448 B / 96D9189F…**）与
+`dsh-plugin-v1.2.10`（tgz **1,974,423 B / 676F41EC…**）都从公网下载回来复验过；npm `latest` = **1.2.10**；
+沙箱里 zip → install → `-VerifyOnly` 11/11 → 装出来的 1.0.4 `--doctor` **0 fail** → `-Uninstall` 目录归零。
+
+### 41.5 交接要点
+
+- 上游跟进：[PR #14899](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14899)（`bump-tarball-1.2.10`），
+  工具生成、单文件单行、`MERGEABLE`，`check` 排队中。合并后 `node tools/upstream-entry.mjs --check` 会变 OK。
+- **B 提交之后 CI 会红一次**，这是设计的：`--check` 在「已发布、上游还是旧、且没有 PR 开着」时故意报红，
+  而 B 提交发生在 PR 开出来之前。**重跑那一次即可**（本轮实测：重跑后 success）。
+  这条写在这里，是因为下一次还会遇到，而且看起来像真失败。
+- F8（点击会话行复制项目路径）仍未开工，地基（`expandedRowRect` / `expandedRowHit`、行悬停高亮）已在。
 
 ## 40. 交接：提醒层（2026-11-12 晚，第 40 轮；浮窗 1.0.3 / 插件 1.2.9）
 
