@@ -1,6 +1,6 @@
 {
   "name": "dsh-ai-terminal-pet",
-  "version": "1.2.12",
+  "version": "1.2.13",
   "private": true,
   "description": "Marketplace shim: the DSH plugin lives in packages/dsh-ai-terminal-pet, and this manifest lets a repository-URL install resolve to it.",
   "license": "MIT",
