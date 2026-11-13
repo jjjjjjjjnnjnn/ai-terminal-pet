@@ -212,6 +212,7 @@ CI 里没有 gh 登录，一个仓库范围的 token 也不保证能读别人的
 [ ] node tools/upstream-entry.mjs --check      → OK 或 OK（in flight）
 [ ] 从公网下载三个资产复验；沙箱 install → -VerifyOnly → --doctor → -Uninstall
 [ ] HANDOVER 记本轮：发了什么、上游 PR 号与状态、判可见性读的是哪个文件
+[ ] node tools/check_versions.mjs 绿（徽章/发布链接/安装命令/基线行都与代码里的版本一致）
 ```
 
 ---

@@ -17,7 +17,7 @@
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,554,240 B**（4.34 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,916,288 B** = 11.36 MiB |
-| 代码量 | Go 非测试源码 **47 文件 / 16,882 行**、测试 **51 文件 / 8,884 行**（**326** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
+| 代码量 | Go 非测试源码 **47 文件 / 16,882 行**、测试 **52 文件 / 8,982 行**（**329** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
@@ -28,8 +28,8 @@
 | 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；扫描 5 s / 存活探测 10 s |
 | 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run`（开机自启）· `approvals\`（auto-approve 握手） |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--doctor/--version/--help` |
-| 单测 | **326 个 `func Test`**（ui 138 / app 35 / platform 28 / store 27 / reporter 23 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 8 / pipeserver 7 / i18n 3） |
-| 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tests/fresh-machine.mjs --no-overlay`（162 项）/ `scripts/package.ps1` 打 zip 并上传 artifact |
+| 单测 | **329 个 `func Test`**（ui 138 / app 38 / platform 28 / store 27 / reporter 23 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 8 / pipeserver 7 / i18n 3） |
+| 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tools/check_versions.mjs` 与它的规则测试 / `tests/fresh-machine.mjs --no-overlay`（162 项）/ `python tools/check_docs_links.py` / `scripts/package.ps1` 打 zip 并上传 artifact |
 | 自检 | `ai-terminal-pet --doctor` **10 项**（environment / install files / version / runtime / config / pipe / instance / node / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
 | 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.14**，18 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.14`，资产字节与 sha256 见 CHANGELOG 的 `[1.0.7]` 一节，npm 包与 Release 资产**解包后逐文件相同**（npm 会重打包，`.tgz` 字节本就不同） |

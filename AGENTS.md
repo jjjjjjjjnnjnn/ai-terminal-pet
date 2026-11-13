@@ -69,7 +69,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (201 func Test across 12 packages)
+# 1. Static analysis and all unit tests (329 func Test across 12 packages)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -89,6 +89,8 @@ node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
 node tools/upstream-entry.mjs --check   # catalogue entry points at this package version (SKIP is not a pass)
 node --test tools/upstream-entry.test.mjs
+node tools/check_versions.mjs           # every documented version equals the code's (badge, links, install commands)
+node --test tools/check_versions.test.mjs
 python tools/check_docs_links.py   # every relative path and #anchor in the docs we maintain
 
 # 3. Production build
@@ -218,3 +220,14 @@ Two conventions in those commands are load-bearing, not style:
      an issue reply that explains a design decision. Drafting is cheap; a claim the project cannot
      support, published under its own name, is not. The `docs/LAUNCH.md` round found exactly that: a
      draft that read as if all four terminals worked with zero setup, when only DeepSeek Harness does.
+
+9. **"It didn't write the file" starts with how the process exited**:
+   - `config.json` is written from a goroutine on purpose (`configSaver`), because a synchronous write can
+     stall the message pump on a machine with an AV write hook. A staged value reaches the disk on its own,
+     and `defer settingsSaver.flush()` is only the last resort at a **graceful** exit.
+   - So a `taskkill`, a `Stop-Process -Force` or a sandbox that gets torn down skips that flush. Verifying
+     persistence by killing the process answers a different question than the one you asked - it proves
+     nothing about the click handler. Close the window, `--quit`, wait a moment, then read the file.
+   - This was recorded as an unexplained bug for a whole round (HANDOVER §44.7) and cost a re-verification
+     in §45.1. `TestConfigSaverPersistsWithoutAFlush` / `TestConfigSaverFlushPersistsAStagedValue` pin both
+     halves of the contract so the next reading starts from the mechanism.

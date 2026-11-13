@@ -246,6 +246,24 @@ jobs:
       - name: Check documentation links
         run: python tools/check_docs_links.py
 
+      # Version strings in the documentation rot independently of the release
+      # number: the README badge sat at 1.0.2 across three releases, and both
+      # "the package is now" paragraphs said 1.2.8 while npm served 1.2.13. This
+      # reads the `const Version` line and the two manifests, then requires every
+      # known claim shape (badge, release link, install command, "current version
+      # is", baseline row) to state the same number, and refuses any version
+      # NEWER than the current one (a half-finished bump or a typo). The claim
+      # shapes and the one exemption (fenced blocks and backticked literals) are
+      # in the tool.
+      - name: Check documented versions
+        run: node tools/check_versions.mjs
+
+      # The rules behind the check above, pinned as unit tests: the const parse,
+      # exact match counts, the future-version sweep, the code-span exemption and
+      # the changelog heading rules.
+      - name: Version claim rules
+        run: node --test tools/check_versions.test.mjs
+
       # The portable zip and the self-extracting setup exe are what a Windows
       # user who does not use the DeepSeek Harness actually downloads, so a
       # packaging script that cannot produce them is a broken release, not a
