@@ -8,7 +8,8 @@
 
 ## 1. 当前状态（2026-11-13 傍晚；浮窗 **1.0.7**、插件包 **1.2.14** 已发版）
 
-> 接手请先读本节与文末 **§46「交接：把两个流程缺口变成门禁」**（最新一轮；工具与测试，不改已发布版本）、
+> 接手请先读本节与文末 **§47「维护：工作区整理」**（最新一轮；只删可再生产物，没改代码）、
+> **§46「交接：把两个流程缺口变成门禁」**（工具与测试）、
 > **§45「交接：把第 44 轮发出去 —— 1.0.7 / 1.2.14」**（上一次发版，没有改代码）、
 > **§44「交接：设置窗口可读、可用」**（1.0.7 的代码就是它）、
 > **§43「交接：三个假提醒的根因 + OpenCode 2.x」**（上一轮）、
@@ -40,7 +41,8 @@
   `bin/AI-Terminal-Pet.exe` **4,554,240 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**；
   `dist/` 里是 1.0.7 的产物（`ai-terminal-pet-1.0.7-win-x64.zip` 5,053,946 B、
-  `pet-setup.exe` 14,307,840 B），均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
+  `pet-setup.exe` 14,307,840 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
+  均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
   - 插件线：npm `latest` = **1.2.14**（`npm view` 核对）；`dsh-plugin-v1.2.14` 的 Release 资产
@@ -3241,6 +3243,52 @@ python tools/check_docs_links.py            # 11 份文档全解
 
 - **文档里的版本号会独立腐烂** → `tools/check_versions.mjs`（CI 步骤 + 24 条规则测试）。
 - **"点了没写盘"要先问进程是怎么退出的** → `internal/app/config_saver_test.go` 三条测试 + AGENTS.md 第 9 条。
+
+## 47. 维护：工作区整理（2026-11-13 晚，第 47 轮；没有改代码）
+
+要求是"维护、更新、整理工作区"。这一轮只动**可再生的产物**：源码、文档结论与已发布资产一个字节没动。
+
+### 47.1 删了什么，以及凭什么能删
+
+| 位置 | 之前 | 之后 | 依据 |
+|---|---|---|---|
+| `dist/` | **73,356,358 B**（0.9.0–1.0.6 共 8 个 zip、1 个 1.2.6 的 tgz、`dist/ai-terminal-pet` staging 树） | **19,361,786 B**（只留 1.0.7 的 zip 与 `pet-setup.exe`） | 旧 zip 与 tgz 都在 GitHub Release 上，也能由对应 tag 重建；staging 树是 `scripts/package.ps1` 的工作目录，它每次运行都先删再建（第 243 行），第 451 行还把路径打印给人看 |
+| `.local/` | **9,749,966 B**（1.2.4/1.2.5 的 tarball 四份、发版文案草稿、上游快照、门禁日志） | **36 B**（只剩 `state/gh/device-id`） | 这个目录自己的注释就写着"machine-local scratch，随时可删"；草稿的内容已在 GitHub Release 与 git 历史里 |
+| `.agents/tasks/` | 5 张 2026-11-12 的任务卡（4,599 B） | 空 | `.gitignore` 注明它们是 KB hub 自动派发的模板，HANDOVER §34.6 记过"它们不是工作" |
+| 本地分支 `feat/pet-hook-native` | 已并入 `main`（`git log main..feat` 为空，`main` 领先 86 个提交） | 已删 | 提交仍在 `main` 里；**远端同名分支没动**，删不删由人决定 |
+| `.git` | 172 个松散对象 12.6 MiB + 3 个包 9.15 MiB | 0 个松散对象 + 2 个包 10.08 MiB | `git gc` |
+
+核对：`git status` 干净；`git status --ignored` 只剩 `bin/`、`dist/`、`.local/`、`.workbuddy-ai/`、`.agents/`
+五个预期目录。
+
+### 47.2 故意没删的，以及为什么不能删
+
+`%LOCALAPPDATA%\AI-Terminal-Pet` 里有一批 2026-11-05 迁移期留下的文件，看着像残渣，但**其中两个是活线**：
+
+- `codex-notify.js` —— `~/.codex/config.toml` 第 1 行 `notify = [ "node", "...\\AI-Terminal-Pet\\codex-notify.js", "turn-ended" ]`。删了 Codex 的回合结束提醒就没了。
+- `terminal-pet-profile.ps1` —— 用户的 `Microsoft.PowerShell_profile.ps1` 第 20–23 行 `Test-Path` 之后
+  dot-source 它。删了 PowerShell 里的状态同步就没了。
+
+其余（`pet-ipc.js`、`pet-statusline-shim.js`、`pet-statusline-core.exe`、`pet-statusline-old.exe`、
+`pet-statusline-v1-backup.exe`、四个 `*.bak-20261105`、`path-backup.txt`、`probe.log`、
+`runtime-backup-20261105\`）在 `%APPDATA%`/`%LOCALAPPDATA%` 的配置目录（含 Antigravity、Claude、
+opencode）里**没有找到引用**。但"没找到"不等于"确认没有"——Antigravity 的 statusline 配置位置没有
+权威清单——所以**一个都没删**。真要清，建议**移动**到 `_old-20261105\` 而不是删除；动手前先确认
+`--version` 是 1.0.7、`--doctor` 10 项 0 fail（本轮实测两者都成立）。`path-backup.txt` 尤其不要删：
+那是 `install.ps1 -AddToPath` 之前留下的 PATH 原件记录。
+
+### 47.3 顺带核对的两件事
+
+- **没有死图**：`docs/assets/` 的 14 个文件在文档里都有引用（最少 3 次）。
+- **没有 CRLF/mixed**：`git ls-files --eol` 里没有 `w/crlf`、`i/mixed`、`w/mixed`；`go mod tidy -diff`
+  无输出、`go mod verify` 全过。
+
+### 47.4 以后照这个来
+
+- `dist/` 只留**当前版本**的两件资产；历史版本从 tag 或 Release 取，别指望本地还在。
+- 删 `%LOCALAPPDATA%` 里的东西之前先查三个地方：PowerShell profile、`~/.codex/config.toml`，
+  以及 `install.ps1 -VerifyOnly` 报的那 11 个文件——**那份清单是"应该存在"的白名单，清单之外的都是历史残留**，
+  但残留也可能是活线（上面两条就是），所以"没引用"要有证据，不能靠眼熟。
 
 ## 46. 交接：把两个流程缺口变成门禁（2026-11-13 晚，第 46 轮；工具与测试，不改已发布版本）
 
