@@ -57,18 +57,19 @@
   - 浮窗线：`pet-v1.0.7` 的 Release 带两个资产——`ai-terminal-pet-1.0.7-win-x64.zip`
     **5,053,946 B / sha256 `F3D04961…`**（17 个文件）与 `pet-setup.exe` **14,307,840 B / sha256 `AE3E2DE7…`**；
     `pet-v1.0.6` 及更早的每一个 tag 仍在（不可变，已被取代）。
-  - **上游条目**：`main` 的 `tarball` 现在是 **1.2.14**（#15045 已被合并，2026-11-13 深夜复读）；
-    1.2.15 的跟进是
-    [#15067](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15067)（分支
-    `bump-tarball-1.2.15`，单文件单行）已开、`MERGEABLE`，`tools/upstream-entry.mjs --check` =
-    `OK（in flight）`。#14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）均已关并留说明。
-    合并仍要人工，**合并 ≠ 可见**：判断可见性读对方站点索引文件，不读 PR 页面。
+  - **上游条目**：`main` 的 `tarball` 现在是 **1.2.15**（#15067 已被合并，2026-11-13 深夜复读）；
+    1.2.16 的跟进是
+    [#15075](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15075)（分支
+    `bump-tarball-1.2.16`，单文件 `+3 −3`：`tarball` 加中英两段 `description`）已开、`MERGEABLE`，
+    `tools/upstream-entry.mjs --check` = `OK（in flight）`。#14990（1.2.13）、#14945（1.2.11）、
+    #14899（1.2.10）均已关并留说明。合并仍要人工，**合并 ≠ 可见**：判断可见性读对方站点索引文件（见 §50.5）。
   - **其余九家目录的当前状态见 §49**（哪些已最新、哪些等对方扫描、哪些在等人工复核）。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
   才会汇进同一块面板。那版改动落在包内 `README.md` 与两份清单的 `dsh.catalog` 摘要
-  （en 225 / zh 114 字符，三处逐字相同：根 shim、包清单、`docs/market-index.json`）。
+  （三处逐字相同：根 shim、包清单、`docs/market-index.json`；1.2.4 时 en 225 / zh 114 字符，
+  1.2.16 换成提问式后是 **en 225 / zh 110 字符**）。
   1.2.3 那版改的是两份清单的 `dsh.marketplace` 块（`profiles: ["desktop","headless","web"]`、
   `requiresBuildApproval: false`、`manualSteps: false`），因为按 `install.profiles` 过滤的第三方商店
   （如 YELEBAI/dsh-plugin-marketplace）此前只能把 host-only bundle 猜成 `[headless, web]`，桌面端于是
@@ -3303,18 +3304,29 @@ Harness 装上即接而另外三家要装上报端。
 **发布结果**（当场核对）：
 
 - 资产 `dsh-ai-terminal-pet-1.2.16.tgz` **2,005,718 B / sha256 `9CAEE39D…` / shasum `98e7bc0a…`**，19 个文件（多出 `README.zh.md`）。
-- 真的装进 **0.2.2-rc.3** 宿主：`add` 成功、`--dump-config` 有我们的层，装出来的目录里
-  `README.md` 与 `README.zh.md` 都在。
-- 市场侧：`docs/market-index.json` 的 `description` 与 `summary` 已是新版；上游条目那条
-  `description`（详情页真正显示的那段）要等 PR 合并，见 §50.5。
+- 从公网 URL 下载回来复验字节与摘要一致；**拿下载回来的那个文件**装进真的 **0.2.2-rc.3** 宿主：
+  `add` 成功、`--dump-config` 有我们的层，装出来的目录里 `README.md`（10,970 B）与
+  `README.zh.md`（10,588 B）都在。
+- npm `dist-tags.latest` = **1.2.16**，`npm pack` 解包后与 Release 资产**逐文件相同（19/19）**。
+- 市场侧：`docs/market-index.json` 的 `description` 与 `dsh.catalog.summary` 已是新版；上游条目的
+  `description` 走 [#15075](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15075)
+  （单文件 `+3 −3`，`MERGEABLE`）——**顺带发现 #15067（1.2.15）在我们发这一版期间已被合并**，
+  所以那个 PR 是从"上游 main 已含 1.2.15"重建的。
 
-### 50.5 还没到位的那一半
+### 50.5 工具改动：`--description`
 
-详情页上的**描述**来自上游 `data/plugins/<我们>.yml` 的 `description.en/zh`，那是别人仓库里的一行。
-`tools/upstream-entry.mjs` 原来只会换 `tarball`（并断言"只改一行"），所以这一轮给它加了
-`--description` 支持：从一份两行文件里取 en/zh，重建 `description:` 块，并**同时**断言
-"只有我们这一个文件、只有 tarball 与 description 这几行变了、把这两处都还原回去与上游逐字节相同"。
-只有这样才能一个 PR 同时带"新版本 + 新文案"，而不是让两个 PR 改同一行互相冲突。
+详情页上的**描述**来自上游 `data/plugins/<我们>.yml` 的 `description.en/zh`，那是别人仓库里的两行。
+`tools/upstream-entry.mjs` 原来只会换 `tarball`（并断言"只改一行"），两个 PR 改同一行必然互相冲突，
+所以给它加了 `--description <file.json>`：
+
+- 从 JSON 取 `en`/`zh`，重建那两个**单引号单行标量**（YAML 里 `'` 用 `''` 转义）；
+- 形状不对就**拒绝**：块标量（`|`/`>`）、缺一种语言、两个 `description:` 键，一律不猜；
+- 断言升级为"只改我们这一个文件、**恰好三行**、每一行都必须以 `tarball:`/`en:`/`zh:` 开头"；
+- 证明仍然成立：**把这三行都还原回去**，必须与上游逐字节相同。
+
+规则测试从 8 条加到 **12 条**（形状识别、引号转义、三种拒绝、三条 verdict 语义、块标量拒绝）。
+仍然保留 `# 描述由维护者润色` 的余地——PR 正文里写明了"如果你更想用自己的措辞，只取 `tarball` 那一行即可，
+我不会为此再开第二个 PR"。
 
 ## 49. 上架巡检：十家目录现在各指哪里（2026-11-13 深夜，第 49 轮）
 
