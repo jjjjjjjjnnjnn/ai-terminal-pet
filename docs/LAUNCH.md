@@ -9,12 +9,12 @@
 ## 0. 发布顺序（**已全部就绪**）
 
 ```
-P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（1.0.0 / 1.2.6）──► ✅ 现在可以发声
+P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.7 / 1.2.14）──► ✅ 现在可以发声
 ```
 
-**前提条件全部满足，可以发了。** 浮窗 1.0.0、插件 1.2.6、npm `latest` = 1.2.6、`pet-v1.0.0` 的
-zip 与 `pet-setup.exe` 都在线上并且都从公网下载回来实测过，四个数字终于一致。
-发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.0` 这个链接。
+**前提条件全部满足，可以发了。** 浮窗 1.0.7、插件 1.2.14、npm `latest` = 1.2.14、`pet-v1.0.7` 的
+zip 与 `pet-setup.exe` 都在线上，并且都从公网下载回来逐字节复验过（sha256 与 CHANGELOG 记的一致）。
+发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.7` 这个链接。
 
 **唯一还需要人做的一步**：`docs/assets/smartscreen-unsigned.png` 是**示意图**（图左下角写着 MOCKUP）。
 真机截图只有一台「从没构建过本项目」的机器才拍得到；如果能在发帖前补一张真的，更好；补不到就用示意图，
@@ -140,8 +140,8 @@ Limits: Windows only. Out of the box only DeepSeek Harness sessions appear; the 
 three need their reporter wired once (one line per terminal, table in the README). Not
 code-signed, so first run shows SmartScreen.
 
-Three native executables, nothing to install first: a 4.17 MiB overlay, a statusline shim,
-a hook binary. No account, no network, no telemetry, MIT. 201 Go tests plus a 162-check
+Three native executables, nothing to install first: a 4.34 MiB overlay, a statusline shim,
+a hook binary. No account, no network, no telemetry, MIT. 326 Go tests plus a 162-check
 suite that installs into a throwaway sandbox.
 
 https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
@@ -171,9 +171,9 @@ entry.
 
 3/5 Auto-approve is off by default and opt-in per terminal. Before the 5-second countdown starts a denylist is checked: rm -rf, rd /s, format, git push --force. Those always go to manual review; silence only approves an ordinary tool prompt you chose to delegate.
 
-4/5 Three native exes, no runtime at install: the 4.17 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
+4/5 Three native exes, no runtime at install: the 4.34 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
 
-5/5 Windows only. MIT, no account, no network, no telemetry. 201 Go tests plus a 162-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 Windows only. MIT, no account, no network, no telemetry. 326 Go tests plus a 162-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 213。
@@ -194,9 +194,9 @@ entry.
 
 3/5 自动同意默认关闭、按终端单独开启。倒计时开始前先过黑名单：rm -rf、rd /s、format、git push --force 一律走人工确认；沉默只放行你主动委托的普通工具调用。
 
-4/5 三个原生 exe，装完不需要任何运行时：4.17 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
+4/5 三个原生 exe，装完不需要任何运行时：4.34 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
 
-5/5 仅 Windows。MIT，无账号、不联网、无遥测。201 个 Go 单测 + 162 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 仅 Windows。MIT，无账号、不联网、无遥测。326 个 Go 单测 + 162 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 132。
@@ -275,7 +275,7 @@ files alone does not wire it. The connect table in the README has one line per t
 | Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.0` = **4**（发帖后约 22 小时未变）／`pet-v0.9.0` = 3／`v1.2.6` = **7**（发帖时是 1）／`v1.2.5` = 13／`v1.2.4` = 4／`v1.2.3` = 47 |
 | 仓库浏览 | `gh api .../traffic/views` | 30 天 7 views / 2 uniques（发帖前，尚未刷新） |
 | star / fork | `gh repo view` | 1 / 0 |
-| npm | `npm view dsh-ai-terminal-pet version` | **1.2.6**（`dist-tags.latest`） |
+| npm | `npm view dsh-ai-terminal-pet version` | **1.2.14**（`dist-tags.latest`，2026-11-13 复读） |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后约 22 小时） |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条 |
