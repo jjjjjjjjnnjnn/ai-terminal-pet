@@ -9,19 +9,19 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-13，浮窗 1.0.6 / 插件 1.2.13；本轮按发布产物重新实测） |
+| 维度 | 数值（2026-11-13，浮窗 1.0.6 / 插件 1.2.13 已发布；工作区另有**未发版**的第 44 轮，见下） |
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
 | 版本 | `1.0.6`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.13` |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,520,448 B**（4.31 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,520,448 B**（4.31 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`）；含第 44 轮的工作区是 **4,554,240 B**（未发版） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,876,352 B** = 11.32 MiB |
-| 代码量 | Go 非测试源码 **42 文件 / 14,469 行**、测试 **43 文件 / 7,172 行**（**302** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
+| 代码量 | Go 非测试源码 **47 文件 / 16,880 行**、测试 **51 文件 / 8,884 行**（**326** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
-| 设置窗口 | 第二个顶层窗口类 `AITerminalPetSettings`，四页签 general/sound/sessions/look，高度按内容自适应（150% DPI） |
+| 设置窗口 | 第二个顶层窗口类 `AITerminalPetSettings`，四页签 general/sound/sessions/look，高度按内容自适应、屏幕放不下时按字号降档（第 44 轮）；字号可设小/标准/大 |
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
 | 管道 | `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>`（按用户隔离，跨语言 golden 测试锁定） |
 | 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
