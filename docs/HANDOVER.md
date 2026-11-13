@@ -55,10 +55,12 @@
   - 浮窗线：`pet-v1.0.7` 的 Release 带两个资产——`ai-terminal-pet-1.0.7-win-x64.zip`
     **5,053,946 B / sha256 `F3D04961…`**（17 个文件）与 `pet-setup.exe` **14,307,840 B / sha256 `AE3E2DE7…`**；
     `pet-v1.0.6` 及更早的每一个 tag 仍在（不可变，已被取代）。
-  - **上游条目**：`main` 的 `tarball` 仍指向 **1.2.9**；1.2.15 的跟进 PR 号与状态见 §48（合并仍要人工）。
-    1.2.14 的 [PR #15045](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15045) 已被 1.2.15 的 PR 取代；
-    #14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）都已关并留说明。**合并 ≠ 可见**：判断可见性读对方
-    站点索引文件，不读 PR 页面（细节与资产复验见 §45）。
+  - **上游条目**：`main` 的 `tarball` 现在是 **1.2.14**（#15045 已被合并，2026-11-13 深夜复读）；
+    1.2.15 的跟进是
+    [#15067](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15067)（分支
+    `bump-tarball-1.2.15`，单文件单行）已开、`MERGEABLE`，`tools/upstream-entry.mjs --check` =
+    `OK（in flight）`。#14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）均已关并留说明。
+    合并仍要人工，**合并 ≠ 可见**：判断可见性读对方站点索引文件，不读 PR 页面（见 §48.7 与 §45）。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
@@ -3324,13 +3326,23 @@ bundle 只在宿主进程里跑，所以声明与宿主对齐；我们自己的�
    `versions[0].engines.dsh`（`verify.mjs` 会断言三者一致），再加 README 里那句人话。
 5. 发布走 §27 / [docs/UPSTREAM.md](UPSTREAM.md)：新版本号（资产不可变）、A/B 两提交、上游 bump PR。
 
-### 48.7 这一轮的发布结果
+### 48.7 这一轮的发布结果（当场核对）
 
-- A 提交：版本 + 三处 `engines` + README/ROADMAP/CHANGELOG/HANDOVER。
-- tag `dsh-plugin-v1.2.15`、Release 资产 `dsh-ai-terminal-pet-1.2.15.tgz`
-  **2,000,898 B / sha256 `F6D85F76…` / shasum `27c20674…`**，npm `latest` = 1.2.15。
-- B 提交把 `docs/market-index.json` 的 `source.commit` 与 `icon` 钉到 A 的 sha。
-- 上游条目：新的 bump PR（1.2.15），并关掉被取代的 #15045（1.2.14）。
+- **提交与 tag**：A = `139466c`（版本 + 三处 `engines` + 文档），B = `beae43f`（索引 `source.commit` 与
+  `icon` 钉到 A）。tag `dsh-plugin-v1.2.15` 指向 A；该提交上的 CI **success**（run `43484108896`）。
+- **Release**：[`dsh-plugin-v1.2.15`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/dsh-plugin-v1.2.15)，
+  资产 `dsh-ai-terminal-pet-1.2.15.tgz` **2,000,898 B / sha256 `F6D85F76…` / shasum `27c20674…`**（18 文件）。
+  从公网 URL 下载回来复验：字节与 sha256 一致；**拿下载回来的那个文件**装进真的 0.2.2-rc.3 宿主，
+  `dsh plugin --profile pet add` 成功、`--dump-config` 里有 `# == dsh-ai-terminal-pet` 那一层。
+- **npm**：`dist-tags.latest` = **1.2.15**；`npm pack dsh-ai-terminal-pet@1.2.15` 解包后与 Release 资产
+  **逐文件相同（18/18）**。
+- **上游**：新 PR [#15067](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15067)
+  （分支 `bump-tarball-1.2.15`，单文件单行）已开、`MERGEABLE`；`tools/upstream-entry.mjs --check` 报
+  `OK（in flight）`。**意外收获**：1.2.14 的 #15045 在这期间已经被合并了，所以上游 `main` 的 `tarball`
+  现在指向 **1.2.14**（不是 1.2.9）——`--check` 的提示原文就是 "still dsh-plugin-v1.2.14, but
+  dsh-plugin-v1.2.15 is in flight"，这也是为什么每次都要重新读，而不是照着上一次的记录推理。
+- 平台（`dsh.bundle.platforms: ["win32"]`）与 `dsh.marketplace` 块这次没动：前者仍然正确（浮窗是 Win32 的），
+  后者是给按 `install.profiles` 过滤的第三方商店读的，DSH 自己不看。
 
 ## 47. 维护：工作区整理（2026-11-13 晚，第 47 轮；没有改代码）
 
