@@ -149,8 +149,34 @@ func TestDefaultSettingsMirrorConfig(t *testing.T) {
 		defaults.IdleSeconds != expected.IdleMinutes*60 ||
 		defaults.DonePolicy != expected.DonePolicy ||
 		defaults.QuietCurrent != expected.QuietCurrent ||
-		defaults.QuietSubagents != expected.QuietSubagents {
+		defaults.QuietSubagents != expected.QuietSubagents ||
+		defaults.SettingsTextSize != expected.SettingsTextSize ||
+		defaults.SettingsKeyboard != expected.SettingsKeyboard ||
+		defaults.SettingsTooltips != expected.SettingsTooltips {
 		t.Fatalf("ui.DefaultSettings() drifted from config.Default():\n ui: %+v\ncfg: %+v", defaults, expected)
+	}
+	// Every text size config.json accepts must have a ramp, and every ramp must
+	// be a size config.json can store. A name on one side only means a config
+	// file that silently falls back to standard, which is the kind of "my
+	// setting does nothing" report this round started with.
+	if len(settingsTypeRamps) != len(config.TextSizes) {
+		t.Fatalf("ui has %d text ramps, config has %d text sizes", len(settingsTypeRamps), len(config.TextSizes))
+	}
+	for _, name := range config.TextSizes {
+		if _, ok := settingsTypeRamps[name]; !ok {
+			t.Fatalf("config offers text size %q but ui has no ramp for it", name)
+		}
+		if got := config.ValidTextSize(name); got != name {
+			t.Fatalf("config rejects its own text size %q (got %q)", name, got)
+		}
+		if got := normalizeTextSize(name); got != name {
+			t.Fatalf("ui normalises %q to %q", name, got)
+		}
+	}
+	for name := range settingsTypeRamps {
+		if got := config.ValidTextSize(name); got != name {
+			t.Fatalf("ui has a ramp for %q but config normalises it to %q", name, got)
+		}
 	}
 	if len(SoundSchemes) != len(config.SoundSchemes) {
 		t.Fatalf("ui has %d sound schemes, config has %d", len(SoundSchemes), len(config.SoundSchemes))
@@ -170,20 +196,35 @@ func TestDefaultSettingsMirrorConfig(t *testing.T) {
 
 func settingsRowsFor(t *testing.T, tab int) []settingsRow {
 	t.Helper()
-	return settingsRowsIn(tab, i18n.LangZhCN)
+	return settingsRowsIn(t, tab, i18n.LangZhCN)
 }
 
-func settingsRowsIn(tab int, lang i18n.Lang) []settingsRow {
+func settingsRowsIn(t *testing.T, tab int, lang i18n.Lang) []settingsRow {
+	return settingsRowsMeasuredFor(t, tab, lang, textSizeStandard)
+}
+
+// settingsRowsMeasuredFor is the production path: build the rows, then measure
+// how many lines each hint needs at this text size and column width.
+func settingsRowsMeasuredFor(t *testing.T, tab int, lang i18n.Lang, textSize string) []settingsRow {
+	t.Helper()
+	var rows []settingsRow
 	switch tab {
 	case 1:
-		return soundRows(lang)
+		rows = soundRows(lang)
 	case 2:
-		return sessionRows(lang, 0)
+		rows = sessionRows(lang, 0)
 	case 3:
-		return appearanceRows(lang)
+		rows = appearanceRows(lang)
 	default:
-		return generalRows(lang)
+		rows = generalRows(lang)
 	}
+	target, err := newCanvas(1, 1)
+	if err != nil {
+		t.Fatalf("measure canvas: %v", err)
+	}
+	defer target.close()
+	probe := settingsGeometrySized(96, textSize, tab, nil)
+	return measureSettingsRows(target, rows, settingsTypeRamps[textSize], probe.scale(settingsContentWidth))
 }
 
 // TestAppearanceTabIsLaidOutLikeEveryOtherTab pins the fourth tab into the same
@@ -383,13 +424,21 @@ func TestRenderSettingsPreview(t *testing.T) {
 		{"settings-appearance-en", 3, i18n.LangEn, settingsTheme, 1, settingsNone},
 	}
 	for _, tc := range cases {
-		rows := settingsRowsIn(tc.tab, tc.lang)
+		rows := settingsRowsIn(t, tc.tab, tc.lang)
 		geometry := settingsGeometryFor(96, tc.tab, rows)
 		target, err := newCanvas(geometry.width, geometry.height)
 		if err != nil {
 			t.Fatalf("%s: canvas: %v", tc.name, err)
 		}
-		drawSettings(target, geometry, view, tc.hover, tc.hoverAt, tc.press, tc.lang)
+		drawSettings(target, settingsPaint{
+			geometry: geometry,
+			view:     view,
+			hover:    tc.hover,
+			hoverAt:  tc.hoverAt,
+			pressed:  tc.press,
+			focus:    -1,
+			lang:     tc.lang,
+		})
 		img := compositeOver(target, desktop)
 		target.close()
 		writePNG(t, filepath.Join(dir, tc.name+".png"), upscale(img, 2))

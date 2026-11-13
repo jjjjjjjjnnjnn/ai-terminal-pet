@@ -295,9 +295,12 @@ Right-click the overlay for a quick menu (show/hide, reset position, notificatio
 | Sessions | Auto-approve | `autoApprove` | `false` | Off by default; see Safety below |
 | Sessions | Auto-approve timeout | `autoApproveTimeoutSec` | `5` | Veto window, 1–60 s; **needs a restart** |
 | Sessions | Reset window position | *(immediate)* | — | Same as `--reset` |
+| Look | Text size | `settingsTextSize` | `standard` | `small`, `standard` or `large`; scales the settings window, and steps down on its own when the screen is too short for the chosen size |
 | Look | Theme | `theme` | `slate` | `slate` (dark, the one in every screenshot), `paper` (light) or `contrast` (black with saturated state colours); applies to the panel and the settings window |
 | Look | Colour by terminal | `perSourceColor` | `false` | Tints each expanded row's source name by which CLI it came from; the state colour is left alone |
 | Look | Start hidden | `hiddenAtLaunch` | `false` | Begin in the tray; a reporter or `--show` brings the panel back. Startup only - the tray entry point stays authoritative afterwards |
+| General | Keyboard navigation | `settingsKeyboard` | `false` | Tab moves between the settings window's controls, Space or Enter activates them. Off by default: a dialog that starts eating Tab surprises a mouse user |
+| General | Show clipped text | `settingsTooltips` | `true` | Hover a shortened label to read all of it. Only appears where something was actually cut off |
 
 The remaining keys in `config.json` are runtime state, not settings: `placed`, `x`, `y`, `zoom`, `expanded`. The overlay writes them so it reopens where you left it; editing them by hand is harmless but pointless.
 
@@ -697,9 +700,12 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | 会话 | 自动同意 | `autoApprove` | `false` | 默认关，见下一节「安全边界」 |
 | 会话 | 自动同意倒计时 | `autoApproveTimeoutSec` | `5` | 否决窗口 1–60 秒；**改完需重启** |
 | 会话 | 重置窗口位置 | *（立即执行）* | — | 等同 `--reset` |
+| 外观 | 字号 | `settingsTextSize` | `standard` | `small` / `standard` / `large`，放大或缩小设置窗口；屏幕放不下所选档位时会自动降一档 |
 | 外观 | 配色主题 | `theme` | `slate` | `slate`（深色，仓库里所有截图用的就是它）、`paper`（浅色）、`contrast`（纯黑 + 高饱和状态色）；面板与设置窗口同时生效 |
 | 外观 | 按终端着色 | `perSourceColor` | `false` | 给展开行里的来源名按终端上色；状态色不动 |
 | 外观 | 启动时隐藏 | `hiddenAtLaunch` | `false` | 启动后先进托盘，上报端或 `--show` 会把面板拉回来；只作用于启动，之后托盘菜单说了算 |
+| 通用 | 键盘操作 | `settingsKeyboard` | `false` | Tab 在设置窗口的控件间移动，空格或回车执行。默认关：会吞 Tab 的对话框对只用鼠标的人是意外 |
+| 通用 | 显示被截断的文字 | `settingsTooltips` | `true` | 鼠标停在被省略的标签上可看全文；只有真被截断的地方才会出现 |
 
 `config.json` 里剩下的键是运行期状态而不是设置：`placed`、`x`、`y`、`zoom`、`expanded`。浮窗写它们是为了「下次在原来的位置、原来的缩放打开」，手改无害但没意义。
 

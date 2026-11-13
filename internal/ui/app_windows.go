@@ -147,6 +147,16 @@ type Settings struct {
 	// overlay, and someone who wants it out of the way until a session needs
 	// attention should not have to hide it every logon.
 	HiddenAtLaunch bool
+	// SettingsTextSize scales the settings window: "small", "standard" or
+	// "large". A name, like Theme, because the factor is a rendering decision
+	// (settingsTextScales) and config.json should record the choice.
+	SettingsTextSize string
+	// SettingsKeyboard enables Tab focus and Space/Enter activation in the
+	// settings window. Off by default; see config.Config.
+	SettingsKeyboard bool
+	// SettingsTooltips shows the untruncated text when a settings label had to
+	// be cut off.
+	SettingsTooltips bool
 }
 
 // DefaultSettings is what "restore defaults" puts back, and what the overlay
@@ -176,6 +186,9 @@ func DefaultSettings() Settings {
 		DonePolicy:            string(DonePolicyBackground),
 		QuietCurrent:          true,
 		QuietSubagents:        true,
+		SettingsTextSize:      textSizeStandard,
+		SettingsKeyboard:      false,
+		SettingsTooltips:      true,
 	}
 }
 
@@ -360,8 +373,11 @@ type App struct {
 	// Settings window. It is a second top-level window on the same UI thread,
 	// created lazily the first time it is opened: most runs never need it, and
 	// a window plus a DIB is real memory for a panel nobody configured.
-	settingsHandle     atomic.Uintptr
-	settingsSurface    *canvas
+	settingsHandle  atomic.Uintptr
+	settingsSurface *canvas
+	// settingsMeasure is a 1x1 canvas used only to ask GDI how wide a string is,
+	// so the row heights can reserve the right number of hint lines.
+	settingsMeasure    *canvas
 	settingsDPI        uint32
 	settingsGeometry   settingsGeometry
 	settingsFrame      settingsFrameKey
@@ -369,6 +385,11 @@ type App struct {
 	settingsHover      settingsControl
 	settingsHoverIndex int
 	settingsPress      settingsControl
+	// settingsFocus is the keyboard focus inside the settings window, and
+	// settingsFocusVisible says whether the focus ring should be drawn (it is
+	// only drawn once the user has used the keyboard, never on open).
+	settingsFocus        int
+	settingsFocusVisible bool
 	// settingsDrag is the slider currently being dragged, settingsNone when
 	// the pointer is not held. A drag repaints but does not persist; release
 	// writes config.json once.

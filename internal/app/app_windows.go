@@ -142,6 +142,9 @@ func RunWith(openSettings bool) error {
 			Theme:                 settings.Theme,
 			PerSourceColor:        settings.PerSourceColor,
 			HiddenAtLaunch:        settings.HiddenAtLaunch,
+			SettingsTextSize:      settings.SettingsTextSize,
+			SettingsKeyboard:      settings.SettingsKeyboard,
+			SettingsTooltips:      settings.SettingsTooltips,
 		},
 		AutoStart:             autostartEnabled,
 		AutoApproveTimeoutSec: settings.AutoApproveTimeoutSec,
@@ -264,6 +267,9 @@ func RunWith(openSettings bool) error {
 			Theme:                 current.Theme,
 			PerSourceColor:        current.PerSourceColor,
 			HiddenAtLaunch:        current.HiddenAtLaunch,
+			SettingsTextSize:      current.SettingsTextSize,
+			SettingsKeyboard:      current.SettingsKeyboard,
+			SettingsTooltips:      current.SettingsTooltips,
 		})
 	})
 	if err := window.Run(); err != nil {
@@ -543,6 +549,9 @@ func applyUISettings(target *config.Config, value ui.Settings) {
 	target.Theme = config.ValidTheme(value.Theme)
 	target.PerSourceColor = value.PerSourceColor
 	target.HiddenAtLaunch = value.HiddenAtLaunch
+	target.SettingsTextSize = config.ValidTextSize(value.SettingsTextSize)
+	target.SettingsKeyboard = value.SettingsKeyboard
+	target.SettingsTooltips = value.SettingsTooltips
 	if value.Opacity > 0 {
 		target.Opacity = value.Opacity
 	}

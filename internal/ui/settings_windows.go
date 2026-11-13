@@ -29,6 +29,7 @@ import (
 	"time"
 	"unsafe"
 
+	"ai-terminal-pet/internal/config"
 	"ai-terminal-pet/internal/i18n"
 	"ai-terminal-pet/internal/session"
 	win "github.com/lxn/win"
@@ -38,24 +39,88 @@ const (
 	settingsClassName   = "AITerminalPetSettings"
 	settingsWindowTitle = "AI Terminal Pet — Settings"
 
-	// Logical layout at 96 DPI.
-	settingsWidth = 452
-	// settingsMinHeight keeps the sidebar (three tabs plus margins) from being
+	// Logical layout at 96 DPI, at the standard text size.
+	settingsWidth = 500
+	// settingsMinHeight keeps the sidebar (four tabs plus margins) from being
 	// clipped on the shortest tab; the real height follows the content.
-	settingsMinHeight    = 260
-	settingsHeaderHeight = 52
+	settingsMinHeight    = 280
+	settingsHeaderHeight = 56
 	settingsMargin       = 20
-	settingsSidebarWidth = 104
-	settingsTabsTop      = 68
-	settingsTabHeight    = 32
-	settingsTabGap       = 4
-	settingsContentLeft  = 160
-	settingsRowsTop      = 66
+	settingsSidebarWidth = 112
+	settingsTabsTop      = 70
+	settingsTabHeight    = 36
+	settingsTabGap       = 6
+	settingsContentLeft  = 176
+	settingsRowsTop      = 70
 	settingsPanelRadius  = 14
 )
 
 // settingsContentWidth is the width of the right-hand column.
 const settingsContentWidth = settingsWidth - settingsMargin - settingsContentLeft
+
+// Settings text sizes. config.json stores these names (internal/config owns the
+// list); the ui package compares against them, and a test in internal/app pins
+// the two together.
+const (
+	textSizeSmall    = "small"
+	textSizeStandard = "standard"
+	textSizeLarge    = "large"
+)
+
+// settingsTypeRamp is the type scale of the settings window: one requested cell
+// height per role, in logical pixels at 96 DPI.
+//
+// These numbers are not arbitrary and not a single table multiplied by a factor.
+// GDI rounds a requested cell height onto the face's own ladder, measured on
+// this machine as: requests 9-10 render 7 px glyphs, 11-13 render 8 px, 14-15
+// render 9 px, 16 renders 10 px, 17-18 render 12 px, 20 renders 14 px. So
+//
+//   - a 1 px ramp step is usually a no-op. The first version of this window used
+//     15/12/12/10 and actually rendered only two sizes (9 px and 8 px), which is
+//     why it read as flat as well as small;
+//   - scaling one table by 1.2 collapses two roles onto one rung (a 12 px title
+//     and a 9 px hint both land on 48), so the three ramps below are hand-picked
+//     on distinct rungs instead.
+//
+// TestSettingsTypeRampStaysOrdered measures every ramp at four DPIs and fails if
+// the roles stop being visually ordered.
+type settingsTypeRamp struct {
+	header   int
+	subtitle int
+	tab      int
+	title    int
+	hint     int
+	note     int
+	value    int
+	segment  int
+	button   int
+}
+
+// settingsSpacing is how much room each text size gets. It scales margins, row
+// heights and the window width, never the glyphs themselves.
+var settingsSpacing = map[string]float64{
+	textSizeSmall:    0.9,
+	textSizeStandard: 1.0,
+	textSizeLarge:    1.2,
+}
+
+var settingsTypeRamps = map[string]settingsTypeRamp{
+	// 8 px hint, 10 px title, 12 px header.
+	textSizeSmall: {header: 18, subtitle: 11, tab: 13, title: 16, hint: 12, note: 12, value: 13, segment: 13, button: 13},
+	// 9 px hint, 10 px title, 14 px header - the shipped default.
+	textSizeStandard: {header: 20, subtitle: 12, tab: 14, title: 16, hint: 14, note: 14, value: 14, segment: 14, button: 14},
+	// 12 px hint, 14 px title, 17 px header.
+	textSizeLarge: {header: 24, subtitle: 15, tab: 18, title: 20, hint: 17, note: 17, value: 18, segment: 17, button: 17},
+}
+
+// normalizeTextSize maps a persisted or hand-edited name onto one of the three
+// ramps. The control id settingsTextSize is a different thing, hence the verb.
+func normalizeTextSize(value string) string {
+	if _, ok := settingsTypeRamps[value]; ok {
+		return value
+	}
+	return textSizeStandard
+}
 
 // Row kinds. The height of a row follows from what it has to contain: a toggle
 // shares its line with the label, a slider and a segment need a line below it.
@@ -68,20 +133,32 @@ const (
 	rowNote
 )
 
-func settingsRowHeight(kind int) int {
+// Row height parts, in logical pixels at 96 DPI. The height of a row is these
+// parts added up rather than one number per kind, because a hint may need one or
+// two lines and a fixed height either wastes space or clips the second line.
+const (
+	settingsTitleBand = 24
+	settingsHintLine  = 17
+	settingsRowPad    = 10
+	settingsBandGap   = 4
+)
+
+func settingsRowHeight(kind, hintLines int) int {
+	if hintLines < 1 {
+		hintLines = 1
+	}
+	base := settingsTitleBand + hintLines*settingsHintLine + settingsRowPad
 	switch kind {
 	case rowSlider:
-		return 68
+		// The track sits in its own band under the hint.
+		return base + settingsBandGap + 4 + 8
 	case rowSegment:
-		// A segment needs the title line, the hint line and then its own band;
-		// 80 leaves a visible gap under the hint so the two never touch.
-		return 80
+		return base + settingsBandGap + 30
 	case rowNote:
-		return 58
+		// A note has no title line and no control.
+		return hintLines*settingsHintLine + settingsRowPad
 	default:
-		// Toggles, steppers and buttons share the title line with their
-		// control, so one line plus the hint is all the height they need.
-		return 54
+		return base
 	}
 }
 
@@ -116,6 +193,13 @@ const (
 	settingsTheme
 	settingsPerSource
 	settingsHiddenAtLaunch
+
+	// How the settings window itself behaves. They live on the two tabs the
+	// window is about: text size on Look (it is a look), keyboard and tooltips
+	// on General (they are interaction).
+	settingsTextSize
+	settingsKeyboard
+	settingsTooltips
 
 	settingsAutoApprove
 	settingsApproveDown
@@ -177,6 +261,11 @@ type settingsRow struct {
 	kind  int
 	title string
 	hint  string
+	// hintLines is how many lines the hint needs at the current width. It is
+	// filled in by measureSettingsRows, because it depends on the font and the
+	// column width; the row builders leave it zero and settingsRowHeight reads
+	// that as one line.
+	hintLines int
 	// action is the caption inside a rowButton's button. Buttons carry their
 	// own verb so the row title can stay descriptive.
 	action  string
@@ -207,6 +296,9 @@ type settingsView struct {
 	Theme          string
 	PerSource      bool
 	HiddenAtLaunch bool
+	TextSize       string
+	Keyboard       bool
+	Tooltips       bool
 	// Attentiveness. DonePolicy is the persisted string so the segment and
 	// the tick can both be derived from one field.
 	ForegroundAware bool
@@ -241,6 +333,11 @@ type settingsGeometry struct {
 	width  int
 	height int
 	dpi    uint32
+	// textSize is the persisted name this layout was built for, and fonts is the
+	// ramp it resolved to. Both are carried so a repaint can tell "the user
+	// changed the text size" from "the window merely moved".
+	textSize string
+	fonts    settingsTypeRamp
 	// lang is the language the row labels were built in. Switching language
 	// changes every string but not the layout, so the geometry has to be
 	// rebuilt to pick the new labels up.
@@ -253,24 +350,54 @@ type settingsGeometry struct {
 	// as clickable as its switch), controls the drawn sub-control inside it.
 	frames   []settingsRect
 	controls []settingsRect
+	// contentHeight is where the last row ends, which is what "does this tab fit
+	// the screen" is measured against.
+	contentHeight int
 }
 
+// scale converts a logical dimension to device pixels at the current DPI and
+// text size.
 func (g settingsGeometry) scale(base int) int {
+	spacing := g.spacing()
+	return maxInt(int(math.Round(float64(base)*float64(g.dpi)/96*spacing)), 1)
+}
+
+// font converts a logical type size to device pixels. It deliberately does not
+// apply the spacing factor: the ramp table already says how big each role is at
+// this text size, and multiplying it again would land on the wrong GDI rung.
+func (g settingsGeometry) font(base int) int {
 	return maxInt(int(math.Round(float64(base)*float64(g.dpi)/96)), 1)
 }
 
-// settingsGeometryFor resolves the layout. Pure: same inputs, same output, no
-// DPI query, which is what makes it testable off a real window.
+func (g settingsGeometry) spacing() float64 {
+	if factor, ok := settingsSpacing[g.textSize]; ok {
+		return factor
+	}
+	return 1
+}
+
+// settingsGeometryFor resolves the layout at the standard text size. Kept as the
+// default entry point so the layout tests read as "the shipped layout".
 func settingsGeometryFor(dpi uint32, tab int, rows []settingsRow) settingsGeometry {
+	return settingsGeometrySized(dpi, textSizeStandard, tab, rows)
+}
+
+// settingsGeometrySized resolves the layout for one text size. Pure: same
+// inputs, same output, no DPI query, which is what makes it testable off a real
+// window.
+func settingsGeometrySized(dpi uint32, textSize string, tab int, rows []settingsRow) settingsGeometry {
 	if dpi == 0 {
 		dpi = 96
 	}
+	size := normalizeTextSize(textSize)
 	geometry := settingsGeometry{
-		width: maxInt(int(math.Round(float64(settingsWidth)*float64(dpi)/96)), 96),
-		dpi:   dpi,
-		tab:   tab,
-		rows:  rows,
+		dpi:      dpi,
+		textSize: size,
+		fonts:    settingsTypeRamps[size],
+		tab:      tab,
+		rows:     rows,
 	}
+	geometry.width = geometry.scale(settingsWidth)
 	s := geometry.scale
 
 	closeSize := s(24)
@@ -295,12 +422,13 @@ func settingsGeometryFor(dpi uint32, tab int, rows []settingsRow) settingsGeomet
 	geometry.frames = make([]settingsRect, 0, len(rows))
 	geometry.controls = make([]settingsRect, 0, len(rows))
 	for _, row := range rows {
-		height := s(settingsRowHeight(row.kind))
+		height := s(settingsRowHeight(row.kind, row.hintLines))
 		frame := settingsRect{Left: contentLeft, Top: y, Width: contentWidth, Height: height}
 		geometry.frames = append(geometry.frames, frame)
 		geometry.controls = append(geometry.controls, settingsControlRect(frame, row, s))
 		y += height
 	}
+	geometry.contentHeight = y
 	// The window is exactly as tall as its content. A fixed height left the
 	// shortest tab with half a screen of emptiness, which reads as a broken
 	// layout rather than a compact one.
@@ -308,23 +436,54 @@ func settingsGeometryFor(dpi uint32, tab int, rows []settingsRow) settingsGeomet
 	return geometry
 }
 
+// settingsFitSizes is the order the layout is tried in when the preferred text
+// size makes the window taller than the screen: the choice is a preference, the
+// work area is a constraint, and a control nobody can reach is worse than text
+// one step smaller.
+var settingsFitSizes = []string{textSizeLarge, textSizeStandard, textSizeSmall}
+
+// settingsGeometryFitting picks the largest text size at or below the preferred
+// one whose window still fits maxHeight, and falls back to the smallest size
+// when even that does not fit (the window is then taller than the screen, but
+// nothing else can be done without scrolling).
+func settingsGeometryFitting(dpi uint32, textSize string, tab int, rows []settingsRow, maxHeight int) settingsGeometry {
+	preferred := normalizeTextSize(textSize)
+	start := 0
+	for index, name := range settingsFitSizes {
+		if name == preferred {
+			start = index
+			break
+		}
+	}
+	var smallest settingsGeometry
+	for index := start; index < len(settingsFitSizes); index++ {
+		geometry := settingsGeometrySized(dpi, settingsFitSizes[index], tab, rows)
+		smallest = geometry
+		if maxHeight <= 0 || geometry.height <= maxHeight {
+			return geometry
+		}
+	}
+	return smallest
+}
+
 // settingsControlRect places the interactive part of a row. A toggle and a
 // stepper sit on the title line at the right edge; a slider, a segment and a
 // button get their own band underneath it.
 func settingsControlRect(frame settingsRect, row settingsRow, s func(int) int) settingsRect {
+	titleLine := s(settingsTitleBand)
 	switch row.kind {
 	case rowToggle:
-		width, height := s(38), s(21)
-		return settingsRect{Left: frame.right() - width, Top: frame.Top + s(3), Width: width, Height: height}
+		width, height := s(40), s(22)
+		return settingsRect{Left: frame.right() - width, Top: frame.Top + s(1), Width: width, Height: height}
 	case rowSlider:
-		return settingsRect{Left: frame.Left, Top: frame.Top + s(38), Width: frame.Width, Height: s(4)}
+		return settingsRect{Left: frame.Left, Top: frame.Top + titleLine + s(settingsHintLine*row.hintLines+settingsBandGap), Width: frame.Width, Height: s(4)}
 	case rowSegment:
-		return settingsRect{Left: frame.Left, Top: frame.Top + s(38), Width: frame.Width, Height: s(28)}
+		return settingsRect{Left: frame.Left, Top: frame.Top + titleLine + s(settingsHintLine*row.hintLines+settingsBandGap), Width: frame.Width, Height: s(30)}
 	case rowStepper:
-		return settingsRect{Left: frame.right() - s(92), Top: frame.Top + s(2), Width: s(92), Height: s(24)}
+		return settingsRect{Left: frame.right() - s(96), Top: frame.Top, Width: s(96), Height: s(26)}
 	case rowButton:
-		width := s(76)
-		return settingsRect{Left: frame.right() - width, Top: frame.Top + s(1), Width: width, Height: s(24)}
+		width := s(84)
+		return settingsRect{Left: frame.right() - width, Top: frame.Top, Width: width, Height: s(26)}
 	default:
 		return frame
 	}
@@ -376,6 +535,103 @@ func (g settingsGeometry) hit(x, y int) (settingsControl, int, settingsRect, boo
 		}
 	}
 	return settingsNone, -1, settingsRect{}, false
+}
+
+// settingsFocusOrder is the order Tab walks: the close button, the four sidebar
+// tabs, then every interactive row in reading order. Notes are skipped because
+// there is nothing to activate on them.
+func settingsFocusOrder(geometry settingsGeometry) []settingsControl {
+	order := make([]settingsControl, 0, settingsTabCount+1+len(geometry.rows))
+	order = append(order, settingsClose)
+	for index := 0; index < settingsTabCount; index++ {
+		order = append(order, settingsTabControl(index))
+	}
+	for _, row := range geometry.rows {
+		if row.control == settingsNone || row.kind == rowNote {
+			continue
+		}
+		order = append(order, row.control)
+	}
+	return order
+}
+
+// settingsFocusControl is the control at one focus index, or settingsNone.
+func settingsFocusControl(geometry settingsGeometry, index int) settingsControl {
+	order := settingsFocusOrder(geometry)
+	if index < 0 || index >= len(order) {
+		return settingsNone
+	}
+	return order[index]
+}
+
+// settingsFocusRect is where the focus ring goes for one focus index.
+func settingsFocusRect(geometry settingsGeometry, index int) (settingsRect, bool) {
+	control := settingsFocusControl(geometry, index)
+	if control == settingsNone {
+		return settingsRect{}, false
+	}
+	if control == settingsClose {
+		return geometry.close, true
+	}
+	if tab := settingsTabIndex(control); tab >= 0 && settingsTabControl(tab) == control {
+		return geometry.tabs[tab], true
+	}
+	for rowIndex, row := range geometry.rows {
+		if row.control == control || row.alt == control {
+			return geometry.controls[rowIndex], true
+		}
+	}
+	return settingsRect{}, false
+}
+
+// moveSettingsFocus walks the focus ring. delta is +1 for Tab and -1 for
+// Shift+Tab; wrapping is intentional, so Tab never dead-ends.
+func (a *App) moveSettingsFocus(delta int) {
+	order := settingsFocusOrder(a.settingsGeometry)
+	if len(order) == 0 {
+		return
+	}
+	index := a.settingsFocus + delta
+	if index < 0 {
+		index = len(order) - 1
+	}
+	if index >= len(order) {
+		index = 0
+	}
+	a.settingsFocus = index
+	a.settingsFocusVisible = true
+	_ = a.paintSettings()
+}
+
+// activateSettingsFocus runs the focused control, the same path a click takes.
+func (a *App) activateSettingsFocus() {
+	control := settingsFocusControl(a.settingsGeometry, a.settingsFocus)
+	if control == settingsNone {
+		return
+	}
+	a.settingsApply(control, settingsIndexForControl(a.settingsGeometry, control, a.settingsView()))
+}
+
+// settingsIndexForControl answers the option index a control needs: the current
+// one for a segment, the plus half for a stepper. Keyboard activation has no
+// cursor to point at an option, so a segment re-applies the option it is
+// already showing rather than guessing a new one.
+func settingsIndexForControl(geometry settingsGeometry, control settingsControl, view settingsView) int {
+	for _, row := range geometry.rows {
+		if row.control != control {
+			continue
+		}
+		if row.kind == rowSegment {
+			if len(row.options) == 0 {
+				return -1
+			}
+			return (settingsSegmentIndex(row, view) + 1) % len(row.options)
+		}
+		if row.kind == rowStepper {
+			return 1
+		}
+	}
+	return -1
 }
 
 // settingsSliderFraction turns an x coordinate into a 0..1 position on a track.
@@ -442,6 +698,9 @@ func (a *App) settingsView() settingsView {
 		Theme:           normalizeTheme(settings.Theme),
 		PerSource:       settings.PerSourceColor,
 		HiddenAtLaunch:  settings.HiddenAtLaunch,
+		TextSize:        normalizeTextSize(settings.SettingsTextSize),
+		Keyboard:        settings.SettingsKeyboard,
+		Tooltips:        settings.SettingsTooltips,
 		ForegroundAware: settings.ForegroundAware,
 		IdleMinutes:     settings.IdleSeconds / 60,
 		DonePolicy:      string(ValidDonePolicy(settings.DonePolicy)),
@@ -460,23 +719,53 @@ func (a *App) approveSeconds() int {
 	return seconds
 }
 
-func (a *App) settingsRows() []settingsRow {
+func (a *App) settingsRows(dpi uint32) []settingsRow {
+	var rows []settingsRow
 	switch a.settingsTab {
 	case 1:
-		return soundRows(a.lang)
+		rows = soundRows(a.lang)
 	case 2:
-		return sessionRows(a.lang, a.mutes.size())
+		rows = sessionRows(a.lang, a.mutes.size())
 	case 3:
-		return appearanceRows(a.lang)
+		rows = appearanceRows(a.lang)
 	default:
-		return generalRows(a.lang)
+		rows = generalRows(a.lang)
 	}
+	// The number of lines each hint needs depends on the font and the column
+	// width, so it is measured here rather than guessed by the builders. The
+	// column width does not depend on the rows, so this cannot chase itself.
+	size := normalizeTextSize(a.options.Settings.SettingsTextSize)
+	probe := settingsGeometrySized(dpi, size, a.settingsTab, nil)
+	fonts := settingsTypeRamps[size]
+	return measureSettingsRows(a.settingsMeasureCanvas(), rows, fonts, probe.scale(settingsContentWidth))
+}
+
+// settingsMeasureCanvas is a one-pixel canvas used only to ask GDI how wide a
+// string is. It is created lazily and lives as long as the window.
+func (a *App) settingsMeasureCanvas() *canvas {
+	if a.settingsMeasure != nil {
+		return a.settingsMeasure
+	}
+	scratch, err := newCanvas(1, 1)
+	if err != nil {
+		return nil
+	}
+	a.settingsMeasure = scratch
+	return scratch
 }
 
 // appearanceRows is the look of the product: palette, provenance colour, and
 // whether the panel starts in the tray.
 func appearanceRows(lang i18n.Lang) []settingsRow {
 	return []settingsRow{
+		{control: settingsTextSize, kind: rowSegment,
+			title: i18n.T(lang, i18n.KeySettingsTextSize),
+			hint:  i18n.T(lang, i18n.KeySettingsTextSizeHint),
+			options: []string{
+				i18n.T(lang, i18n.KeyTextSizeSmall),
+				i18n.T(lang, i18n.KeyTextSizeStandard),
+				i18n.T(lang, i18n.KeyTextSizeLarge),
+			}},
 		{control: settingsTheme, kind: rowSegment,
 			title: i18n.T(lang, i18n.KeySettingsTheme),
 			hint:  i18n.T(lang, i18n.KeySettingsThemeHint),
@@ -512,6 +801,13 @@ func generalRows(lang i18n.Lang) []settingsRow {
 			options: []string{i18n.T(lang, i18n.KeyTrayLangAuto), "简体中文", "English"}},
 		{control: settingsAutoStart, kind: rowToggle,
 			title: i18n.T(lang, i18n.KeySettingsAutostart), hint: i18n.T(lang, i18n.KeySettingsAutostartHint)},
+		// The two switches that make this window usable with a keyboard, and
+		// that show what a clipped label said. Both are opt-in for the keyboard
+		// half: a dialog that starts eating Tab is a surprise for a mouse user.
+		{control: settingsKeyboard, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsKeyboard), hint: i18n.T(lang, i18n.KeySettingsKeyboardHint)},
+		{control: settingsTooltips, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsTooltips), hint: i18n.T(lang, i18n.KeySettingsTooltipsHint)},
 	}
 }
 
@@ -621,6 +917,8 @@ func settingsSegmentIndex(row settingsRow, view settingsView) int {
 		return settingsSchemeIndex(view.Scheme)
 	case settingsLanguage:
 		return settingsLanguageIndex(view.Language)
+	case settingsTextSize:
+		return settingsTextSizeIndex(view.TextSize)
 	case settingsTheme:
 		return settingsThemeIndex(view.Theme)
 	case settingsDonePolicy:
@@ -654,6 +952,17 @@ func settingsDonePolicyAt(index int) (DonePolicy, bool) {
 		return DonePolicyAlways, true
 	}
 	return "", false
+}
+
+// settingsTextSizeIndex maps the persisted text size onto the segment index.
+func settingsTextSizeIndex(value string) int {
+	size := normalizeTextSize(value)
+	for index, name := range config.TextSizes {
+		if name == size {
+			return index
+		}
+	}
+	return 0
 }
 
 // settingsThemeIndex maps the persisted palette onto the segment index.
@@ -770,8 +1079,27 @@ func itoaPercent(value int) string {
 
 // ------------------------------------------------------------------ drawing
 
-func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, hover settingsControl, hoverIndex int, pressed settingsControl, lang i18n.Lang) {
+// settingsPaint is everything one frame of the settings window needs. It is a
+// struct rather than eight parameters because the window now has three kinds of
+// transient state (hover, press, keyboard focus) and a positional argument list
+// that long is where the wrong argument gets passed silently.
+type settingsPaint struct {
+	geometry settingsGeometry
+	view     settingsView
+	hover    settingsControl
+	hoverAt  int
+	pressed  settingsControl
+	focus    int
+	focusOn  bool
+	lang     i18n.Lang
+}
+
+func drawSettings(target *canvas, paint settingsPaint) {
+	geometry, view := paint.geometry, paint.view
+	lang, fonts := paint.lang, geometry.fonts
+	hover, hoverIndex, pressed := paint.hover, paint.hoverAt, paint.pressed
 	s := geometry.scale
+	f := geometry.font
 	width, height := geometry.width, geometry.height
 
 	target.clear()
@@ -779,15 +1107,16 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 	target.outlineRounded(0, 0, width, height, s(settingsPanelRadius), 1, colors.Border)
 
 	// Header.
-	target.text(s(settingsMargin), s(12), width-s(settingsMargin)*2-s(40), s(26),
-		i18n.T(lang, i18n.KeySettingsTitle), s(15), 600, colors.Primary,
+	target.text(s(settingsMargin), s(12), width-s(settingsMargin)*2-s(40), s(30),
+		i18n.T(lang, i18n.KeySettingsTitle), f(fonts.header), 600, colors.Primary,
 		dtSingleLine|dtVCenter|dtNoPrefix)
-	subtitleWidth := s(150)
-	target.text(width-s(settingsMargin)-s(30)-subtitleWidth, s(12), subtitleWidth, s(26),
-		i18n.T(lang, i18n.KeySettingsSubtitle), s(10), 400, colors.Muted,
+	subtitleWidth := s(160)
+	target.text(width-s(settingsMargin)-s(30)-subtitleWidth, s(12), subtitleWidth, s(30),
+		i18n.T(lang, i18n.KeySettingsSubtitle), f(fonts.subtitle), 400, colors.Muted,
 		dtSingleLine|dtVCenter|dtRight|dtNoPrefix)
 	target.fillRect(s(settingsMargin), s(settingsHeaderHeight), width-s(settingsMargin)*2, 1, colors.Divider)
 	drawSettingsClose(target, geometry, hover == settingsClose || pressed == settingsClose)
+	drawSettingsFocus(target, geometry, paint, settingsClose)
 
 	// Sidebar.
 	for index := range geometry.tabs {
@@ -811,8 +1140,9 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 			color = colors.Primary
 		}
 		label := settingsTabLabel(index, lang)
-		target.text(rect.Left+s(14), rect.Top, rect.Width-s(18), rect.Height, label, s(12), 500, color,
+		target.text(rect.Left+s(14), rect.Top, rect.Width-s(18), rect.Height, label, f(fonts.tab), 500, color,
 			dtSingleLine|dtVCenter|dtNoPrefix)
+		drawSettingsFocus(target, geometry, paint, control)
 	}
 	dividerX := s(settingsContentLeft) - s(18)
 	target.fillRect(dividerX, s(settingsRowsTop)-s(6), 1, height-s(settingsRowsTop)-s(settingsMargin)+s(6), colors.Divider)
@@ -823,26 +1153,23 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 		control := geometry.controls[index]
 		hot := hover == row.control || hover == row.alt
 		if row.kind == rowNote {
-			target.text(frame.Left, frame.Top, frame.Width, frame.Height, row.title, s(10), 400, colors.Hint,
-				dtWordBreak|dtNoPrefix)
+			lines := wrapHint(target, row.title, f(fonts.note), 400, frame.Width, settingsNoteMaxLines)
+			for line, value := range lines {
+				target.text(frame.Left, frame.Top+line*s(settingsHintLine), frame.Width, s(settingsHintLine),
+					value, f(fonts.note), 400, colors.Hint, dtSingleLine|dtVCenter|dtNoPrefix)
+			}
 			continue
 		}
-		titleWidth := frame.Width
-		switch row.kind {
-		case rowToggle:
-			titleWidth = frame.Width - s(46)
-		case rowStepper:
-			titleWidth = frame.Width - s(100)
-		case rowButton:
-			titleWidth = frame.Width - s(88)
-		case rowSlider:
-			titleWidth = frame.Width - s(52)
-		}
-		target.text(frame.Left, frame.Top, titleWidth, s(20), row.title, s(12), 500, colors.Primary,
+		titleWidth := settingsTitleWidth(geometry, row, frame)
+		target.text(frame.Left, frame.Top, titleWidth, s(settingsTitleBand), row.title, f(fonts.title), 500, colors.Primary,
 			dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
 		if row.hint != "" {
-			target.text(frame.Left, frame.Top+s(19), frame.Width, s(16), row.hint, s(10), 400, colors.Hint,
-				dtSingleLine|dtVCenter|dtNoPrefix|dtEndEllipsis)
+			lines := wrapHint(target, row.hint, f(fonts.hint), 400, frame.Width, settingsMaxLines(row.kind))
+			for line, value := range lines {
+				top := frame.Top + s(settingsTitleBand) + line*s(settingsHintLine)
+				target.text(frame.Left, top, frame.Width, s(settingsHintLine), value, f(fonts.hint), 400, colors.Hint,
+					dtSingleLine|dtVCenter|dtNoPrefix)
+			}
 		}
 
 		switch row.kind {
@@ -850,7 +1177,7 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 			drawSettingsToggle(target, control, settingsToggleState(row, view), hot, pressed == row.control)
 		case rowSlider:
 			label := settingsValueLabel(row, view)
-			target.text(frame.right()-s(52), frame.Top, s(52), s(20), label, s(11), 500, colors.Secondary,
+			target.text(frame.right()-s(56), frame.Top, s(56), s(settingsTitleBand), label, f(fonts.value), 500, colors.Secondary,
 				dtSingleLine|dtVCenter|dtRight|dtNoPrefix)
 			drawSettingsSlider(target, control, settingsSliderValueFor(row, view), hot, s(14))
 		case rowSegment:
@@ -867,14 +1194,110 @@ func drawSettings(target *canvas, geometry settingsGeometry, view settingsView, 
 			}
 			target.fillRounded(control.Left, control.Top, control.Width, control.Height, s(8), fill)
 			target.outlineRounded(control.Left, control.Top, control.Width, control.Height, s(8), 1, colors.Border)
-			labelColor := colors.Primary
-			if hot {
-				labelColor = colors.Primary
-			}
-			target.text(control.Left, control.Top, control.Width, control.Height, row.action, s(11), 500, labelColor,
+			target.text(control.Left, control.Top, control.Width, control.Height, row.action, f(fonts.button), 500, colors.Primary,
 				dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 		}
+		drawSettingsFocus(target, geometry, paint, row.control)
 	}
+	drawSettingsTooltip(target, paint)
+}
+
+// drawSettingsTooltip shows the full text of a label that had to be ellipsised.
+//
+// It is drawn inside the window rather than as a shell tooltip window on
+// purpose: this window is a layered surface with no child controls, so a real
+// tooltip would need its own top-level window and its own activation plumbing
+// for a case that is now rare - after the type ramp and the wrapping fix, only
+// an unusually long row title is ever cut off. A strip attached to the row does
+// the job with no new window, and it cannot end up off-screen.
+func drawSettingsTooltip(target *canvas, paint settingsPaint) {
+	if !paint.view.Tooltips {
+		return
+	}
+	geometry := paint.geometry
+	if paint.hover == settingsNone || paint.hover == settingsClose {
+		return
+	}
+	index := -1
+	for rowIndex, row := range geometry.rows {
+		if row.control == paint.hover || row.alt == paint.hover {
+			index = rowIndex
+			break
+		}
+	}
+	if index < 0 {
+		return
+	}
+	row := geometry.rows[index]
+	if row.kind == rowNote || row.title == "" {
+		return
+	}
+	frame := geometry.frames[index]
+	titleWidth := settingsTitleWidth(geometry, row, frame)
+	titleFont := geometry.font(geometry.fonts.title)
+	if target.measure(row.title, titleFont, 500) <= titleWidth {
+		return
+	}
+
+	s := geometry.scale
+	padding := s(10)
+	width := frame.Width
+	lines := wrapHint(target, row.title, titleFont, 500, width-padding*2, 2)
+	if len(lines) == 0 {
+		return
+	}
+	height := s(settingsHintLine)*len(lines) + padding
+	top := frame.bottom() + s(4)
+	if top+height > geometry.height-s(settingsMargin) {
+		top = frame.Top - height - s(4)
+	}
+	if top < s(settingsHeaderHeight) {
+		top = s(settingsHeaderHeight) + s(4)
+	}
+	target.fillRounded(frame.Left, top, width, height, s(8), colors.ControlBg)
+	target.outlineRounded(frame.Left, top, width, height, s(8), 1, colors.Border)
+	for line, value := range lines {
+		target.text(frame.Left+padding, top+padding/2+line*s(settingsHintLine), width-padding*2, s(settingsHintLine),
+			value, titleFont, 500, colors.Primary, dtSingleLine|dtVCenter|dtNoPrefix)
+	}
+}
+
+// settingsTitleWidth is the space a row title has before its control, shared by
+// the row drawing and the tooltip decision so the two cannot disagree about
+// whether a title fits.
+func settingsTitleWidth(geometry settingsGeometry, row settingsRow, frame settingsRect) int {
+	s := geometry.scale
+	switch row.kind {
+	case rowToggle:
+		return frame.Width - s(48)
+	case rowStepper:
+		return frame.Width - s(104)
+	case rowButton:
+		return frame.Width - s(96)
+	case rowSlider:
+		return frame.Width - s(56)
+	}
+	return frame.Width
+}
+
+// drawSettingsFocus draws the keyboard focus ring for one control, and only when
+// the user has actually used the keyboard: a ring that appears because the window
+// opened is the visual equivalent of shouting at someone who reached for the
+// mouse.
+func drawSettingsFocus(target *canvas, geometry settingsGeometry, paint settingsPaint, control settingsControl) {
+	if !paint.focusOn || control == settingsNone {
+		return
+	}
+	if settingsFocusControl(geometry, paint.focus) != control {
+		return
+	}
+	rect, ok := settingsFocusRect(geometry, paint.focus)
+	if !ok {
+		return
+	}
+	thickness := maxInt(geometry.scale(1), 1)
+	target.outlineRounded(rect.Left-thickness, rect.Top-thickness, rect.Width+thickness*2,
+		rect.Height+thickness*2, geometry.scale(8), thickness, colors.Accent)
 }
 
 func settingsTabLabel(index int, lang i18n.Lang) string {
@@ -1060,9 +1483,23 @@ func (a *App) openSettings() {
 	if handle == 0 {
 		return
 	}
+	a.settingsFocus = 0
+	a.settingsFocusVisible = false
 	a.paintSettings()
 	win.ShowWindow(win.HWND(handle), win.SW_SHOW)
 	win.SetForegroundWindow(win.HWND(handle))
+}
+
+// settingsDpi is the DPI of the monitor the settings window is on, falling
+// back to the overlay's. Using the overlay's DPI was wrong whenever the two were
+// on different monitors: the dialog then laid itself out at the wrong scale.
+func (a *App) settingsDpi() uint32 {
+	if handle := a.settingsHandle.Load(); handle != 0 {
+		if dpi := win.GetDpiForWindow(win.HWND(handle)); dpi != 0 {
+			return dpi
+		}
+	}
+	return a.windowDpi()
 }
 
 func (a *App) createSettingsWindow() {
@@ -1075,7 +1512,7 @@ func (a *App) createSettingsWindow() {
 		return
 	}
 	dpi := a.windowDpi()
-	geometry := settingsGeometryFor(dpi, a.settingsTab, a.settingsRows())
+	geometry := a.settingsGeometryFitted(dpi)
 	style := uint32(win.WS_EX_TOOLWINDOW | win.WS_EX_LAYERED | win.WS_EX_TOPMOST)
 	x, y := a.settingsOrigin(geometry.width, geometry.height)
 	created := win.CreateWindowEx(
@@ -1116,6 +1553,7 @@ func (a *App) hideSettings() {
 	a.settingsHover = settingsNone
 	a.settingsMoving = false
 	a.settingsHoverTracking = false
+	a.settingsFocusVisible = false
 	win.ShowWindow(win.HWND(handle), win.SW_HIDE)
 }
 
@@ -1129,6 +1567,10 @@ func (a *App) destroySettings() {
 		a.settingsSurface.close()
 		a.settingsSurface = nil
 	}
+	if a.settingsMeasure != nil {
+		a.settingsMeasure.close()
+		a.settingsMeasure = nil
+	}
 }
 
 // settingsFrameKey is everything that changes the picture. Two equal keys mean
@@ -1140,6 +1582,8 @@ type settingsFrameKey struct {
 	hover         settingsControl
 	hoverIndex    int
 	pressed       settingsControl
+	focus         int
+	focusOn       bool
 	lang          i18n.Lang
 	view          settingsView
 }
@@ -1157,7 +1601,7 @@ func (a *App) reflowSettings(dpi uint32) {
 	if dpi == 0 {
 		dpi = 96
 	}
-	geometry := settingsGeometryFor(dpi, a.settingsTab, a.settingsRows())
+	geometry := a.settingsGeometryFitted(dpi)
 	geometry.lang = a.lang
 	previous := a.settingsGeometry
 	if previous.width > 0 && previous.height > 0 {
@@ -1167,6 +1611,21 @@ func (a *App) reflowSettings(dpi uint32) {
 	a.settingsDPI = dpi
 	a.settingsGeometry = geometry
 	a.clampSettingsToWorkArea()
+}
+
+// settingsGeometryFitted resolves the layout for the current tab and text
+// size, then steps the text size down if the window would be taller than the
+// work area. A control nobody can reach is worse than text one size smaller.
+func (a *App) settingsGeometryFitted(dpi uint32) settingsGeometry {
+	limit := 0
+	if work, ok := a.workArea(); ok {
+		margin := int(math.Round(16 * float64(dpi) / 96))
+		limit = int(work.Bottom-work.Top) - margin
+	}
+	size := normalizeTextSize(a.options.Settings.SettingsTextSize)
+	geometry := settingsGeometryFitting(dpi, size, a.settingsTab, a.settingsRows(dpi), limit)
+	geometry.lang = a.lang
+	return geometry
 }
 
 // clampSettingsToWorkArea keeps the window on screen. It matters because the
@@ -1209,9 +1668,10 @@ func (a *App) paintSettings() error {
 	if handle == 0 {
 		return nil
 	}
-	dpi := a.windowDpi()
+	dpi := a.settingsDpi()
 	if dpi != a.settingsDPI || len(a.settingsGeometry.rows) == 0 ||
-		a.settingsGeometry.tab != a.settingsTab || a.settingsGeometry.lang != a.lang {
+		a.settingsGeometry.tab != a.settingsTab || a.settingsGeometry.lang != a.lang ||
+		a.settingsGeometry.textSize != normalizeTextSize(a.options.Settings.SettingsTextSize) {
 		a.reflowSettings(dpi)
 	}
 	geometry := a.settingsGeometry
@@ -1219,6 +1679,7 @@ func (a *App) paintSettings() error {
 	key := settingsFrameKey{
 		width: geometry.width, height: geometry.height, tab: a.settingsTab,
 		hover: a.settingsHover, hoverIndex: a.settingsHoverIndex, pressed: a.settingsPress,
+		focus: a.settingsFocus, focusOn: a.settingsFocusVisible,
 		lang: a.lang, view: view,
 	}
 	if key == a.settingsFrame && a.settingsSurface != nil {
@@ -1235,7 +1696,16 @@ func (a *App) paintSettings() error {
 		}
 		a.settingsSurface = surface
 	}
-	drawSettings(a.settingsSurface, geometry, view, a.settingsHover, a.settingsHoverIndex, a.settingsPress, a.lang)
+	drawSettings(a.settingsSurface, settingsPaint{
+		geometry: geometry,
+		view:     view,
+		hover:    a.settingsHover,
+		hoverAt:  a.settingsHoverIndex,
+		pressed:  a.settingsPress,
+		focus:    a.settingsFocus,
+		focusOn:  a.settingsFocusVisible,
+		lang:     a.lang,
+	})
 	a.settingsFrame = key
 
 	screenDC := win.GetDC(0)
@@ -1281,9 +1751,20 @@ func (a *App) handleSettingsMessage(hwnd win.HWND, message uint32, wParam, lPara
 	case wmLButtonUp:
 		a.settingsMouseUp(int(int16(uint16(lParam))), int(int16(uint16(lParam>>16))))
 		return 0
+	case wmDPIChanged:
+		// Dragging this window to a monitor with different scaling used to leave
+		// it laid out for the old one, because the layout read the *overlay's*
+		// DPI and nothing re-read it. The new DPI arrives in the low word of
+		// wParam; the suggested rectangle Windows also passes is deliberately
+		// ignored, because this window is placed by its own rules and clamped to
+		// the work area straight after.
+		a.settingsDPI = 0
+		a.reflowSettings(uint32(wParam & 0xffff))
+		a.clampSettingsToWorkArea()
+		_ = a.paintSettings()
+		return 0
 	case wmKeyDown:
-		if wParam == wmKeyEscape {
-			a.hideSettings()
+		if a.handleSettingsKey(wParam, lParam) {
 			return 0
 		}
 	case wmClose:
@@ -1294,6 +1775,36 @@ func (a *App) handleSettingsMessage(hwnd win.HWND, message uint32, wParam, lPara
 		return 0
 	}
 	return win.DefWindowProc(hwnd, message, wParam, lParam)
+}
+
+// handleSettingsKey runs the settings window's keyboard gestures and reports
+// whether it consumed the key.
+//
+// Escape always works. Tab and Space/Enter only work when the user turned
+// keyboard navigation on: this dialog is mouse-first, and a window that starts
+// swallowing Tab because it happens to be open is a surprise. The flag exists so
+// that is a choice rather than an opinion.
+func (a *App) handleSettingsKey(key uintptr, lParam uintptr) bool {
+	if key == wmKeyEscape {
+		a.hideSettings()
+		return true
+	}
+	if !a.options.Settings.SettingsKeyboard {
+		return false
+	}
+	switch key {
+	case wmKeyTab:
+		delta := 1
+		if win.GetKeyState(win.VK_SHIFT) < 0 {
+			delta = -1
+		}
+		a.moveSettingsFocus(delta)
+		return true
+	case wmKeySpace, wmKeyReturn:
+		a.activateSettingsFocus()
+		return true
+	}
+	return false
 }
 
 func (a *App) settingsMouseMove(x, y int) {
@@ -1473,7 +1984,12 @@ func (a *App) settingsApply(control settingsControl, index int) {
 	case settingsClose:
 		a.hideSettings()
 		return
-	case settingsTabGeneral, settingsTabSound, settingsTabSessions:
+	// Every tab in the sidebar must be listed here. settingsTabAppearance was
+	// missing from this case for two releases: the tab hit-tested, hovered and
+	// drew its selected state, and clicking it did nothing at all - which also
+	// meant the three appearance settings had no reachable UI, because the tray
+	// menu has no theme entry. TestSettingsEveryTabSwitches pins it.
+	case settingsTabGeneral, settingsTabSound, settingsTabSessions, settingsTabAppearance:
 		a.settingsTab = settingsTabIndex(control)
 		a.reflowSettings(a.settingsDPI)
 		a.settingsHover = settingsNone
@@ -1566,6 +2082,20 @@ func (a *App) settingsApply(control settingsControl, index int) {
 		a.lang = i18n.Resolve(i18n.Setting(settings.Language), i18n.SystemLocale())
 		a.updateTooltip()
 		a.postRefresh()
+	case settingsTextSize:
+		if index >= 0 && index < len(config.TextSizes) {
+			settings.SettingsTextSize = config.TextSizes[index]
+			// The window is sized by its content, so changing the text size
+			// changes the window. Reflow keeps the centre still.
+			a.reflowSettings(a.settingsDPI)
+		}
+	case settingsKeyboard:
+		settings.SettingsKeyboard = !settings.SettingsKeyboard
+		if !settings.SettingsKeyboard {
+			a.settingsFocusVisible = false
+		}
+	case settingsTooltips:
+		settings.SettingsTooltips = !settings.SettingsTooltips
 	case settingsTheme:
 		if index >= 0 && index < len(ThemeNames) {
 			settings.Theme = ThemeNames[index]

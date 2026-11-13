@@ -92,10 +92,38 @@ const (
 	DefaultIdleMinutes = 3
 	MaxIdleMinutes     = 120
 
+	// Settings window text sizes. The values are names, not factors, for the
+	// same reason Theme is a name: config.json should say what the user chose,
+	// and the factor is a rendering decision that may be retuned. ui owns the
+	// factors (settingsTextScales), and internal/app pins the two lists.
+	TextSizeSmall    = "small"
+	TextSizeStandard = "standard"
+	TextSizeLarge    = "large"
+
+	DefaultTextSize = TextSizeStandard
+
 	// muteListMax caps the per-session silence list, so a hand-edited
 	// config.json cannot grow it without bound.
 	muteListMax = 200
 )
+
+// TextSizes is the complete, user-visible set in the order the settings window
+// offers them: smallest first, which is how a size control reads. Unlike
+// DonePolicies this is not "default first" - a segment that jumps from Large to
+// Small to Standard is a puzzle, not a scale - so the default is named
+// separately by DefaultTextSize.
+var TextSizes = []string{TextSizeSmall, TextSizeStandard, TextSizeLarge}
+
+// ValidTextSize normalises an unknown or empty value back to the default, so a
+// hand-edited config.json cannot make the settings window unreadable.
+func ValidTextSize(value string) string {
+	for _, size := range TextSizes {
+		if strings.EqualFold(strings.TrimSpace(value), size) {
+			return size
+		}
+	}
+	return DefaultTextSize
+}
 
 // DonePolicies is the complete, user-visible set, in the order the settings
 // window offers them: the default first.
@@ -280,6 +308,21 @@ type Config struct {
 	// a heuristic: a forked conversation also carries a parent id, and the two
 	// cannot be told apart from what reporters send.
 	QuietSubagents bool `json:"quietSubagents"`
+	// SettingsTextSize scales the settings window: "small", "standard" or
+	// "large". It exists because the settings window's type ramp is a
+	// judgement call about someone else's eyesight, and the first version
+	// guessed too small for a 150% display. It scales the whole dialog
+	// (spacing and text together), so it cannot make text overflow its row.
+	SettingsTextSize string `json:"settingsTextSize"`
+	// SettingsKeyboard turns on Tab/Shift+Tab focus and Space/Enter activation
+	// inside the settings window. Off by default: a dialog that starts
+	// swallowing Tab is a surprise for someone who only ever uses the mouse,
+	// and this overlay is a mouse-first thing.
+	SettingsKeyboard bool `json:"settingsKeyboard"`
+	// SettingsTooltips shows the full text when a settings label had to be
+	// truncated. On by default: it only appears where something was actually
+	// cut off, so it cannot become noise.
+	SettingsTooltips bool `json:"settingsTooltips"`
 }
 
 // Default returns the settings used when config.json is absent or unreadable.
@@ -293,7 +336,8 @@ func Default() Config {
 		Theme:                 DefaultTheme, PerSourceColor: false,
 		ForegroundAware: true, IdleMinutes: DefaultIdleMinutes,
 		DonePolicy: DefaultDonePolicy, QuietCurrent: true,
-		QuietSubagents: true,
+		QuietSubagents: true, SettingsTextSize: TextSizeStandard,
+		SettingsKeyboard: false, SettingsTooltips: true,
 	}
 }
 
@@ -319,6 +363,7 @@ func (c Config) Normalize() Config {
 		c.AutoApproveTimeoutSec = Default().AutoApproveTimeoutSec
 	}
 	c.Theme = ValidTheme(c.Theme)
+	c.SettingsTextSize = ValidTextSize(c.SettingsTextSize)
 	if c.IdleMinutes < 0 || c.IdleMinutes > MaxIdleMinutes {
 		c.IdleMinutes = DefaultIdleMinutes
 	}

@@ -45,6 +45,9 @@ const (
 	wmCaptureChanged = 0x0215
 	wmCancelMode     = 0x001F
 	wmKeyEscape      = 0x1B
+	wmKeyTab         = 0x09
+	wmKeyReturn      = 0x0D
+	wmKeySpace       = 0x20
 	mkLButton        = 0x0001
 
 	// ninBalloonUserClick is the tray callback event raised when the user

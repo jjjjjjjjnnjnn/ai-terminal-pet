@@ -223,6 +223,15 @@ const (
 	KeySettingsHiddenAtLaunch     = "settings.hiddenAtLaunch"
 	KeySettingsHiddenAtLaunchHint = "settings.hiddenAtLaunch.hint"
 	KeySettingsAppearanceNote     = "settings.appearance.note"
+	KeySettingsTextSize           = "settings.textSize"
+	KeySettingsTextSizeHint       = "settings.textSize.hint"
+	KeyTextSizeSmall              = "textSize.small"
+	KeyTextSizeStandard           = "textSize.standard"
+	KeyTextSizeLarge              = "textSize.large"
+	KeySettingsKeyboard           = "settings.keyboard"
+	KeySettingsKeyboardHint       = "settings.keyboard.hint"
+	KeySettingsTooltips           = "settings.tooltips"
+	KeySettingsTooltipsHint       = "settings.tooltips.hint"
 
 	KeyThemeSlate    = "theme.slate"
 	KeyThemePaper    = "theme.paper"
@@ -395,6 +404,15 @@ var dictEn = map[string]string{
 	KeySettingsHiddenAtLaunch:     "Start hidden",
 	KeySettingsHiddenAtLaunchHint: "Begin in the tray; a reporter brings it back",
 	KeySettingsAppearanceNote:     "The palette applies to the panel and to this window. Every screenshot in the repository uses Slate.",
+	KeySettingsTextSize:           "Text size",
+	KeySettingsTextSizeHint:       "Scales this window; it shrinks on its own when the screen is too short",
+	KeyTextSizeSmall:              "Small",
+	KeyTextSizeStandard:           "Standard",
+	KeyTextSizeLarge:              "Large",
+	KeySettingsKeyboard:           "Keyboard navigation",
+	KeySettingsKeyboardHint:       "Tab moves between controls, Space or Enter activates",
+	KeySettingsTooltips:           "Show clipped text",
+	KeySettingsTooltipsHint:       "Hover a shortened label to read all of it",
 
 	KeyThemeSlate:    "Slate",
 	KeyThemePaper:    "Paper",
@@ -562,6 +580,15 @@ var dictZhCN = map[string]string{
 	KeySettingsHiddenAtLaunch:     "启动时隐藏",
 	KeySettingsHiddenAtLaunchHint: "启动后先进托盘，有会话上报再出现",
 	KeySettingsAppearanceNote:     "调色板同时作用于面板与这个设置窗口。仓库里所有截图用的都是「石板」。",
+	KeySettingsTextSize:           "字号",
+	KeySettingsTextSizeHint:       "放大或缩小这个窗口；屏幕放不下时会自动降一档",
+	KeyTextSizeSmall:              "小",
+	KeyTextSizeStandard:           "标准",
+	KeyTextSizeLarge:              "大",
+	KeySettingsKeyboard:           "键盘操作",
+	KeySettingsKeyboardHint:       "Tab 在控件间移动，空格或回车执行",
+	KeySettingsTooltips:           "显示被截断的文字",
+	KeySettingsTooltipsHint:       "把鼠标停在被省略的标签上可看全文",
 
 	KeyThemeSlate:    "石板",
 	KeyThemePaper:    "纸白",
