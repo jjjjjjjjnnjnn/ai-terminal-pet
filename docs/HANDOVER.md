@@ -48,9 +48,12 @@
   - 浮窗线：`pet-v1.0.7` 的 Release 带两个资产——`ai-terminal-pet-1.0.7-win-x64.zip`
     **5,053,946 B / sha256 `F3D04961…`**（17 个文件）与 `pet-setup.exe` **14,307,840 B / sha256 `AE3E2DE7…`**；
     `pet-v1.0.6` 及更早的每一个 tag 仍在（不可变，已被取代）。
-  - **上游条目**：`main` 的 `tarball` 仍指向 **1.2.9**；1.2.14 的跟进 PR 号与状态见 §45（合并仍要人工，
-    `node tools/upstream-entry.mjs --check` 只认 `OK` / `OK（in flight）`）。
-    **合并 ≠ 可见**：判断可见性读对方站点索引文件，不读 PR 页面。
+  - **上游条目**：`main` 的 `tarball` 仍指向 **1.2.9**；1.2.14 的跟进
+    [PR #15045](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15045)（分支
+    `bump-tarball-1.2.14`，commit `bac06ec`，单文件单行）已开、`MERGEABLE`，
+    `node tools/upstream-entry.mjs --check` = `OK（in flight）`；被取代的 #14990（1.2.13）、
+    #14945（1.2.11）、#14899（1.2.10）已关并留说明。合并仍要人工，**合并 ≠ 可见**：判断可见性读对方
+    站点索引文件，不读 PR 页面（细节与资产复验见 §45）。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
@@ -3196,6 +3199,46 @@ python tools/check_docs_links.py            # 11 份文档全解
   设置窗口滚动、`--json` 走 IPC），都不应塞进发版轮。
 - **`go test -race` 仍未跑**：缺 gcc/cgo，属环境，不是代码。
 - **上游仍要人工合并**：我们只能保证"随时可合、检查跑过、只改一行"，可见性以对方站点索引文件为准。
+
+### 45.6 发出去的结果（当场核对，不靠回忆）
+
+- **提交与 tag**：A = `f60d8a5`（版本 + 文档数字），B = `5b95107`（索引的 `source.commit` 与 `icon` 钉到
+  `f60d8a5`）。两个 tag 都指向 `f60d8a5`；该提交上的 CI **success**（run `43457593263`，1m35s）。
+- **两个 Release**：[`pet-v1.0.7`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.7)
+  （zip + `pet-setup.exe`）与
+  [`dsh-plugin-v1.2.14`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/dsh-plugin-v1.2.14)
+  （tgz）。GitHub 自己算的 `digest` 与我们记的 sha256 **逐字相同**（三个资产都核过）。
+- **npm**：`dsh-ai-terminal-pet@1.2.14` 已发布，`dist-tags.latest` = **1.2.14**；
+  `npm pack dsh-ai-terminal-pet@1.2.14` 解包后与 Release 资产**逐文件相同（18/18）**
+  ——`.tgz` 字节不同是 npm 重打包的正常现象，比的是解包后的文件。
+- **上游**：[PR #15045](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15045)
+  （分支 `bump-tarball-1.2.14`，commit `bac06ec`，单文件单行）已开、`MERGEABLE`；
+  `node tools/upstream-entry.mjs --check` = **OK（in flight）**。被取代的 #14990（1.2.13）、
+  #14945（1.2.11）、#14899（1.2.10）已关，各留一句「被 #15045 取代」。
+  上游 `main` 的 `tarball` 仍是 1.2.9——**合并仍要维护者**，且**合并 ≠ 可见**：判断可见性读对方站点索引。
+- **资产复验**（全部从公网 URL 下载回来，不读本机文件）：三个 sha256 与 §45.3 的表一致；
+  沙箱拿**下载回来的 zip** 跑 `install`（11 个文件、逐文件 SHA256 校验）→ `-VerifyOnly`
+  **11/11 `[ok]`、0 failed** → 装出来的 `--version` = **1.0.7** → `--doctor` **7 ok / 3 warn / 0 fail**
+  （三条 warn 是「`runtime/` 还没建」「管道没人听」「没有活实例」，空沙箱里必然如此）→ `-Uninstall` 后
+  安装目录 **0 文件**。
+- **本机升级**：`scripts\install.cmd` 装到 1.0.7 后 `--version` = **1.0.7**、`--doctor`
+  **10 ok / 0 warn / 0 fail**；在**装好的这份**上再点一次「纸白」→ `config.json` 的 `theme` 变 `paper`，
+  点回「石板」→ `slate`。
+- `packages/dsh-ai-terminal-pet/*.tgz` 已删（打包产物只作 Release 资产，`.gitignore` 已挡住）。
+
+### 45.7 下一个会话从这里开始
+
+没有欠账。可选的下一轮（都取自 [ROADMAP.md](ROADMAP.md) §4，按"用户可感知"排序）：
+**UIA 无障碍**（自绘分层窗口对屏幕阅读器完全不可见，是一整轮）、**设置窗口滚动**（现在按工作区降档）、
+**`--json` 走 IPC 查运行中实例**（目前只读快照，约束是永不阻塞 GUI）。上架这边只剩等 #15045 合并与
+对方站点重建，判断标准见 [docs/UPSTREAM.md](UPSTREAM.md) §4。
+
+### 45.8 这一轮暴露的两个流程缺口
+
+- **文档里的版本号会独立腐烂**：这轮改版本号时才发现 README 徽章停在 1.0.2、插件版本段落停在 1.2.8。
+  发版前搜一次 `1\.0\.[0-9]` 与 `1\.2\.1[0-9]`（包括徽章、`--version` 示例、包内 README），比事后被人指出便宜。
+- **"点了没写盘"要先问进程是怎么退出的**：`configSaver` 在守护协程里写文件，`kill` 不触发 `defer flush()`。
+  验持久化必须正常关窗 + `--quit`，否则会把"验法错了"当成"代码错了"。
 
 ## 44. 交接：设置窗口可读、可用、外观页签终于能点（2026-11-13 深夜，第 44 轮；**已随 1.0.7 发版**）
 
