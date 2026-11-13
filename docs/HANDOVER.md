@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13 晚；浮窗 **1.0.6**、插件包 **1.2.12**，第 43 轮已发版）
+## 1. 当前状态（2026-11-13 晚；浮窗 **1.0.6**、插件包 **1.2.13**，第 43 轮已发版）
 
 > 接手请先读本节与文末 **§43「交接：三个假提醒的根因 + OpenCode 2.x」**（最新一轮，已发版）、
 > **§42「交接：点行复制路径」**（上一轮，已发版）、**§41「交接：判定记录搬家」**（上一轮）、
@@ -17,10 +17,11 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.6`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.12`**。
+- **版本**：浮窗 **`1.0.6`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.13`**。
   两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`。
-  **`pet-v1.0.6` 与 `dsh-plugin-v1.2.12` 是本轮新打的**，资产与沙箱复验见 §43；
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`。
+  **`pet-v1.0.6` 与 `dsh-plugin-v1.2.13` 是本轮新打的**（1.2.12 因包内 README 指向 1.2.11 被 1.2.13 取代），
+  资产与沙箱复验见 §43；
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**316 个** `func Test`，
@@ -3134,7 +3135,7 @@ python tools/check_docs_links.py            # 11 份文档全解
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
 
-## 43. 交接：三个"假提醒"的根因 + OpenCode 对齐 2.x（2026-11-13 晚，第 43 轮；浮窗 1.0.6 / 插件 1.2.12）
+## 43. 交接：三个"假提醒"的根因 + OpenCode 对齐 2.x（2026-11-13 晚，第 43 轮；浮窗 1.0.6 / 插件 1.2.13）
 
 用户的原话只有两句：**"普通终端命令也会响"**、**"没有 agent 完成任务它也响"**。两句都不是"提醒太敏感"，
 而是四个互相独立的错误。顺序、证据与结论如下；每一条都先在真机/沙箱里复现，再改，再回归。
@@ -3232,11 +3233,49 @@ tombstone 全部按上报进程记账——这是**协议层身份**，不能动
   控制组（真完成）仍然 `tone=finished`；重复 pid 被清理后**无 tone/balloon**；只杀上报端后
   `decision=vanished` 且静默。
 
-### 43.6 没做的事 / 下一步
+### 43.6 发布与上游（本轮实际发生的）
 
-- **已发版**：`pet-v1.0.6` 与 `dsh-plugin-v1.2.12` 按 §27 与
+**浮窗 `pet-v1.0.6`**（tag 在 `1efca5a`）：
+
+| 资产 | 大小 | sha256 | 公网复验 |
+|---|---|---|---|
+| `ai-terminal-pet-1.0.6-win-x64.zip`（17 文件） | 5,041,100 B | `5E2762A2…` | 下载回来逐字节相同 |
+| `pet-setup.exe` | 14,274,048 B | `39BC505C…` | 下载回来逐字节相同 |
+
+沙箱拿**下载回来的 zip** 跑完整链路：解出 17 个文件 → `install.cmd`（无 `[fail]`）→ 覆盖层与
+`protocol.js`、DSH bundle 都落到沙箱 `%LOCALAPPDATA%` → `-VerifyOnly` **11 个 `[ok]`、0 失败** →
+装出来的二进制 `--version` 打印 **1.0.6** → `--doctor` **10 项、0 fail** → `-Uninstall` 后安装目录
+**0 文件**。`pet-setup.exe` 本轮重建（内嵌 payload 跟着 `scripts/package.ps1` 一起变）。
+
+**插件 `dsh-plugin-v1.2.13`**（tag 在 `05fc1fb`）：`dsh-ai-terminal-pet-1.2.13.tgz`，
+1,990,629 B / `FB809C2B…` / shasum `dbfc774d…`；公网下载回来逐字节相同，解包后 README 里两条安装命令
+都是 1.2.13，没有残留的 1.2.11/1.2.12。
+
+**为什么是 1.2.13**：1.2.12 的 tarball 是在改 README **之前** `npm pack` 出来的，包里那份 README 的
+安装命令还写着 `dsh-plugin-v1.2.11`——照它装会装到上一版。已发布资产不可变（AGENTS.md 规矩 6），
+所以用修好的 README 重新打 1.2.13，并关掉 1.2.12 的 PR。**这是本轮唯一一次重复劳动，成因是顺序**：
+`npm pack` 必须在所有版本号文本（含 `packages/dsh-ai-terminal-pet/README.md`）改完之后，
+而且要把包里的 README 解出来核对（`tar -xzf … package/README.md`），只看工作区不算数。
+
+**npm**：`dist-tags.latest` = **1.2.13**（发布后约 3 分钟才生效，头几分钟读到的还是上一版，这是正常的）。
+`npm pack dsh-ai-terminal-pet@1.2.13` 解包后与 Release 资产**逐文件 sha256 相同**（18/18）；
+注意 npm 会重新打包，**tarball 字节数与 sha256 与 Release 资产不同是正常的**（1.2.13：npm 端
+1,990,629 B 而 gzip 头不同 → 哈希不同），所以复验要比解包后的文件，不要比 `.tgz` 本身。
+
+**上游**：[PR #14990](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14990)
+（分支 `bump-tarball-1.2.13`，单文件单行）。`node tools/upstream-entry.mjs --check` =
+`OK (in flight)`。同一作者的 #14899（1.2.10）、#14945（1.2.11）仍开着，#14986（1.2.12）已关并留了说明；
+维护者合并 #14990 之后，上游条目才会从 `dsh-plugin-v1.2.9` 跳到 1.2.13（**合并 ≠ 可见**，
+要等对方站点重建，读 `plugins.json` 而不是 PR 页面）。
+
+**市场索引**：A 提交 `1efca5a` 带 1.2.12 与 `publishTimestamp`，A2 提交 `05fc1fb` 把它改成 1.2.13
+（`publishTimestamp` 同时更新），B 提交把 `source.commit` 与 `icon` 钉到 `05fc1fb` 的完整 sha。
+
+### 43.7 没做的事 / 下一步
+
+- **已发版**：`pet-v1.0.6` 与 `dsh-plugin-v1.2.13` 按 §27 与
   [docs/UPSTREAM.md](UPSTREAM.md) 的八步顺序走完（A 提交带版本/两份清单/索引版本与时间戳，B 提交钉
-  `source.commit` 与 `icon`，两个 tag、两个 Release、npm publish、上游 `bump-tarball-1.2.12`）。
+  `source.commit` 与 `icon`，两个 tag、两个 Release、npm publish、上游 `bump-tarball-1.2.13`）。
   资产字节、sha256、沙箱复验与上游 PR 号记在本节末尾。
 - **`packages/dsh-ai-terminal-pet/*.tgz` 不进 git**：1.2.11 的 tarball 是上一次 `git add -A` 顺手带进
   `73a9fad` 的（2 MB 二进制躺在历史里）。本轮把它从工作区删掉、把 `*.tgz` 写进 `.gitignore`，
