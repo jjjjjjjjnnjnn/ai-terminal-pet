@@ -8,7 +8,8 @@
 
 ## 1. 当前状态（2026-11-13 深夜；浮窗 **1.0.7**、插件包 **1.2.15** 已发版）
 
-> 接手请先读本节与文末 **§48「交接：适配 DSH 0.2.x」**（最新一轮；只改兼容声明，没动代码）、
+> 接手请先读本节与文末 **§49「上架巡检：十家目录现在各指哪里」**（最新一轮；只读 + 一处源头修正）、
+> **§48「交接：适配 DSH 0.2.x」**（1.2.15 的兼容声明）、
 > **§47「维护：工作区整理」**（只删可再生产物）、
 > **§46「交接：把两个流程缺口变成门禁」**（工具与测试）、
 > **§45「交接：把第 44 轮发出去 —— 1.0.7 / 1.2.14」**（上一次发版，没有改代码）、
@@ -60,7 +61,8 @@
     [#15067](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15067)（分支
     `bump-tarball-1.2.15`，单文件单行）已开、`MERGEABLE`，`tools/upstream-entry.mjs --check` =
     `OK（in flight）`。#14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）均已关并留说明。
-    合并仍要人工，**合并 ≠ 可见**：判断可见性读对方站点索引文件，不读 PR 页面（见 §48.7 与 §45）。
+    合并仍要人工，**合并 ≠ 可见**：判断可见性读对方站点索引文件，不读 PR 页面。
+  - **其余九家目录的当前状态见 §49**（哪些已最新、哪些等对方扫描、哪些在等人工复核）。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
   要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
@@ -3246,6 +3248,49 @@ python tools/check_docs_links.py            # 11 份文档全解
 
 - **文档里的版本号会独立腐烂** → `tools/check_versions.mjs`（CI 步骤 + 24 条规则测试）。
 - **"点了没写盘"要先问进程是怎么退出的** → `internal/app/config_saver_test.go` 三条测试 + AGENTS.md 第 9 条。
+
+## 49. 上架巡检：十家目录现在各指哪里（2026-11-13 深夜，第 49 轮）
+
+要求是"确保所有插件市场全部更新到最新版"。按 [docs/UPSTREAM.md](UPSTREAM.md) §4 的规矩**读对方公开索引文件**，
+不读 PR 页面，逐家核对如下。**"最新"分三种情况**：我们自己能直接改的（已改完）、等对方合并/重建的、
+以及对方按自己节奏自动扫的。全部都是当场读到的值，不是回忆。
+
+| 目录 | 它怎么收录 | 现在提供的（实测） | 我们做了什么 |
+|---|---|---|---|
+| **npm** | 我们发布 | `dist-tags.latest` = **1.2.15** | 已发布，`npm pack` 解包与 Release 资产逐文件相同 |
+| **本仓库 format-1 索引**（DSH Discover 可直接加） | 我们自己写 | `1.2.15`、`engines.dsh >=0.2.0-0 <0.3.0-0`、commit `139466c` | B 提交已钉 sha；`verify.mjs` 断言索引与包内声明一致 |
+| **awesome-dsh-plugin**（dshmarket 的 Market 页由它生成） | 单文件 PR + 站点重建 | 仓库条目已合并到 **1.2.14**；站点 `plugins.json` 仍渲染 **1.2.9**（含旧 install 命令） | 开了 [#15067](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15067)（1.2.15，单文件单行，`MERGEABLE`）。**合并与重建都只能等** |
+| **polang233/dsh-plugin-index**（dshopen.org） | 人工审核，按版本/提交固定 | `data/sources.json` 第 1204 条仍钉 **1.2.4**（commit `ff7f6de`）；线上 `public/index.json` 里还没有带 git 源的条目 | 按他们 CONTRIBUTING 的「更新与更正」在**原 issue [#423](https://github.com/polang233/dsh-plugin-index/issues/423) 里回复**了 1.2.15 + 新 commit + npm 已可用（他们写明关闭的 issue 也接受回复，且默认跟踪 npm `latest`） |
+| **YELEBAI/dsh-plugin-marketplace** | 每 2 小时扫 `topic:dsh-plugin`，写一份中心 registry | `version 1.2.8`，`install.spec` 钉在 `github:…#8ec59ac` | 无需投递；下次扫描会带走新版本与新描述（见 §49.2） |
+| **bradeGithub/DSH-Plugins-Marketplace** | 2 小时增量扫描 | `version` / `npm_version` = **1.2.13**，`registry_seen_at 13:32Z` | 同上，等它自己的扫描 |
+| **imsai-sh/awesome-deepseek-harness-plugins** | 目录文件只存仓库与描述，安装走 npm | 条目里**没有版本字段**，所以 npm 装到哪个就是哪个（现在 1.2.15） | 无需改动 |
+| **zhu1090093659/dsh-community-plugins** | `community.json` 只存 id/名称/描述/仓库 | 同样**没有版本字段** | 无需改动 |
+| **dshmarketplace.dev** | 它自己的提交 API | **已收录**（`inRegistry: true`），但 `installKind: unknown`、`installable: false`、`npmPackage: null` | 没有文档化的更新入口，**没有重投**（重复投递不会加快，只会让"我们不看规则"变成印象） |
+| **1024 Store** | 抓取/展示 | 详情页 **200**，标题与摘要正常；**版本不在 HTML 里**（前端渲染），其 API 搜不到本包 | 无可查项，无动作 |
+| **dshbase / dsh.so / AllDSH** | 人工复核 issue | `#322` / `#24` / `#2` 仍 **OPEN、0 评论**（11-11 投出） | 按 `docs/UPSTREAM.md` §4 的规矩**不重投** |
+| **dsh-plugin.org** | 人工复核 issue | [#735](https://github.com/dshplugin/dsh-plugin-hub/issues/735) 已关闭并回复 **collected**：因 manifest 声明 `platforms: ["win32"]` 标成 Windows-only，安装走源码 `github:jjjjjjjjnnjnn/ai-terminal-pet` | 已收录，无需动作（站点首页前端渲染，HTML 里看不到条目） |
+
+### 49.1 结论
+
+- **我们能自己决定的两位已经是最新**：npm 与仓库内的 format-1 索引。
+- **两位跟着仓库/包自动走的已经间接最新**：imsai 与 zhu 没有版本字段，装到哪个就是哪个。
+- **两位自动扫描的会在下一次扫描到位**：YELEBAI 与 bradeGithub（各自 2 小时节奏）。
+- **三位要等别人动**：awesome-dsh-plugin 等合并 + 站点重建；dshopen 等人工复核；1024 Store 与
+  dshmarketplace.dev 的元数据缺陷在对方手里（一个不暴露版本，一个没识别出安装源）。
+- **三位仍停在"已投、无回应"**：dshbase / dsh.so / AllDSH。这不是我们能推进的事，重投只会变差。
+
+### 49.2 顺带修掉一个"源头"
+
+抓取型目录的条目描述是**逐字抄我们 GitHub 仓库的那段 description**。它当时还写着
+"**56px** always-on-top status strip … **4.17 MiB**"——面板早已是可展开的 200×N（紧凑条 56×156），
+浮窗也已是 **4,554,240 B = 4.34 MiB**。也就是说：不改这一处，每两小时就有一批目录把错数字抄一遍。
+已改为（289 字符，只写可核对的事实）：
+
+> A Windows overlay for DeepSeek Harness, Claude Code, OpenCode and Antigravity: session state travels
+> over a named pipe to a native Go binary, which draws a 4.34 MiB always-on-top panel with a tray icon
+> so you can see which agent is waiting. No account, no network, no runtime dependencies.
+
+所以这一轮**没有**去改十家目录里的九段文案，只改了一个源头 + 一个索引 + 一个 PR + 一条 issue 回复。
 
 ## 48. 交接：适配 DSH 0.2.x —— 1.2.15（2026-11-13 深夜，第 48 轮；只改兼容声明）
 
