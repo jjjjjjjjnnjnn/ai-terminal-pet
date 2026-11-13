@@ -6,9 +6,10 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13 傍晚；浮窗 **1.0.7**、插件包 **1.2.14** 已发版）
+## 1. 当前状态（2026-11-13 深夜；浮窗 **1.0.7**、插件包 **1.2.15** 已发版）
 
-> 接手请先读本节与文末 **§47「维护：工作区整理」**（最新一轮；只删可再生产物，没改代码）、
+> 接手请先读本节与文末 **§48「交接：适配 DSH 0.2.x」**（最新一轮；只改兼容声明，没动代码）、
+> **§47「维护：工作区整理」**（只删可再生产物）、
 > **§46「交接：把两个流程缺口变成门禁」**（工具与测试）、
 > **§45「交接：把第 44 轮发出去 —— 1.0.7 / 1.2.14」**（上一次发版，没有改代码）、
 > **§44「交接：设置窗口可读、可用」**（1.0.7 的代码就是它）、
@@ -21,10 +22,11 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.7`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.14`**。
+- **版本**：浮窗 **`1.0.7`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.15`**。
   两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`。
-  **`pet-v1.0.7` 与 `dsh-plugin-v1.2.14` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）。
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`。
+  **`pet-v1.0.7` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）；**`dsh-plugin-v1.2.15` 是第 48 轮打的**，
+  只改兼容声明（`engines.dsh` / `engines.node`），浮窗一个字节没动，见 §48。
   **工作区与 tag 已经同步**：`bin/`、`packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的
   `AI-Terminal-Pet.exe` 三份逐字节相同（**4,554,240 B**，sha256 `01B42DC2…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
@@ -45,18 +47,17 @@
   均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.14**（`npm view` 核对）；`dsh-plugin-v1.2.14` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.14.tgz` **2,000,539 B / sha256 `EBD6CE82…` / shasum `b95b20c7…`**（18 个文件），
-    包内 README 的安装命令是 1.2.14；
-    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §45，`icon` 同一 sha）。
+  - 插件线：npm `latest` = **1.2.15**（`npm view` 核对）；`dsh-plugin-v1.2.15` 的 Release 资产
+    `dsh-ai-terminal-pet-1.2.15.tgz` **2,000,898 B / sha256 `F6D85F76…` / shasum `27c20674…`**（18 个文件），
+    包内 README 的安装命令是 1.2.15；
+    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §48，`icon` 同一 sha；
+    索引里的 `engines.dsh` 与包内声明一致，`verify.mjs` 断言这一点）。
   - 浮窗线：`pet-v1.0.7` 的 Release 带两个资产——`ai-terminal-pet-1.0.7-win-x64.zip`
     **5,053,946 B / sha256 `F3D04961…`**（17 个文件）与 `pet-setup.exe` **14,307,840 B / sha256 `AE3E2DE7…`**；
     `pet-v1.0.6` 及更早的每一个 tag 仍在（不可变，已被取代）。
-  - **上游条目**：`main` 的 `tarball` 仍指向 **1.2.9**；1.2.14 的跟进
-    [PR #15045](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15045)（分支
-    `bump-tarball-1.2.14`，commit `bac06ec`，单文件单行）已开、`MERGEABLE`，
-    `node tools/upstream-entry.mjs --check` = `OK（in flight）`；被取代的 #14990（1.2.13）、
-    #14945（1.2.11）、#14899（1.2.10）已关并留说明。合并仍要人工，**合并 ≠ 可见**：判断可见性读对方
+  - **上游条目**：`main` 的 `tarball` 仍指向 **1.2.9**；1.2.15 的跟进 PR 号与状态见 §48（合并仍要人工）。
+    1.2.14 的 [PR #15045](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15045) 已被 1.2.15 的 PR 取代；
+    #14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）都已关并留说明。**合并 ≠ 可见**：判断可见性读对方
     站点索引文件，不读 PR 页面（细节与资产复验见 §45）。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
@@ -3243,6 +3244,93 @@ python tools/check_docs_links.py            # 11 份文档全解
 
 - **文档里的版本号会独立腐烂** → `tools/check_versions.mjs`（CI 步骤 + 24 条规则测试）。
 - **"点了没写盘"要先问进程是怎么退出的** → `internal/app/config_saver_test.go` 三条测试 + AGENTS.md 第 9 条。
+
+## 48. 交接：适配 DSH 0.2.x —— 1.2.15（2026-11-13 深夜，第 48 轮；只改兼容声明）
+
+用户说"DSH 版本更新了"。查完事实：本机桌面版是 `@deepseek-ai/dsh-desktop` **0.2.2-rc.3**（更新通道
+`nightly`，`resources/app.asar` 里的 `package.json` 就是这么写的），npm 上 `@deepseek-ai/dsh` 的
+`dist-tags` 是 `latest 0.2.2-rc.1` / `next 0.2.2-rc.3` / `alpha 0.2.2-alpha.3`。而我们包里的声明还停在
+`engines.dsh: ">=0.1.0-rc.6"`——那是 0.1 线的地基，中间隔了 0.1.1–0.1.7 与整条 0.2 线。
+
+### 48.1 真正要改的那一条规则
+
+DSH 从 **0.2.1-alpha.3** 起改判兼容性（`docs/upgrade-guide/v0.2.1-alpha.3/plugin-engines-dsh`）：
+
+> An own `engines.dsh` range decides alone and those peers are ignored; the peer rule applies only
+> when `engines.dsh` is absent.
+
+实现在 `@deepseek-ai/dsh-app-boot` 的 `evaluatePluginCompatibility(manifest, exemptions, runtimeVersion)`，
+判定用 `semver.satisfies(runtimeVersion, range, { includePrerelease: true })`，不符就把包名、版本与
+**未满足的 requirements** 一起返回，`dsh plugin` 据此拒绝安装并**回滚 profile**（pnpm 的 package.json、
+lockfile、node_modules 都还原）。也就是说：**`engines.dsh` 这一个字符串就是全部的兼容性声明**，
+`peerDependencies` 上的 `@deepseek-ai/dsh*` 范围不再参与判断。
+
+### 48.2 量出来的坑：`includePrerelease` 让文档写法的两端都错
+
+DSH 自己的 `publish.md` 推荐写 `">=0.2.0 <0.3.0"`。用宿主自己的 `evaluatePluginCompatibility` 跑一遍矩阵：
+
+| 运行时 | `>=0.2.0 <0.3.0`（文档写法） | `>=0.2.0-0 <0.3.0-0`（本包采用） |
+|---|---|---|
+| 0.1.7 | 拒 | 拒 |
+| 0.2.0-rc.1 | **拒**（预发布排在 0.2.0 之下） | 收 |
+| 0.2.1-rc.5 / 0.2.2-rc.1 / 0.2.2-rc.3 | 收 | 收 |
+| 0.2.2（正式版） | 收 | 收 |
+| 0.3.0-rc.1 | **收**（预发布同样排在 0.3.0 之下） | 拒 |
+| 1.0.0 | 拒 | 拒 |
+
+所以本包写 **`>=0.2.0-0 <0.3.0-0`**：整条 0.2 线（含它的预发布）收，0.3 的预发布也不放进来。
+这不是洁癖——DSH 自己就在发 `-rc.N`，用文档写法会一边拒掉自己家的 rc、一边放过下一个大版本的 rc。
+
+### 48.3 怎么验的（可以在任何机器上重做）
+
+```powershell
+# 1. 两个真宿主：0.2.2-rc.3（当前）与 0.2.0-rc.1（区间下端）
+npm install @deepseek-ai/dsh@0.2.2-rc.3   # 装进一个空目录，2 分钟、672 个包
+$env:DSH_HOME = "$env:TEMP\dsh-home"; node .\node_modules\@deepseek-ai\dsh\lib\bin.js --version
+
+# 2. 装包并看它有没有被合成进配置（--dump-config 不启动宿主，只合成层）
+node ...\lib\bin.js plugin --profile pet add <tarball>
+node ...\lib\bin.js --profile pet --dump-config | Select-String 'ai-terminal-pet'
+
+# 3. 反证：把 engines.dsh 改成 >=9.0.0 再装，必须被拒且回滚
+```
+
+实测结果：两个宿主都把 1.2.15 装进 profile（`bundles` = `["@deepseek-ai/dsh-base","dsh-ai-terminal-pet"]`），
+`--dump-config` 都能看到 `# == dsh-ai-terminal-pet` 那一层；改成 `>=9.0.0` 的那份被拒，输出
+`requirements {"engines.dsh":">=9.0.0"}` 并把 profile 还原。
+
+### 48.4 代码这次一行没改，凭什么
+
+插件只依赖五个事件，0.2.2-rc.3 的文档里都还在：`session/event`（durable session 记录）、
+`agent/inbox/claimed`、`agent/status`、`agent/error`、`approval/request`（仍是 **waterfall**，签名仍是
+`(req, next)`，见 `docs/subsystems/approval.md`）。`ctx.logger` 与 `process.on('exit')` 也没动。
+所以 `lib/index.js` 保持原样，`vendor/AI-Terminal-Pet.exe`（浮窗 1.0.7）一个字节没动——这次是**元数据版本**，
+不是功能版本。
+
+### 48.5 同时改的 `engines.node`
+
+`^22.19 || >=24` → **`>=24.9.0`**。DSH 0.2.1-rc.2 起要求 Node 24.9+ 并放弃 Node 22
+（`docs/upgrade-guide/v0.2.1-rc.2/node-24`，宿主的 `package.json` 也是 `{"node":">=24.9.0"}`）。
+bundle 只在宿主进程里跑，所以声明与宿主对齐；我们自己的代码没有 Node 24 专属 API，但"能在 Node 22 上跑"
+这句话现在没有意义——那个宿主根本起不来。
+
+### 48.6 下次 DSH 再升版时照着做
+
+1. `npm view @deepseek-ai/dsh dist-tags` 与桌面版 asar 里的 `version` 各读一次（**读文件，别猜**）。
+2. 读 `docs/upgrade-guide/README.md` 里跨过的那几档，尤其 `plugin-*`、`approval*`、`session*` 条目。
+3. 用 §48.3 的配方在新宿主上装一次 + `--dump-config`；顺手把矩阵跑一遍（`engines.dsh` 的上下界各取一个
+   预发布版本试）。
+4. 只有这三件同步改完才算"适配"：包内 `engines`、根 shim 的 `engines`、`docs/market-index.json` 的
+   `versions[0].engines.dsh`（`verify.mjs` 会断言三者一致），再加 README 里那句人话。
+5. 发布走 §27 / [docs/UPSTREAM.md](UPSTREAM.md)：新版本号（资产不可变）、A/B 两提交、上游 bump PR。
+
+### 48.7 这一轮的发布结果
+
+- A 提交：版本 + 三处 `engines` + README/ROADMAP/CHANGELOG/HANDOVER。
+- tag `dsh-plugin-v1.2.15`、Release 资产 `dsh-ai-terminal-pet-1.2.15.tgz`
+  **2,000,898 B / sha256 `F6D85F76…` / shasum `27c20674…`**，npm `latest` = 1.2.15。
+- B 提交把 `docs/market-index.json` 的 `source.commit` 与 `icon` 钉到 A 的 sha。
+- 上游条目：新的 bump PR（1.2.15），并关掉被取代的 #15045（1.2.14）。
 
 ## 47. 维护：工作区整理（2026-11-13 晚，第 47 轮；没有改代码）
 

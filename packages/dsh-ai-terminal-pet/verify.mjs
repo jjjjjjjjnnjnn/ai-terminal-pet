@@ -294,8 +294,27 @@ async function caseManifest() {
   check(JSON.stringify(manifest.dsh?.marketplace?.profiles) === '["desktop","headless","web"]', 'dsh.marketplace.profiles covers the desktop, headless and web profiles')
   check(manifest.dsh.marketplace.requiresBuildApproval === false, 'the package ships prebuilt runtime files, so no build approval is needed')
   check(manifest.dsh.marketplace.manualSteps === false, 'installing needs no manual step')
-  check(manifest.engines?.node === '^22.19 || >=24', 'engines.node covers Node 22.19 and 24+')
-  check(typeof manifest.engines?.dsh === 'string' && manifest.engines.dsh.length > 0, 'engines.dsh declares a dsh requirement')
+  // Since DSH 0.2.1-alpha.3 an own `engines.dsh` range decides alone and DSH peer
+  // ranges are ignored (app-boot's evaluatePluginCompatibility, which evaluates
+  // it with semver's includePrerelease), so this string is the entire
+  // compatibility gate: a range the running host does not satisfy makes
+  // `dsh plugin add` refuse the package and roll the profile back. Verified
+  // against a real host on both ends of the range: 0.2.0-rc.1 and 0.2.2-rc.3
+  // installed the tarball and composed its layer in `dsh --dump-config`.
+  //
+  // The `-0` bounds are not decoration. Under includePrerelease the documented
+  // idiom ">=0.2.0 <0.3.0" refuses 0.2.0-rc.1 (a prerelease sorts below 0.2.0)
+  // and admits 0.3.0-rc.1 (a prerelease sorts below 0.3.0) - measured with the
+  // host's own evaluatePluginCompatibility. ">=0.2.0-0 <0.3.0-0" admits the whole
+  // 0.2 line including its prereleases and nothing of 0.3.
+  check(
+    manifest.engines?.dsh === '>=0.2.0-0 <0.3.0-0',
+    'engines.dsh targets the DSH 0.2 line (verified on 0.2.0-rc.1 and 0.2.2-rc.3)'
+  )
+  // DSH 0.2.x requires Node 24.9 or newer (v0.2.1-rc.2 dropped Node 22), and a
+  // bundle only ever runs inside that host, so the package states the same floor
+  // instead of advertising a runtime the host refuses to start on.
+  check(manifest.engines?.node === '>=24.9.0', 'engines.node states the Node floor DSH 0.2.x requires')
   check(manifest.files.includes('vendor'), 'the vendored binary ships in the tarball')
 
   const patch = readFileSync(path.join(packageDir, 'cordis.patch.yml'), 'utf8')

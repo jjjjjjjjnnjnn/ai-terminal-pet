@@ -91,10 +91,10 @@ tarball, or by pinning the release tag. All three are verified end to end:
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # release tarball: same bytes as the npm release, straight from the GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.14/dsh-ai-terminal-pet-1.2.14.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.15/dsh-ai-terminal-pet-1.2.15.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.14&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.15&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Those three differ only in transport. The npm path is the shortest and the one a
@@ -169,7 +169,16 @@ only wants the plugin gets one installed automatically.
 ## Requirements and limits
 
 - Windows only (named pipes plus a Win32 layered window).
-- Node 22.19+ or 24+ in the Harness runtime.
+- DeepSeek Harness 0.2.x. `engines.dsh` is `>=0.2.0-0 <0.3.0-0`, and since DSH
+  0.2.1-alpha.3 the host reads that range alone: a bundle whose range the running
+  DSH does not satisfy is refused and the profile rolled back, so the range is the
+  whole compatibility statement. The `-0` bounds are deliberate - DSH evaluates
+  the range with semver's `includePrerelease`, under which `<0.3.0` still admits
+  `0.3.0-rc.1` and `>=0.2.0` still refuses `0.2.0-rc.1`. Both ends were measured
+  against the host's own compatibility function. It was verified by installing
+  this tarball into a real 0.2.0-rc.1 host and a real 0.2.2-rc.3 host and
+  composing its layer with `dsh --dump-config`.
+- Node 24.9+ in the Harness runtime, which is what DSH 0.2.x itself requires.
 - Nothing in this package can fail the host: every entry point is wrapped,
   every report is fire-and-forget, and there is no process.exit.
 - Session id is the Harness session.header.id; pid is a synthetic per-session

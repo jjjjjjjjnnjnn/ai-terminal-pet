@@ -163,11 +163,16 @@ test('a release without a heading for the current overlay version fails', () => 
   assert.match(failures[0], /no "## \[1\.0\.7\]" heading/)
 })
 
-test('an unreleased section below a released one fails', () => {
+test('an unreleased section below a released overlay version fails', () => {
   const text = ['## [1.0.7] — today', '## [未发布] — tomorrow'].join('\n')
   const failures = checkChangelog(text, versions)
   assert.equal(failures.length, 1)
-  assert.match(failures[0], /lists \[未发布\] at position 2/)
+  assert.match(failures[0], /lists \[未发布\] below 1\.0\.7/)
+})
+
+test('a released plugin version above [未发布] is fine: the lines ship independently', () => {
+  const text = ['## [1.2.14] — today', '## [未发布] — also today', '## [1.0.7] — last week'].join('\n')
+  assert.deepEqual(checkChangelog(text, versions), [])
 })
 
 test('an unreleased section at the top is fine - that is what a working tree looks like', () => {

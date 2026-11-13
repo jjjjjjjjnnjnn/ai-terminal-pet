@@ -13,7 +13,7 @@
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.7`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.14` |
+| 版本 | `1.0.7`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.15` |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,554,240 B**（4.34 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,916,288 B** = 11.36 MiB |
@@ -32,7 +32,7 @@
 | 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tools/check_versions.mjs` 与它的规则测试 / `tests/fresh-machine.mjs --no-overlay`（162 项）/ `python tools/check_docs_links.py` / `scripts/package.ps1` 打 zip 并上传 artifact |
 | 自检 | `ai-terminal-pet --doctor` **10 项**（environment / install files / version / runtime / config / pipe / instance / node / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.14**，18 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.14`，资产字节与 sha256 见 CHANGELOG 的 `[1.0.7]` 一节，npm 包与 Release 资产**解包后逐文件相同**（npm 会重打包，`.tgz` 字节本就不同） |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.15**，18 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.15`，资产字节与 sha256 见 CHANGELOG 的 `[1.2.15]` 一节，npm 包与 Release 资产**解包后逐文件相同**（npm 会重打包，`.tgz` 字节本就不同）；`engines.dsh >=0.2.0-0 <0.3.0-0` 是在真实 0.2.0-rc.1 与 0.2.2-rc.3 宿主上装过并 `--dump-config` 验过的 |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
 
@@ -48,8 +48,8 @@ DSH 的插件市场正好提供了一个现成的分发面：注册表仓库里�
 
 - `packages/dsh-ai-terminal-pet/` 独立 Cordis bundle 包（npm 名 `dsh-ai-terminal-pet`，MIT，
   `type: module`；1.2.4 口径 **18 个文件**含 vendor 与 `vendor/manifest.json`）。
-  `dsh.bundle { patch: './cordis.patch.yml', platforms: ['win32'] }`，`engines node ^22.19 || >=24` /
-  `dsh >=0.1.0-rc.6`，`files` 显式 10 项。**1.1.0 起没有任何生命周期钩子**（`prepack` 被删，
+  `dsh.bundle { patch: './cordis.patch.yml', platforms: ['win32'] }`，`engines node >=24.9.0` /
+  `dsh >=0.2.0-0 <0.3.0-0`（1.2.15 起；DSH 0.2.1-alpha.3 之后只读 `engines.dsh`），`files` 显式 10 项。**1.1.0 起没有任何生命周期钩子**（`prepack` 被删，
   因为 pnpm 对 git 依赖会执行它、未钉版本的源会撞上 `allowBuilds`）；`vendor/` 改为整体提交，只做校验。
 - **版本线 1.0.0 → 1.1.0 → 1.2.0 → 1.2.1 → 1.2.2 → 1.2.3 → 1.2.4：一版一个 tag，旧 tag 不删也不复用**。
   1.0.0（`7f476c9` + `91719e5`，资产 1,913,682 B / sha256 `7365f6a6f4aea1174ec6f2f00670e868568e944816d1869aeb59db363ae6b5af`；

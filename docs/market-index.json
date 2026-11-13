@@ -61,8 +61,8 @@
       },
       "versions": [
         {
-          "version": "1.2.14",
-          "publishTimestamp": 1794584809,
+          "version": "1.2.15",
+          "publishTimestamp": 1794594030,
           "source": {
             "type": "git",
             "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
@@ -70,7 +70,7 @@
             "path": "packages/dsh-ai-terminal-pet"
           },
           "engines": {
-            "dsh": ">=0.1.0-rc.6"
+            "dsh": ">=0.2.0-0 <0.3.0-0"
           }
         }
       ]

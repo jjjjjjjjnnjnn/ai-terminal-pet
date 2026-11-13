@@ -326,9 +326,11 @@ export function sweepFutureVersions(documents, versions) {
  * version (1.2.N) - the rule is only that neither may name a version newer than
  * its own line's current one, and that the overlay's current version is there.
  *
- * `[未发布]` is legitimate in a working tree, so it is not an error - but it
- * must be the first heading: a released tree with an unreleased section below a
- * released version is the classic half-done release commit.
+ * `[未发布]` is legitimate in a working tree, so it is not an error - but it must
+ * not sit below an unreleased *overlay* version, which is the shape of a
+ * half-done release commit. A released plugin version above it is fine: the two
+ * lines ship independently (1.2.15 is a plugin-only release while the overlay
+ * batch below it is still unshipped).
  */
 export function checkChangelog(text, versions) {
   const failures = []
@@ -352,10 +354,13 @@ export function checkChangelog(text, versions) {
   }
   const unreleased = headings.indexOf('未发布')
   if (unreleased > 0) {
-    failures.push(
-      `fail: CHANGELOG.md lists [未发布] at position ${unreleased + 1}, below ${headings[0]}: ` +
-        'a released tree cannot have an unreleased section under a released version'
-    )
+    const overlayAbove = headings.slice(0, unreleased).filter((heading) => /^1\.0\.\d+$/.test(heading))
+    if (overlayAbove.length > 0) {
+      failures.push(
+        `fail: CHANGELOG.md lists [未发布] below ${overlayAbove.join(', ')}: ` +
+          'an unreleased overlay batch cannot sit under a released overlay version'
+      )
+    }
   }
   return failures
 }

@@ -40,10 +40,64 @@
 两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
-## [未发布] — 2026-11-13 晚（第 46 轮：把两个流程缺口做成门禁）
+## [1.2.15] — 2026-11-13（DSH 插件包：适配 DSH 0.2.x）
 
-第 45 轮发完版后留下的两句"下次注意"，这一轮把它们做成改不掉的东西。**用户可见行为没有变化**，
-所以没有升版本：浮窗仍是 1.0.7、插件包仍是 1.2.14，`dsh-plugin-v1.2.14` 的资产一个字节都没动。
+DSH 更新到 **0.2.2-rc.3**（本机桌面版是 `@deepseek-ai/dsh-desktop` 0.2.2-rc.3、更新通道 nightly），
+而包里声明的兼容范围还是 `engines.dsh: ">=0.1.0-rc.6"`。这一版**只改声明**：浮窗一个字节没动（仍是 1.0.7），
+`lib/index.js` 一行没改。
+
+### Changed
+
+- **`engines.dsh`: `>=0.1.0-rc.6` → `>=0.2.0-0 <0.3.0-0`**。这不是"顺手写宽一点"：DSH 从 0.2.1-alpha.3 起
+  **只读 `engines.dsh`**（`@deepseek-ai/dsh-app-boot` 的 `evaluatePluginCompatibility`，内部用
+  `semver.satisfies(..., { includePrerelease: true })`，所以预发布版本也参与匹配），`peerDependencies`
+  里那些 `@deepseek-ai/dsh*` 范围不再参与判断。旧写的区间在 0.2.x 上照样能装，但它在说"0.1.0-rc.6
+  以来的每一个 DSH 都支持"，而那批版本早就不在测试范围内了。
+- **两个 `-0` 边界是量出来的，不是装饰**。DSH 文档推荐的写法是 `>=0.2.0 <0.3.0`，但在
+  `includePrerelease` 下它**拒掉 `0.2.0-rc.1`**（预发布排在 0.2.0 之下）、**却放过 `0.3.0-rc.1`**
+  （预发布同样排在 0.3.0 之下）——两条都用宿主自己的 `evaluatePluginCompatibility` 实测过。
+  `>=0.2.0-0 <0.3.0-0` 才是"整条 0.2 线、不含 0.3"。
+- **`engines.node`: `^22.19 || >=24` → `>=24.9.0`**。DSH 0.2.1-rc.2 起要求 Node 24.9+ 并放弃 Node 22
+  （`upgrade-guide/v0.2.1-rc.2/node-24`），bundle 只在宿主里跑，所以声明与宿主对齐，不再暗示 Node 22 可用。
+- `docs/market-index.json` 的 `versions[0].engines.dsh` 跟着改。宿主文档明确要求它与包内的声明一致
+  （`plugin-market.md`：`engines.dsh` "should match the package's own"），`verify.mjs` 断言两者相等。
+
+### 验证（在真的宿主里装，不是读文档推断）
+
+| 宿主 | 动作 | 结果 |
+|---|---|---|
+| 0.2.2-rc.3 | `dsh plugin --profile pet add <tarball>` | 装进 profile，`bundles` = `["@deepseek-ai/dsh-base","dsh-ai-terminal-pet"]` |
+| 0.2.2-rc.3 | `dsh --profile pet --dump-config` | 合成配置里出现 `# == dsh-ai-terminal-pet` 那一层 |
+| 0.2.0-rc.1（区间下端） | 同上两步 | 装上了，层也出现了 |
+| 0.2.2-rc.3 | 把 `engines.dsh` 改成 `>=9.0.0` 再装 | **被拒**：`requirements {"engines.dsh":">=9.0.0"}` 并把 profile 回滚——证明这个字段真的在生效 |
+
+本插件监听的五个事件在 0.2.2-rc.3 的文档里都还在：`session/event`、`agent/inbox/claimed`、`agent/status`、
+`agent/error`、`approval/request`（后者仍是 waterfall，签名仍是 `(req, next)`）。
+
+### 注意
+
+- 1.2.14 的资产不可变，所以这是**新版本**而不是重传；`dsh-plugin-v1.2.14` 的 Release 保持原样。
+- 上游目录条目要开新的 bump PR（旧的那条指 1.2.14）。
+
+### Numbers
+
+`node packages/dsh-ai-terminal-pet/verify.mjs` PASS（含"index 的 `engines.dsh` 与包里一致"）；
+`node tools/check_versions.mjs` 18 个版本形状一致；`tools/check_docs_links.py` 12 份文档全解；
+`node --test tools/check_versions.test.mjs` 26/26（`[未发布]` 允许排在已发布的**插件**版本之后——两条线各自独立）。
+
+发布资产（本机 `npm pack` 实测）：
+
+| 资产 | 大小 | sha256 |
+|---|---|---|
+| `dsh-ai-terminal-pet-1.2.15.tgz`（18 文件） | **2,000,898 B** | `F6D85F76AF4CEC43A0DA360B9D2D0D37F7E43B1A283F0407775518CE1AABD52B` |
+
+shasum `27c20674268eb6f9ad3053d27dc1005f94a129de`。包内 README 的安装命令已是 1.2.15，
+`package.json` 的 `engines` 与 `vendor/manifest.json` 的摘要都是本次构建的。
+
+## [未发布] — 2026-11-13 晚（第 46、47 轮：门禁与工作区维护）
+
+第 45 轮发完版后留下的两句"下次注意"，这一轮把它们做成改不掉的东西；随后又做了一轮工作区整理。
+**用户可见行为没有变化**：浮窗仍是 1.0.7，插件包的可见行为在 1.2.15 里也没变。
 
 ### Added
 
