@@ -339,7 +339,11 @@ type App struct {
 	// contextRow is which session row the pointer is over, or -1. It resolves
 	// both the row's hover highlight and the row a right-click targets, from
 	// the same geometry the rows are drawn with.
-	contextRow      int
+	contextRow int
+	// toast is the copy receipt: the pill that says a tap on a row put a path
+	// on the clipboard. It expires on its own and is dead until a copy
+	// happens, so a panel that never copies behaves exactly as it did before.
+	toast           copyToast
 	taskbarMessage  uint32
 	trayIcon        win.HICON
 	trayAdded       bool
@@ -1253,29 +1257,78 @@ func (a *App) endDrag(x, y int) {
 		a.persistPlacement()
 	}
 	if action == releaseToggle {
-		// An aimed tap on a jump arrow switches to that terminal instead of
-		// collapsing the panel. It takes priority over the auto-approve veto
-		// because it is an explicit action on a distinct control.
-		_, hasJump := mostUrgentJump(a.sessions)
-		if row, hit := focusHit(x, y, a.width, a.height, a.expanded, hasJump, len(a.sessions)); hit && a.jumpTo(row) {
+		a.handleTap(x, y)
+	}
+	a.syncTuck()
+}
+
+// handleTap resolves one tap through decideTap and performs it. The decision is
+// pure (tap_windows.go); this half only turns it into effects, so the rules can
+// be tested without a window while the window keeps its usual shape.
+func (a *App) handleTap(x, y int) {
+	inputs := a.tapInputs(x, y)
+	switch action, row := decideTap(inputs); action {
+	case tapJump:
+		if a.jumpTo(row) {
 			a.syncTuck()
 			return
 		}
-		// With auto-approve on, a tap on the expanded panel is a veto, not
-		// a collapse: the hook is about to approve on silence, so the only
-		// thing a tap can usefully mean is "don't". Taps on the compact
-		// strip still toggle, so the pending request stays one tap away.
-		if a.expanded && a.options.Settings.AutoApprove {
-			if key := a.approvals.urgentKey(a.sessions); key != "" {
-				a.approvals.deny(key, a.sessions)
-				a.postRefresh()
-				a.syncTuck()
-				return
-			}
+		// No window could be resolved for that session: fall through to the
+		// ordinary behaviour rather than swallowing the click, and tell the
+		// user why nothing happened (jumpTo already posted the balloon).
+		a.toggleExpanded()
+	case tapCopyStrip:
+		if value, ok := compactCopyText(a.sessions); ok {
+			a.copyTo(value, toastCompactRow)
+			return
 		}
 		a.toggleExpanded()
+	case tapVeto:
+		if key := a.approvals.urgentKey(a.sessions); key != "" {
+			a.approvals.deny(key, a.sessions)
+			a.postRefresh()
+			return
+		}
+		a.toggleExpanded()
+	case tapCopyRow:
+		if value, ok := rowCopyText(a.sessions, row); ok {
+			a.copyTo(value, row)
+			return
+		}
+		a.toggleExpanded()
+	default:
+		a.toggleExpanded()
 	}
-	a.syncTuck()
+}
+
+// tapInputs resolves the frame state decideTap reads. Everything here comes
+// from the geometry the frame was drawn with, so "what the tap meant" and "what
+// the panel showed" cannot drift apart.
+func (a *App) tapInputs(x, y int) tapInputs {
+	if a.expanded {
+		_, hasJump := mostUrgentJump(a.sessions)
+		if row, hit := focusHit(x, y, a.width, a.height, true, hasJump, false, len(a.sessions)); hit {
+			return tapInputs{expanded: true, jumpHit: true, jumpRow: row, jumpValid: true}
+		}
+		inputs := tapInputs{expanded: true}
+		if key := a.approvals.urgentKey(a.sessions); a.options.Settings.AutoApprove && key != "" {
+			inputs.vetoArmed = true
+		}
+		if row, _, copyable := a.expandedRowCopyTarget(x, y); copyable {
+			inputs.copyRowHit = true
+			inputs.copyRow = row
+		}
+		return inputs
+	}
+	inputs := tapInputs{}
+	_, hasJump := mostUrgentJump(a.sessions)
+	_, stripCopyable := compactCopyText(a.sessions)
+	inputs.copyStripValid = stripCopyable
+	inputs.copyStripHit = compactCopyHit(x, y, a.width, a.height, stripCopyable)
+	if row, hit := focusHit(x, y, a.width, a.height, false, hasJump, stripCopyable, len(a.sessions)); hit {
+		return tapInputs{jumpHit: true, jumpRow: row, jumpValid: true}
+	}
+	return inputs
 }
 
 // jumpTo brings the terminal that owns one session to the foreground.
@@ -1342,6 +1395,53 @@ func (a *App) focusFailure() {
 		i18n.T(a.lang, i18n.KeyBalloonJumpBody), win.NIIF_WARNING)
 }
 
+// expandedRowCopyTarget resolves a tap on a drawn session row to the path that
+// row would put on the clipboard, and which row it is. The row hit test is the
+// one the rows are drawn with (rows_windows.go), and the copy decision is
+// rowCopyText's, so "which row did I click" and "is there anything to copy"
+// have one answer each rather than one per call site.
+func (a *App) expandedRowCopyTarget(x, y int) (int, string, bool) {
+	if !a.expanded {
+		return 0, "", false
+	}
+	index, hit := expandedRowHit(x, y, a.width, a.height, len(a.sessions))
+	if !hit {
+		return 0, "", false
+	}
+	value, copyable := rowCopyText(a.sessions, index)
+	if !copyable {
+		return 0, "", false
+	}
+	return index, value, true
+}
+
+// copyTo is the single place the clipboard, the receipt and the repaint meet.
+//
+// The receipt appears only when the clipboard really took the text:
+// copyToClipboard reports the truth, and a pill reading "copied" over a
+// clipboard that refused is precisely the kind of quiet lie this project keeps
+// writing tests against. A failure still answers - it says "copy failed" - and
+// it never falls through to collapsing the panel, because a tap that was
+// ignored is indistinguishable from a tap that was not received.
+func (a *App) copyTo(value string, row int) {
+	identity := ""
+	switch {
+	case row == toastCompactRow:
+		if current, ok := mostUrgentJump(a.sessions); ok {
+			identity = session.Identity(current)
+		}
+	case row >= 0 && row < len(a.sessions):
+		identity = session.Identity(a.sessions[row])
+	}
+	copied := copyToClipboard(value)
+	a.toast.show(row, identity, !copied, time.Now())
+	if !copied {
+		beep(beepExclamation)
+	}
+	a.syncAnimation()
+	a.postRefresh()
+}
+
 func (a *App) zoomBy(delta float64) {
 	if delta == 0 {
 		return
@@ -1360,6 +1460,10 @@ func (a *App) zoomBy(delta float64) {
 
 func (a *App) toggleExpanded() {
 	a.expanded = !a.expanded
+	// A receipt is about one row (or one strip). Both stop existing the
+	// moment the panel changes shape, and a pill carried across the toggle
+	// would point at a row that is no longer on screen.
+	a.toast.clear()
 	a.load()
 	// Publish the new geometry synchronously (resize/clamp only position
 	// the frame; they never block), but paint asynchronously: present()
@@ -1434,7 +1538,11 @@ func (a *App) syncAnimation() {
 	if handle == 0 {
 		return
 	}
-	want := !a.hidden && (a.state == session.StateWaitingPermission || a.state == session.StateError || a.tuck != a.tuckTarget)
+	// The receipt's own timer is the same pulse the alert states use: one
+	// installed timer, installed and removed on real transitions. It asks the
+	// receipt's frame (not just its deadline) so a pill whose session left its
+	// row stops costing ticks immediately.
+	want := !a.hidden && (a.state == session.StateWaitingPermission || a.state == session.StateError || a.tuck != a.tuckTarget || a.toast.frame(time.Now(), a.sessions).visible())
 	interval := uint32(pulseInterval)
 	if a.tuck != a.tuckTarget {
 		interval = slideInterval
@@ -2116,6 +2224,11 @@ func (a *App) present() error {
 	// used to mean a full GDI repaint of the panel several times a second for
 	// nothing.
 	key := frameKey(width, height, a.digest, a.state, len(a.sessions), a.expanded, a.pressed, a.hovering, a.tuck, a.animating, now, a.lang, a.approvals.maxRemainingSeconds(now), a.options.Settings.Theme, a.options.Settings.PerSourceColor, unreadBits(a.sessions, a.unread), mutedBits(a.sessions, a.mutes), a.contextRow)
+	// The copy receipt is drawn and it expires by itself, so it is part of the
+	// key: same key means same bitmap, and a receipt that changed but did not
+	// enter the key would stay on screen until some unrelated refresh.
+	toast := a.toast.frame(now, a.sessions)
+	key.withToast(toast)
 	if key == a.lastFrame && a.surface != nil {
 		return nil
 	}
@@ -2151,6 +2264,7 @@ func (a *App) present() error {
 			Unread:    a.unread,
 			Muted:     a.mutes,
 			HoverRow:  a.contextRow,
+			Toast:     toast,
 			Tuck:      a.tuck,
 			Sliver:    a.sliverWidth(),
 			Dock:      a.dock,

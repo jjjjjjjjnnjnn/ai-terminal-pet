@@ -59,7 +59,8 @@ The table below outlines the core capabilities and exact runtime parameters of t
 |---|---|
 | State aggregation | Aggregates sessions across 7 states (`idle`, `thinking`, `working`, `tool_use`, `waiting_permission`, `error`, `closed`), showing the highest-priority state across all active sessions. |
 | Compact and expanded panels | Compact panel occupies 56x156 logical pixels anchored to a screen edge; clicking expands to 200 px wide, displaying 1–6 rows before adding an overflow line. |
-| Whole-panel gestures | Click anywhere toggles compact and expanded views, drag anywhere moves 1:1 with the cursor, and mouse wheel adjusts zoom between 65% and 160%. |
+| Copy a project path | Click a session row (or the copy half of the compact strip) to put that conversation's working directory on the clipboard; a short pill over the row confirms it, and a failed copy says so instead of claiming success. Rows whose reporter sent no working directory keep their old meaning: clicking them collapses the panel. |
+| Whole-panel gestures | Clicking anywhere that is not a session row or a control toggles compact and expanded; drag anywhere moves 1:1 with the cursor; the wheel zooms between 65% and 160%. |
 | Edge retract | Slides mostly off-screen when docked at an edge leaving a thin sliver; hovering restores it, while waiting_permission or error states override retraction to remain visible. |
 | Tray menu | Right-click tray menu toggles visibility, resets position and zoom, opens settings, switches language, toggles autostart, and configures auto-approve. |
 | Settings window | Native four-tab window (General, Sound, Sessions, Look) where every change persists immediately to `config.json` without an OK button. |
@@ -115,15 +116,15 @@ There are three ways in. Pick the one that matches how you got here.
 dsh plugin add dsh-ai-terminal-pet
 ```
 
-The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.10), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
+The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.11), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
 
 **B. Everyone else — download a package, no Go toolchain**
 
 Two packages are published for this release: a self-extracting `pet-setup.exe` and a portable zip. Both install the same 11 artifacts into the same directory; the zip additionally lets you look inside before running anything.
 
-1. Download one of them from the [`pet-v1.0.4` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.4):
+1. Download one of them from the [`pet-v1.0.5` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.5):
    - **`pet-setup.exe`** (13.5 MB): double-click it. It verifies its own payload against `SHA256SUMS.txt` **before** writing anything, then runs the installer inside itself. `pet-setup.exe --verify` re-checks the installed files at any time, `--uninstall` removes them, `--add-to-path` puts the commands on your PATH.
-   - **`ai-terminal-pet-1.0.4-win-x64.zip`** (4.99 MB, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
+   - **`ai-terminal-pet-1.0.5-win-x64.zip`** (5,039,878 B, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
 2. Verify that the installation works:
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -199,10 +200,10 @@ The Harness side has a second, self-contained option since `dsh-ai-terminal-pet`
 
 ```powershell
 # from the release tarball: no git clone, no build step
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.10/dsh-ai-terminal-pet-1.2.10.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.11/dsh-ai-terminal-pet-1.2.11.tgz
 
 # from git, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.10&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.11&path:/packages/dsh-ai-terminal-pet"
 
 # from the repository URL: resolves through the root manifest shim
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -446,7 +447,8 @@ ai-terminal-pet 在屏幕边缘贴上一条 56 像素宽的状态带。你无需
 |---|---|
 | 状态聚合 | 聚合 `idle`、`thinking`、`working`、`tool_use`、`waiting_permission`、`error`、`closed` 七种状态，始终展示所有会话中优先级最高的状态。 |
 | 紧凑与展开两态 | 紧凑态固定为 56×156 逻辑像素；点击展开后宽度为 200 像素，自适应展示 1–6 行会话，会话超过 6 行后展示溢出提示。 |
-| 整块可点可拖 | 面板任意位置点击切换展开/收起，整块区域均可按住拖拽并与光标 1:1 跟随；滚轮可在 65%–160% 之间无级缩放，按 `Esc` 键直接收起。 |
+| 整块可点可拖 | 点会话行与控制以外的任何位置切换展开/收起，整块区域均可按住拖拽并与光标 1:1 跟随；滚轮可在 65%–160% 之间无级缩放，按 `Esc` 键直接收起。 |
+| 复制项目路径 | 点一下会话行（或紧凑态条的左半）即把该会话的工作目录放进剪贴板；行上会短暂出现一个"已复制"回执，复制失败时回执写"复制失败"而不是假装成功。上报端没带工作目录的行保持原含义：点它仍然收起面板。 |
 | 贴边收起机制 | 面板贴靠屏幕边缘时自动滑出屏幕并保留细边，鼠标悬停即滑出复原；有会话处于等待确认或出错状态时保持完全可见，不执行收起。 |
 | 终端窗口跳转 | 出现需要处理的会话时，点击紧凑态跳转条或展开态行尾箭头，沿进程树与窗口标题匹配并将对应终端窗口置顶；匹配置信度不足时拒绝误切。 |
 | 自动同意与否决 | 开启后为权限请求留出默认 5 秒的否决窗口，面板显示"允许（5 秒）"倒计时条；点击面板立即拒绝，倒计时结束仍无操作则自动同意。 |
@@ -505,9 +507,9 @@ dsh plugin add dsh-ai-terminal-pet
 
 这一版发布两个包：自解压的 `pet-setup.exe` 与便携 zip。两者装的是**同一份 11 件制品、同一个目录**；zip 的额外好处是你可以在运行前先拆开看。
 
-1. 从 [`pet-v1.0.4` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.4) 下载其中一个：
+1. 从 [`pet-v1.0.5` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.5) 下载其中一个：
    - **`pet-setup.exe`**（13.5 MB）：双击即可。它会先拿自带的 `SHA256SUMS.txt` 校验自己的载荷，**全部吻合才动手**，然后调用内嵌的安装脚本。`pet-setup.exe --verify` 随时复核已装文件，`--uninstall` 卸载，`--add-to-path` 加进 PATH。
-   - **`ai-terminal-pet-1.0.4-win-x64.zip`**（4.99 MB，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
+   - **`ai-terminal-pet-1.0.5-win-x64.zip`**（5,039,878 字节，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
 2. 验证安装输出：
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -594,10 +596,10 @@ Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状�
 
 ```powershell
 # 用 Release 资产：不需要 clone，也不需要构建
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.10/dsh-ai-terminal-pet-1.2.10.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.11/dsh-ai-terminal-pet-1.2.11.tgz
 
 # 用 git 源：钉住 Release 的那个 tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.10&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.11&path:/packages/dsh-ai-terminal-pet"
 
 # 用仓库地址：靠仓库根的清单 shim 解析过去
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -650,7 +652,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --autostart` | 查询当前的开机自启状态 |
 | `ai-terminal-pet --autostart=on` | 设置为登录时自动启动 |
 | `ai-terminal-pet --autostart=off` | 取消开机自启设置 |
-| `ai-terminal-pet --version` | 打印版本信息（v1.0.4） |
+| `ai-terminal-pet --version` | 打印版本信息（v1.0.5） |
 | `ai-terminal-pet --help` | 输出命令行帮助信息 |
 
 通过 `--json` 参数读取当前状态时，返回的会话数据结构示例如下：

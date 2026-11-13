@@ -42,6 +42,17 @@ and its one-click jump button targets the Harness window. Plugin reload (HMR)
 disposes the listeners but deliberately does not close sessions: only a real
 process exit means the conversation is over.
 
+Panel gestures (overlay 1.0.5 and later): clicking a session row - or the left
+half of the compact strip - copies that conversation's working directory to the
+clipboard and shows a short "Copied" receipt over the row; clicking anywhere
+else still collapses the panel. The copy is the path, not the label the row
+prints.
+
+![Copy receipt](../../docs/assets/overlay-copy.png)
+*The receipt after a click on a session row: the path is on the clipboard and the
+row says so for about a second. A failed copy says "Copy failed" instead of
+claiming success.*
+
 ## Where it is listed, and what each market indexes
 
 Three independent paths exist today, and each one reads a different field:
@@ -80,10 +91,10 @@ tarball, or by pinning the release tag. All three are verified end to end:
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # release tarball: same bytes as the npm release, straight from the GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.10/dsh-ai-terminal-pet-1.2.10.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.11/dsh-ai-terminal-pet-1.2.11.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.10&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.11&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Those three differ only in transport. The npm path is the shortest and the one a

@@ -26,7 +26,7 @@ import (
 // (slate stays the default, so nothing changes unless you ask), a switch that
 // tints each row's source name by terminal, and "start hidden" for people who
 // want the strip in the tray until a session needs them.
-const Version = "1.0.4"
+const Version = "1.0.5"
 
 func Run() error {
 	return RunWith(false)

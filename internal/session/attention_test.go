@@ -70,6 +70,33 @@ func TestKindOfSession(t *testing.T) {
 	}
 }
 
+// Label is what a bug report reads. "none" is a statement ("this conversation
+// is not asking for anything"), an empty string is not: it reads as a missing
+// field, and --doctor printed a bare "/not-asking" because of it.
+func TestKindLabelNamesTheAbsence(t *testing.T) {
+	cases := map[Kind]string{
+		KindNone:     "none",
+		KindApproval: "approval",
+		KindQuestion: "question",
+		KindPlan:     "plan",
+		KindError:    "error",
+		KindDone:     "done",
+	}
+	for kind, want := range cases {
+		if got := kind.Label(); got != want {
+			t.Fatalf("%q.Label() = %q, want %q", string(kind), got, want)
+		}
+	}
+	// The zero value is still the empty kind itself: only the rendering is
+	// renamed, so every comparison in the policy keeps its meaning.
+	if Kind("").Label() != "none" {
+		t.Fatal("the zero Kind must render as none")
+	}
+	if Kind("") != KindNone {
+		t.Fatal("the zero Kind must still equal KindNone")
+	}
+}
+
 // Identity is what a mute and an unread mark are remembered by, so it must
 // ignore the pid: hook reporters hand out a synthetic pid per process, and a
 // mute keyed on it would expire at the next event.

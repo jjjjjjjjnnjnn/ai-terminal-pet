@@ -1875,7 +1875,8 @@ imsai 的 #912（`clean`，该仓库规定「改已存在条目永不自动合�
 3. 需要动包/发版时：§27.2（包结构与 `dsh.bundle` 契约）、§27.5（发布与分发现状）、§27.9–§27.10（三条发现路径
    与自建索引）、§27.12（1.2.4 只改文案那次的完整操作）、§31（按真实 Harness 类型定义做的适配）；
 4. [AGENTS.md](../AGENTS.md) **八条**铁律——尤其第 6 条（发版提交必须同时前移索引）、第 1 条（reporter 绝不
-   把异常抛进宿主 CLI）与第 8 条（对外结论先过 `agy --model gemini-3.8-flash-high --effort high`）；
+   把异常抛进宿主 CLI）与第 8 条（**同会话复核**：实现、评审与对外措辞都在做这件事的会话里、用用户选定的
+   模型完成，逐条对着代码核；**不要**再调 `agy` / `gemini` 之类的模型 CLI 求第二意见）；
 5. 改动上报端或插件后：`node tests/fresh-machine.mjs`（§30），它才是「新机器上装上去能不能用」的门禁。
 
 ### 28.3 外部世界在等什么（2026-11-11 15:40 UTC 复读）
@@ -2593,6 +2594,8 @@ scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
   发帖前过了一轮 `agy` 评审，改掉三处会直接导致删帖的问题，记录在 [docs/LAUNCH.md](LAUNCH.md) §1.2：
   四终端并列（触犯「禁止无关推广/报菜名」）、把自家 `protocol.js` 写成「官方 protocol 模块」、
   以及 `**_> …_**` 渲染不出引用块（"非官方"声明会变成一串星号）。
+  （**历史记录**：那次评审发生在 2026-11-11，当时的第 8 条允许调用外部模型 CLI；2026-11-13 起第 8 条
+  改为同会话复核，这类评审不再经过 `agy`。）
 - ✅ **两家市场是自动采集、不用申请**：`YELEBAI/dsh-plugin-marketplace` 的 `registry/plugins.json`
   第 8,729 条（`version: 1.2.5`、`verifiedCommit: 584bc2f`、`profiles: [desktop, headless, web]`）、
   `bradeGithub/DSH-Plugins-Marketplace` 的 `registry.json` 第 13,128 条（`pkg_name` +
@@ -2604,7 +2607,8 @@ scripts\package.ps1                              4,983,915 B / 17 files / 7 dirs
 `doctor-green.png`（程序自己的 stdout，用户名替换为 `<you>`）。四张都已从 README 中英两段引用。
 
 **文案**：对外可见的一切（X 中英双线程、Show HN 标题与正文、DSH Discussions 帖、市场摘要、三份 issue
-回复模板）已按 AGENTS.md 第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对，
+回复模板）已按当时的 AGENTS.md 第 8 条由 `agy --model gemini-3.8-flash-high --effort high` 起草并逐条核对
+（**这一条已于 2026-11-13 改为同会话复核：不再调外部模型 CLI，见 §41 与本轮 §42**），
 成品在 [docs/LAUNCH.md](LAUNCH.md)。该轮评审至少纠正了一条会真出问题的事实表述：初稿把浮窗写成
 像是对 Claude Code / OpenCode / Antigravity 开箱即用，而实际只有 DeepSeek Harness 无需配置。
 同一份评审在 DSH 论坛帖上又抓出三处：四终端并列触犯该区的「禁止无关推广」、把自家 `protocol.js`

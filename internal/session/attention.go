@@ -70,10 +70,20 @@ func (k Kind) Urgent() bool {
 	return false
 }
 
-// Label is the stable, untranslated name used in diagnostics and `--json`.
-// It is not drawn on the panel: the panel shows the reporter's own reason
-// text, which is more specific than any of these.
+// Label is the word this kind is written as in the alert receipt and in
+// --doctor's decisions list. The panel never draws it: the panel shows the
+// reporter's own reason text, which is more specific than any of these.
+//
+// The empty kind means "this session is not asking for anything" - a busy
+// conversation. Writing it as "" made the receipt read like a missing field
+// rather than a statement ("kind":"" next to "decision":"not-asking"), and
+// --doctor printed a bare "/not-asking" for the same reason. The type keeps the
+// empty string as its zero value, so KindOf and every comparison still behave;
+// only these two human-facing renderings name it.
 func (k Kind) Label() string {
+	if k == KindNone {
+		return "none"
+	}
 	return string(k)
 }
 

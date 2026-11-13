@@ -117,6 +117,26 @@ type renderedKey struct {
 	// above - and a stale highlight is exactly the shape of bug this project
 	// has already shipped twice.
 	hoverRow int32
+	// toastRow, toastTick and toastFailed are the copy receipt. It is drawn,
+	// so it belongs in the key; and because it is time-driven (a pill that
+	// disappears on its own) it cannot ride on clock - the breathing path
+	// ignores clock on purpose, and a receipt that never left the screen
+	// would be the same bug as 1.0.1's frozen duration. toastTick is 0 when
+	// there is no receipt, which is why "pill gone" and "pill on row 0"
+	// cannot be confused.
+	toastRow    int32
+	toastTick   int64
+	toastFailed bool
+}
+
+// withToast folds the live receipt into the frame key. It is a method rather
+// than another parameter because frameKey already takes nineteen arguments and
+// every call site is a test that pins one field - the receipt is one field
+// group, applied in one place.
+func (k *renderedKey) withToast(p panelToast) {
+	k.toastRow = p.row
+	k.toastTick = p.tick
+	k.toastFailed = p.failed
 }
 
 func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64, theme string, perSource bool, unreadRows, mutedRows uint64, hoverRow int) renderedKey {
@@ -184,6 +204,9 @@ type panelState struct {
 	// rather than a local because the row highlight is part of the frame the
 	// key hashes (see renderedKey.hoverRow).
 	HoverRow int
+	// Toast is the live copy receipt, zero when there is none. It is drawn
+	// over the compact subject line or over one expanded row.
+	Toast panelToast
 	// Tuck is 0 when the panel is fully on screen and 1 when it has slid all
 	// the way into its docked edge.
 	Tuck float64
@@ -237,8 +260,18 @@ func drawVerticalPanel(target *canvas, state panelState) {
 		target.setAlphaScale(1 - state.Tuck)
 		if state.Expanded {
 			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised, state.Lang, state.Countdown, state.Unread, state.Muted, state.HoverRow)
+			// The receipt is an overlay on a row that was just drawn: it goes
+			// after the rows, so the pill is not covered by the next row's
+			// fill, and inside the fade so it slides with the contents.
+			if state.Toast.visible() {
+				drawCopyToastRow(target, state.Toast, items, state.Lang)
+			}
 		} else {
-			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed, state.Lang)
+			toast := panelToast{}
+			if state.Toast.compact() {
+				toast = state.Toast
+			}
+			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed, state.Lang, toast)
 		}
 		target.setAlphaScale(1)
 	}
@@ -285,7 +318,7 @@ func drawDockedTab(target *canvas, state session.State, dock dockSide, sliver in
 // arrow-labelled counters, a divider and a chevron - encoded those same two
 // facts six different ways, which made the panel dense without making it
 // informative.
-func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent rgba, pressed bool, lang i18n.Lang) {
+func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent rgba, pressed bool, lang i18n.Lang, toast panelToast) {
 	width := target.width
 	unit := float64(width) / compactWidth
 	value := func(base int) int {
@@ -323,12 +356,32 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 		// make room for the one-tap bar, then draw the bar below it.
 		subject, subjectColor := compactSubject(items, state, lang)
 		subject = target.fitText(subject, value(8), 400, width-value(8))
+		if toast.visible() {
+			// The receipt replaces the subject line for its second: the strip
+			// has no second row to spare, and a confirmation that appeared
+			// somewhere else would be a change of layout, not of one line.
+			subject = target.fitText(copyToastLabel(toast, lang), value(8), 700, width-value(8))
+			if toast.failed {
+				subjectColor = colors.Error
+			} else {
+				subjectColor = colors.Primary
+			}
+		}
 		target.text(value(4), value(119), width-value(8), value(13), subject, value(8), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
-		drawCompactJump(target, jump, lang)
+		_, copyable := compactCopyText(items)
+		drawCompactJump(target, jump, lang, copyable)
 		return
 	}
 	subject, subjectColor := compactSubject(items, state, lang)
 	subject = target.fitText(subject, value(9), 400, width-value(8))
+	if toast.visible() {
+		subject = target.fitText(copyToastLabel(toast, lang), value(9), 700, width-value(8))
+		if toast.failed {
+			subjectColor = colors.Error
+		} else {
+			subjectColor = colors.Primary
+		}
+	}
 	target.text(value(4), value(124), width-value(8), value(14), subject, value(9), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }
 

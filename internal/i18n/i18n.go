@@ -122,6 +122,10 @@ const (
 	KeyPanelHint     = "panel.hint"
 	KeyPanelEmpty    = "panel.empty"
 	KeyPanelJump     = "panel.jump"
+	// The copy receipt's two states. Short verbs: they are drawn in an
+	// 18-unit pill (expanded) or take over the strip's subject line.
+	KeyCopyDone   = "copy.done"
+	KeyCopyFailed = "copy.failed"
 
 	KeySummaryEmpty    = "summary.empty"
 	KeySummarySessions = "summary.sessions"
@@ -297,6 +301,8 @@ var dictEn = map[string]string{
 	KeyPanelHint:     "Drag · Scroll to zoom · ↗ Jump · Click to collapse",
 	KeyPanelEmpty:    "Launch an AI CLI in a terminal; the panel appears on its own",
 	KeyPanelJump:     "Jump",
+	KeyCopyDone:      "Copied",
+	KeyCopyFailed:    "Copy failed",
 
 	KeySummaryEmpty:    "No sessions",
 	KeySummarySessions: "%d sessions",
@@ -462,6 +468,8 @@ var dictZhCN = map[string]string{
 	KeyPanelHint:     "拖拽 · 滚轮缩放 · ↗ 跳转 · 点击收起",
 	KeyPanelEmpty:    "在终端里启动 AI CLI，浮窗会自动出现",
 	KeyPanelJump:     "跳转",
+	KeyCopyDone:      "已复制",
+	KeyCopyFailed:    "复制失败",
 
 	KeySummaryEmpty:    "暂无会话",
 	KeySummarySessions: "%d 个会话",

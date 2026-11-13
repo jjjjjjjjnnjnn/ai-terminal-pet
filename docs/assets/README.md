@@ -13,6 +13,7 @@ layout. Nothing here is hand-drawn or mocked up.
 | `overlay-expanded-many.png` | 400x676 | README, *What it looks like* | Six rows plus the overflow line, from the `6 rows + more` layout test |
 | `overlay-expanded-unread.png` | 400x424 | README, *What it looks like* | Expanded list with an unread mark on the waiting row - the alert that was suppressed because the user was elsewhere, and the mark left instead |
 | `overlay-auto-approve.png` | 400x424 | README, *What it looks like* | Auto-approve countdown with the draining bar and `Allow (5s)` |
+| `overlay-copy.png` | 400x424 | `packages/dsh-ai-terminal-pet/README.md` | The copy receipt: "Copied" over the tapped row, after a click that put that project's path on the clipboard |
 | `overlay-compact-en.png` | 168x468 | not referenced | Same compact strip under the English locale, kept for localization checks |
 | `overlay-compact-hover.png` | 168x468 | not referenced | Compact strip in the hovered state (raised background and stroke) |
 | `overlay-expanded-en.png` | 400x424 | not referenced | Expanded list under the English locale, kept for localization checks |

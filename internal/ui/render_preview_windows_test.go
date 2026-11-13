@@ -13,6 +13,10 @@ import (
 	"ai-terminal-pet/internal/session"
 )
 
+// toastNonePreview is "no receipt in this frame", distinct from row 0 and from
+// the compact strip's negative row index.
+const toastNonePreview = -2
+
 // TestRenderPreview rasterises the panel to PNG so the layout can be reviewed
 // without a live window. Opt-in: set PET_PREVIEW_DIR to a directory and run
 //
@@ -85,31 +89,48 @@ func TestRenderPreview(t *testing.T) {
 		marks bool
 		// hoverRow is which row the pointer is over, -1 for none.
 		hoverRow int
+		// toastRow renders the copy receipt: a row index for the expanded
+		// panel, toastCompactRow for the strip, toastNonePreview for neither.
+		// The receipt is a new visual element, so it needs frames of its
+		// own before it can be reviewed.
+		toastRow  int
+		toastFail bool
 	}{
-		{"compact-waiting", waiting, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
-		{"compact-waiting-hover", waiting, false, false, true, 0, 3, i18n.LangZhCN, false, 0, false, -1},
-		{"compact-busy", busy, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
-		{"compact-error", broken, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
-		{"compact-empty", nil, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1},
-		{"compact-waiting-en", waiting, false, false, false, 0, 3, i18n.LangEn, false, 0, false, -1},
-		{"docked-tuck-half", busy, false, false, false, 0.5, 3, i18n.LangZhCN, false, 33, false, -1},
-		{"docked-tuck-full", busy, false, false, false, 1, 3, i18n.LangZhCN, false, 10, false, -1},
-		{"docked-tuck-full-idle", idle, false, false, false, 1, 3, i18n.LangZhCN, false, 10, false, -1},
-		{"expanded-waiting", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1},
-		{"expanded-waiting-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0, false, -1},
-		{"expanded-approve-zh", waiting, true, false, false, 0, 2, i18n.LangZhCN, true, 0, false, -1},
-		{"expanded-approve-en", waiting, true, false, false, 0, 2, i18n.LangEn, true, 0, false, -1},
-		{"expanded-many", many, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1},
-		{"expanded-empty", nil, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1},
+		{"compact-waiting", waiting, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
+		{"compact-waiting-hover", waiting, false, false, true, 0, 3, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
+		{"compact-busy", busy, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
+		{"compact-error", broken, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
+		{"compact-empty", nil, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
+		{"compact-waiting-en", waiting, false, false, false, 0, 3, i18n.LangEn, false, 0, false, -1, toastNonePreview, false},
+		{"docked-tuck-half", busy, false, false, false, 0.5, 3, i18n.LangZhCN, false, 33, false, -1, toastNonePreview, false},
+		{"docked-tuck-full", busy, false, false, false, 1, 3, i18n.LangZhCN, false, 10, false, -1, toastNonePreview, false},
+		{"docked-tuck-full-idle", idle, false, false, false, 1, 3, i18n.LangZhCN, false, 10, false, -1, toastNonePreview, false},
+		{"expanded-waiting", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
+		{"expanded-waiting-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0, false, -1, toastNonePreview, false},
+		{"expanded-approve-zh", waiting, true, false, false, 0, 2, i18n.LangZhCN, true, 0, false, -1, toastNonePreview, false},
+		{"expanded-approve-en", waiting, true, false, false, 0, 2, i18n.LangEn, true, 0, false, -1, toastNonePreview, false},
+		{"expanded-many", many, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
+		{"expanded-empty", nil, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
 		// The alert layer's two visible states: a row waiting on the user that
 		// was announced while they were elsewhere (unread), and a row the user
 		// silenced (muted). Neither changes the geometry, so both can be
 		// reviewed against the existing expanded previews.
-		{"expanded-unread", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, true, -1},
-		{"expanded-unread-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0, true, -1},
+		{"expanded-unread", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, true, -1, toastNonePreview, false},
+		{"expanded-unread-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0, true, -1, toastNonePreview, false},
 		// A hovered row is the only affordance saying the row itself is a
 		// target, which is what makes the per-row context menu discoverable.
-		{"expanded-row-hover", waiting, true, false, true, 0, 2, i18n.LangZhCN, false, 0, false, 1},
+		{"expanded-row-hover", waiting, true, false, true, 0, 2, i18n.LangZhCN, false, 0, false, 1, toastNonePreview, false},
+		// The copy receipt: the pill over the row that was tapped, its
+		// failure wording, and the compact strip's two controls with the
+		// receipt taking over the subject line.
+		{"expanded-copy", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1, 1, false},
+		{"expanded-copy-en", waiting, true, false, false, 0, 2, i18n.LangEn, false, 0, false, -1, 1, false},
+		{"expanded-copy-failed", waiting, true, false, false, 0, 2, i18n.LangZhCN, false, 0, false, -1, 1, true},
+		{"compact-copy", waiting, false, false, false, 0, 3, i18n.LangZhCN, false, 0, false, -1, toastCompactRow, false},
+		{"compact-copy-en", waiting, false, false, false, 0, 3, i18n.LangEn, false, 0, false, -1, toastCompactRow, false},
+		// The strip split into copy + jump, which is the whole silhouette
+		// change F8 makes: it has to look like two controls, not one.
+		{"compact-strip-half-split", waiting, false, false, true, 0, 3, i18n.LangZhCN, false, 0, false, -1, toastNonePreview, false},
 	}
 	for _, tc := range cases {
 		width := compactWidth
@@ -133,6 +154,10 @@ func TestRenderPreview(t *testing.T) {
 				}
 			}
 		}
+		var toast panelToast
+		if tc.toastRow != toastNonePreview {
+			toast = panelToast{row: int32(tc.toastRow), tick: 900, failed: tc.toastFail}
+		}
 		drawVerticalPanel(target, panelState{
 			Items:     tc.items,
 			Now:       now,
@@ -144,6 +169,7 @@ func TestRenderPreview(t *testing.T) {
 			Unread:    unreadFor(tc.items, tc.marks),
 			Muted:     mutedFor(tc.items, tc.marks),
 			HoverRow:  tc.hoverRow,
+			Toast:     toast,
 			Tuck:      tc.tuck,
 			Sliver:    dockedSliver,
 			Dock:      dockRight,

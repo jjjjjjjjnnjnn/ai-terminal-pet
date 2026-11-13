@@ -1,6 +1,6 @@
 {
   "name": "dsh-ai-terminal-pet",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "description": "DeepSeek Harness Cordis bundle that mirrors session state into the AI Terminal Pet desktop overlay (Windows).",
   "license": "MIT",
   "type": "module",

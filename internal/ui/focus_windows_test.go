@@ -28,16 +28,16 @@ func TestFocusHitCompactJumpBar(t *testing.T) {
 	left, top, w, h := compactFocusRect(width)
 	x, y := left+w/2, top+h/2
 
-	if row, ok := focusHit(x, y, width, height, false, true, 3); !ok || row != -1 {
+	if row, ok := focusHit(x, y, width, height, false, true, false, 3); !ok || row != -1 {
 		t.Fatalf("centre of jump bar = (%d,%v), want (-1,true)", row, ok)
 	}
-	if _, ok := focusHit(x, y, width, height, false, false, 3); ok {
+	if _, ok := focusHit(x, y, width, height, false, false, false, 3); ok {
 		t.Fatal("a panel with no jumpable session must not have a live jump bar")
 	}
-	if _, ok := focusHit(0, 0, width, height, false, true, 3); ok {
+	if _, ok := focusHit(0, 0, width, height, false, true, false, 3); ok {
 		t.Fatal("a tap in the top-left corner must not trigger a jump")
 	}
-	if _, ok := focusHit(-1, -1, 0, 0, false, true, 3); ok {
+	if _, ok := focusHit(-1, -1, 0, 0, false, true, false, 3); ok {
 		t.Fatal("a zero-sized frame must not trigger a jump")
 	}
 }
@@ -48,17 +48,17 @@ func TestFocusHitExpandedRowsAreDistinct(t *testing.T) {
 	rows := 3
 	for index := 0; index < rows; index++ {
 		left, top, size := expandedRowFocusRect(width, expandedFocusRowTop(width, index), expandedFocusRowHeight(width))
-		if row, ok := focusHit(left+size/2, top+size/2, width, height, true, true, rows); !ok || row != index {
+		if row, ok := focusHit(left+size/2, top+size/2, width, height, true, true, false, rows); !ok || row != index {
 			t.Fatalf("row %d centre = (%d,%v), want (%d,true)", index, row, ok, index)
 		}
 	}
-	if _, ok := focusHit(width/2, height/2, width, height, true, true, rows); ok {
+	if _, ok := focusHit(width/2, height/2, width, height, true, true, false, rows); ok {
 		t.Fatal("the middle of a row is not a jump button (it must still toggle/drag)")
 	}
 	// Only the first expandedMaxRows are painted; a tap below them must not
 	// address an invisible row.
 	_, belowTop, belowSize := expandedRowFocusRect(width, expandedFocusRowTop(width, expandedMaxRows), expandedFocusRowHeight(width))
-	if _, ok := focusHit(expandedWidth-20, belowTop+belowSize/2, width, height+400, true, true, 20); ok {
+	if _, ok := focusHit(expandedWidth-20, belowTop+belowSize/2, width, height+400, true, true, false, 20); ok {
 		t.Fatal("a click past the visible row limit must not jump to a hidden row")
 	}
 }

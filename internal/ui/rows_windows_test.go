@@ -8,6 +8,8 @@ package ui
 
 import (
 	"testing"
+
+	"ai-terminal-pet/internal/session"
 )
 
 func TestExpandedRowRectMatchesTheRasterizer(t *testing.T) {
@@ -107,5 +109,45 @@ func TestExpandedRowHitHandlesDegenerateInput(t *testing.T) {
 	}
 	if _, ok := expandedRowHit(10, 10, expandedWidth, 400, 0); ok {
 		t.Fatal("no sessions means no rows")
+	}
+}
+
+// A row is only a copy target when it actually knows where its session lives:
+// reporters may send no working directory at all, and a receipt over an empty
+// clipboard is worse than a tap that does nothing.
+func TestRowCopyTextNeedsAProjectPath(t *testing.T) {
+	cases := []struct {
+		name  string
+		items []session.Session
+		index int
+		want  string
+		ok    bool
+	}{
+		{"full path", []session.Session{{Project: `C:\Users\me\work\app`}}, 0, `C:\Users\me\work\app`, true},
+		{"empty project", []session.Session{{Project: ""}}, 0, "", false},
+		{"whitespace only", []session.Session{{Project: "   "}}, 0, "", false},
+		{"no sessions", nil, 0, "", false},
+		{"negative index", []session.Session{{Project: `C:\x`}}, -1, "", false},
+		{"past the end", []session.Session{{Project: `C:\x`}}, 1, "", false},
+		// Past expandedMaxRows nothing is drawn, so there is no row to tap.
+		{"not drawn", make([]session.Session, expandedMaxRows+1), expandedMaxRows, "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := rowCopyText(tc.items, tc.index)
+			if ok != tc.ok || got != tc.want {
+				t.Fatalf("rowCopyText = (%q,%v), want (%q,%v)", got, ok, tc.want, tc.ok)
+			}
+		})
+	}
+}
+
+// The clipboard gets the full path, not the label the row prints: filepath.Base
+// is a 200-unit-wide compromise, and the path is what gets pasted.
+func TestRowCopyTextUsesTheWholePathNotTheLabel(t *testing.T) {
+	value := session.Session{Project: `C:\Users\me\work\ai-terminal-pet`}
+	got, ok := rowCopyText([]session.Session{value}, 0)
+	if !ok || got != value.Project {
+		t.Fatalf("rowCopyText = (%q,%v), want the whole path", got, ok)
 	}
 }

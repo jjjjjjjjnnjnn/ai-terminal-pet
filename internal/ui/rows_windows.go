@@ -1,5 +1,11 @@
 package ui
 
+import (
+	"strings"
+
+	"ai-terminal-pet/internal/session"
+)
+
 // Row geometry for the expanded list, in one place.
 //
 // The rule this file exists to enforce is the same one focus_windows.go already
@@ -39,4 +45,27 @@ func expandedRowHit(x, y, width, height, rows int) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// rowCopyText is what a tap on a drawn session row puts on the clipboard.
+//
+// A row is only a copy target when the session actually reported a working
+// directory. Reporters are allowed to send no context at all, and a receipt
+// that says "copied" over an empty clipboard would be worse than the click
+// meaning nothing, so an empty project falls through to the ordinary
+// collapse behaviour instead of copying "".
+//
+// The full path is used, not the displayed label: panel rows print
+// filepath.Base(project) because a 200-unit-wide row cannot show
+// C:\Users\me\work\ai-terminal-pet, and the path is the thing worth pasting
+// into a terminal.
+func rowCopyText(items []session.Session, index int) (string, bool) {
+	if index < 0 || index >= len(items) || index >= expandedMaxRows {
+		return "", false
+	}
+	value := strings.TrimSpace(items[index].Project)
+	if value == "" {
+		return "", false
+	}
+	return value, true
 }

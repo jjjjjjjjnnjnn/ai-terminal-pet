@@ -9,30 +9,30 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-11，v0.9.0 + 未发版增量；本轮重新实测） |
+| 维度 | 数值（2026-11-13，浮窗 1.0.5 / 插件 1.2.11；本轮按发布产物重新实测） |
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `0.9.0`（`internal/app/app_windows.go:23`） |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,371,968 B**（4.17 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 版本 | `1.0.5`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.11` |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,514,304 B**（4.30 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
-| 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,734,016 B** = 11.19 MiB |
-| 代码量 | Go 非测试源码 **33 文件 / 12,046 行**、测试 **28 文件 / 5,208 行**（**201** 个 `func Test`）；JS **12 文件 / 4,346 行**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
+| 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,876,352 B** = 11.32 MiB |
+| 代码量 | Go 非测试源码 **42 文件 / 14,469 行**、测试 **43 文件 / 7,172 行**（**302** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
-| 设置窗口 | 第二个顶层窗口类 `AITerminalPetSettings`，三页签 general/sound/sessions，高度按内容 450↔504↔306（150% DPI） |
+| 设置窗口 | 第二个顶层窗口类 `AITerminalPetSettings`，四页签 general/sound/sessions/look，高度按内容自适应（150% DPI） |
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
 | 管道 | `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>`（按用户隔离，跨语言 golden 测试锁定） |
 | 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
 | 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；扫描 5 s / 存活探测 10 s |
 | 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run`（开机自启）· `approvals\`（auto-approve 握手） |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--doctor/--version/--help` |
-| 单测 | **201 个 `func Test`**（ui 49 / store 26 / app 23 / reporter 23 / platform 20 / cmd-pet-hook 13 / config 13 / cmd-pet-setup 11 / autostart 8 / pipeserver 7 / session 5 / i18n 3） |
+| 单测 | **302 个 `func Test`**（ui 119 / app 34 / store 27 / platform 24 / reporter 23 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 8 / pipeserver 7 / i18n 3） |
 | 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tests/fresh-machine.mjs --no-overlay`（162 项）/ `scripts/package.ps1` 打 zip 并上传 artifact |
-| 自检 | `ai-terminal-pet --doctor` 9 项（environment / install files / version / runtime / config / pipe / instance / node / autostart），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
+| 自检 | `ai-terminal-pet --doctor` **10 项**（environment / install files / version / runtime / config / pipe / instance / node / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.5**，17 个文件含 vendor 与 `vendor/manifest.json`，tarball **1,917,342 B**）；release tag `dsh-plugin-v1.2.5`（指向发版提交 `34aa1f7`，资产 sha256 `dfa89a1e…` / shasum `1f6d5340…`），npm 上 `dist-tags.latest` 同为 1.2.5 且与 Release 资产逐字节相同 |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.11**，18 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.11`，资产字节与 sha256 见本轮 HANDOVER §42，npm `dist-tags.latest` 与 Release 资产逐字节相同（发版后 `npm view` 复核） |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
 
@@ -594,7 +594,7 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 |---|---|---|---|
 | **I1** | **独立安装包（签名 `.exe` / `.msi`）**：给不用 DeepSeek Harness 的 Windows 用户一条「下载—双击—完成」的路，不再需要 Go 工具链，也不必从 tarball 里手动挖出 `vendor/AI-Terminal-Pet.exe` | **高** | 高 |
 | **F10** | **提醒层：一个纯函数决定「要不要打扰」，并留下可回答的判定记录** —— **已交付（2026-11-12，1.0.3）**，见下方 F10 小节 | **高** | **中**（三种请求要分开、前台/闲置要采样、逐会话静音与未读要持久化） |
-| **F8** | 会话行点击复制项目路径（面板内回执，避免"点了没反应"）——**下一个开工项**，约束见下方 F8 小节 | 高 | **中**（原位写「低」，实测要动交互规则 + 新绘制元素，见小节） |
+| **F8** | 会话行点击复制项目路径（面板内回执，避免"点了没反应"）——**已交付（2026-11-13，1.0.5）**，见下方 F8 小节 | 高 | **中**（回执是时间驱动的绘制元素，紧凑条拆成两个命中区） |
 | F2 | 键盘快捷键：`Esc` 收起（已有）、方向键在会话行间移动、`Enter` 跳转 | 中 | 中 |
 | F5 | 记住所在显示器（多屏场景下按显示器恢复，而不是全局坐标） | 中 | 中 |
 | F1 | 悬停展开面板时显示完整会话明细（就地浮层） | 中 | 中 |
@@ -627,8 +627,11 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 3. 采样绝不上 UI 线程：枚举别人的窗口会卡在挂起的窗口上（AppHang 的形状），采样器是独立 goroutine，8 秒一次，复用 `Presence` 缓存。
 4. 标记不占宽度：未读是一个点、静音是整行压暗——第一版用两个字把 `reason` 挤掉了一半。
 
-**可回答性**：`runtime/alerts.json`（覆写不追加）记下最近一次扫描里每个会话为什么响/为什么没响，
-`--json` 的 `alerts` 与 `--doctor` 的第 10 项读它。
+**可回答性**：`%LOCALAPPDATA%\AI-Terminal-Pet\alerts.json`（覆写不追加，在 `config.json` 旁边而不是 `runtime/` 里）
+记下最近一次扫描里每个会话为什么响/为什么没响，`--json` 的 `alerts` 与 `--doctor` 的第 10 项读它。
+**1.0.4 修过一次**：这行原先写的是 `runtime/alerts.json`，而那个目录里每个 `*.json` 都被 `internal/store`
+当成一条上报快照、解析不成就删除——记录在一个 5 秒扫描周期内消失，`--json` 报「没有记录」、`--doctor` 报
+「从未扫描」。`internal/store/runtime_contract_test.go` 从目录一侧把规则钉住，**不要再把任何 JSON 放回那个目录**。
 
 **唯一改变老用户体感的默认值**：`donePolicy` 默认 `background`（旧行为是「完成就弹」）。旧配置里的
 `notifyOnFinish: true` 被迁移成 `always` 而不是 `background`——用户当初点的就是「完成要提醒」。
@@ -636,36 +639,35 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 **明确不做**：外部推送（Discord / 飞书 / Server酱 等）。它会打破 README 与包清单里的 `no-network` 声明，
 并且需要 HTTP 客户端、凭据文件、重试与失败记录。理由记在 §5 非目标里。
 
-### F8 — 点击会话行复制项目路径（下一步，未开工；地基已在 1.0.3 里落好）
+### F8 — 点击会话行复制项目路径 ✅ 已交付（2026-11-13，浮窗 1.0.5 / 插件 1.2.11）
 
-**为什么它比表里的「低复杂度」高**：当前规则是「点击面板任意处 = 收起」，所以会话行现在不可点。
-要做 F8 就得把规则改成「点击行 = 复制路径 + 回执，点击行以外 = 收起」，并新增一个绘制元素（回执）
-与它的定时器。这是一次交互改动加一次新渲染，不是加一行文案。
+**做了什么**：展开态点一行、紧凑态点跳转条的左半，即把该会话的**完整工作目录**放进剪贴板
+（面板行上显示的是 `filepath.Base`，剪贴板里是 `session.Project` 的原值）；行上出现 1.2 秒的
+回执胶囊（`已复制` / `复制失败`），紧凑态的回执顶掉 subject 行。剪贴板调用失败时**不假装成功**：
+回执写「复制失败」并响一声，点击不会落到「收起」。
 
-**三条施工约束**（2026-11-12 这一天摔出来的，别绕过去）：
+**四条施工约束（1.0.3 摔出来的那三条 + 这一条新增）**：
 
-1. **命中区域必须与绘制同源**。照 `focusHit` / `expandedRowFocusRect` 的做法，把「这一行可点吗、
-   点在不在回执范围内」写成纯函数并单测，否则会出现「画在这儿、点在那儿」。
-2. **新画的东西必须进 `renderedKey`**。帧复用规则是「同一个 key = 同一张位图」，1.0.1 的等待时长冻结
-   与 1.0.2 的主题不重绘都是这条规则的成因；回执的出现与消失都必须让 key 变化。
-   回执是一个**时间驱动**的元素（显示几百毫秒后消失），所以它需要一个自己的桶字段，不能靠 `clock`
-   （呼吸态复用位的路径会忽略 `clock`）。
-3. **回执的定时器复用 `syncAnimation` 的装/卸机制**，不要新开常驻计时器。
+1. **命中区域必须与绘制同源**。`expandedRowRect` / `expandedRowHit`（1.0.3 就已落好）与新增的
+   `compactActionRects` 同时喂给光栅化与命中；紧凑条的两半有单测钉住「不重叠、中点各归各位」。
+2. **新画的东西必须进 `renderedKey`**。回执是时间驱动的元素，所以它有独立的三元组字段
+   （`toastRow` / `toastTick` / `toastFailed`），**不挂在 `clock`** 上——呼吸路径刻意忽略 `clock`，
+   而「回执留在屏幕上不走」正是 1.0.1 时长冻结的同一种 bug。
+3. **回执的定时器复用 `syncAnimation`**，不新开常驻计时器；`toggleExpanded` 会把回执清掉。
+4. **回执是「关于某个会话」的断言**。面板会随上报重排，所以 `copyToast` 记的是 `session.Identity`：
+   那一行换了主人、或紧凑条的最紧急会话变了，回执立刻消失，而不是把「已复制」留在别人的项目上。
 
-**验收**：`TestRenderPreview` 加一个「回执可见」用例；命中函数有单测（行内 / 行外 / 回执区域）；
-`--json` 不受影响；复制到剪贴板要真的可用（`OpenClipboard` + `SetClipboardData`，失败时**不要**假装成功——
-回执只在复制成功后才出现）。
+**交互规则写成纯函数**：`internal/ui/tap_windows.go` 的 `decideTap` 按固定顺序
+**跳转箭头 > 紧凑条左半 > auto-approve 否决（仅倒计时武装时）> 展开态行 > 收起**。
+否决排在行复制之前是有意的：倒计时在跑的那几秒里，「别放行」是最贵的一次点击，
+用一次剪贴板写入来回答它等于静默放行。
 
-**1.0.3 已经替这一项做掉的部分**：`internal/ui/rows_windows.go` 就是约束 1 要的函数
-（`expandedRowRect` 与 `expandedRowHit`，绘制与命中共用一手几何，`rows_windows_test.go` 逐像素钉住）；
-行悬停高亮（`renderedKey.hoverRow`）也已经在，回执可以沿用同一套「进 key 才重绘」的做法。
-剩下的只有剪贴板、回执本身与它的定时器。
+**验收（都跑过）**：`go test` 12 包全绿；`PET_CLIPBOARD_PROBE=1` 的桌面探针走真实往返（写一次、读回、
+再写一次确认是替换不是追加）；沙箱里拿**装出来的** 1.0.5 用 `PostMessage` 点第一行，`Get-Clipboard`
+拿到的就是那个完整路径，点页脚仍然收起（200 px → 56 px），紧凑条左半复制、右半不碰剪贴板。
 
-**发版代价与 F9 / 外观两轮相同**：三二进制重编 → `npm run vendor` → 插件 **1.2.9** → A 提交（版本 + 索引
-`version`/`publishTimestamp`）→ 双 tag + 双 Release + `npm publish` → B 提交钉索引 `source.commit` 与 `icon`
-→ awesome-dsh-plugin 的 `bump-tarball-1.2.9` 跟进 PR（只改 `tarball` 一行，base64 上传）。
-`docs/assets/` 的面板 PNG、`hero.png`、`demo.gif`、`desktop-scene.png` 与插件包内 `screenshots/` 都要重出
-（回执是新的视觉元素）。整套流程见 [docs/HANDOVER.md](HANDOVER.md) §38.3 与 §28.6。
+**代价**：`docs/assets/` 的面板 PNG 与插件包 `screenshots/` 重出（紧凑条多了复制半与分隔线，
+展开行多了回执），因此需要一次完整发版。
 
 ### F9 — 紧凑态显示最长等待时长 ✅ 已交付（2026-11-12，浮窗 1.0.1 / 插件 1.2.7）
 
@@ -727,13 +729,12 @@ I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三�
 **不可变**；插件线的九个 tag 同理（`dsh-plugin-v1.0.0` … `v1.2.7`）。1.0.1 → 1.0.2 会是新的 tag 与新资产，
 不要替换任何已发布的那份。
 
-F9 已于 1.0.1 交付（见上）；F8 仍是「一个下午」的量级，且不触碰渲染核心，适合作为再下一次迭代的起点。
-F1 现在价值下降：展开态已经能列出 6 行带项目名、状态、来源和相对时间的明细，
-悬停浮层要证明自己比"点一下"更快才有意义。
+F9 已于 1.0.1 交付、**F8 已于 1.0.5 交付**（见上）。F1 现在价值下降：展开态已经能列出 6 行带项目名、
+状态、来源和相对时间的明细，悬停浮层要证明自己比"点一下"更快才有意义。
 
-**关于"点击任意处收起"与 F8 的冲突**：当前规则是「点击 = 收起」，所以会话行暂时不可点。
-若要做 F8，建议改成「点击行 = 复制路径 + 气泡回执，点击行以外的面板区域 = 收起」——
-回执是必须的，分层窗口没有别的方式告诉用户"复制成功了"。
+**"点击任意处收起"这条规则已经被 F8 改掉了**，而且是有意改的：现在点会话行（或紧凑条左半）= 复制路径
++ 回执，点行与控制以外的面板区域 = 收起。这不只是交互变更——**分层窗口没有别的方式告诉用户"复制成功了"**，
+所以回执不是装饰，是这个手势能被相信的前提。
 
 **已交付但值得回头看的一项**：`--json` 目前只读快照，因此看不到「只走管道、不写快照」
 的上报路径（如果将来有上报端选择不落盘）。真需要时可以给它加一个查询运行中实例的

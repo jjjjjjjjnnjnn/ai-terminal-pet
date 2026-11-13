@@ -22,7 +22,7 @@ func TestAlertReportIsReadFromTheRuntimeDirectory(t *testing.T) {
 		Tone:     "waiting",
 		Sessions: []AlertReportSession{
 			{Identity: "claude-hook · ses_1", State: "waiting_permission", Kind: "approval", Decision: "elsewhere", Unread: true},
-			{Identity: "opencode · ses_2", State: "working", Kind: "", Decision: "not-asking"},
+			{Identity: "opencode · ses_2", State: "working", Kind: "none", Decision: "not-asking"},
 		},
 	}
 	data, err := json.Marshal(record)

@@ -110,6 +110,9 @@ def flat_panels(preview: Path) -> dict[str, Image.Image]:
         "expanded-many": "expanded-many.png",
         "expanded-unread": "expanded-unread.png",
         "auto-approve": "expanded-approve-zh.png",
+        # The copy receipt: a new visual element in 1.0.5, so it gets its own
+        # still rather than being inferred from a frame with a row highlight.
+        "copy": "expanded-copy.png",
     }
     missing = [name for name in sources.values() if not (preview / name).is_file()]
     if missing:
