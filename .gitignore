@@ -9,6 +9,11 @@ bin/
 # the repository grow on every release.
 dist/
 
+# The packed plugin tarball (npm pack). It is a release asset, not source: it
+# carries a vendored copy of the overlay, so committing it would add ~2 MB of
+# binary per release. 73a9fad accidentally carried 1.2.11; do not repeat that.
+packages/dsh-ai-terminal-pet/*.tgz
+
 # Runtime / logs (machine-local state)
 error.log
 hang.log

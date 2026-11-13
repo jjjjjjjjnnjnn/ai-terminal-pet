@@ -4,12 +4,12 @@
   "goVersion": "go1.27.0",
   "source": {
     "files": 35,
-    "sha256": "f2db7de596a5b8ca041ba79a44f2b85e01779375f0cae14723378914f5221edd"
+    "sha256": "597be5e59ec58c61fee1a19db23c6a7ea1ca53292be6588b0c455a1e55fe20c1"
   },
   "overlay": {
     "file": "vendor/AI-Terminal-Pet.exe",
     "bytes": 4520448,
-    "sha256": "3e60738c5fff372015a63d30ae0454deeb9595115f160fcd60764b57b9a97260"
+    "sha256": "562d1565c8b80739144a795beecbcb78551a15ef8a01e4342588e4836ccd28fd"
   },
   "protocol": {
     "file": "vendor/protocol.js",

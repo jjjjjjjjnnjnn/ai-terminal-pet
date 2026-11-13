@@ -9,12 +9,12 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-13，浮窗 1.0.5 / 插件 1.2.11；本轮按发布产物重新实测） |
+| 维度 | 数值（2026-11-13，浮窗 1.0.6 / 插件 1.2.12；本轮按发布产物重新实测） |
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.5`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.11` |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,514,304 B**（4.30 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`）。第 43 轮修复后工作区是 **4,520,448 B**，未发版 |
+| 版本 | `1.0.6`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.12` |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,520,448 B**（4.31 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,876,352 B** = 11.32 MiB |
 | 代码量 | Go 非测试源码 **42 文件 / 14,469 行**、测试 **43 文件 / 7,172 行**（**302** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
@@ -32,7 +32,7 @@
 | 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tests/fresh-machine.mjs --no-overlay`（162 项）/ `scripts/package.ps1` 打 zip 并上传 artifact |
 | 自检 | `ai-terminal-pet --doctor` **10 项**（environment / install files / version / runtime / config / pipe / instance / node / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.11**，18 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.11`，资产字节与 sha256 见本轮 HANDOVER §42，npm `dist-tags.latest` 与 Release 资产逐字节相同（发版后 `npm view` 复核） |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.12**，18 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.12`，资产字节与 sha256 见 HANDOVER §43，npm `dist-tags.latest` 与 Release 资产逐字节相同（发版后 `npm view` 复核） |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
 
@@ -602,7 +602,7 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 
 ### I1 拆成三段，第一段已交付（2026-11-11）
 
-### F11 — 提醒只报真实事件：消失不算完成、一行一个会话、OpenCode 对齐 2.x 🟡 已落地，**未发版**（2026-11-13 晚，第 43 轮）
+### F11 — 提醒只报真实事件：消失不算完成、一行一个会话、OpenCode 对齐 2.x ✅ 已交付（2026-11-13，浮窗 1.0.6 / 插件 1.2.12）
 
 **为什么它是一条独立条目而不是 F10 的补丁**：F10 把"要不要提醒"收进了一个纯函数，但它假设
 **输入是真的**。用户的两次报告说明输入有三个洞：一个"忙过的会话消失"被合成完成、一个会话可能占两行、

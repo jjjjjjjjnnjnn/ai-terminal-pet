@@ -116,15 +116,15 @@ There are three ways in. Pick the one that matches how you got here.
 dsh plugin add dsh-ai-terminal-pet
 ```
 
-The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.11), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
+The package carries a prebuilt overlay and this project's own `protocol.js`. On first load it copies them into `%LOCALAPPDATA%\AI-Terminal-Pet\` **only when they are missing**, so it never overwrites an install you maintain yourself. That is the whole setup: the panel appears on the next session. It is also on npm as [`dsh-ai-terminal-pet`](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.12), and the release tarball, a tag-pinned git source and a bare repository URL all work (`dsh plugin add <path-or-git-url>`); the same bootstrap runs either way.
 
 **B. Everyone else — download a package, no Go toolchain**
 
 Two packages are published for this release: a self-extracting `pet-setup.exe` and a portable zip. Both install the same 11 artifacts into the same directory; the zip additionally lets you look inside before running anything.
 
-1. Download one of them from the [`pet-v1.0.5` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.5):
+1. Download one of them from the [`pet-v1.0.6` release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.6):
    - **`pet-setup.exe`** (13.5 MB): double-click it. It verifies its own payload against `SHA256SUMS.txt` **before** writing anything, then runs the installer inside itself. `pet-setup.exe --verify` re-checks the installed files at any time, `--uninstall` removes them, `--add-to-path` puts the commands on your PATH.
-   - **`ai-terminal-pet-1.0.5-win-x64.zip`** (5,039,878 B, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
+   - **`ai-terminal-pet-1.0.6-win-x64.zip`** (5,041,100 B, 17 files): unzip it anywhere and double-click `install.cmd`. Everything is inspectable first; `install.cmd -VerifyOnly`, `-Uninstall` and `-AddToPath` work as they do in the source tree.
 2. Verify that the installation works:
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -200,10 +200,10 @@ The Harness side has a second, self-contained option since `dsh-ai-terminal-pet`
 
 ```powershell
 # from the release tarball: no git clone, no build step
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.11/dsh-ai-terminal-pet-1.2.11.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.12/dsh-ai-terminal-pet-1.2.12.tgz
 
 # from git, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.11&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.12&path:/packages/dsh-ai-terminal-pet"
 
 # from the repository URL: resolves through the root manifest shim
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -507,9 +507,9 @@ dsh plugin add dsh-ai-terminal-pet
 
 这一版发布两个包：自解压的 `pet-setup.exe` 与便携 zip。两者装的是**同一份 11 件制品、同一个目录**；zip 的额外好处是你可以在运行前先拆开看。
 
-1. 从 [`pet-v1.0.5` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.5) 下载其中一个：
+1. 从 [`pet-v1.0.6` Release](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.6) 下载其中一个：
    - **`pet-setup.exe`**（13.5 MB）：双击即可。它会先拿自带的 `SHA256SUMS.txt` 校验自己的载荷，**全部吻合才动手**，然后调用内嵌的安装脚本。`pet-setup.exe --verify` 随时复核已装文件，`--uninstall` 卸载，`--add-to-path` 加进 PATH。
-   - **`ai-terminal-pet-1.0.5-win-x64.zip`**（5,039,878 字节，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
+   - **`ai-terminal-pet-1.0.6-win-x64.zip`**（5,041,100 字节，17 个文件）：解压到任意目录，双击 `install.cmd`。一切都能先检查；`install.cmd -VerifyOnly`、`-Uninstall`、`-AddToPath` 与源码树里的用法一致。
 2. 验证安装输出：
    ```powershell
    & "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json
@@ -596,10 +596,10 @@ Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状�
 
 ```powershell
 # 用 Release 资产：不需要 clone，也不需要构建
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.11/dsh-ai-terminal-pet-1.2.11.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.12/dsh-ai-terminal-pet-1.2.12.tgz
 
 # 用 git 源：钉住 Release 的那个 tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.11&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.12&path:/packages/dsh-ai-terminal-pet"
 
 # 用仓库地址：靠仓库根的清单 shim 解析过去
 dsh plugin --profile <profile> add github:jjjjjjjjnnjnn/ai-terminal-pet
@@ -652,7 +652,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --autostart` | 查询当前的开机自启状态 |
 | `ai-terminal-pet --autostart=on` | 设置为登录时自动启动 |
 | `ai-terminal-pet --autostart=off` | 取消开机自启设置 |
-| `ai-terminal-pet --version` | 打印版本信息（v1.0.5） |
+| `ai-terminal-pet --version` | 打印版本信息（v1.0.6） |
 | `ai-terminal-pet --help` | 输出命令行帮助信息 |
 
 通过 `--json` 参数读取当前状态时，返回的会话数据结构示例如下：

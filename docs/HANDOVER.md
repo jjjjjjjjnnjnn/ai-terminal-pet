@@ -6,9 +6,9 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13 晚；浮窗 **1.0.5**、插件包 **1.2.11** 已发布，**第 43 轮修复已落地但未发版**）
+## 1. 当前状态（2026-11-13 晚；浮窗 **1.0.6**、插件包 **1.2.12**，第 43 轮已发版）
 
-> 接手请先读本节与文末 **§43「交接：三个假提醒的根因 + OpenCode 2.x」**（最新一轮，**未提交**）、
+> 接手请先读本节与文末 **§43「交接：三个假提醒的根因 + OpenCode 2.x」**（最新一轮，已发版）、
 > **§42「交接：点行复制路径」**（上一轮，已发版）、**§41「交接：判定记录搬家」**（上一轮）、
 > **§40「交接：提醒层」**（产品能力）和 **§39「交接：上游目录条目 sync」**
 > （上架机制，读它再读 §28 的清单形状）；§28 是更早一版的清单（分发状态已过期，只保留它的清单形状），
@@ -17,10 +17,10 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **版本**：浮窗 **`1.0.5`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.11`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`。
-  **`pet-v1.0.5` 与 `dsh-plugin-v1.2.11` 是本轮新打的**，提交 `885bdd4`，资产见 §42；
+- **版本**：浮窗 **`1.0.6`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.12`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6` 与
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`。
+  **`pet-v1.0.6` 与 `dsh-plugin-v1.2.12` 是本轮新打的**，资产与沙箱复验见 §43；
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**316 个** `func Test`，
@@ -32,9 +32,9 @@
   那两条 warn 是「浮窗已退出」与「没有活实例」，不是故障）。
 - **规模**：Go 非测试源码 **46 文件 / 16,037 行**、测试 **49 文件 / 8,480 行**（316 个 `func Test`，
   外加 `cmd/pet-setup` 的 11 个）；
-  `bin/AI-Terminal-Pet.exe` **4,520,448 B**（1.0.5 + 第 43 轮修复，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
+  `bin/AI-Terminal-Pet.exe` **4,520,448 B**（1.0.6，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**、
-  `dist/pet-setup.exe` **14,267,904 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
+  `dist/pet-setup.exe` **14,274,048 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
   - 插件线：npm `latest` = **1.2.10**（`npm view` 核对；`npm pack` 取回的 tarball 与 Release 资产**逐字节相同**，
@@ -3134,7 +3134,7 @@ python tools/check_docs_links.py            # 11 份文档全解
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
 
-## 43. 交接：三个"假提醒"的根因 + OpenCode 对齐 2.x（2026-11-13 晚，第 43 轮；**未提交、未发版**）
+## 43. 交接：三个"假提醒"的根因 + OpenCode 对齐 2.x（2026-11-13 晚，第 43 轮；浮窗 1.0.6 / 插件 1.2.12）
 
 用户的原话只有两句：**"普通终端命令也会响"**、**"没有 agent 完成任务它也响"**。两句都不是"提醒太敏感"，
 而是四个互相独立的错误。顺序、证据与结论如下；每一条都先在真机/沙箱里复现，再改，再回归。
@@ -3234,11 +3234,13 @@ tombstone 全部按上报进程记账——这是**协议层身份**，不能动
 
 ### 43.6 没做的事 / 下一步
 
-- **没有提交、没有发版**。工作区里这一轮全部是未提交改动。发版要按 §27 与
-  [docs/UPSTREAM.md](UPSTREAM.md) 的八步顺序：升 `Version` 到 1.0.6、插件包 1.2.12、
-  把本段 CHANGELOG 的 `[未发布]` 转正、市场索引两段提交（A 提版本与时间戳，B 提 `source.commit` 与 `icon`）、
-  打两个 tag、再走上游目录条目。
-- **`dist/pet-setup.exe` 没有重建**（它内嵌 payload，只有发版时才需要按 `scripts/package.ps1` 重做）。
+- **已发版**：`pet-v1.0.6` 与 `dsh-plugin-v1.2.12` 按 §27 与
+  [docs/UPSTREAM.md](UPSTREAM.md) 的八步顺序走完（A 提交带版本/两份清单/索引版本与时间戳，B 提交钉
+  `source.commit` 与 `icon`，两个 tag、两个 Release、npm publish、上游 `bump-tarball-1.2.12`）。
+  资产字节、sha256、沙箱复验与上游 PR 号记在本节末尾。
+- **`packages/dsh-ai-terminal-pet/*.tgz` 不进 git**：1.2.11 的 tarball 是上一次 `git add -A` 顺手带进
+  `73a9fad` 的（2 MB 二进制躺在历史里）。本轮把它从工作区删掉、把 `*.tgz` 写进 `.gitignore`，
+  打包产物只作为 Release 资产上传。
 - **改任何 `.go` 文件后要"重建 + 重新 vendor"一次，哪怕只改注释**：Go 的 build ID 参与源码内容哈希，
   所以注释改动也会让二进制字节变（体积不变、哈希变），`vendor.mjs --check` 在本机（同 Go 版本）会走
   逐字节比较并报 `the build is not reproducible`。这不是源码摘要失配——摘要比的是源码，那一步是过的。
