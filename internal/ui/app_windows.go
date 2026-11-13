@@ -1931,8 +1931,22 @@ const (
 	alertUrgent
 )
 
+// sessionAlertKey is the ledger key for one conversation.
+//
+// It is session.Identity (source + sessionId) rather than the store key, and
+// that is a deliberate change: the store key carries the reporter's pid, so an
+// OpenCode restart used to look like a brand-new session to the alert ledger -
+// a waiting conversation could be announced twice, once under each pid. The
+// mute list and the unread marks were already keyed on identity; the ledger is
+// the last place that still keyed on the process.
+//
+// The pid is only used as a fallback when the reporter sent no session id at
+// all, which the protocol allows but no real reporter does.
 func sessionAlertKey(value session.Session) string {
-	return fmt.Sprintf("%s\x00%s\x00%d", value.Source, value.SessionID, value.PID)
+	if identity := session.Identity(value); identity != "" {
+		return identity
+	}
+	return fmt.Sprintf("%s\x00\x00%d", value.Source, value.PID)
 }
 
 // alertOnTransitions turns one load into at most one balloon, one tone and a
@@ -1965,9 +1979,10 @@ func (a *App) alertOnTransitions() {
 	settings := a.attentionSettings()
 
 	inputs := a.alertInputs(previous, current, sample, sampleKnown, settings)
-	// A conversation that disappeared while it was busy is a completion, and
-	// List() drops it, so it can never appear in the loop above. It is
-	// synthesized here so a closed terminal still says it finished.
+	// A conversation that disappeared while it was busy is NOT a completion, and
+	// List() drops it, so it can never appear in the loop above. It is reported
+	// here as a silent `vanished` decision: the receipt can still explain the
+	// row that went away, but nothing is announced for it.
 	inputs = append(inputs, a.vanishedInputs(previous, current, sample)...)
 
 	if len(inputs) == 0 {
@@ -2073,8 +2088,16 @@ func (a *App) alertInputs(previous, current map[string]alertFacts, sample attend
 	return inputs
 }
 
-// vanishedInputs synthesizes a completion for a conversation that was busy and
-// is gone: the strongest completion signal there is.
+// vanishedInputs reports conversations that disappeared while they were busy.
+//
+// It used to *synthesize a completion* for them ("the strongest completion
+// signal there is"), which is how a dead reporter, a pruned duplicate or an
+// aged-out snapshot came to fire the "finished" tone although nothing had
+// finished. A disappearance is evidence of loss, not of work ending: the agent
+// may have been killed, or it may still be running in a terminal the overlay
+// cannot see any more. These inputs are therefore marked Vanished, which
+// Decide answers with the silent decisionVanished reason - the receipt keeps
+// the explanation, the user hears nothing.
 func (a *App) vanishedInputs(previous, current map[string]alertFacts, sample attendanceState) []AlertInput {
 	var inputs []AlertInput
 	for key, old := range previous {
@@ -2087,10 +2110,11 @@ func (a *App) vanishedInputs(previous, current map[string]alertFacts, sample att
 		source, sessionID := splitAlertKey(key)
 		inputs = append(inputs, AlertInput{
 			Session:  session.Session{Source: source, SessionID: sessionID, State: session.StateClosed},
-			Kind:     session.KindDone,
+			Kind:     session.KindNone,
 			Previous: old.State,
 			Existed:  true,
 			Present:  sample.Present,
+			Vanished: true,
 		})
 	}
 	return inputs
@@ -2305,7 +2329,11 @@ func (a *App) load() {
 		return
 	}
 	a.revision = revision
-	a.sessions = a.values.List()
+	// One conversation, one row. The store keys on source + sessionId + pid
+	// because the pipe and the tombstone ledger are per reporter process; the
+	// panel shows conversations, so two pids reporting the same sessionId must
+	// not become two rows. See sessions_dedupe.go.
+	a.sessions = dedupeSessions(a.values.List())
 	a.state = session.Aggregate(a.sessions)
 	a.digest = sessionDigest(a.sessions)
 	// Reconcile the auto-approve countdowns with what is actually waiting.

@@ -30,14 +30,81 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-未发布版本：**已全部发版**。浮窗本体是 **1.0.4**（tag `pet-v1.0.4`），插件包是 **1.2.10**
-（tag `dsh-plugin-v1.2.10`）；下面几段原本标着 `[Unreleased]`/批次标题的段落记录的是 1.0.2 之前的
+未发布版本：**第 43 轮（2026-11-13 晚）是未发版的一批**，它修的是三个"假提醒"根因并把
+OpenCode 上报端对齐到 2.x 插件 API，版本常量仍是 **1.0.5**、插件包仍是 **1.2.11**（两者的 tag 都已发布）。
+除此之外**已全部发版**：浮窗本体 **1.0.5**（tag `pet-v1.0.5`），插件包 **1.2.11**
+（tag `dsh-plugin-v1.2.11`）；下面几段原本标着 `[Unreleased]`/批次标题的段落记录的是 1.0.2 之前的
 三批工作，它们分别在 1.0.0 / 1.2.6 那次换版本号（`df4fcf6`）与 2026-11-12 的无版本号批次里交付
 （`[Unreleased]` 只能属于「还没发出去的东西」，留着它会和本段第一句直接矛盾）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 原先写在这一段的「浮窗停在 0.9.0、插件包 1.2.5」是当时的事实，现在是历史。
 两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
+
+## [未发布] — 2026-11-13 晚（第 43 轮：三个"假提醒"的根因，OpenCode 上报端对齐 2.x）
+
+用户报了两件事：**普通终端命令也会响**、**没有 agent 完成任务它也响**。两者都不是提醒层"太敏感"，
+而是四个各自独立的错误，全部先在真机/沙箱里复现，再逐个修掉。
+
+### Fixed
+
+- **会话消失不再冒充"完成"**（这就是"没人完成任务它也响"）。旧的 `vanishedInputs` 为"忙过之后消失的会话"
+  **合成一个 closed/done**，注释写着"最强的完成信号"——而"消失"其实只是"丢失"：上报端进程死掉、重复 pid 被清理、
+  快照过期，三种情况都会触发，没有一种能证明工作结束了。现在它标记 `AlertInput.Vanished`，
+  `Decide` 返回**静默**的 `decisionVanished`，回执仍然写明原因。
+  沙箱实测（只杀上报端进程，会话本身一直 `working`）：旧版 `closed/done -> done-away` + `tone=finished`；
+  现在 `closed/none -> vanished`，无 balloon、无 tone、无未读。
+- **一个会话一行**（面板层去重）。store 的 key 是 `source + sessionId + pid`，因为管道、快照文件、
+  tombstone 都是按上报进程记账的——那是**协议层身份**，`--json` 必须保留（两个上报端对同一会话说法不一致，
+  正是排障要看的证据）。但面板画的是**会话**，所以去重放在 `internal/ui/sessions_dedupe.go`：
+  同一 `session.Identity` 只留一行，时间戳相同则取更紧急的状态、再取更大的 pid（稳定，不会每帧换行）。
+  同时把 `sessionAlertKey` 从 pid 键改成 `session.Identity`：否则一次 OpenCode 重启会让同一个等待中的会话
+  以两个 pid 各提醒一次（静音列表与未读标记本来就是按身份记的，只有告警账本还按进程记）。
+- **幽灵行**：`presence.SessionAlive` 里两条规则，都来自真机测量而不是读代码——
+  1. **受信任上报端（`opencode` / `powershell-ipc` / `pwsh-session`）的 pid 一旦死亡，会话即结束**，
+     任何窗口标题都不能翻案。此前一个死掉的 `opencode.exe` 留下的快照，会被**任意**一个标题里含会话标题或项目名的
+     标签页永久续命。真机测量：6 行 / 3 个会话，其中 3 行来自已经不存在的 pid，全靠一个 `OC | <标题>` 标签页吊着。
+     修后同一台机器只剩活进程的 4 行 / 4 个会话。
+  2. **纯工具名标题不是会话身份**（`opencode` / `OpenCode` / `OC` / `claude` / `agy` / `codex` / `terminal` …）。
+     插件在学到真实标题之前会写 `"opencode"`，标签页也常叫 `OpenCode`，两个短字符串互相匹配，
+     就把该工具所有历史会话续了命。匹配按**整条标题**，所以 `OC | 修一下解析器` 仍然是身份。
+     故意**没有**采用"窗口必须属于该会话的进程树"这条更强的规则：实测 pid 38072（活的 opencode）父进程 24640 已死、
+     它的窗口 pid 20992 不在链上，那条规则会把活会话一起删掉。
+- **OpenCode 上报端对齐 2.2.7**（这是"普通命令也响"的直接原因）。`reporters/opencode.js` 有两处同时过时：
+  - **插件 API**：旧文件导出的是函数 + `{ event, "tool.execute.before", "tool.execute.after" }`，那是 1.x 的 hook 形状。
+    OpenCode 2 的加载器要求默认导出带 `id` 和 `setup`（二进制里的原话：`Plugin must export a default definition
+    with an id and an effect or setup function`），所以在 2.x 上这个文件**什么都没做**。
+  - **事件名**：旧映射里的 `tool.execute.before/after`、`question.asked/replied`、`permission.updated` 在 2.2.7 里
+    一个都不存在，其余靠子串猜。子串猜法正是本机插件把 `tui.prompt.append`（往 TUI 输入框里追加文本，
+    也就是**用户敲/粘一条普通命令**）判成 `waiting_permission` 的原因——这就是"普通命令也响"。
+  现在事件表按 `@opencode/schema`（`session-event.js` / `session-status-event.js` / `permission.js` / `form.js`）
+  逐条写死：`session.execution.started/succeeded/failed/interrupted`、`session.step.*`、`session.tool.called/
+  success/failed`、`session.reasoning.*`、`session.text.*`、`session.shell.*`、`session.compaction.*`、
+  `session.retry.scheduled`、`session.status`（`busy/retry/idle`）、`permission.asked/replied`、
+  `form.created/replied/cancelled`、`session.deleted`。不在表里的事件**故意忽略**：
+  这个文件读不懂的事件不是关于 agent 状态的证据。
+  三个刻意的判断：`session.tool.failed` → `working`（**不是** error，命令失败是日常，agent 会读错误继续）；
+  `session.step.failed` → `working`（模型调用失败会被重试，终结性失败由 `session.execution.failed` 报）；
+  唯一映射到 idle 的是 `session.execution.succeeded`。逐 token 的 `*.delta` / `tool.progress` 一律不映射——
+  它们不改变面板画的东西，一次回答里却有上百个。
+  本机真正被加载的那份插件（`~/.config/opencode/plugins/terminal-pet/index.ts`）做了同样的收敛，
+  并顺手修掉两处：新会话第一次上报若是 `idle` 会被"状态没变"的优化吞掉（现在 `lastStateChange === 0` 视为必须上报）；
+  标题不再伪造 `"opencode"`（空标题让面板回落到项目目录名，至少是真的）。
+
+### Added
+
+- `reporters/opencode-events.test.mjs`：8 个用例钉住事件表（含"`tui.prompt.append` 等 29 个事件绝不出状态"、
+  "工具失败不是回合失败"、"只有 runner 说结束才算结束"、`evt_/msg_/prt_` 不是会话身份、2.x 插件形状）。
+  CI 增加 `node --test reporters/opencode-events.test.mjs` 一步，`AGENTS.md` 的校验清单同步。
+- `internal/ui/vanished_windows_test.go`、`internal/ui/dedupe_windows_test.go`、
+  `internal/platform/ghost_windows_test.go`：三组回归测试，每条规则一条用例。
+
+### Changed
+
+- `internal/ui/app_windows.go` 的 `vanishedInputs` 不再合成 `KindDone`；`alertOnTransitions` 里那句
+  "消失就是完成"的注释同步改掉（注释和代码相反比没有注释更坏）。
+- `packages/dsh-ai-terminal-pet/vendor/` 重新 vendor（源码变了，`vendor.mjs --check` 的源码摘要必须跟着走）。
+  包版本仍是 1.2.11：这一批**未发版**，已发布的 `dsh-plugin-v1.2.11` 资产不动，下一轮发版时一起升版本号。
 
 ## [1.0.5] — 2026-11-13（浮窗：点会话行复制项目路径；判定记录的空 kind 有了名字）
 

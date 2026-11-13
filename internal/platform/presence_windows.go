@@ -131,6 +131,25 @@ func (p *Presence) SessionAlive(value session.Session) bool {
 	}
 	processes, windows := p.view()
 
+	// A dead reporter process is the end of its conversation, and no window
+	// title may overrule that.
+	//
+	// This is the "ghost row" rule. Before it, a snapshot left behind by
+	// `opencode.exe` (a trustworthy pid) whose process had exited was kept alive
+	// forever by *any* open tab whose title contained the session title or the
+	// project name - including a tab belonging to a completely different
+	// process. Measured on the machine that reported it: three of six rows came
+	// from pids that no longer existed, kept alive by one "OC | <title>" tab.
+	//
+	// The title stays evidence for reporters whose pid is a synthetic hash
+	// (hook and statusline reporters), because for them the pid proves nothing
+	// either way; that is the case the title rule was written for.
+	if trustedProcessID(value) {
+		if _, alive := processes[value.PID]; !alive {
+			return false
+		}
+	}
+
 	if windowIdentifiesSession(windows, FocusTarget{
 		PID:       value.PID,
 		ParentPID: value.ParentPID,
@@ -185,10 +204,47 @@ func trustedProcessID(value session.Session) bool {
 	return false
 }
 
+// bareWindowTitle is the set of titles that name a *tool*, not a conversation.
+//
+// An OpenCode plugin that has not learned the session title yet writes the
+// literal "opencode", and the terminal tab is often titled just "OpenCode" or
+// "OC" too. Matching those against each other is how one open tab kept every
+// historical conversation of that tool alive: the title was 8 runes long, so
+// the old "at least 3 characters" guard let it through.
+//
+// Matching is on the whole title, not a substring: a tab called
+// "OC | refactor the parser" is real identity even though it starts with a
+// bare tool name.
+var bareWindowTitle = map[string]bool{
+	"opencode": true, "oc": true,
+	"claude": true, "claude code": true, "claude-code": true,
+	"agy": true, "antigravity": true, "antigravity cli": true,
+	"codex": true, "codex cli": true,
+	"deepseek harness": true, "deepseek-harness": true, "dsh": true,
+	"terminal": true, "windows terminal": true, "powershell": true,
+	"pwsh": true, "cmd": true, "command prompt": true, "bash": true,
+	"wsl": true, "git bash": true,
+}
+
+// titleIdentifiesConversation reports whether a session title can be used as
+// evidence that a window belongs to that session.
+//
+// It lowercases and trims on the way in rather than trusting the caller: the
+// window comparison already lowercases everything, and a helper that only
+// recognised the exact casing it was written with would silently let
+// "OpenCode" through.
+func titleIdentifiesConversation(title string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(title))
+	if len([]rune(trimmed)) < 3 {
+		return false
+	}
+	return !bareWindowTitle[trimmed]
+}
+
 func windowIdentifiesSession(windows []focusWindow, target FocusTarget) bool {
 	title := strings.ToLower(strings.TrimSpace(target.Title))
 	base := strings.ToLower(projectBase(target.Project))
-	if len([]rune(title)) < 3 {
+	if !titleIdentifiesConversation(title) {
 		title = ""
 	}
 	// A CLI keyword alone is deliberately NOT identity. With one Antigravity

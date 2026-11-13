@@ -137,6 +137,17 @@ type AlertInput struct {
 	// Muted is the user's per-session silence; Subagent marks a child session.
 	Muted    bool
 	Subagent bool
+
+	// Vanished marks a conversation the store dropped while it was busy.
+	//
+	// This is deliberately NOT a completion. A reporter that dies, a duplicate
+	// pid that gets pruned, or a snapshot that ages out all look like "the busy
+	// session went away", and announcing that as "finished" is a claim nothing
+	// supports: the agent may have been killed, or it may still be running in a
+	// terminal the overlay merely lost sight of. It is carried through so the
+	// receipt can say what happened (reason "vanished") without any balloon,
+	// tone or unread mark.
+	Vanished bool
 }
 
 // AlertDecision is the answer for one session. Deliberately not a bool: a
@@ -182,6 +193,9 @@ const (
 	decisionPresenceUnknown = "presence-unknown"
 	decisionElsewhere       = "elsewhere"
 	decisionAwarenessOff    = "awareness-off"
+	// decisionVanished names a conversation that disappeared while it was busy.
+	// It is a diagnostic, not a signal: nothing is announced for it.
+	decisionVanished = "vanished"
 )
 
 // sinceSpoke answers "how long ago did this conversation last make a balloon",
@@ -233,6 +247,18 @@ func Decide(in AlertInput, settings AttentionSettings, sinceFinish time.Duration
 	// rewording into a new balloon is how alerts become noise.
 	if in.Existed && in.Previous == in.Session.State && !in.ChangedKind {
 		return AlertDecision{Reason: decisionUnchanged}
+	}
+	// A conversation that vanished while it was busy is not a completion. The
+	// old rule announced it as one - `vanishedInputs` synthesized a closed/done
+	// session for it - and that is the "it rings although no agent finished"
+	// report: a reporter dying, a duplicate pid being pruned, or a snapshot
+	// aging out all produce it, and none of them is evidence that work ended.
+	//
+	// The honest reading of a disappearance is "unknown". The receipt still
+	// records it (see decisionVanished), because a session that vanished while
+	// blocked is worth being able to explain later, but nothing is announced.
+	if in.Vanished {
+		return AlertDecision{Reason: decisionVanished}
 	}
 	if in.Kind == session.KindDone {
 		return decideCompletion(in, settings, sinceFinish)

@@ -13,22 +13,34 @@ import (
 	"ai-terminal-pet/internal/session"
 )
 
-// TestFactsOfKeysArePerConversation: the per-conversation identity is the
-// point. A single global "most urgent session" key used to be cleared when
-// that session ended, which made a still-waiting sibling look like it had been
-// caused by an unrelated new session.
+// TestFactsOfKeysArePerConversation: the ledger must be keyed on the
+// conversation, not on a single global "most urgent session" and not on the
+// reporter process. A single global key used to be cleared when that session
+// ended, which made a still-waiting sibling look like it had been caused by an
+// unrelated new session; a pid-keyed ledger instead made an OpenCode restart
+// look like a brand-new conversation, so a waiting ask could be announced
+// twice - once per pid.
 func TestFactsOfKeysArePerConversation(t *testing.T) {
 	a := session.Session{Source: "deepseek-harness", SessionID: "ses_1", PID: 11, State: session.StateWorking}
 	b := session.Session{Source: "deepseek-harness", SessionID: "ses_1", PID: 22, State: session.StateWaitingPermission}
 	c := session.Session{Source: "deepseek-harness", SessionID: "ses_2", PID: 11, State: session.StateIdle}
-	facts := factsOf([]session.Session{a, b, c}, time.Now(), nil)
-	if len(facts) != 3 {
-		t.Fatalf("want 3 distinct identities, got %d", len(facts))
+	if sessionAlertKey(a) != sessionAlertKey(b) {
+		t.Fatal("one conversation reported by two pids must share a ledger key")
 	}
-	if facts[sessionAlertKey(a)].State != session.StateWorking ||
-		facts[sessionAlertKey(b)].State != session.StateWaitingPermission ||
-		facts[sessionAlertKey(c)].Kind != session.KindDone {
+	if sessionAlertKey(a) == sessionAlertKey(c) {
+		t.Fatal("two conversations must not share a ledger key")
+	}
+	// Two conversations, three reports: the map holds two entries, and the
+	// second conversation keeps its own state.
+	facts := factsOf([]session.Session{c, a}, time.Now(), nil)
+	if len(facts) != 2 {
+		t.Fatalf("want 2 conversations, got %d", len(facts))
+	}
+	if facts[sessionAlertKey(c)].Kind != session.KindDone {
 		t.Fatal("facts were mixed between conversations")
+	}
+	if facts[sessionAlertKey(a)].State != session.StateWorking {
+		t.Fatal("the wrong report won the conversation")
 	}
 }
 

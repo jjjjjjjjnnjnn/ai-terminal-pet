@@ -14,7 +14,7 @@
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
 | 版本 | `1.0.5`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.11` |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,514,304 B**（4.30 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,514,304 B**（4.30 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`）。第 43 轮修复后工作区是 **4,520,448 B**，未发版 |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,876,352 B** = 11.32 MiB |
 | 代码量 | Go 非测试源码 **42 文件 / 14,469 行**、测试 **43 文件 / 7,172 行**（**302** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
@@ -601,6 +601,30 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 | ~~F9~~ | ~~紧凑态显示「最久等待了多久」~~ **已交付（2026-11-12，1.0.1）**，见下方 F9 小节 | 中 | 低 |
 
 ### I1 拆成三段，第一段已交付（2026-11-11）
+
+### F11 — 提醒只报真实事件：消失不算完成、一行一个会话、OpenCode 对齐 2.x 🟡 已落地，**未发版**（2026-11-13 晚，第 43 轮）
+
+**为什么它是一条独立条目而不是 F10 的补丁**：F10 把"要不要提醒"收进了一个纯函数，但它假设
+**输入是真的**。用户的两次报告说明输入有三个洞：一个"忙过的会话消失"被合成完成、一个会话可能占两行、
+一个死进程能被窗口标题续命。第四个洞在上报端：OpenCode 2.x 的插件 API 与事件名一起换了，仓库里那份
+`reporters/opencode.js` 在 2.x 上既不加载、也不认识任何真实事件名。
+
+**四条规则（各自一条测试，且都在真机/沙箱复现过）**：
+
+| 洞 | 规则 | 位置 |
+|---|---|---|
+| 消失被当成完成 | `AlertInput.Vanished` → 静默 `decisionVanished`，回执仍写明 | `internal/ui/attention.go` |
+| 一个会话两行 | 面板层按 `session.Identity` 去重（`--json` 仍保留 per-process 行） | `internal/ui/sessions_dedupe.go` |
+| 死 pid 被标题续命 | 受信任上报端 pid 死亡即结束；纯工具名标题不算身份 | `internal/platform/presence_windows.go` |
+| 普通命令也响 | 事件表逐条写死 2.2.7 的真实事件名；`tui.prompt.append` 永不产出状态 | `reporters/opencode.js` |
+
+**证据**（都在 §43.5）：真机 `--json` 6 行/3 会话（3 个死 pid）→ 4 行/4 会话；沙箱只杀上报端进程，
+回执从 `closed/done -> done-away` + `tone=finished` 变成 `closed/none -> vanished` 且静默；
+控制组（真完成）仍然响。
+
+**别"优化"回去的四件事**：`--json` 的 per-process 行是有意的（两个上报端说法不一致正是证据）；
+标题规则只对合成 pid 生效（hook/statusline 的 pid 不证明任何事）；不要改成"窗口必须属于该会话的进程树"
+（实测会误删活会话）；`session.tool.failed` 不是 `error`（命令失败是日常）。
 
 ### F10 — 提醒层：一个决策器 + 可回答的判定记录 ✅ 已交付（2026-11-12，浮窗 1.0.3 / 插件 1.2.9）
 

@@ -6,9 +6,10 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13 下午；浮窗 **1.0.5**、插件包 **1.2.11**，两个 Release 与 npm 已落地，上游 PR 在等合并）
+## 1. 当前状态（2026-11-13 晚；浮窗 **1.0.5**、插件包 **1.2.11** 已发布，**第 43 轮修复已落地但未发版**）
 
-> 接手请先读本节与文末 **§42「交接：点行复制路径」**（最新一轮）、**§41「交接：判定记录搬家」**（上一轮）、
+> 接手请先读本节与文末 **§43「交接：三个假提醒的根因 + OpenCode 2.x」**（最新一轮，**未提交**）、
+> **§42「交接：点行复制路径」**（上一轮，已发版）、**§41「交接：判定记录搬家」**（上一轮）、
 > **§40「交接：提醒层」**（产品能力）和 **§39「交接：上游目录条目 sync」**
 > （上架机制，读它再读 §28 的清单形状）；§28 是更早一版的清单（分发状态已过期，只保留它的清单形状），
 > §27 是插件包分发的完整 runbook，而上游目录条目的规则、八步发版顺序与「合并 ≠ 可见」的判断方式在
@@ -22,15 +23,16 @@
   **`pet-v1.0.5` 与 `dsh-plugin-v1.2.11` 是本轮新打的**，提交 `885bdd4`，资产见 §42；
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**302 个** `func Test`，
-  12 个包）；上报端逐个 `node --check` 全过；三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**316 个** `func Test`，
+  12 个包）；上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **8/8**；
+  三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
   `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
   `--doctor` **10 项**（本机 10 ok / 0 warn / 0 fail；沙箱里跑完浮窗后是 8 ok / 2 warn / 0 fail，
   那两条 warn 是「浮窗已退出」与「没有活实例」，不是故障）。
-- **规模**：Go 非测试源码 **45 文件 / 15,860 行**、测试 **46 文件 / 8,112 行**（302 个 `func Test`，
-  外加 `cmd/pet-setup` 的 11 个）、JS **14 文件**；
-  `bin/AI-Terminal-Pet.exe` **4,514,304 B**（1.0.5，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
+- **规模**：Go 非测试源码 **46 文件 / 16,037 行**、测试 **49 文件 / 8,480 行**（316 个 `func Test`，
+  外加 `cmd/pet-setup` 的 11 个）；
+  `bin/AI-Terminal-Pet.exe` **4,520,448 B**（1.0.5 + 第 43 轮修复，与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**、
   `dist/pet-setup.exe` **14,267,904 B**（均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26）；
   第三方依赖 3 个。
@@ -3131,6 +3133,121 @@ python tools/check_docs_links.py            # 11 份文档全解
 | 中文段落被合并坏掉 | `462dca2` 把两版中文段落首尾相接，留下一个从句中开始的残句；第一次修的时候又把故事讲了两遍 | 改中文长段前先数「同一事实出现几次」；重复检测用探针字符串 |
 | `go test` 的 `frameKey` 签名变化 | 加参数后测试批量 `not enough arguments` | 签名改动要么保持兼容，要么一次性把所有调用点（含测试）都改掉 |
 | 文档说「未跑」而其实能跑 | 旧文档写「govulncheck/gosec 因缺 gcc 未跑」，其实两者都是纯 Go | 写「做不到」之前先跑一次 |
+
+## 43. 交接：三个"假提醒"的根因 + OpenCode 对齐 2.x（2026-11-13 晚，第 43 轮；**未提交、未发版**）
+
+用户的原话只有两句：**"普通终端命令也会响"**、**"没有 agent 完成任务它也响"**。两句都不是"提醒太敏感"，
+而是四个互相独立的错误。顺序、证据与结论如下；每一条都先在真机/沙箱里复现，再改，再回归。
+
+### 43.1 消失 ≠ 完成（"没人完成它也响"的一半）
+
+`internal/ui/app_windows.go` 的 `vanishedInputs` 原来为"忙过之后从 store 里消失的会话"**合成一个
+closed/done**，注释写着"最强的完成信号"。但"消失"只是"丢失"：上报端进程死掉、重复 pid 被清理、
+快照过期，三种都会触发，没有一种能证明工作结束了。
+
+现在：`AlertInput.Vanished` → `Decide` 在 `unchanged` 之后、`KindDone` 之前返回静默的
+`decisionVanished`（`internal/ui/attention.go`）。回执里仍然写明 `state=closed / kind=none /
+decision=vanished`，所以"为什么没提醒我"仍然可查。
+
+沙箱实测（`%TEMP%\pet-repro3.ps1`，只杀上报端进程，会话本身一直是 `working`）：
+
+| | 旧 | 新 |
+|---|---|---|
+| 回执 | `closed/done -> done-away` | `closed/none -> vanished` |
+| tone | `finished` | 空 |
+| balloon | `opencode · ses_silent` | 空 |
+
+### 43.2 一个会话一行（重复行）
+
+store 的 key 是 `source + sessionId + pid`（`internal/store/store.go` 的 `key()`），因为管道、快照文件、
+tombstone 全部按上报进程记账——这是**协议层身份**，不能动。面板画的是**会话**，所以在
+`internal/ui/sessions_dedupe.go`（新文件）做面板层去重，由 `App.load()` 唯一一处接入。
+
+- 同 `session.Identity` 只留一行；时间戳相同取更紧急的状态，再取更大的 pid → 结果稳定（每帧都一样）。
+- 没有 sessionId 的行**永不合并**：合并两行不相关的会把其中一行藏起来。
+- `--json` **故意**保留 per-process 行：两个上报端对同一会话说法不一致，正是排障要的证据。
+  这条边界由 `TestDedupeIsAPanelConcernOnly` 钉住。
+
+同时 `sessionAlertKey` 从 `source\0sessionId\0pid` 改成 `session.Identity`（`source\0sessionId`）：
+静音列表与未读标记本来就是按身份记的，只有告警账本还按进程记，导致一次 OpenCode 重启让同一个等待中的
+会话以两个 pid 各响一次。
+
+### 43.3 幽灵行（死 pid 被窗口标题续命）
+
+`internal/platform/presence_windows.go` 的 `SessionAlive` 加了两条规则：
+
+1. **受信任上报端**（`opencode` / `powershell-ipc` / `pwsh-session`，即 `trustedProcessID` 为真的那些）
+   的 pid 一旦死亡，`SessionAlive` 立刻返回 false，**窗口标题不再参与判断**。
+   此前一个死掉的 `opencode.exe` 留下的快照，会被任意一个"标题里含会话标题或项目名"的标签页永久续命。
+2. **纯工具名标题不是会话身份**：`bareWindowTitle` 表 + `titleIdentifiesConversation()`，
+   按**整条标题**匹配（`OC | 修一下解析器` 仍是身份，`OpenCode` 不是）。
+
+真机测量（同一台机器，修前）：`--json` 6 行 / 3 个 sessionId，其中 pid 106060、46108、38752 都已不存在，
+三行全靠一个 `OC | <标题>` 标签页吊着。修后同机：9 个死 pid 的快照被扫描器删除，只剩活进程 54972 的
+4 行 / 4 个会话。
+
+**故意没做的事**：没有采用"窗口必须属于该会话的进程树"这条更强的规则。实测 pid 38072（活的 opencode）
+父进程 24640 已死、它的窗口 pid 20992 不在链上——那条规则会把活会话一起删掉。
+标题规则也**保留**给合成 pid 的 hook/statusline 上报端：它们的 pid 本身不证明任何事，
+`TestPresenceSyntheticPIDStillUsesTheTabTitle` 钉的就是这个。
+
+### 43.4 OpenCode 上报端：两处同时过时（"普通命令也响"的直接原因）
+
+`reporters/opencode.js` 旧文件有两个独立的错：
+
+- **插件 API 是 1.x 的**：导出函数 + `{ event, "tool.execute.before", "tool.execute.after" }`。
+  OpenCode 2 的加载器要求默认导出带 `id` 和 `setup`（二进制字符串原文：`Plugin must export a default
+  definition with an id and an effect or setup function`），所以这个文件在 2.x 上**什么都没做**。
+- **事件名靠子串猜**：`tool.execute.before/after`、`question.asked/replied`、`permission.updated`
+  在 2.2.7 里一个都不存在；而 `includes("prompt")` 把 `tui.prompt.append`（往 TUI 输入框追加文本，
+  也就是用户敲/粘一条普通命令）判成 `waiting_permission` —— 这就是"普通命令也响"。
+
+现在事件表按 `@opencode/schema` 逐条写死（来源文件写在文件头注释里：
+`session-event.js` / `session-status-event.js` / `permission.js` / `form.js`，装在本机
+`~/.config/opencode/plugins/notify-native/node_modules/@opencode/schema`）。三个刻意的判断：
+
+- `session.tool.failed` → `working`，**不是** `error`。命令失败是日常，agent 读错误继续。
+- `session.step.failed` → `working`（会被 `session.retry.scheduled` 重试；终结性失败由
+  `session.execution.failed` 报）。
+- 唯一映射到 `idle` 的是 `session.execution.succeeded`。
+- 逐 token 的 `*.delta` / `session.tool.progress` **一律不映射**：不改变面板画的东西，一次回答却有上百个。
+
+回归测试 `reporters/opencode-events.test.mjs`（8 个用例）与 CI 新增一步一起钉住这张表。
+
+**本机还有一份不在仓库里的插件**：`~/.config/opencode/plugins/terminal-pet/index.ts` 才是
+`opencode.json` 的 `plugins` 里真正加载的那个。它做了同样的收敛，并顺手修了两处：
+新会话第一次上报若是 `idle` 会被"状态没变"优化吞掉（现在 `lastStateChange === 0` 视为必须上报）；
+标题不再伪造 `"opencode"`。**下次改 OpenCode 上报语义时，两边必须一起改**——仓库里那份是文档与
+`file://` 接入方式的真相，本机这份是当下实际跑的。
+
+### 43.5 这一轮的验证清单（都跑过）
+
+- `gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 12 包全过（316 个 `func Test`）。
+- `reporters/*.js` 逐个 `node --check`；`node --test reporters/opencode-events.test.mjs` 8/8。
+- `node integrations/deepseek-harness/verify.mjs`、`node packages/dsh-ai-terminal-pet/verify.mjs` PASS；
+  `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs --check` 两文件吻合（本轮已重新 vendor）。
+- `node tests/fresh-machine.mjs --no-overlay` 162/162；`python tools/check_docs_links.py` 12 份全解。
+- 真机：`--json` 从 6 行/3 会话（3 个死 pid）变成 4 行/4 会话（只有活进程）。
+- 沙箱（`%TEMP%\pet-repro2.ps1`、`pet-repro3.ps1`，都用 `alerts.json` 这个产品自己的判定记录）：
+  控制组（真完成）仍然 `tone=finished`；重复 pid 被清理后**无 tone/balloon**；只杀上报端后
+  `decision=vanished` 且静默。
+
+### 43.6 没做的事 / 下一步
+
+- **没有提交、没有发版**。工作区里这一轮全部是未提交改动。发版要按 §27 与
+  [docs/UPSTREAM.md](UPSTREAM.md) 的八步顺序：升 `Version` 到 1.0.6、插件包 1.2.12、
+  把本段 CHANGELOG 的 `[未发布]` 转正、市场索引两段提交（A 提版本与时间戳，B 提 `source.commit` 与 `icon`）、
+  打两个 tag、再走上游目录条目。
+- **`dist/pet-setup.exe` 没有重建**（它内嵌 payload，只有发版时才需要按 `scripts/package.ps1` 重做）。
+- **改任何 `.go` 文件后要"重建 + 重新 vendor"一次，哪怕只改注释**：Go 的 build ID 参与源码内容哈希，
+  所以注释改动也会让二进制字节变（体积不变、哈希变），`vendor.mjs --check` 在本机（同 Go 版本）会走
+  逐字节比较并报 `the build is not reproducible`。这不是源码摘要失配——摘要比的是源码，那一步是过的。
+  顺序永远是：`go build` → `node packages/dsh-ai-terminal-pet/scripts/vendor.mjs` → `--check`。
+- 如果用户下次还说"还在响"，排查顺序是固定的：先看 `%LOCALAPPDATA%\AI-Terminal-Pet\alerts.json`
+  里那行的 `decision`（`vanished`/`done-away`/`idle-away`/`foreground` 各自指向不同层），
+  再看 `runtime\*.json` 里那个会话的 `state`+`reason` 是谁写的（`reason` 能直接区分是
+  `execution_succeeded` 这种真完成、还是某个上报端自己声称的 `waiting_permission`），
+  最后才怀疑提醒层——本轮四个根因里有三个在提醒层之外。
 
 ## 42. 交接：点行复制路径（2026-11-13 下午，第 42 轮；浮窗 1.0.5 / 插件 1.2.11）
 

@@ -84,6 +84,7 @@ go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -severity high -confidence
 # 2. Reporter syntax and the DeepSeek Harness bundle (zero npm dependencies)
 for f in reporters/*.js; do node --check "$f"; done   # per file: node --check only guards its first argument
 node --check tests/fresh-machine.mjs
+node --test reporters/opencode-events.test.mjs   # the OpenCode event -> state table
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
 node tools/upstream-entry.mjs --check   # catalogue entry points at this package version (SKIP is not a pass)

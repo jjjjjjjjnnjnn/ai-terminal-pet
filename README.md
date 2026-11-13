@@ -186,7 +186,7 @@ Installing a terminal hook is required for that terminal to report; see the next
 
 | Terminal | How to connect | What you get |
 |---|---|---|
-| OpenCode | Add `file:///C:/path/to/ai-terminal-pet/reporters/opencode.js` to `plugin` in `opencode.json` | Automatic session tracking for tool use, prompt handling, and task completion |
+| OpenCode | Add `file:///C:/path/to/ai-terminal-pet/reporters/opencode.js` to `plugins` in `opencode.json` (OpenCode 2.x: the file is a plugin with an `id` and a `setup`) | Turn, tool and permission states, including the difference between "waiting for you" and "still working" |
 | Claude Code | Add `& "%LOCALAPPDATA%\AI-Terminal-Pet\pet-hook.exe" --mode=claude` for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and `Notification` in `settings.json`. `node <repo>/reporters/claude-hook.js` still works and is the fallback when you cannot run the `.exe`. | Real-time status updates, tool execution tracking, and permission prompt alerts |
 | Antigravity | Set `statusLine.command` to `pet-statusline.exe` and configure `pet-hook.exe --mode=antigravity` for agent and tool events (`antigravity-hook.js` is the fallback) | Fast statusline updates, agent state changes, and permission request forwarding |
 | DeepSeek Harness | Install the Cordis bundle from `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge\` via the plugin manager (`install_bundle`) | turn/start to working, tool/call to tool_use, approval/asked to waiting_permission, tool/result with an error to error, turn/end to idle, process exit to closed |
@@ -582,7 +582,7 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/
 
 | 终端 | 怎么接 | 得到什么 |
 |---|---|---|
-| OpenCode | 在 `opencode.json` 的 `plugin` 列表中加入 `file:///C:/path/to/ai-terminal-pet/reporters/opencode.js`。修改配置后重启 OpenCode 即可生效。 | 执行中、工具调用、思考中等状态实时上报。 |
+| OpenCode | 在 `opencode.json` 的 `plugins` 列表中加入 `file:///C:/path/to/ai-terminal-pet/reporters/opencode.js`（OpenCode 2.x：该文件是一个带 `id` 与 `setup` 的插件）。修改配置后重启 OpenCode 即可生效。 | 回合、工具、权限三类状态实时上报，并区分"在等你"和"还在干活"。 |
 | Claude Code | 在 `settings.json` 的 hooks 配置中，为 `SessionStart`、`PreToolUse`、`Stop`、`PermissionRequest` 等挂载 `& "%LOCALAPPDATA%\AI-Terminal-Pet\pet-hook.exe" --mode=claude`；不能运行 `.exe` 的环境退回 `node <repo>/reporters/claude-hook.js`。 | 权限确认拦截、工具执行状态与 5 秒否决倒计时。 |
 | Antigravity | 将 `statusLine.command` 指向 `pet-statusline.exe`，并在事件配置中注册 `pet-hook.exe --mode=antigravity`（退回方案是 `antigravity-hook.js`）。 | 亚秒级状态栏响应、Agent 思考与权限确认聚合。 |
 | DeepSeek Harness | 在官方插件管理器中运行 `install_bundle`，传入 `%LOCALAPPDATA%\AI-Terminal-Pet\bundles\ai-terminal-pet-bridge\` 的绝对路径。 | 真实事件映射：turn/start→working、tool/call→tool_use、approval/asked→waiting_permission、tool/result 出错→error、turn/end→idle、进程退出→closed。 |

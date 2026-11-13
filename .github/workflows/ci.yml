@@ -162,6 +162,16 @@ jobs:
             echo "node --check: $file OK"
           done
 
+      # The OpenCode event mapping is a pure function, so it is tested directly
+      # instead of by eye. Two shipped bugs came out of this table: a substring
+      # matcher turned tui.prompt.append - fired when the user types or pastes an
+      # ordinary command - into waiting_permission, so the overlay rang for
+      # nothing, and the events that do carry a real ask (permission.asked) and
+      # real work (session.tool.called, session.execution.*) were not mapped at
+      # all under their 2.2.7 names.
+      - name: Test the OpenCode event mapping
+        run: node --test reporters/opencode-events.test.mjs
+
       # verify.mjs loads the Harness bundle the way the Harness loader does and
       # fails on an unloadable manifest, a missing locale or a broken patch.
       - name: Verify the DeepSeek Harness bundle
