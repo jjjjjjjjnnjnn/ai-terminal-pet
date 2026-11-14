@@ -3603,22 +3603,42 @@ export default plugin
 应该先看这一行**：判据是 `--json` 里那条会话的 `pid`（statusline 用的是稳定哈希，不是真 pid，
 所以 `trustedProcessID` 不认它——靠的是 `DefaultOrphanAfter` 45 分钟与窗口标题）。
 
-### 53.6 门禁与影响面
+### 53.6 顺手量了第 3 项的第一个候选：设置窗口一帧画多久
+
+§51.3 的候选 2 是"消息泵卡住"。这一轮加了 `internal/ui/paint_cost_test.go`
+（`go test ./internal/ui -run TestMeasureSettingsPaint -v`），在**本机真实的字号与主题**
+（contrast、150% DPI）下量一帧的**光栅化**成本（不含 `UpdateLayeredWindow`）：
+
+| 字号 | 通用 | 声音 | 会话 | 外观 |
+|---|---|---|---|---|
+| 标准 | 17.0 ms | 19.1 ms | 22.3 ms | 13.2 ms |
+| **大** | 22.0 ms | 33.1 ms | **47.5 ms** | 27.2 ms |
+
+（窗口 781×997 与 938×1198；每帧 20 次取平均，已含一次预热。）
+
+结论：**这不是卡死的来源**。47 ms 是"一次点击后慢半拍"，不是 `hang.log` 里那种 6 秒 stall；
+`hang.log` 那 6 次 `WM_TIMER` stall 仍然没有解释，但它不是设置窗口绘制。测试只打印不设阈值
+（阈值在 CI 上必然是 flaky），**别**把它改成断言。
+
+### 53.7 门禁与影响面
 
 - 只动上报端与文档：`node --check reporters/opencode.js`、`node --test
   reporters/opencode-events.test.mjs` **10/10**、`node --check` 本机 wrapper、Go 全套未受影响
-  （`go test ./...` 仍 334 个）。**没有重发版本**：浮窗二进制与插件包一个字节没变，
-  `pet-v1.0.8` / `dsh-plugin-v1.2.17` 仍是当前版本。CI run `43643276551` success。
-- 仓库侧新增的只有注释（`reporters/opencode.js` 里"为什么不抄那三个优化"），因此
-  `vendor/manifest.json` 的源码摘要不受影响（它只哈希 `cmd/` 与 `internal/`，不进 `reporters/`）。
+  （`go test ./...` 仍 334 个，新增的是一个只看 `-run` 才跑的测量）。**没有重发版本**：浮窗二进制
+  与插件包一个字节没变，`pet-v1.0.8` / `dsh-plugin-v1.2.17` 仍是当前版本。
+  CI run `43643276551` 与 `43644215965` 都 success。
+- 仓库侧新增的只有注释（`reporters/opencode.js` 里"为什么不抄那三个优化"）与一个测量测试，
+  因此 `vendor/manifest.json` 的源码摘要不受影响（它只哈希 `cmd/` 与 `internal/` 的**非测试**文件）。
 
-### 53.7 下一轮（从 §52.5 顺延）
+### 53.8 下一轮（从 §52.5 顺延）
 
 1. ~~上报端来源~~ → 已完成（§53）。
 2. ~~Claude Code / Antigravity 的结束信号~~ → 查清（§53.5）：三个入口都会发 `closed`；
    Antigravity 的 statusline 是电平接口，本机只装了它，所以没有 `closed`。
    **如果之后要动它**，方向是让 Antigravity 也装 hook（`terminationReason`），不是改 statusline 的映射。
-3. **设置窗口另外两个候选**（`WM_TIMER` stall / DPI 重排）：有复现再动代码。
+3. **设置窗口剩下的候选**：`WM_TIMER` stall 与 DPI 重排。绘制成本已量过（§53.6，最大 47.5 ms），
+   所以不是它；若用户再报"未响应"，下一步用同一台机器上的 `hang.log` 时间戳去对
+   `WM_DPICHANGED` 与托盘/贴边动作，而不是继续改绘制。
 4. **面板与 `--json` 的去重规则**：不要为了"统一"改掉。
 
 ## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
