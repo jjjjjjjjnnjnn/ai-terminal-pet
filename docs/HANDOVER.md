@@ -3560,7 +3560,7 @@ export default plugin
    所以"行消失"由 `runtime/` 里那个文件被消费证明）；`{"archived":false}` → 快照变
    `idle / session_unarchived`，行回到面板。
 
-### 53.3 旧分支里那两个"优化"没有搬过来，理由写进了代码
+### 53.3 旧分支里那三个"优化"没有搬过来，理由写进了代码
 
 | 旧本地分支的做法 | 为什么**不**移植 |
 |---|---|
@@ -3580,20 +3580,44 @@ export default plugin
 - **不要**把 `index.ts.bak-20261114-fork` 当成"随时可以恢复的旧版本"：它能编译，但没有被验证过，
   而且它承载的两个行为上面已经说明为什么不采纳。真正的实现只有仓库里那份。
 
-### 53.5 门禁与影响面
+### 53.5 顺带把第 2 项查清了：Claude Code / Antigravity 的结束信号
+
+结论：**三个入口都真的会发 `closed`，缺的不是代码，是"这些终端有没有装上报端"**。
+
+| 入口 | 实测（沙箱，仓库里的文件） | 结果 |
+|---|---|---|
+| `reporters/claude-hook.js` | `SessionStart` → `SessionEnd` | 快照 `closed / session_end`（`claude-hook`） |
+| 本机装的 `~/.claude/hooks/terminal-pet-hook.js` | `SessionStart` / `Stop` / `SessionEnd` | `idle` / `idle` / **`closed`**（`claude-ipc`），走的是安装目录里的 `pet-ipc.js` |
+| `reporters/antigravity-hook.js` | `terminationReason` / `fullyIdle` | `closed / termination_reason` 与 `idle / fully_idle` |
+| `pet-statusline.exe` | `agent_state` = `terminated` / `closed` / `finished` | **`idle / agent_state`** |
+
+最后一行不是缺陷，是**设计**：statusline 是"每刷新一次喂一个电平"的接口，没有边沿，
+`closed|terminated|finished|complete|done|idle` 都映射成 `idle`（`internal/reporter/statusline.go`
+的注释与 `reporters/antigravity-statusline.js` 都写明了，`StatuslineStatus` 的测试也钉着）。
+所以 Antigravity 的会话会不会"关掉之后还留着"，取决于它有没有 hook 在发 `terminationReason`；
+本机的 `~/.gemini/config/plugins/antigravity-windows-notifier` 只配了
+`BeforeAgent` / `AfterAgent` / `BeforeTool(ask_user)` / `Notification`，**没有**终止事件，
+而 `~/.gemini/antigravity-cli/settings.json` 的 `statusLine` 用的是 `pet-statusline.exe`。
+也就是说：本机的 Antigravity 只有一个"电平"上报端，回合结束后会停在 `idle`，不会有 `closed`。
+这不是这一轮要改的东西（改它等于替宿主发明一个它没发的信号），但**下一个报"agy 关掉之后还留着"的人
+应该先看这一行**：判据是 `--json` 里那条会话的 `pid`（statusline 用的是稳定哈希，不是真 pid，
+所以 `trustedProcessID` 不认它——靠的是 `DefaultOrphanAfter` 45 分钟与窗口标题）。
+
+### 53.6 门禁与影响面
 
 - 只动上报端与文档：`node --check reporters/opencode.js`、`node --test
   reporters/opencode-events.test.mjs` **10/10**、`node --check` 本机 wrapper、Go 全套未受影响
   （`go test ./...` 仍 334 个）。**没有重发版本**：浮窗二进制与插件包一个字节没变，
-  `pet-v1.0.8` / `dsh-plugin-v1.2.17` 仍是当前版本。
-- 仓库侧新增的只有注释（`reporters/opencode.js` 里"为什么不抄那两个优化"），因此
+  `pet-v1.0.8` / `dsh-plugin-v1.2.17` 仍是当前版本。CI run `43643276551` success。
+- 仓库侧新增的只有注释（`reporters/opencode.js` 里"为什么不抄那三个优化"），因此
   `vendor/manifest.json` 的源码摘要不受影响（它只哈希 `cmd/` 与 `internal/`，不进 `reporters/`）。
 
-### 53.6 下一轮（从 §52.5 顺延）
+### 53.7 下一轮（从 §52.5 顺延）
 
-2. **Claude Code / Antigravity 的"结束"信号**：`reporters/claude-hook.js` 的 `SessionEnd` 与
-   `reporters/antigravity-hook.js` 的 `closed` 两条路径（判据：`--json` 里那个会话的 pid 是否已死、
-   快照是否还在）。
+1. ~~上报端来源~~ → 已完成（§53）。
+2. ~~Claude Code / Antigravity 的结束信号~~ → 查清（§53.5）：三个入口都会发 `closed`；
+   Antigravity 的 statusline 是电平接口，本机只装了它，所以没有 `closed`。
+   **如果之后要动它**，方向是让 Antigravity 也装 hook（`terminationReason`），不是改 statusline 的映射。
 3. **设置窗口另外两个候选**（`WM_TIMER` stall / DPI 重排）：有复现再动代码。
 4. **面板与 `--json` 的去重规则**：不要为了"统一"改掉。
 
