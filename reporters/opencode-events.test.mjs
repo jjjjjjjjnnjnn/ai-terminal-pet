@@ -20,7 +20,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { eventData, mapEvent, plugin, sessionIdOf } from './opencode.js'
+import { archivedAt, eventData, mapEvent, plugin, sessionIdOf } from './opencode.js'
 
 // Events OpenCode 2.2.7 emits that say nothing about a session's state, or that
 // describe the TUI rather than the agent. None of them may ever produce a
@@ -121,6 +121,38 @@ test('a session id is a conversation, never an event id', () => {
   }
   assert.equal(sessionIdOf({}), '')
   assert.equal(sessionIdOf({ sessionID: '   ' }), '')
+})
+
+test('archiving ends a conversation, and unarchiving puts it back', () => {
+  // The ghost rows: OpenCode archives a conversation instead of deleting it,
+  // emits no `session.deleted`, and `opencode serve` outlives the archive.
+  // These two names are declared by the host next to `session.deleted`.
+  const archived = mapEvent('session.archived', { sessionID: 'ses_1' })
+  assert.equal(archived.state, 'closed')
+  assert.equal(archived.reason, 'session_archived')
+  // Not an ask, not a completion: a closed row must never be mistaken for
+  // either one that wants an answer or one that finished.
+  assert.doesNotMatch(archived.reason, /question|plan|permission|done|finish/)
+
+  const unarchived = mapEvent('session.unarchived', { sessionID: 'ses_1' })
+  assert.equal(unarchived.state, 'idle', 'unarchive is the user asking for the row back')
+  assert.equal(unarchived.reason, 'session_unarchived')
+  assert.doesNotMatch(unarchived.reason, /question|plan|permission/)
+
+  // A host that only sends the envelope still resolves the conversation.
+  assert.equal(
+    sessionIdOf(eventData({ type: 'session.archived', data: { sessionID: 'ses_2' } })),
+    'ses_2'
+  )
+})
+
+test('a session the host says is archived is never adopted as live', () => {
+  // archive time is a millisecond timestamp; anything else is "not archived".
+  assert.equal(archivedAt(1762164000000), true)
+  assert.equal(archivedAt(0), false)
+  assert.equal(archivedAt(null), false)
+  assert.equal(archivedAt(undefined), false)
+  assert.equal(archivedAt('2026-11-14T18:00:00Z'), false)
 })
 
 test('the payload is read from data, and from properties as a fallback', () => {

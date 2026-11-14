@@ -9,15 +9,15 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-13，浮窗 1.0.7 / 插件 1.2.14 已发布） |
+| 维度 | 数值（2026-11-14，浮窗 1.0.8 / 插件 1.2.17 已发布） |
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.7`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.16` |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,554,240 B**（4.34 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 版本 | `1.0.8`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.17` |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,555,264 B**（4.35 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
-| 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,916,288 B** = 11.36 MiB |
-| 代码量 | Go 非测试源码 **47 文件 / 16,882 行**、测试 **52 文件 / 8,982 行**（**329** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
+| 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,917,312 B** = 11.37 MiB |
+| 代码量 | Go 非测试源码 **50 文件 / 17,068 行**、测试 **53 文件 / 9,087 行**（**334** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
@@ -25,14 +25,14 @@
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
 | 管道 | `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>`（按用户隔离，跨语言 golden 测试锁定） |
 | 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
-| 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；扫描 5 s / 存活探测 10 s |
+| 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟（**可见的设置窗口算"仍在使用"**，见 `internal/ui/lifetime.go`）；扫描 5 s / 存活探测 10 s |
 | 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run`（开机自启）· `approvals\`（auto-approve 握手） |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--doctor/--version/--help` |
-| 单测 | **329 个 `func Test`**（ui 138 / app 38 / platform 28 / store 27 / reporter 23 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 8 / pipeserver 7 / i18n 3） |
+| 单测 | **334 个 `func Test`**（ui 143 / app 38 / platform 28 / store 27 / reporter 23 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 8 / pipeserver 7 / i18n 3） |
 | 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tools/check_versions.mjs` 与它的规则测试 / `tests/fresh-machine.mjs --no-overlay`（162 项）/ `python tools/check_docs_links.py` / `scripts/package.ps1` 打 zip 并上传 artifact |
 | 自检 | `ai-terminal-pet --doctor` **10 项**（environment / install files / version / runtime / config / pipe / instance / node / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1 |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.16**，18 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.16`，资产字节与 sha256 见 CHANGELOG 的 `[1.2.16]` 一节，npm 包与 Release 资产**解包后逐文件相同**（npm 会重打包，`.tgz` 字节本就不同）；`engines.dsh >=0.2.0-0 <0.3.0-0` 是在真实 0.2.0-rc.1 与 0.2.2-rc.3 宿主上装过并 `--dump-config` 验过的 |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.17**，19 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.17`，资产字节与 sha256 见 CHANGELOG 的 `[1.0.8]` 一节，npm 包与 Release 资产**解包后逐文件相同**（npm 会重打包，`.tgz` 字节本就不同）；`engines.dsh >=0.2.0-0 <0.3.0-0` 是在真实 0.2.0-rc.1 与 0.2.2-rc.3 宿主上装过并 `--dump-config` 验过的 |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
 
@@ -535,10 +535,11 @@ IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法
 3. AV 排除目录（需管理员，用户决策）——docs/archive/BASELINE-20260924.md §13 已记录这是唯一能真正压到亚秒的手段。
 4. 已落地：`--reset`/`--toggle` 等控制路径不再走 `app.Run()`，避免控制命令意外拉起常驻实例。
 
-### L2 — 二进制体积（4.17 MiB → 目标 <2.5 MiB）
-**现状**：主程序 **4,371,968 B**（4.17 MiB）、状态行 shim **3,664,896 B**、原生 hook **3,697,152 B**，
-三者合计 **11,734,016 B** = 11.19 MiB。共享内核 `internal/reporter` 让 shim 比共享前（3,643,392 B）
+### L2 — 二进制体积（4.35 MiB → 目标 <2.5 MiB）
+**现状**：主程序 **4,555,264 B**（4.35 MiB）、状态行 shim **3,664,896 B**、原生 hook **3,697,152 B**，
+三者合计 **11,917,312 B** = 11.37 MiB。共享内核 `internal/reporter` 让 shim 比共享前（3,643,392 B）
 长了 **21,504 B**，hook 也因此不再各写一份脱敏/投递逻辑——用 21 KB 换掉一份会漂移的重复实现。
+1.0.8 又在主程序上加了 **1,024 B**（`internal/ui/lifetime.go` 与两个诊断构建文件）。
 本版新增 `--doctor` 让主程序比 v0.9.0 的 4,178,432 B 增加了 **193,536 B**（约 +189 KiB，+4.6%），
 其中 `internal/app/doctor_windows.go` 占 22,932 字节源码——这是「可自查」换来的体积。
 **做法**：`-ldflags "-s -w"` 已用。**`-buildvcs=false` 已实测并入**：同样的 -s -w，
@@ -764,7 +765,7 @@ I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三�
 **β 已交付**（浮窗 1.0.0 / 插件 1.2.6，`pet-v1.0.0` 与 `dsh-plugin-v1.2.6` 双 Release，npm `latest` = 1.2.6），
 所以那条「正式发声排在 β 之后」的约束**已经满足**：现在可以发声，而且四个数字终于一致。
 **2026-11-12 又交付了 F9**（浮窗 1.0.1 / 插件 1.2.7），见下方 F9 小节。
-宣传素材里的每一个数字都必须是当场跑出来的（201 个 `func Test` / 162 项新机检查 / 4.17 MiB），
+宣传素材里的每一个数字都必须是当场跑出来的（**334** 个 `func Test` / 162 项新机检查 / **4.35** MiB），
 **不要写「全量安全扫描」**：`govulncheck` 与 `gosec` 从 2026-11-12 起已跑（见 §6），但 `go test -race`
 仍缺 gcc/cgo，所以「静态扫描 + 依赖漏洞扫描通过」可以说，「安全审计通过」不能说。
 

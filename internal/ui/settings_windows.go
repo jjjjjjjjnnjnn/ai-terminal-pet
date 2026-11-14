@@ -1483,9 +1483,21 @@ func (a *App) openSettings() {
 	if handle == 0 {
 		return
 	}
+	// Opening it is a fresh claim on the process lifetime: an overlay that had
+	// already spent most of its idle grace must not quit ten seconds into
+	// someone configuring it. See timerIdle.
+	a.lastAvailable = time.Now()
+	traceSettings("opened")
 	a.settingsFocus = 0
 	a.settingsFocusVisible = false
-	a.paintSettings()
+	// A layered window whose surface never got painted is created, shown and
+	// completely transparent - which reads exactly like "it opened and vanished".
+	// The release build has nothing to say about that; the petdebug build records
+	// it beside the exit reasons, because a log that ends at "opened" with no
+	// exit and no paint error is itself the answer.
+	if err := a.paintSettings(); err != nil {
+		traceSettings("paint-failed")
+	}
 	win.ShowWindow(win.HWND(handle), win.SW_SHOW)
 	win.SetForegroundWindow(win.HWND(handle))
 }
@@ -1548,6 +1560,12 @@ func (a *App) hideSettings() {
 	if handle == 0 {
 		return
 	}
+	// Hiding hands the lifetime question back to the store, and restarts the
+	// grace: without it, a session-less overlay that was kept alive by an open
+	// settings window would destroy itself on the very next timer tick after
+	// the user closed it.
+	a.lastAvailable = time.Now()
+	traceSettings("hidden")
 	a.settingsDrag = settingsNone
 	a.settingsPress = settingsNone
 	a.settingsHover = settingsNone

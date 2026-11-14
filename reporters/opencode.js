@@ -102,6 +102,21 @@ const EVENT_STATE = new Map(Object.entries({
   // --- lifecycle --------------------------------------------------------
   "session.created": ["idle", "session_created"],
   "session.deleted": ["closed", "session_deleted"],
+
+  // Archiving is not deleting. OpenCode's own store keeps `time_archived`
+  // beside `time_deleted`, and archiving a conversation only fills that
+  // column: no `session.deleted` is emitted, so without these two entries an
+  // archived row stayed on the panel for as long as its host process lived -
+  // and `opencode serve` can live for days. That was the ghost row users
+  // reported ("closed things still show").
+  //
+  // Both names are declared by the host itself (2.3.0's event schema, listed
+  // next to `session.deleted`) and each carries the conversation's `sessionID`.
+  // Unarchiving puts the row back on purpose: it is the same conversation and
+  // the user asked for it, so it is idle and silent rather than left to
+  // reappear on some later event that may never come.
+  "session.archived": ["closed", "session_archived"],
+  "session.unarchived": ["idle", "session_unarchived"],
 }))
 
 // eventData reads one event's payload.
@@ -134,6 +149,15 @@ function sessionIdOf(data) {
     return id
   }
   return ""
+}
+
+// archivedAt reports whether a session's `time` block says it is archived.
+//
+// OpenCode stores `time_archived` as a millisecond timestamp and leaves it
+// absent (or null) for a live conversation. Only a positive number counts: a
+// zero would be an epoch, and a string is not the documented shape.
+function archivedAt(value) {
+  return typeof value === "number" && value > 0
 }
 
 // modelName renders Model.Ref ({ providerID, id }) as "provider/model".
@@ -287,6 +311,19 @@ function createTracker(context) {
       try {
         const info = await client.get({ sessionID: meta.sessionId })
         if (!info || typeof info !== "object") return
+        // A conversation the host says is archived must not be adopted at all.
+        // The archive event is delivered once, and only to a plugin instance
+        // that was loaded when it fired; a plugin that reloads afterwards would
+        // otherwise treat the next event from that conversation as a fresh one
+        // and put the row back. The host's own session record is the
+        // authority here, which is why this is not gated on the state we
+        // happened to have reported: an archived conversation emits no state
+        // events, so any state we did report is older than the archive.
+        if (archivedAt(info.time?.archived)) {
+          report(meta, "closed", "session_archived", null, true)
+          sessions.delete(meta.sessionId)
+          return
+        }
         const changed = applyMetadata(meta, {
           title: info.title,
           parentID: info.parentID,
@@ -410,4 +447,4 @@ export default plugin
 
 // The mapping helpers are exported so reporters/opencode-events.test.mjs can pin
 // the event catalog without a pipe, a window or an OpenCode process.
-export { eventData, mapEvent, sessionIdOf }
+export { archivedAt, eventData, mapEvent, sessionIdOf }

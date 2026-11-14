@@ -6,10 +6,11 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-14 晚；浮窗 **1.0.7**、插件包 **1.2.16** 已发版；**两个现场缺陷待修，见 §51**）
+## 1. 当前状态（2026-11-14 晚；浮窗 **1.0.8**、插件包 **1.2.17** 已发版；§51 的两个现场缺陷已修复，见 §52）
 
-> 接手请先读本节与文末 **§51「交接：两个现场缺陷 —— 幽灵会话与设置窗口闪退」**（最新一轮；
-> 只取证未改代码，下一轮从这里开工），再读 **§50「中文 README 与市场文案」**、
+> 接手请先读本节、**§52「交接：两个现场缺陷已修 —— 归档即结束、设置窗口不再跟着自毁」**（最新一轮；
+> 修复与验收都在这一节），再读 **§51「交接：两个现场缺陷」**（上一轮，只取证）、
+> **§50「中文 README 与市场文案」**、
 > **§49「上架巡检：十家目录现在各指哪里」**、
 > **§48「交接：适配 DSH 0.2.x」**（1.2.15 的兼容声明）、
 > **§47「维护：工作区整理」**（只删可再生产物）、
@@ -25,50 +26,51 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
-- **待修（详见 §51）**：① **已归档/已关闭的会话仍显示**——存在性按**进程**判定，`session.deleted`
-  是唯一的结束信号，而 opencode 归档会话不删除、也不发这个事件（`opencode serve` 可活几天）；
-  ② **设置窗口"闪退"**——无 WER、无 `error.log`、无应用日志条目，所以不是崩溃；三个候选各有判据：
-  空闲自毁退出进程、消息泵卡死（`hang.log` 记了 6 次 `WM_TIMER` stall）、DPI 重排到工作区外。
-- **版本**：浮窗 **`1.0.7`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.16`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`。
+- **已修复（详见 §52）**：① **归档的会话仍占一行**——结束信号原来只有 `session.deleted`，
+  而 OpenCode 归档只填 `time_archived`、不发那条事件（`opencode serve` 可活几天）。现在
+  `session.archived → closed`、`session.unarchived → idle`，并在 hydrate 时用宿主自己的会话记录再挡一次。
+  ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
+  现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
+  关闭设置后重新计 10 分钟。
+- **版本**：浮窗 **`1.0.8`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.17`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7`/`v1.0.8` 与
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`/`v1.2.17`。
   **`pet-v1.0.7` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）；**`dsh-plugin-v1.2.15` 是第 48 轮打的**
   （只改兼容声明），**`dsh-plugin-v1.2.16` 是第 50 轮打的**（中文 README + 市场文案，同样没动代码，
-  见 §50）。
+  见 §50），**`pet-v1.0.8` 与 `dsh-plugin-v1.2.17` 是第 52 轮打的**（§52 的两个现场缺陷修复）。
   **工作区与 tag 已经同步**：`bin/`、`packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的
-  `AI-Terminal-Pet.exe` 三份逐字节相同（**4,554,240 B**，sha256 `01B42DC2…`）。
+  `AI-Terminal-Pet.exe` 三份逐字节相同（**4,555,264 B**，sha256 `CB881ACE…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**329 个** `func Test`，
-  12 个包）；上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **8/8**；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**334 个** `func Test`，
+  12 个包）；上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **10/10**；
   三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tools/check_versions.mjs` **18 个版本形状全一致**（`node --test tools/check_versions.test.mjs` 24/24）；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
   `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
   `--doctor` **10 项**（本机 10 ok / 0 warn / 0 fail）。
-- **规模**：Go 非测试源码 **47 文件 / 16,882 行**、测试 **52 文件 / 8,982 行**（329 个 `func Test`，
+- **规模**：Go 非测试源码 **50 文件 / 17,068 行**、测试 **53 文件 / 9,087 行**（334 个 `func Test`，
   外加 `cmd/pet-setup` 的 11 个）；
-  `bin/AI-Terminal-Pet.exe` **4,554,240 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
+  `bin/AI-Terminal-Pet.exe` **4,555,264 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**；
-  `dist/` 里是 1.0.7 的产物（`ai-terminal-pet-1.0.7-win-x64.zip` 5,053,946 B、
-  `pet-setup.exe` 14,307,840 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
+  `dist/` 里是 1.0.8 的产物（`ai-terminal-pet-1.0.8-win-x64.zip` 5,054,322 B、
+  `pet-setup.exe` 14,308,864 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
   均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.16**（`npm view` 核对）；`dsh-plugin-v1.2.16` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.16.tgz` **2,005,718 B / sha256 `9CAEE39D…` / shasum `98e7bc0a…`**（19 个文件，
-    含中英两份 README），包内 README 的安装命令是 1.2.16；
-    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §48，`icon` 同一 sha；
+  - 插件线：npm `latest` = **1.2.17**（发版后 `npm view` 核对）；`dsh-plugin-v1.2.17` 的 Release 资产
+    `dsh-ai-terminal-pet-1.2.17.tgz` **2,006,574 B / sha256 `5D4B2AA8…` / shasum `a7c660a3…`**（19 个文件，
+    含中英两份 README），包内 README 的安装命令是 1.2.17；
+    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §52，`icon` 同一 sha；
     索引里的 `engines.dsh` 与包内声明一致，`verify.mjs` 断言这一点）。
-  - 浮窗线：`pet-v1.0.7` 的 Release 带两个资产——`ai-terminal-pet-1.0.7-win-x64.zip`
-    **5,053,946 B / sha256 `F3D04961…`**（17 个文件）与 `pet-setup.exe` **14,307,840 B / sha256 `AE3E2DE7…`**；
-    `pet-v1.0.6` 及更早的每一个 tag 仍在（不可变，已被取代）。
-  - **上游条目**：`main` 的 `tarball` 现在是 **1.2.15**（#15067 已被合并，2026-11-13 深夜复读）；
-    1.2.16 的跟进是
-    [#15075](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15075)（分支
-    `bump-tarball-1.2.16`，单文件 `+3 −3`：`tarball` 加中英两段 `description`）已开、`MERGEABLE`，
-    `tools/upstream-entry.mjs --check` = `OK（in flight）`。#14990（1.2.13）、#14945（1.2.11）、
-    #14899（1.2.10）均已关并留说明。合并仍要人工，**合并 ≠ 可见**：判断可见性读对方站点索引文件（见 §50.5）。
+  - 浮窗线：`pet-v1.0.8` 的 Release 带两个资产——`ai-terminal-pet-1.0.8-win-x64.zip`
+    **5,054,322 B / sha256 `C8FE834A…`**（17 个文件）与 `pet-setup.exe` **14,308,864 B / sha256 `2EBF0E7E…`**；
+    `pet-v1.0.7` 及更早的每一个 tag 仍在（不可变，已被取代）。
+  - **上游条目**：`main` 的 `tarball` 现在是 **1.2.16**（#15075 已被合并，2026-11-14 复读）；
+    1.2.17 的跟进 PR 在这一轮发版后开（分支 `bump-tarball-1.2.17`，单文件 `+3 −3`：`tarball` 与
+    `icon`/description 行），开之前 `tools/upstream-entry.mjs --check` 是 **SKIP**（资产 404 是预期）。
+    #14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）均已关并留说明。合并仍要人工，
+    **合并 ≠ 可见**：判断可见性读对方站点索引文件（见 §50.5）。
   - **其余九家目录的当前状态见 §49**（哪些已最新、哪些等对方扫描、哪些在等人工复核）。
   1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
   开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
@@ -3372,6 +3374,132 @@ python tools/check_docs_links.py            # 11 份文档全解
   查 `session_v2` 的 `time_archived` / `time_suspended` / `time_idle`（`mode=ro` + `query_only`，不写一行）。
 - 一条命令看会话视图：`& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json --pretty`
   （它只读快照，永远不会阻塞 GUI）。
+
+## 52. 交接：两个现场缺陷已修 —— 归档即结束、设置窗口不再跟着自毁（2026-11-14 晚，第 52 轮）
+
+§51 只取证、没改代码。这一轮两条都先**复现**、再改，而且改的每一处都有能让它重新变红的测试。
+发版：**浮窗 1.0.8（`pet-v1.0.8`）/ 插件包 1.2.17（`dsh-plugin-v1.2.17`）**。
+
+### 52.1 缺陷一：归档的会话在面板上留一行（已修）
+
+**复现（确定性，2 分钟）**：不需要界面，宿主自己的接口就能归档——
+
+```powershell
+opencode api PATCH "/api/session/<ses_id>" --data '{\"archived\":true}'
+```
+
+归档之后 `GET /api/session?archived=true` 能列出它，`time.archived` 变成毫秒时间戳，
+而 `session.deleted` **不会**发。这就是 §51 推出来的机制，本轮实测确认了。
+
+**改动**（`reporters/opencode.js`，并同步到本机真正加载的那份插件）：
+
+- 事件表补两条：`session.archived → closed / session_archived`、`session.unarchived → idle / session_unarchived`。
+  两条名字都在宿主的 OpenAPI 里声明（`Session.Event.Durable` 的 union 里就有），`data.sessionID` 也都在。
+- `hydrate()` 补一道**收养守卫**：宿主自己的会话记录里 `time.archived` 非空时，不再把它当活会话收养，
+  直接写一条 `closed`。归档事件只投给当时在场的那份插件，重载之后光靠事件补不回来——这一步是给那种情况兜底。
+  守卫不看"我们之前报过什么状态"：归档的会话不发状态事件，所以我们报过的任何状态都比归档时间旧。
+- **不改 Go**：`closed` 快照本来就会被 `SnapshotScanner` 消费、由 `internal/store` 入墓碑，`List()` 两头都不显示。
+  §43 的"消失 ≠ 完成"规则因此原样保留——归档走的是 `closed`，不是"空闲超时删除"。
+
+**真机验收**（隔离沙箱，`--json` 与 `runtime/` 两条视图都看）：
+
+| 动作 | 修前 | 修后 |
+|---|---|---|
+| 归档一个会话 | 快照仍 `idle`，行还在 | 3 秒内 `closed / session_archived`，`--json` `count` 7 → 6 |
+| 取消归档 | 无变化 | 快照 `idle`，行回到面板，不响铃 |
+| 跨插件重载 | 会被当新会话收养 | hydrate 读到 `time.archived` 直接判死 |
+
+### 52.2 缺陷二：设置窗口跟着进程一起消失（已修）
+
+**为什么不是崩溃**：§51 已经查过 WER / CrashDumps / `error.log` / 应用日志，全空。这一轮加了一个
+**只存在于诊断构建**的退出日志（`-tags petdebug`，写 `exit.log`），于是"哪条退出路径"变成一行字。
+
+**诊断构建与它的两条开关**：
+
+```powershell
+go build -tags petdebug -o .\bin\petdebug.exe .\cmd\ai-terminal-pet
+$env:PET_IDLE_GRACE_SEC = "15"    # 只在 petdebug 构建里被读取
+```
+
+发布构建里 `traceExit` / `traceSettings` 是**空函数**——"不出网、非必要不落盘"是产品承诺，
+所以这份日志不能进用户安装的包里。`lifetime_test.go` 有一条测试钉住发布构建的 10 分钟默认值。
+
+**复现（修前构建，同一台机器）**：无会话 + `--settings` + 宽限 15 秒 → **~30 秒时进程退出**，
+设置窗口一起消失；`exit.log` 里是 `exit idle` → `exit destroyed`。这就是"打开以后闪退"。
+
+**根因**：`timerIdle` 每 30 秒问一次"会话表空了吗"，空过 10 分钟就 `DestroyWindow` 浮窗 →
+`wmDestroy` → `PostQuitMessage` → 进程退出。设置在**同一个 UI 线程**上的第二个顶层窗口，跟着走。
+
+**改动**：这条规则抽进 `internal/ui/lifetime.go` 的 `idleDecision(now, anchor, hasSessions,
+settingsVisible, grace) (quit, nextAnchor)`：
+
+- **可见的设置窗口也算"仍在使用"**（`IsWindowVisible`，创建但隐藏的不算——用户点了 × 就是不用了）；
+- 打开设置时重置宽限锚点，隐藏时**重新计 10 分钟**（否则一个靠设置窗口续命的进程会在关掉它的下一个 tick 上自杀）。
+
+**真机验收（修前 / 修后同场景对照）**：
+
+| 场景 | 1.0.7 | 1.0.8 |
+|---|---|---|
+| 设置打开、零会话、宽限 15 秒 | ~30 秒进程退出 | 80 秒后仍在运行 |
+| 之后关掉设置（不发 `--quit`） | — | 12 秒宽限后 `exit idle` → `exit destroyed` |
+| 有会话时 | 不受影响 | 不受影响（`HasAvailable()` 仍优先） |
+
+### 52.3 本轮还发现一件事：本机加载的插件不在仓库里
+
+`~/.config/opencode/opencode.json` 的 `plugins` 指向 `plugins/terminal-pet`（一个**目录**），
+OpenCode 解析到的是 `~/.config/opencode/plugins/terminal-pet/index.ts`——一份 **20,515 B 的 TS 分支**，
+仓库里的 `reporters/opencode.js` 是 **17,332 B 的 JS**，两者不是同一个实现（本地版有 stale-snapshot
+sweep 与写盘节流，仓库版有 `MAX_TRACKED`、hydrate 与 `sendStatus` 的 5 秒重试+拉起）。
+所以 §51 那句"在 `reporters/opencode.js` 的 handler 里打印 event.type"在本机**不会生效**。
+
+本轮的处理是**两份同步**（两边的映射与收养守卫现在一致），"统一成单一来源"（把本地插件改成
+re-export 仓库文件，并把本地独有的两个优化移植回去）留作下一轮的第一件事。**不要把那份 TS 删掉**：
+它是用户环境里在跑的代码。
+
+### 52.4 发版清单（按 docs/UPSTREAM.md §2，逐条落地）
+
+1. `Version` → **1.0.8**；三个二进制按 `-trimpath -buildvcs=false -ldflags "-s -w"` 重编；
+   `npm run vendor` 重算 `vendor/manifest.json`（源码摘要 `6c41ef6a…`，39 个文件；overlay
+   4,555,264 B / `cb881ace…`）。
+2. A 提交：版本 + 两份清单 + `docs/market-index.json` 的 `versions[0].version` 与 `publishTimestamp`
+   + CHANGELOG + README / ROADMAP / HANDOVER。`verify.mjs` 全 PASS。
+3. 双 tag：`pet-v1.0.8` / `dsh-plugin-v1.2.17`。
+4. 双 Release：浮窗 `ai-terminal-pet-1.0.8-win-x64.zip`（**5,054,322 B / `C8FE834A…`**，17 文件）
+   与 `pet-setup.exe`（**14,308,864 B / `2EBF0E7E…`**）；插件 `dsh-ai-terminal-pet-1.2.17.tgz`
+   （**2,006,574 B / `5D4B2AA8…` / shasum `a7c660a3…`**，19 文件）。
+5. `npm publish`，等 2–4 分钟核对 `dist-tags.latest` = 1.2.17。
+6. B 提交：`source.commit` 与 `icon` 钉到 A 的 sha。
+7. 上游条目：`node tools/upstream-entry.mjs --version 1.2.17 --write --branch bump-tarball-1.2.17`。
+
+**发布资产不可变**，所以以后哪怕只改一句措辞也要新版本号；`pet-v1.0.7` 与 `dsh-plugin-v1.2.16`
+及更早的每一个 tag 都仍然有效、不要重传。
+
+### 52.5 下一轮从这里开始（按顺序）
+
+1. **统一上报端来源**（§52.3）：把本地 `index.ts` 改成 re-export 仓库 `reporters/opencode.js`，
+   先把本地独有的两个优化（stale-snapshot sweep、写盘节流）移植进仓库版并各配一条测试，
+   再删本地实现。这一步不该再耗一个版本号（只动上报端不打包），但要重跑
+   `node --test reporters/opencode-events.test.mjs` 与 `tests/fresh-machine.mjs --no-overlay`。
+2. **Claude Code / Antigravity 的"结束"信号**：这一轮只修了 OpenCode 的归档。那两个终端的
+   会话结束靠 hook 的 `SessionEnd` / 进程退出；如果用户报的是"关掉 Claude Code 之后还留着",
+   从 `reporters/claude-hook.js` 的 `SessionEnd` 与 `pet-statusline` 的 `closed` 两条路径查起
+   （判据：`--json` 里那个会话的 `pid` 是否已死、快照是否还在）。
+3. **设置窗口的另外两个候选**（§51.3 的 2 与 3）：这一轮把候选 1 证成了，但 `hang.log` 的
+   `WM_TIMER` stall 与 DPI 重排没有复现过。若用户再报"未响应"，先用
+   `PET_PREVIEW_DIR` 渲染 large+contrast 量设置窗口的绘制耗时，再动代码。
+4. **面板与 `--json` 的去重规则**（§51.4 的提醒）：面板按 `session.Identity` 合并、
+   `--json` 保留 per-process 行。这一轮没动它们，但归档修复让两条视图第一次在"会话结束"上完全一致
+   ——`internal/ui/dedupe_windows_test.go` 与 `internal/store` 的 closed 路径都有测试，别为了"统一"改掉。
+
+### 52.6 守则（与前几轮一致，别绕）
+
+- `reporters/*.js` 永远 fail-fast 且静默：不能让宿主 CLI 因上报端卡住或崩。
+- 验证写盘类行为必须**让进程正常退出**（AGENTS 第 9 条）：kill 掉再读文件说明不了任何事。
+- **诊断构建可以写日志，发布构建不行**：`-tags petdebug` 是唯一的入口；不要把 `exit.log`
+  写进默认构建，也不要在发布构建里读 `PET_IDLE_GRACE_SEC`（`lifetime_test.go` 会红）。
+- 改包内任何文件都要 `go build` → `vendor.mjs` → `vendor.mjs --check`；改 `engines`/清单要同步三处
+  （包、根 shim、索引），且**发版提交必须同时前移索引**（AGENTS 第 6 条）。
+- 全门禁按 AGENTS「标准验证命令」；本机 `--doctor` 应 10 项 0 fail。
 
 ### 51.7 上一轮的收尾（顺手核对，供对照）
 

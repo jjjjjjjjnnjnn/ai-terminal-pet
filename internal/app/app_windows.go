@@ -28,7 +28,13 @@ import (
 // hints wrap to two lines instead of losing text to an ellipsis, the window
 // reads its own DPI and follows WM_DPICHANGED, and the Look tab - which was
 // drawn, hovered and highlighted but wired to nothing - finally switches.
-const Version = "1.0.7"
+//
+// 1.0.8 fixes the two defects that report described as "closed things still
+// show" and "the settings window flashes and goes away". An archived
+// OpenCode conversation now ends its row (the host emits `session.archived`,
+// not `session.deleted`), and a visible settings window keeps the process
+// alive instead of letting the session-less idle timer quit underneath it.
+const Version = "1.0.8"
 
 func Run() error {
 	return RunWith(false)

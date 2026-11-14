@@ -30,15 +30,93 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.7**（tag `pet-v1.0.7`）/ **1.2.14**（tag `dsh-plugin-v1.2.14`）：这一批是设置窗口的
-可读性、可用性，以及那个点不进去的外观页签（见下面的 `[1.0.7]` 一节）。此前浮窗本体 **1.0.6**
-（tag `pet-v1.0.6`）、插件包 **1.2.13**（tag `dsh-plugin-v1.2.13`）都已发布且不可变；下面几段原本标着 `[Unreleased]`/批次标题的段落记录的是 1.0.2 之前的
+已发版到 **1.0.8**（tag `pet-v1.0.8`）/ **1.2.17**（tag `dsh-plugin-v1.2.17`）：这一批是第 51 轮记下的
+两个现场缺陷——归档的 OpenCode 会话仍占一行，以及设置窗口会跟着空闲自毁的进程一起消失
+（见下面的 `[1.0.8]` 一节）。此前浮窗本体 **1.0.7**（tag `pet-v1.0.7`）、插件包 **1.2.16**
+（tag `dsh-plugin-v1.2.16`）都已发布且不可变；下面几段原本标着 `[Unreleased]`/批次标题的段落记录的是 1.0.2 之前的
 三批工作，它们分别在 1.0.0 / 1.2.6 那次换版本号（`df4fcf6`）与 2026-11-12 的无版本号批次里交付
 （`[Unreleased]` 只能属于「还没发出去的东西」，留着它会和本段第一句直接矛盾）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 原先写在这一段的「浮窗停在 0.9.0、插件包 1.2.5」是当时的事实，现在是历史。
 两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
+
+## [1.0.8] — 2026-11-14（第 52 轮：归档的会话不再占一行，设置窗口不再被空闲自毁带走）
+
+第 51 轮只取证、没动代码，把用户的两句话变成了可证伪的机制：
+**"有些不存在的程序，已经关闭的程序还是会显示"** 与 **"设置打开以后界面经常闪退"**。
+这一轮两条都先复现、再改，改的每一处都有一个能让它重新变红的测试。
+
+### Fixed
+
+- **已归档的会话仍然占一行**。存在性按**进程**判定（`snapshotAwareAlive` 在快照仍在时直接返回
+  true，`DefaultAbsenceGrace` 只在宿主不可观测时才起作用），而结束信号当时只有
+  `reporters/opencode.js` 里的 `session.deleted` 一条。OpenCode 的库里 `time_archived` 与
+  `time_deleted` 是两列：归档一个会话只填前者，**不发** `session.deleted`，而 `opencode serve`
+  可以活几天——那几行就一直在面板上。修法不是"空闲就删"（§43 已经证明"消失"是有语义的），
+  而是把宿主本来就声明了的两条事件接上：`session.archived → closed`、`session.unarchived → idle`
+  （取消归档时那一行回来，且不响铃）。`hydrate()` 里再补一道：宿主自己的会话记录说
+  `time.archived` 非空时，插件**不再把它当活会话收养**——归档事件只投给当时在场的那份插件，
+  重载之后光靠事件补不回来。
+- **设置窗口被空闲自毁带走**。`timerIdle` 每 30 秒问一次"会话表空了吗"，空过 10 分钟就
+  `DestroyWindow` 浮窗 → `PostQuitMessage` → 进程退出。设置在同一个 UI 线程上的第二个顶层窗口，
+  于是跟着一起消失——这正是"打开以后闪退"（无 WER、无 `error.log`、无应用日志，因为进程是**正常退出**的）。
+  现在这条规则抽成 `internal/ui/lifetime.go` 的 `idleDecision` 纯函数：**可见的设置窗口也算"仍在使用"**，
+  打开时重置宽限锚点，隐藏时重新计 10 分钟（否则一个靠设置窗口续命的进程会在用户关掉它的下一个
+  计时器 tick 上自杀）。
+
+### Added
+
+- **诊断构建的退出原因日志**（`-tags petdebug`）。生产构建里 `traceExit` / `traceSettings` 是空函数，
+  一个字节都不写——"不出网、非必要不落盘"是产品的承诺。诊断构建把 `exit.log` 写在 `config.json`
+  旁边（`idle` / `close` / `destroyed`、`settings opened|hidden|paint-failed`），并认
+  `PET_IDLE_GRACE_SEC` 把 10 分钟缩到几秒。它是在 §51.3 那三个候选之间做决定的工具，不是产品功能：
+  `lifetime_test.go` 有一条测试钉住发布构建的 10 分钟默认值。
+- `reporters/opencode-events.test.mjs` 从 8 条加到 **10 条**：归档映射到 `closed` 且理由里不含
+  `question|plan|permission|done|finish`（不能被误当成"在等人"或"完成了"）、取消归档映射到 `idle`、
+  `archivedAt` 只认正数毫秒时间戳。
+- `internal/ui/lifetime_test.go`：8 种组合的 `idleDecision` 表（有会话 / 设置可见 / 刚好到宽限 /
+  超过宽限 / 零锚点 / 将来锚点 / 非正宽限）。
+
+### Changed
+
+- **`reporters/opencode.js` 与用户机器上真正加载的那份插件同批修改**。本机
+  `~/.config/opencode/plugins/terminal-pet/index.ts` 是一份不在仓库里的 TS 分支（20,515 B，仓库那份是
+  18 KB 级的 JS），`opencode.json` 指向它，所以只改仓库文件在本机不会生效。两份的事件表与收养规则
+  现在一致；"统一成单一来源"作为后续项，不在这一版里做。
+
+### Numbers
+
+`gofmt -l .` 无输出 / `go vet ./...` 0 / `go test -count=1 ./...` 12 包全过（**334** 个 `func Test`，
+其中 `cmd/pet-setup` 11 个）/ 上报端逐个 `node --check` 全过 / `node --test
+reporters/opencode-events.test.mjs` **10/10** / 三个 `verify.mjs` 全 PASS / `vendor.mjs --check`
+两个文件吻合（源码摘要 `6c41ef6a…`，39 个文件）/ `tools/check_versions.mjs` **18 个形状全一致** /
+`tests/fresh-machine.mjs --no-overlay` **162/162** / `tools/check_docs_links.py` 全解。
+
+规模：Go 非测试源码 **50 文件 / 17,068 行**、测试 **53 文件 / 9,087 行**；
+`bin/AI-Terminal-Pet.exe` **4,555,264 B**（+1,024 B，新增两个源文件与一张谓词表）、
+`bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**。
+
+真机验收（沙箱 + 隔离的 `LOCALAPPDATA`/`USERPROFILE`，两份构建对照）：
+
+| 场景 | 1.0.7 | 1.0.8 |
+|---|---|---|
+| 归档一个 OpenCode 会话（`PATCH /api/session/<id> {"archived":true}`） | 快照仍是 `idle`，行还在 | 3 秒内变 `closed/session_archived`，`--json` 的 `count` 从 7 降到 6 |
+| 取消归档 | 无变化 | 快照变 `idle`、行回到面板 |
+| `--settings` 打开、无任何会话、宽限 15 秒 | **~30 秒时进程退出**，设置窗口一起消失 | 80 秒后仍在运行 |
+| 关掉设置窗口（不发 `--quit`） | — | 12 秒宽限后 `exit idle` → `exit destroyed`，日志两条都在 |
+
+发布资产（本机 `scripts/package.ps1` 与 `npm pack` 实测）：
+
+| 资产 | 大小 | sha256 |
+|---|---|---|
+| `ai-terminal-pet-1.0.8-win-x64.zip`（17 文件） | **5,054,322 B** | `C8FE834A826D8C26CA6E1E70146621C07EE84CBF9BDC6B0583D2E7CB32D3EE34` |
+| `pet-setup.exe` | **14,308,864 B** | `2EBF0E7EA82068E13F8575B5D3064B9DDDFFC4EA7438CC518C318447C85DB051` |
+| `dsh-ai-terminal-pet-1.2.17.tgz`（19 文件） | **2,006,574 B** | `5D4B2AA8F6CA23E9723809E50660DAE9DEE249D026422CEEF57631C344CF4E56` |
+
+`npm pack` 之后把包里的 `README.md` 解出来核对过：两处安装命令都是 `dsh-plugin-v1.2.17`，
+`package.json` 与 `vendor/manifest.json` 的摘要也是本次构建的（`source.sha256`
+`6c41ef6aa0c386c7…`、`overlay.sha256` `cb881aceb3e646fb…`，4,555,264 B）。
 
 ## [1.2.16] — 2026-11-13 深夜（DSH 插件包：中文 README + 市场文案重写）
 
@@ -136,7 +214,7 @@ DSH 更新到 **0.2.2-rc.3**（本机桌面版是 `@deepseek-ai/dsh-desktop` 0.2
 shasum `27c20674268eb6f9ad3053d27dc1005f94a129de`。包内 README 的安装命令已是 1.2.15，
 `package.json` 的 `engines` 与 `vendor/manifest.json` 的摘要都是本次构建的。
 
-## [未发布] — 2026-11-13 晚（第 46、47 轮：门禁与工作区维护）
+## 门禁与工作区维护 — 2026-11-13 晚（第 46、47 轮；随 1.0.8 / 1.2.17 交付）
 
 第 45 轮发完版后留下的两句"下次注意"，这一轮把它们做成改不掉的东西；随后又做了一轮工作区整理。
 **用户可见行为没有变化**：浮窗仍是 1.0.7，插件包的可见行为在 1.2.15 里也没变。

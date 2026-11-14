@@ -950,6 +950,7 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		}
 		return 0
 	case wmClose:
+		traceExit("close")
 		a.persistPlacement()
 		// Tear the settings window down first: DestroyWindow on the overlay
 		// ends the message loop, and an orphaned settings window would then
@@ -958,6 +959,7 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		win.DestroyWindow(hwnd)
 		return 0
 	case wmDestroy:
+		traceExit("destroyed")
 		// The overlay also removes itself on idle, so this is the only
 		// chance to remember where the user left it.
 		a.persistPlacement()
@@ -977,9 +979,17 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 func (a *App) handleTimer(hwnd win.HWND, timer uintptr) uintptr {
 	switch timer {
 	case timerIdle:
-		if a.values.HasAvailable() {
-			a.lastAvailable = time.Now()
-		} else if time.Since(a.lastAvailable) >= 10*time.Minute {
+		// A visible settings window is the user still using this process: the
+		// idle self-destruct asks "may I stop?", and "the store is empty" is
+		// only half of that answer. See lifetime.go for the whole rule.
+		settingsVisible := false
+		if handle := a.settingsHandle.Load(); handle != 0 {
+			settingsVisible = win.IsWindowVisible(win.HWND(handle))
+		}
+		quit, anchor := idleDecision(time.Now(), a.lastAvailable, a.values.HasAvailable(), settingsVisible, idleGrace)
+		a.lastAvailable = anchor
+		if quit {
+			traceExit("idle")
 			win.DestroyWindow(hwnd)
 		}
 	case timerClock:
