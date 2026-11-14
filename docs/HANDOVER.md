@@ -8,8 +8,10 @@
 
 ## 1. 当前状态（2026-11-14 晚；浮窗 **1.0.8**、插件包 **1.2.17** 已发版；§51 的两个现场缺陷已修复，见 §52）
 
-> 接手请先读本节、**§52「交接：两个现场缺陷已修 —— 归档即结束、设置窗口不再跟着自毁」**（最新一轮；
-> 修复与验收都在这一节），再读 **§51「交接：两个现场缺陷」**（上一轮，只取证）、
+> 接手请先读本节、**§53「交接：上报端只剩一份实现」**（最新一轮；本机现在加载的是仓库里的
+> `reporters/opencode.js`，本地目录插件只是一次静态 re-export），再读
+> **§52「交接：两个现场缺陷已修 —— 归档即结束、设置窗口不再跟着自毁」**（1.0.8 / 1.2.17 的代码与验收）、
+> **§51「交接：两个现场缺陷」**（只取证的那一轮）、
 > **§50「中文 README 与市场文案」**、
 > **§49「上架巡检：十家目录现在各指哪里」**、
 > **§48「交接：适配 DSH 0.2.x」**（1.2.15 的兼容声明）、
@@ -136,7 +138,9 @@
    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
    版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
   细节与坑见 §27。
-- **接入**：OpenCode（`reporters/opencode.js` 插件）、Claude Code（`reporters/claude-hook.js` 7 事件）、
+- **接入**：OpenCode（`reporters/opencode.js` 插件；本机 `opencode.json` 指向
+  `~/.config/opencode/plugins/terminal-pet` 这个目录，里面的 `index.ts` 只做一次静态 re-export，
+  见 §53）、Claude Code（`reporters/claude-hook.js` 7 事件）、
   Antigravity（`bin/pet-statusline.exe` + `reporters/antigravity-hook.js`）、DeepSeek Harness
   （两种：老的 host-only bridge bundle `integrations/deepseek-harness/ai-terminal-pet-bridge`，
   与新的独立插件包 `packages/dsh-ai-terminal-pet`，见 §27）、任意 CLI（`reporters/generic.js`）。
@@ -3454,9 +3458,8 @@ OpenCode 解析到的是 `~/.config/opencode/plugins/terminal-pet/index.ts`—�
 sweep 与写盘节流，仓库版有 `MAX_TRACKED`、hydrate 与 `sendStatus` 的 5 秒重试+拉起）。
 所以 §51 那句"在 `reporters/opencode.js` 的 handler 里打印 event.type"在本机**不会生效**。
 
-本轮的处理是**两份同步**（两边的映射与收养守卫现在一致），"统一成单一来源"（把本地插件改成
-re-export 仓库文件，并把本地独有的两个优化移植回去）留作下一轮的第一件事。**不要把那份 TS 删掉**：
-它是用户环境里在跑的代码。
+本轮（第 52 轮）的处理是**两份同步**：两边的映射与收养守卫现在一致，所以发出去的 1.0.8 在本机
+真的生效了。**统一成单一来源**紧随其后完成，见 §53。
 
 ### 52.4 发版清单（按 docs/UPSTREAM.md §2，逐条落地）
 
@@ -3482,9 +3485,8 @@ re-export 仓库文件，并把本地独有的两个优化移植回去）留作�
 ### 52.5 下一轮从这里开始（按顺序）
 
 1. **统一上报端来源**（§52.3）：把本地 `index.ts` 改成 re-export 仓库 `reporters/opencode.js`，
-   先把本地独有的两个优化（stale-snapshot sweep、写盘节流）移植进仓库版并各配一条测试，
-   再删本地实现。这一步不该再耗一个版本号（只动上报端不打包），但要重跑
-   `node --test reporters/opencode-events.test.mjs` 与 `tests/fresh-machine.mjs --no-overlay`。
+   先把本地独有的两个优化（stale-snapshot sweep、写盘节流）逐个评估再决定是否移植。
+   → **已在第 53 轮完成，见 §53**。
 2. **Claude Code / Antigravity 的"结束"信号**：这一轮只修了 OpenCode 的归档。那两个终端的
    会话结束靠 hook 的 `SessionEnd` / 进程退出；如果用户报的是"关掉 Claude Code 之后还留着",
    从 `reporters/claude-hook.js` 的 `SessionEnd` 与 `pet-statusline` 的 `closed` 两条路径查起
@@ -3508,13 +3510,92 @@ re-export 仓库文件，并把本地独有的两个优化移植回去）留作�
 
 ### 51.7 上一轮的收尾（顺手核对，供对照；上游那一行的"现在"已过期，以 §52.4 为准）
 
-- 上游条目已指到 **1.2.16**（`tools/upstream-entry.mjs --check` = **OK**，不再是 in flight）；
-  站点 `plugins.json` 渲染的 `version` 也是 **1.2.16**，`install` 为 `dsh plugin --profile web add dsh-ai-terminal-pet`。
+- 上游条目当时指到 **1.2.16**（现在是 1.2.16 + 1.2.17 的 PR #15378 在飞）；
+  站点 `plugins.json` 渲染的 `version` 当时也是 **1.2.16**，`install` 为 `dsh plugin --profile web add dsh-ai-terminal-pet`。
 - **中文 README 已经生效**：中文详情页不再显示"该插件的 README 只有英文版本"（§50 的目标达成）。
 - 描述被维护者**按自己的措辞润色过**（我们 PR 里就写了"只取 tarball 那一行也可以"，所以这是预期结果）：
   现在的英文开头是 *"A floating always-on-top overlay for Windows that shows which of your terminals is
   waiting: it aggregates … over a named pipe, rings only on real events, and a click jumps to that terminal
   or copies its project path."*，前置条件与"审批仍在 DSH 完成"都还在。**不要**再为此开 PR 改回去。
+
+## 53. 交接：上报端只剩一份实现（2026-11-14 深夜，第 53 轮；没有耗版本号）
+
+第 52 轮发版时留了一件事：**本机真正加载的上报端不在仓库里**（§52.3）。这一轮把它收成一份，
+并且把它变成仓库里看得见的一条规则，而不是一句"记得两边一起改"。
+
+### 53.1 本机现在加载什么（实测）
+
+`opencode.json` 的 `plugins` 写的是一个**目录** `plugins/terminal-pet`，OpenCode 把它解析成
+`index.ts`。这个文件现在只有 **1,077 B**，内容是一次静态 re-export：
+
+```ts
+import { plugin } from "file:///C:/Users/rongj/Desktop/%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/ai-terminal-pet/reporters/opencode.js"
+
+export default plugin
+```
+
+**为什么是静态 import 而不是 dynamic**：仓库文件缺失时，静态 import 会让 OpenCode 在日志里写
+"loading plugin ... failed"，宿主其余部分照常运行；动态 import 会把这条证据吞掉（一个 `.catch(() => {})`
+之后什么都没发生，而面板从此空着）。**为什么是绝对 file URL**：相对路径从 `~/.config` 走不到仓库，
+而中文目录名必须百分号编码。
+
+### 53.2 怎么验证的（三步，都能重跑）
+
+1. **Bun 能加载它**（OpenCode 的 server 就是 Bun 编的，用 Node 只能证明语法对）：
+
+   ```powershell
+   bun -e 'const m = await import("file:///.../reporters/opencode.js"); console.log(m.default.id, typeof m.default.setup)'
+   ```
+
+   输出 `ai-terminal-pet function`。
+
+2. **wrapper + 真 reporter 端到端**：一个假 context（`event.subscribe` 依次吐
+   `session.execution.started` / `permission.asked` / `session.archived`，`session.get` 返回标题），
+   `setup()` 之后等 2.5 秒，`runtime/` 里出现 **1 个** closed/session_archived 快照。说明
+   "wrapper → 仓库文件 → 协议 → 快照"整条链路是通路的。
+
+3. **真宿主**：改完之后 OpenCode 的 watcher 自己重载了（日志 `loading plugin ... index.ts`，
+   21:26:45Z），随后真机复验一次归档：`PATCH {"archived":true}` → 快照 4 秒内变
+   `closed / session_archived`，`--json` 的 `count` 6 → 6（那次归档的是列表里已不再展示的一行，
+   所以"行消失"由 `runtime/` 里那个文件被消费证明）；`{"archived":false}` → 快照变
+   `idle / session_unarchived`，行回到面板。
+
+### 53.3 旧分支里那两个"优化"没有搬过来，理由写进了代码
+
+| 旧本地分支的做法 | 为什么**不**移植 |
+|---|---|
+| `sweepStaleSnapshots()`：加载时删掉本进程 pid 名下超过 2 小时的快照 | 一段安静两小时的对话**不是**结束了；把文件删掉等于对浮窗说"它结束了"（§43 的规则）。而快照扫描器本来就会删"宿主进程已经不在"的文件，`sessionIdOf()` 也拒绝 `evt_/msg_/prt_/prj_` 开头的 id，它当初要治的病在这里构造不出来 |
+| 写盘节流（非关键写 300 ms 一次） | `report()` 已经在"state/reason/tool 都没变"时直接返回，节流只能推迟**某个状态的第一次上报**——那一次恰恰是最要紧的 |
+| `checkPipeAvailable()` 2 秒缓存 + 10 秒拉起节流 | `protocol.js` 的 `sendStatus` 本来就是"连不上就重试 5 秒、需要时拉起、失败静默"，两套机制叠在一起会让"到底谁在拉起浮窗"变成一个有两个答案的问题 |
+
+前两条在 `reporters/opencode.js` 里留了一段注释（有测试的规则旁边就应该有这样的"为什么没有照抄"
+记录），第三条留在本节。
+
+### 53.4 备份与"不要删"
+
+- `~/.config/opencode/plugins/terminal-pet/` 里现在有：
+  `index.ts`（1,077 B 的一次性 re-export）、`index.ts.bak-20261114-fork`（旧分支的**尽力复原**，
+  **不是**逐字节备份——原文在被覆盖前没有先复制，这份是从本轮编辑过程的读取内容拼回来的）、
+  以及更早的两份 `.bak-20261105*`（不动）。
+- **不要**把 `index.ts.bak-20261114-fork` 当成"随时可以恢复的旧版本"：它能编译，但没有被验证过，
+  而且它承载的两个行为上面已经说明为什么不采纳。真正的实现只有仓库里那份。
+
+### 53.5 门禁与影响面
+
+- 只动上报端与文档：`node --check reporters/opencode.js`、`node --test
+  reporters/opencode-events.test.mjs` **10/10**、`node --check` 本机 wrapper、Go 全套未受影响
+  （`go test ./...` 仍 334 个）。**没有重发版本**：浮窗二进制与插件包一个字节没变，
+  `pet-v1.0.8` / `dsh-plugin-v1.2.17` 仍是当前版本。
+- 仓库侧新增的只有注释（`reporters/opencode.js` 里"为什么不抄那两个优化"），因此
+  `vendor/manifest.json` 的源码摘要不受影响（它只哈希 `cmd/` 与 `internal/`，不进 `reporters/`）。
+
+### 53.6 下一轮（从 §52.5 顺延）
+
+2. **Claude Code / Antigravity 的"结束"信号**：`reporters/claude-hook.js` 的 `SessionEnd` 与
+   `reporters/antigravity-hook.js` 的 `closed` 两条路径（判据：`--json` 里那个会话的 pid 是否已死、
+   快照是否还在）。
+3. **设置窗口另外两个候选**（`WM_TIMER` stall / DPI 重排）：有复现再动代码。
+4. **面板与 `--json` 的去重规则**：不要为了"统一"改掉。
 
 ## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
 

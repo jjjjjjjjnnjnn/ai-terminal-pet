@@ -41,6 +41,26 @@
 两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
+## 上报端来源统一 — 2026-11-14 深夜（第 53 轮；随 1.0.8 / 1.2.17 交付，不占版本号）
+
+第 52 轮发现本机真正加载的上报端是 `~/.config/opencode/plugins/terminal-pet/index.ts`——一份不在
+仓库里的 20,515 B TS 分支，而仓库里的 `reporters/opencode.js` 在**这台机器上**从未生效。这一轮把两边
+收成一份：本地 `index.ts` 从 20,515 B 降到 **1,077 B**，内容只有一次静态
+`import { plugin } from "file:///…/reporters/opencode.js"` 加 `export default plugin`。选静态而不是
+动态 import，是因为仓库文件缺失时宿主会在日志里写明加载失败，而动态 import 会把这条证据吞掉。
+
+验证三步都跑过：Bun 能加载它（OpenCode 的 server 就是 Bun 编的，用 Node 只能证明语法对）；一个假
+context 喂 `session.execution.started` / `permission.asked` / `session.archived` 之后 `runtime/` 出现
+**1 个** `closed/session_archived` 快照；改完宿主 watcher 自己重载，真机归档 → 快照 4 秒内变
+`closed/session_archived`，取消归档 → `idle/session_unarchived` 且行回到面板。
+
+旧分支里的三个"优化"**没有**移植，理由写在代码注释里：启动时扫掉两小时前的快照（一段安静的对话不是
+结束了，而扫描器本来就会删宿主已死的文件）、写盘 300 ms 节流（`report()` 已经按
+state/reason/tool 去重，节流只会推迟要紧的第一次上报）、管道可用性 2 秒缓存（`sendStatus` 已经有
+重试与按需拉起，两套机制会让"谁在拉起浮窗"有两个答案）。
+
+用户目录里保留 `index.ts.bak-20261114-fork`（对旧分支的**尽力复原**，不是逐字节备份，也没被验证过）。
+
 ## [1.0.8] — 2026-11-14（第 52 轮：归档的会话不再占一行，设置窗口不再被空闲自毁带走）
 
 第 51 轮只取证、没动代码，把用户的两句话变成了可证伪的机制：

@@ -41,6 +41,25 @@ const SOURCE = "opencode"
 const TERMINAL = "opencode"
 const MAX_TRACKED = 64
 
+// MAX_TRACKED bounds memory; it is not a garbage collector. There is also
+// deliberately no startup "sweep" of old runtime/ snapshots and no throttle
+// between disk writes, because the user-local fork that ran on one machine had
+// both and each was examined before being dropped:
+//
+//   - The sweep removed this pid's snapshot files older than two hours at
+//     plugin load. A conversation that has simply been quiet that long is not
+//     ended, and the overlay treats a vanished file as "this ended" (§43's
+//     rule) - so the sweep would drop a live row the next time the plugin
+//     reloaded. The overlay's own scanner already prunes files whose host
+//     process is gone, and sessionIdOf() refuses event/message/part ids, so
+//     the pseudo-session files the sweep was written for cannot be created
+//     here in the first place.
+//   - report() below already sends only on a real state, reason or tool
+//     change, so a write throttle could only ever delay the first report of a
+//     state - which is the one report that matters.
+//
+// If a future change reintroduces either, it has to answer those two points.
+
 // EVENT_STATE is event type -> [state, reason].
 //
 // The reasons are free text, but they are not arbitrary: internal/session
