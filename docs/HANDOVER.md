@@ -6,9 +6,11 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-13 深夜；浮窗 **1.0.7**、插件包 **1.2.16** 已发版）
+## 1. 当前状态（2026-11-14 晚；浮窗 **1.0.7**、插件包 **1.2.16** 已发版；**两个现场缺陷待修，见 §51**）
 
-> 接手请先读本节与文末 **§50「中文 README 与市场文案」**（最新一轮）与 **§49「上架巡检：十家目录现在各指哪里」**、
+> 接手请先读本节与文末 **§51「交接：两个现场缺陷 —— 幽灵会话与设置窗口闪退」**（最新一轮；
+> 只取证未改代码，下一轮从这里开工），再读 **§50「中文 README 与市场文案」**、
+> **§49「上架巡检：十家目录现在各指哪里」**、
 > **§48「交接：适配 DSH 0.2.x」**（1.2.15 的兼容声明）、
 > **§47「维护：工作区整理」**（只删可再生产物）、
 > **§46「交接：把两个流程缺口变成门禁」**（工具与测试）、
@@ -23,6 +25,10 @@
 
 - **在役**：安装目录 `AI-Terminal-Pet.exe` 已安装并通过 SHA256 校验；浮窗按需由 reporter 拉起，
   无常驻服务，无会话时自毁。
+- **待修（详见 §51）**：① **已归档/已关闭的会话仍显示**——存在性按**进程**判定，`session.deleted`
+  是唯一的结束信号，而 opencode 归档会话不删除、也不发这个事件（`opencode serve` 可活几天）；
+  ② **设置窗口"闪退"**——无 WER、无 `error.log`、无应用日志条目，所以不是崩溃；三个候选各有判据：
+  空闲自毁退出进程、消息泵卡死（`hang.log` 记了 6 次 `WM_TIMER` stall）、DPI 重排到工作区外。
 - **版本**：浮窗 **`1.0.7`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.16`**。
   两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7` 与
   `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`。
@@ -3250,6 +3256,132 @@ python tools/check_docs_links.py            # 11 份文档全解
 
 - **文档里的版本号会独立腐烂** → `tools/check_versions.mjs`（CI 步骤 + 24 条规则测试）。
 - **"点了没写盘"要先问进程是怎么退出的** → `internal/app/config_saver_test.go` 三条测试 + AGENTS.md 第 9 条。
+
+## 51. 交接：两个现场缺陷 —— 幽灵会话与设置窗口「闪退」（2026-11-14 晚，第 51 轮；只取证，未改代码）
+
+用户原话（两条，都在真机上观察到）：
+
+> **"有些不存在的程序，已经关闭的程序还是会显示"**
+> **"设置打开以后界面经常闪退"**
+
+这一轮**没有动代码**：先把现场证据、可证伪的机制候选、以及复现步骤钉下来，下一轮直接进入修复。
+两条都还不能算"已定位根因"——下面每条都写清"什么现象才能算它"。
+
+### 51.1 现场（2026-11-14 18:3x UTC，实测）
+
+| 项 | 值 |
+|---|---|
+| 安装版 | **1.0.7**（`%LOCALAPPDATA%\AI-Terminal-Pet\AI-Terminal-Pet.exe`，构建于 2026-11-13 16:49），进程 70580 |
+| 用户偏好 | `theme=contrast`、`settingsTextSize=large`、`edgeRetract=true`、`idleMinutes=3`、`language=auto` |
+| 面板几何 | 紧凑 `55x152 @ (2493,176)`；设置窗口 `900x1080`（150% DPI，`y=224` → 底边 1304 < 1600） |
+| 宿主进程 | **54972** = `opencode.exe serve --service`（15:00 起就一直活着），本地端口 `127.0.0.1:28894`（返回的是 Web UI 的 HTML，不是 JSON API；`/api/session` 401） |
+| `--json` | 7 个会话，**全部** pid=54972 |
+| runtime/ | 7 个快照，pid 全部 alive，没有 `closed` 的快照 |
+
+### 51.2 缺陷一：幽灵会话 —— 机制已清楚，现场此刻是干净的
+
+**先说现场核对结果**：用两条独立路径比对，此刻 7 行**都是真会话**。
+
+1. `--json` / `runtime/` 给出 7 个 `sessionId`；
+2. 以只读方式查 opencode 自己的库 `~/.local/share/opencode/opencode.db` 的 `session_v2` 表
+   （`mode=ro` + `PRAGMA query_only=1`）：**7/7 都存在，且 `time_archived` 全是 NULL**。
+
+**机制（读代码得到的，不是猜）**：
+
+- 存在性是**按进程**判定的：`internal/app/app_windows.go` 的 `snapshotAwareAlive()` 在快照仍在时
+  直接返回 true；没有快照时才退到 `presence.SessionAlive(pid)`。`internal/store` 的注释写得很清楚：
+  *"While it is [observable], the session is kept indefinitely."* —— 只在宿主进程连续不可观测
+  `DefaultAbsenceGrace`（2 分钟）后才移除。
+- 对话结束**只有一个信号**：`reporters/opencode.js` 的 `EVENT_STATE` 表里 `"session.deleted": ["closed", "session_deleted"]`
+  （第 104 行附近）。**没有** archive / suspend 的映射。
+- 而 opencode 的库里明确有 **`time_archived`** 与 **`time_suspended`** 两列：在界面上"归档/关掉一个会话"
+  是把它归档，不是删除，因此**不会**触发 `session.deleted`。
+- `opencode serve` 是可以活几天的常驻进程（本机 54972 就是），所以这些行会一直留在面板上，
+  直到那个进程退出。
+
+**结论**：幽灵 = **"在宿主里已归档/已关闭、但没被删除的会话"**。它们此刻没有出现，只是因为用户还没归档过
+现有这 7 个。这也解释了用户说的"有些"和"还会"（不是每次，是有归档动作之后）。
+
+**下个会话的第一件事（确定性复现，10 分钟内可完成）**：
+
+1. 在 opencode 里归档一个会话；
+2. 等 ≥2 分钟（`DefaultAbsenceGrace`），看 `--json` 是否仍有它；
+3. 用 §51.6 的脚本查该 id 的 `time_archived` 是否非空；
+4. **同时抓宿主事件**：在 `reporters/opencode.js` 的 handler 里临时打印 `event.type`（只在自己机器、
+   一次性），确认归档到底发了什么事件。这一步决定修法：
+   - 若发 `session.updated`（带 `time.archived`）或专用的 archive 事件 → **加一条映射即可**；
+   - 若什么都不发 → 需要主动核对宿主状态（读库或找到正确端点；端口 28894 根路径是 Web UI，需再找）；
+   - 都不行 → 只能做策略：空闲超过 N 分钟的会话"隐藏而不删除"。**这是产品决定**，见 51.5 的禁令。
+
+### 51.3 缺陷二：设置窗口"闪退" —— 没有任何崩溃痕迹，所以不是崩溃
+
+取证结论（四路都查了）：
+
+| 检查 | 结果 |
+|---|---|
+| `error.log`（Go 侧错误日志） | **不存在** |
+| Windows 应用日志，近 3 天含 `AI-Terminal-Pet` 的条目 | **0 条** |
+| `CrashDumps` / WER `ReportArchive` | **无相关报告** |
+| `hang.log` | **存在**：6 次 stall，最近两次 **2026-11-13 09:47** 与 **2026-11-14 04:07**，均 `lastMessage=WM_TIMER goroutines=12` |
+
+所以"闪退"只可能是下面三种之一，每种都有代码定位与判据：
+
+1. **进程正常退出，窗口跟着消失**。`destroySettings()` 只在 `wmClose`（托盘退出 / `--quit`）里被调用，
+   窗口自己不会关。另一条退出路径是空闲自毁：`internal/ui/app_windows.go:977-984`，`timerIdle`
+   （30 s 一跳）在 `!values.HasAvailable()` 且距 `lastAvailable` ≥ **10 分钟**时 `DestroyWindow`
+   → `wmDestroy`（`:960-968`）→ `PostQuitMessage`。而 `HasAvailable()` 就是 `len(entries) > 0`。
+   **判据**：闪退前 store 已经空了（所有 AI 终端都关了）。**可确定性验证**：关掉所有终端与 reporter，
+   再 `--settings`，≤10 分钟窗口与进程一起消失。
+2. **消息泵卡住**（`hang.log` 的形态）。`timerClock`（2 s）在展开态里 `a.load()` + `postRefresh()`；
+   设置窗口与浮窗**共用同一个 UI 线程**。卡住时窗口表现为"未响应"，用户点关闭或系统结束它——
+   读作"闪退"。**判据**：闪退前窗口标题栏出现"未响应"，或 `hang.log` 在那时刻增长。
+3. **重排把窗口放到屏幕外**。`WM_DPICHANGED` 用新 DPI 重排并夹进工作区（1.0.7 新增）；
+   若夹取算错，窗口跑到工作区外，用户读作"窗口没了"。**判据**：闪退后用
+   `GetWindowRect` 查——若窗口仍存在但坐标在工作区外，就是这条。
+
+**本轮做过的复现尝试（别重复）**：连续 3 轮 `--settings` → 枚举窗口 → 点「外观」「通用」页签 → 关闭；
+进程始终存活，`hang.log` 增长 **0 B**。所以**不是"一打开就崩"**，必须带具体交互（切主题/改字号/
+拖到另一块屏、或让 store 变空）才能复现。
+
+### 51.4 建议的排查顺序
+
+1. **先修幽灵**（51.2 的复现是确定性的，且判据清楚）。顺手确认：面板层与 `--json` 的去重规则不同
+   （面板按 source+sessionId 合并，`--json` 保留 per-process 行），改的时候两条视图都要有测试。
+2. **给三条退出路径加"只开发构建可见"的原因日志**（`exit: idle` / `exit: quit` / `exit: destroyed`），
+   再复现闪退。这比继续猜快一个数量级；生产构建不要写，`no-network` 与轻量是硬约束。
+3. 若确认是卡死，用 `PET_PREVIEW_DIR` 渲染 + `hang.log` 的 `lastMessage` 缩到具体消息；重点量
+   **large + contrast** 组合下设置窗口的绘制耗时（1.0.7 的 `wrapHint`、字号表、DPI 重排都是新的）。
+4. 修复幽灵时**不要默默删会话**：§43 已经把"消失 = 完成"这个错误修过——"消失"是有语义的。
+   优先加"归档即结束"的映射，而不是加"空闲超时就删除"。
+
+### 51.5 守则（与前几轮一致，别绕）
+
+- `reporters/*.js` 永远 fail-fast 且静默：不能让宿主 CLI（opencode/claude/DSH/antigravity）因上报端卡住或崩。
+- 验证写盘类行为必须**让进程正常退出**（AGENTS 第 9 条）：kill 掉再读文件说明不了任何事。
+- 改包内任何文件都要 `go build` → `vendor.mjs` → `--check`；改 `engines`/清单要同步三处（包、根 shim、索引）。
+- 这是**浮窗行为缺陷**：走 `pet-v1.0.8`；插件包只有在新 vendor 时才需要新版本号。
+- 全门禁按 AGENTS「标准验证命令」；本机 `--doctor` 应 10 项 0 fail。
+
+### 51.6 取证工具（本轮现场做的，可直接复用）
+
+- `%TEMP%\opencode\petwin.ps1`：枚举窗口 / 截屏 / `PostMessage` 点击 / 关闭（自带 per-monitor DPI 感知，
+  否则 `GetWindowRect` 与 `CopyFromScreen` 会差一个缩放比）。
+- `%TEMP%\opencode\ghost-check.mjs`：把 `--json` 的会话与宿主自己的列表对账（注意 PowerShell 写文件带 BOM，
+  脚本里已去）。
+- `%TEMP%\opencode\session-store-check.py`、`session-columns.py`：只读打开 `opencode.db`，
+  查 `session_v2` 的 `time_archived` / `time_suspended` / `time_idle`（`mode=ro` + `query_only`，不写一行）。
+- 一条命令看会话视图：`& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json --pretty`
+  （它只读快照，永远不会阻塞 GUI）。
+
+### 51.7 上一轮的收尾（顺手核对，供对照）
+
+- 上游条目已指到 **1.2.16**（`tools/upstream-entry.mjs --check` = **OK**，不再是 in flight）；
+  站点 `plugins.json` 渲染的 `version` 也是 **1.2.16**，`install` 为 `dsh plugin --profile web add dsh-ai-terminal-pet`。
+- **中文 README 已经生效**：中文详情页不再显示"该插件的 README 只有英文版本"（§50 的目标达成）。
+- 描述被维护者**按自己的措辞润色过**（我们 PR 里就写了"只取 tarball 那一行也可以"，所以这是预期结果）：
+  现在的英文开头是 *"A floating always-on-top overlay for Windows that shows which of your terminals is
+  waiting: it aggregates … over a named pipe, rings only on real events, and a click jumps to that terminal
+  or copies its project path."*，前置条件与"审批仍在 DSH 完成"都还在。**不要**再为此开 PR 改回去。
 
 ## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
 
