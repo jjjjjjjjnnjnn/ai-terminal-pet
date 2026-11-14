@@ -67,8 +67,10 @@
     **5,054,322 B / sha256 `C8FE834A…`**（17 个文件）与 `pet-setup.exe` **14,308,864 B / sha256 `2EBF0E7E…`**；
     `pet-v1.0.7` 及更早的每一个 tag 仍在（不可变，已被取代）。
   - **上游条目**：`main` 的 `tarball` 现在是 **1.2.16**（#15075 已被合并，2026-11-14 复读）；
-    1.2.17 的跟进 PR 在这一轮发版后开（分支 `bump-tarball-1.2.17`，单文件 `+3 −3`：`tarball` 与
-    `icon`/description 行），开之前 `tools/upstream-entry.mjs --check` 是 **SKIP**（资产 404 是预期）。
+    1.2.17 的跟进是
+    [#15378](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15378)（分支
+    `bump-tarball-1.2.17`，commit `a1579df`，单文件 `+3 −3`）已开、`MERGEABLE`，
+    `tools/upstream-entry.mjs --check` = `OK（in flight）`。
     #14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）均已关并留说明。合并仍要人工，
     **合并 ≠ 可见**：判断可见性读对方站点索引文件（见 §50.5）。
   - **其余九家目录的当前状态见 §49**（哪些已最新、哪些等对方扫描、哪些在等人工复核）。
@@ -3466,10 +3468,13 @@ re-export 仓库文件，并把本地独有的两个优化移植回去）留作�
 3. 双 tag：`pet-v1.0.8` / `dsh-plugin-v1.2.17`。
 4. 双 Release：浮窗 `ai-terminal-pet-1.0.8-win-x64.zip`（**5,054,322 B / `C8FE834A…`**，17 文件）
    与 `pet-setup.exe`（**14,308,864 B / `2EBF0E7E…`**）；插件 `dsh-ai-terminal-pet-1.2.17.tgz`
-   （**2,006,574 B / `5D4B2AA8…` / shasum `a7c660a3…`**，19 文件）。
-5. `npm publish`，等 2–4 分钟核对 `dist-tags.latest` = 1.2.17。
-6. B 提交：`source.commit` 与 `icon` 钉到 A 的 sha。
-7. 上游条目：`node tools/upstream-entry.mjs --version 1.2.17 --write --branch bump-tarball-1.2.17`。
+   （**2,006,574 B / `5D4B2AA8…` / shasum `a7c660a3…`**，19 文件）。三个资产都从**公网 URL 下载回来**
+   重新哈希，与本地逐字节一致（GitHub 自己记的 `digest` 也一致）。
+5. `npm publish`，2–4 分钟后 `npm view dsh-ai-terminal-pet version` = **1.2.17**、`dist-tags.latest` = 1.2.17。
+6. B 提交 `ad8975a`：`source.commit` 与 `icon` 钉到 A 的 sha `7b57f32`。
+7. 上游条目：[PR #15378](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15378)
+   （分支 `bump-tarball-1.2.17`，commit `a1579df`，`MERGEABLE`），
+   `tools/upstream-entry.mjs --check` = **OK（in flight）**。合并仍要人工。
 
 **发布资产不可变**，所以以后哪怕只改一句措辞也要新版本号；`pet-v1.0.7` 与 `dsh-plugin-v1.2.16`
 及更早的每一个 tag 都仍然有效、不要重传。
@@ -3501,7 +3506,7 @@ re-export 仓库文件，并把本地独有的两个优化移植回去）留作�
   （包、根 shim、索引），且**发版提交必须同时前移索引**（AGENTS 第 6 条）。
 - 全门禁按 AGENTS「标准验证命令」；本机 `--doctor` 应 10 项 0 fail。
 
-### 51.7 上一轮的收尾（顺手核对，供对照）
+### 51.7 上一轮的收尾（顺手核对，供对照；上游那一行的"现在"已过期，以 §52.4 为准）
 
 - 上游条目已指到 **1.2.16**（`tools/upstream-entry.mjs --check` = **OK**，不再是 in flight）；
   站点 `plugins.json` 渲染的 `version` 也是 **1.2.16**，`install` 为 `dsh plugin --profile web add dsh-ai-terminal-pet`。
