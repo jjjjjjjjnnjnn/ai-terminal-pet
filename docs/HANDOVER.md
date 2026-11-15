@@ -66,8 +66,11 @@
   `bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`，本轮未改）。
   三个二进制合计 **12,095,488 B** = 11.53 MiB。
 - **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.21**；`dsh-plugin-v1.2.21` 的 Release 资产
-    是这一版新打的 tag（`.tgz` 的字节数与 sha256 在本轮发版后回填，见 CHANGELOG 的发布清单）；
+  - 插件线：npm `latest` = **1.2.21**（发布后复查 `dist-tags.latest` 与 `versions[]` 两处都已是 1.2.21）；
+    `dsh-plugin-v1.2.21` 的 Release 资产 `dsh-ai-terminal-pet-1.2.21.tgz`
+    **2,067,752 B / sha256 `AF26A671…` / 19 文件**；上游条目跟进 PR
+    [#15674](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15674)（分支 `bump-tarball-1.2.21`，
+    commit `9fc4b29`，单文件 `+1 −1`，`MERGEABLE`）已开、`tools/upstream-entry.mjs --check` = OK（in flight）；
     钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
   索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
   提供的**替代**路径，而不是权宜之计。
