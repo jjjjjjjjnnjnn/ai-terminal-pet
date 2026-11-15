@@ -116,6 +116,59 @@ jobs:
       - name: go test
         run: go test -count=1 ./...
 
+      # The cross-platform gate (handover §55.6 step 4). It needs no mac runner and
+      # no cgo: a GOOS=darwin/linux build proves that the packages claiming to be
+      # platform-neutral still are, and that nobody put a syscall back into one.
+      #
+      # The allowlist is a file rather than a matrix because the list is expected to
+      # shrink: every package that leaves it is one more thing the next port can
+      # trust. A package that fails while NOT on the list is the regression this
+      # step exists to catch.
+      - name: Cross-platform build gate
+        shell: bash
+        run: |
+          failed=0
+          while IFS= read -r pkg; do
+            case "$pkg" in ''|'#'*) continue ;; esac
+            for target in linux/amd64 darwin/arm64; do
+              os="${target%%/*}"
+              arch="${target##*/}"
+              if ! GOOS="$os" GOARCH="$arch" go build "./$pkg" >/tmp/cross.log 2>&1; then
+                echo "cross: ./$pkg does not build for $target:"
+                cat /tmp/cross.log
+                failed=1
+              fi
+            done
+          done < scripts/portable-packages.txt
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "cross: every listed package builds for linux/amd64 and darwin/arm64"
+
+      # The packages that are NOT expected to build off Windows are named here, so
+      # a port that silently regresses one of them is visible in the other
+      # direction too: the day one of these starts building, this step says so and
+      # the list can be updated on purpose.
+      - name: Cross-platform expectation check
+        shell: bash
+        run: |
+          failed=0
+          while IFS= read -r pkg; do
+            case "$pkg" in ''|'#'*) continue ;; esac
+            for target in linux/amd64 darwin/arm64; do
+              os="${target%%/*}"
+              arch="${target##*/}"
+              if GOOS="$os" GOARCH="$arch" go build "./$pkg" >/dev/null 2>&1; then
+                echo "cross: ./$pkg unexpectedly builds for $target; remove it from scripts/windows-only-packages.txt if that is now true"
+                failed=1
+              fi
+            done
+          done < scripts/windows-only-packages.txt
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "cross: the windows-only list still matches reality"
+
       # -trimpath keeps absolute build paths out of the binary, and -s -w strips
       # the symbol/DWARF tables: these are distributed small and the crash log
       # rotation in cmd/ai-terminal-pet does not need a symbol server.

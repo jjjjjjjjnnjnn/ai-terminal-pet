@@ -1,0 +1,17 @@
+# Packages that are expected NOT to build off Windows, and why.
+#
+# The check runs these for linux/amd64 and darwin/arm64 and FAILS if one of them
+# starts building: not because building is bad, but because it means this list is
+# stale and the person who made it work should move the line to
+# portable-packages.txt on purpose (docs/PLATFORMS.md is the table that has to
+# agree).
+#
+# The reason each one is here, so the next reader does not have to rediscover it:
+
+# The overlay command: it starts the window (ui.New, ui.Run) and therefore needs a
+# window layer.
+cmd/ai-terminal-pet
+
+# The lifecycle: run.go is neutral, but it calls ui.New/ui.Options/ui.Placement,
+# which are the Windows window. Everything else in this package builds on POSIX.
+internal/app
