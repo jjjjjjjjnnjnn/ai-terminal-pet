@@ -1,10 +1,14 @@
 # ai-terminal-pet — AI Maintainer & Agent Guide (AGENTS.md)
 
-> **Project Identity**: Lightweight, native Windows floating companion overlay for AI coding terminals
+> **Project Identity**: Lightweight, native floating companion overlay for AI coding terminals
 > (OpenCode, Claude Code, Antigravity CLI, DeepSeek Harness). Aggregates multi-agent session states via
-> Windows named pipes into a glanceable Win32 layered overlay.
-> **Language**: Go 1.23+ / Win32 API / Node.js (Reporters, zero npm dependencies)
+> one per-user endpoint (a Windows named pipe, a unix socket elsewhere) into a glanceable layered overlay.
+> **Language**: Go 1.23+ / Win32 API (the window) / Node.js (Reporters, zero npm dependencies)
 > **License**: MIT
+>
+> **The reporting path is cross-platform; the window is Windows-only so far.** What works where, and how
+> each claim was measured, is [docs/PLATFORMS.md](docs/PLATFORMS.md) — read it before assuming a package
+> builds everywhere, and before promising anything to a macOS or Linux user.
 
 ---
 
@@ -14,12 +18,12 @@
 Host terminal (Claude Code / OpenCode / Antigravity / DeepSeek Harness)
        │
        ▼ (fire-and-forget hooks)
-reporters/*.js  ──[named pipe / JSON-lines]──►  cmd/ai-terminal-pet (Go)
-                                                    │
-                                                    ├─► internal/pipeserver (32 conns, 5 s read timeout)
-                                                    ├─► internal/store (max 256 sessions, TTL + tombstones)
-                                                    ├─► internal/store (disk snapshots, %LOCALAPPDATA%)
-                                                    └─► internal/ui (Win32 layered window, topmost)
+reporters/*.js  ──[pipe / unix socket, JSON lines]──►  cmd/ai-terminal-pet (Go)
+                                                          │
+                                                          ├─► internal/pipeserver (32 conns, 5 s read timeout)
+                                                          ├─► internal/store (max 256 sessions, TTL + tombstones)
+                                                          ├─► internal/store (disk snapshots, internal/home)
+                                                          └─► internal/ui (layered window, topmost: Win32 today)
 ```
 
 ### Key Subsystems
@@ -41,22 +45,34 @@ reporters/*.js  ──[named pipe / JSON-lines]──►  cmd/ai-terminal-pet (G
 - `internal/ui/`: Win32 layered overlay — GDI canvas rasterization (`CreateDIBSection` +
   `UpdateLayeredWindow`, **no GDI+**), panel layout, tray icon, click/drag/wheel gestures, a four-tab
   settings window, synthesized alert tones, auto-approve countdown, jump-to-terminal, and the alert layer:
-  `attention.go` is the pure policy (`Decide` / `PlanAlerts`, no window, file or clock), `attention_windows.go`
-  samples the desktop off the UI thread, `mute_windows.go` and `receipt_windows.go` hold the per-session
+  `attention.go` is the pure policy (`Decide` / `PlanAlerts`, no window, file or clock), `attention_keys.go`
+  holds its types and constants (untagged, so both can be checked off Windows), `attention_windows.go`
+  samples the desktop off the UI thread, `mute.go` and `receipt_windows.go` hold the per-session
   marks and the decision record. `internal/session/attention.go` derives *what* a blocked session is asking
   for (approval / question / plan) from the reason reporters already send — the wire protocol did not move.
+  **The buffer and all 16 drawing primitives live in `canvas.go` (untagged)**; `canvas_windows.go` is GDI
+  behind them and `canvas_posix.go` is the compile-only placeholder (real buffer, no text). See
+  [docs/PLATFORMS.md](docs/PLATFORMS.md) for what that means per OS.
 - `cmd/pet-setup/`: the single-file installer (`pet-setup.exe`) the release ships. It embeds the
   staged payload, verifies it against `SHA256SUMS.txt` **before** writing anything, then runs the
   `scripts/install.ps1` that ships inside it — so `install.ps1` stays the only implementation of
   what an install is. `payload/` holds only `.gitkeep`; the real files are staged by
   `scripts/package.ps1` and deleted again before it returns.
-- `internal/pipeserver/`: named pipe server (`\\.\pipe\ai-terminal-pet-v1-<8hex>`) with `OK`/`ERR` replies
-  and a per-user DACL.
+- `internal/home/`: **the only answer to "where does this project keep its files"** (`%LOCALAPPDATA%\AI-Terminal-Pet`
+  on Windows — unchanged — `~/Library/Application Support` on macOS, `$XDG_DATA_HOME/ai-terminal-pet` on Linux).
+  Twenty-odd files used to spell that path themselves and `reporters/protocol.js` spelled it again in JavaScript.
+- `internal/pipeserver/`: the transport-neutral protocol (`server.go`: one JSON line, 5 s deadline, exact
+  `OK`/`ERR`, 32 connections) plus one platform file per transport — a named pipe with a per-user DACL on
+  Windows, a `$XDG_RUNTIME_DIR` unix socket elsewhere. **The per-user token is a cross-language contract and
+  must not move**; only the container changes.
 - `internal/store/`: in-memory state store with tombstone cleanup plus snapshot-file fallback under
-  `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\`.
-- `internal/platform/`: single-instance mutex, process/window presence probing, focus activation.
-- `internal/config/`, `internal/i18n/`, `internal/session/`, `internal/autostart/`, and `internal/app/`
-  (which also holds `doctor_windows.go`, the `--doctor` implementation).
+  `<data directory>/runtime/`.
+- `internal/platform/`: single-instance mutex, process/window presence probing, focus activation
+  (Windows-only: the POSIX presence rule is deliberately narrower — see `internal/app/platform_posix.go`).
+- `internal/config/`, `internal/i18n/`, `internal/session/`, `internal/autostart/` (one backend per OS:
+  HKCU Run / LaunchAgent / XDG desktop entry), `internal/connect/` (the host-configuration reader behind
+  `--doctor`'s `reporters` line and `--connect`), and `internal/app/` (`run.go` is the lifecycle, `app.go`
+  the neutral half, `doctor_windows.go` the `--doctor` implementation).
 - `reporters/`: host CLI hooks (`claude-hook.js`, `opencode.js`, `antigravity-hook.js`,
   `antigravity-statusline.js`, `generic.js`, shared `protocol.js`).
 - `integrations/deepseek-harness/ai-terminal-pet-bridge/`: host-only Cordis bundle plus `verify.mjs`.
@@ -69,7 +85,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (366 func Test across 13 packages)
+# 1. Static analysis and all unit tests (382 func Test across 14 packages)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -97,6 +113,12 @@ python tools/check_docs_links.py   # every relative path and #anchor in the docs
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
+
+# 3a. The cross-platform gate. 13 packages must build for linux/amd64 and darwin/arm64,
+#     and the two that must not are named so a port that silently regresses one is seen
+#     (docs/PLATFORMS.md is the measured table this list has to agree with). Same logic
+#     as CI's "Cross-platform build gate"; on Windows run it from Git Bash or WSL.
+bash scripts/cross-build.sh
 
 # 3b. Fresh-machine end-to-end suite (CI runs it with --no-overlay; locally drop
 #     the flag to also boot the overlay in a sandbox and check delivery)
@@ -156,6 +178,7 @@ Two conventions in those commands are load-bearing, not style:
 | I am picking this up from someone else. What is pending, what must not be edited, what looks redundant but is not? | [docs/HANDOVER.md](docs/HANDOVER.md) §28 (handover checklist) |
 | I am working on GitHub email, commit identity, signing or account settings | [docs/HANDOVER.md](docs/HANDOVER.md) §34 — the measured identity table, and the one irreversible decision (rewriting history) |
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |
+| **What works on which OS, and how was each claim measured?** | **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — the per-capability table (the reporting path is three platforms, the panel is one), what is unverified and why, and the two CI lists that pin it |
 | I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/LAUNCH.md](docs/LAUNCH.md) — the only place outward-facing copy lives, with the measured numbers it must not exceed |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |
@@ -169,25 +192,35 @@ Two conventions in those commands are load-bearing, not style:
    - Hook scripts under `reporters/` MUST ALWAYS fail fast and silently. Never allow an unhandled
      exception or crash in `reporters/*.js` to block, delay, or kill the developer's host CLI
      (`claude`, `opencode`, `antigravity`, or the DeepSeek Harness).
-2. **Single-Instance Mutex**:
-   - The app relies on a named global mutex to enforce single-instance semantics. Do not bypass or
-     weaken mutex acquisition in `internal/platform`.
-   - `--doctor` deliberately does **not** open the mutex: `CreateMutex` would create the object and
+2. **Single-Instance**:
+   - The app relies on one exclusive handle per logon session. Do not bypass or weaken its acquisition:
+     a named mutex on Windows (`internal/app/platform_windows.go`), an `flock` on a file in the data
+     directory on POSIX (`internal/app/platform_posix.go` — **not** "does the file exist", because only
+     flock survives a hard kill).
+   - `--doctor` deliberately does **not** open it: on Windows `CreateMutex` would create the object and
      disturb a live instance, so it uses the pipe listener as its evidence instead (see
      `internal/app/doctor_windows.go`, `checkInstance`).
 3. **No External Runtime Bloat**:
    - The Go binary must remain statically compiled with zero runtime DLL dependencies outside standard
      Windows system libraries (`user32.dll`, `gdi32.dll`, `shell32.dll`).
+   - On POSIX the equivalent is: **no cgo, no libgtk, no shelling out for anything the process does
+     per frame.** A window layer that needs cgo is a decision the whole project has to make together
+     (§57.7), not something a port slips in.
 4. **Encoding & Line Endings**:
    - Preserve UTF-8 encoding across all files. `.gitattributes` pins `* text=auto eol=lf`; do not
      introduce CRLF. `scripts/install.ps1`, `scripts/install.cmd` and `scripts/package.ps1` must stay
      pure ASCII, because Windows PowerShell 5.1 reads a BOM-less script as ANSI.
 5. **Cross-language protocol contract**:
-   - The pipe name is the first 4 bytes of `sha256(home lowercased, trailing separators trimmed)`
-     rendered as 8 hex chars. It is implemented twice — Go (`internal/pipeserver`) and JS
-     (`reporters/protocol.js`) — and pinned by `TestPipePathForUserMatchesReporterAlgorithm`.
-     Changing one side without the other breaks every reporter silently. Schema changes follow
-     `docs/PROTOCOL.md` §11.
+   - The per-user endpoint's token is the first 4 bytes of `sha256(home lowercased, trailing separators
+     trimmed)` rendered as 8 hex chars. It is implemented twice — Go (`internal/pipeserver/server.go`) and
+     JS (`reporters/protocol.js`) — and pinned by `TestPipePathForUserMatchesReporterAlgorithm`.
+     **The token is the contract; the container around it is not** (a Windows named pipe, a
+     `$XDG_RUNTIME_DIR` socket elsewhere). Changing either side without the other breaks every reporter
+     silently. Schema changes follow `docs/PROTOCOL.md` §11.
+   - The data directory has the same shape of contract, one level up: `internal/home` answers it for Go,
+     `reporters/protocol.js` mirrors it for JS, and `docs/PLATFORMS.md` records the per-OS answer
+     (`%LOCALAPPDATA%\AI-Terminal-Pet` on Windows is **unchanged on purpose** — moving it would orphan
+     every existing install).
 6. **Release commit must carry the market index**:
    - `docs/market-index.json` states the version each release should install, and
      `verify.mjs` asserts that its newest entry equals the packaged version. Bumping the
@@ -205,8 +238,14 @@ Two conventions in those commands are load-bearing, not style:
      exist); never re-upload or rewrite a published `.tgz`.
 7. **Portability**:
    - Never commit machine-specific absolute paths into source, tests, scripts or docs. Use
-     `os.Getenv("LOCALAPPDATA")`, `os.UserHomeDir()`, `Path(__file__).resolve().parent`, or an
-     environment variable that fails with a human-readable message.
+     `internal/home.Directory()` (or `internal/home.Join(...)`) for this project's own paths,
+     `os.UserHomeDir()` for anything else, `Path(__file__).resolve().parent` in Python, or an environment
+     variable that fails with a human-readable message.
+   - **A test that needs the data directory calls its package's one helper** (e.g.
+     `dataDirectory(t)` in `internal/reporter`, `cmd/pet-hook`) which points LOCALAPPDATA,
+     XDG_DATA_HOME, HOME and USERPROFILE at one temp tree. Setting LOCALAPPDATA alone was correct while
+     the path was spelled by hand and is wrong three platforms later: on linux it writes into the tester's
+     real `~/.local/share` (§57.3). One helper per package, so a caller cannot pass the wrong root.
 8. **Review the work yourself, with the model that wrote it**:
    - Do not shell out to `agy`, `gemini`, or any other model CLI for a second opinion. The whole
      chain — implementation, review, and the wording of anything outward-facing — runs in the session

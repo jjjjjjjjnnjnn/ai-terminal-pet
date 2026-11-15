@@ -360,7 +360,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 - **Cross-platform support**: Extracting the UI layer behind a presenter interface with Unix domain socket transport for macOS and Linux. Inventoried, not started: 5,650 of the 17,238 non-test Go lines are already portable and another 3,887 only carry a `_windows` suffix, so the first two steps are mechanical - the exact split, the five platform layers that really need replacing, and the seven-step order are in [docs/HANDOVER.md](docs/HANDOVER.md) §55.
 
-- **Binary size reduction**: Bring the main executable under 2.5 MiB (currently 4.36 MiB) by stripping reflection metadata and dropping unused packages, and replace the regexp-based redaction in pet-statusline with a hand-written scanner.
+- **Binary size and cross-platform delivery**: the overlay is 4.44 MiB, and §56.9 measured why the old "under 2.5 MiB" target is not reachable — our own code is about 250 KB of it, and the two removable blocks (`encoding/json` and the `pprof`+`flate` pair behind `hang.log`) are both load-bearing features. The headline item that replaced it is the platform port: the reporting path already builds and passes its tests on Linux and compiles for macOS, and what is still missing is the window layer (see [docs/PLATFORMS.md](docs/PLATFORMS.md) and [handover](docs/HANDOVER.md) §57).
 
 Shipped after v0.9.0: the wire protocol specification ([docs/PROTOCOL.md](docs/PROTOCOL.md)) and the `ai-terminal-pet --doctor` self-check command, so both items previously listed here as pending are now available.
 
@@ -759,8 +759,8 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 - **上报端已原生化**：`pet-hook.exe`（`--mode=claude|antigravity`）是 Claude Code 与 Antigravity 的正式上报端，JavaScript hook 保留为参照实现与降级路径。
 - **独立安装包**：做一个**签名过的** `pet-setup.exe` / `.msi`。未签名的单文件安装器**已经交付**（`pet-setup.exe`，`cmd/pet-setup`），现在缺的只有签名，以及企业分发需要的 MSI 打包。
-- **跨平台抽象探索**：计划将窗口渲染层抽象为通用接口，为后续探索基于 Unix 域套接字的平台移植奠定结构基础。
-- **二进制体积压缩**：计划将主程序体积从现状 4.36 MiB 降至 2.5 MiB 以内。手段包括剥离无用反射元数据、去掉未用包，以及把 pet-statusline 里基于 regexp 的脱敏规则改成手写扫描器。
+- **跨平台改造已进入施工**：内核（数据目录、socket 传输、自启、上报端）已经跨平台并在这台机器上验证过；**面板（浮窗本体）目前仍只有 Windows**，没有面板的构建会明确报错而不是悄悄启动。实测矩阵、每一步怎么验的、以及还没验证的部分都在 [docs/PLATFORMS.md](docs/PLATFORMS.md)，施工记录见 [docs/HANDOVER.md](docs/HANDOVER.md) §57。
+- **二进制体积与跨平台交付**：浮窗现在 4.44 MiB，§56.9 量过为什么旧的「压到 2.5 MiB」目标达不到——我们自己的代码只占约 250 KB，可砍的两块（`encoding/json` 与 `hang.log` 的 `pprof`+`flate`）都是功能本身。取代它的头号事项就是上面那条跨平台改造。
 
 v0.9.0 之后已交付：线协议规范文档 [docs/PROTOCOL.md](docs/PROTOCOL.md)（第三方可据此编写合规上报端）与 `ai-terminal-pet --doctor` 自检命令，原先列在此处的两项待办均已完成。
 
