@@ -101,6 +101,7 @@ func statuslinePayload(input map[string]any, state session.State, reason string,
 	payload.StartedAt = statuslineTimestamp(input, now, "started_at", "startedAt", "session_start_time")
 	payload.UpdatedAt = now
 	payload.Tool = reporter.StatuslineToolName(input)
+	payload.Title = reporter.ConsoleAnchorTitle()
 	payload.Terminal = "antigravity"
 	return payload.Finish(now)
 }

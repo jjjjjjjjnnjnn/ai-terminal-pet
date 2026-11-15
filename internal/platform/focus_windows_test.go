@@ -76,6 +76,10 @@ func TestTerminalWindowScoreFiltersNonTerminals(t *testing.T) {
 		{"CabinetWClass", "explorer.exe", -1},
 		{"Progman", "explorer.exe", -1},
 		{"", "unknown.exe", -1},
+		// ConPTY's helper window carries a shell's pid but can never be
+		// brought to the front (handover §61.4), so it must not be a target.
+		{"PseudoConsoleWindow", "powershell.exe", -1},
+		{"PseudoConsoleWindow", "cmd.exe", -1},
 	}
 	for _, test := range cases {
 		if got := terminalWindowScore(test.class, test.exe); got != test.want {

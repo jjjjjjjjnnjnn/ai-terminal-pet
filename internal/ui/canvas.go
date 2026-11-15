@@ -4,7 +4,7 @@ package ui
 //
 // This file has no build tag, and that is handover §55.6 step 2: the twelve
 // "rename-only" files (drawing_windows.go, drawing_compact_windows.go,
-// settings_text_windows.go, rows/mute/pulse/receipt/copy_toast/focus/tap/
+// settings_text.go, rows/mute/pulse/receipt/copy_toast/focus/tap/
 // attention/approve) never call Win32 at all - they call *canvas. The type was
 // Windows-only only because its GDI handles lived here. Now the buffer is the
 // plain thing it always was (width, height, stride, RGBA bytes) and each

@@ -33,6 +33,47 @@
 已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 
+## [1.0.11] & [1.2.20] — 2026-11-15（一处现场缺陷：agy 会话点不跳；附带设置布局三平台可测）
+
+### 修：Antigravity（agy）会话点「跳转」不生效
+- **根因（三次实测）**：`pet-statusline` 的 `parentPid` 是宿主为一次 statusline 渲染临时启动的 shell。
+  40 次采样里它每 2–3 秒换一次（32152 / 31332 / 97196 / …），下一次读取时**全部已死**，于是
+  `internal/platform` 的进程祖先链为空、每个候选窗口都丢掉 depth 加成，点击落到「找不到终端」。
+- **修法**：`internal/reporter` 新增 `ConsoleAnchorTitle()`（Windows 读自身控制台标题，POSIX 返回空），
+  `pet-statusline` 与 `pet-hook` 把它写进载荷的既有 `title` 字段——**线协议没有变化**，
+  `title` 本来就是"人类可读标题"，而解析器早已给完全标题匹配最高的分。
+  实测：把控制台标题设成 `命令提示符 - agy` 后，快照里 `title` 就是该字符串，
+  `ResolveTarget` 用该快照（`parentPid` 已死）仍能命中正确的 Windows Terminal 标签。
+- **顺带**：`PseudoConsoleWindow`（ConPTY 的隐藏助手窗口，跑在终端里的 shell 拥有、但
+  `SetForegroundWindow` 对它**一律失败**）不再被算作终端，也就不会被选中。
+- **没修的半边（诚实记录）**：从 `explorer` 启动、进程链上根本没有终端窗口的 agy，
+  仍然只能得到诚实的"找不到"，而不是跳到一个错误的窗口。
+- 两个回归测试：`TestAntigravityConsoleTitleResolvesWithoutLiveAncestry` /
+  `TestAntigravityConsoleTitleDoesNotBeatOwnTab`。
+
+### 改：设置窗口的布局与命中判定搬到平台中立文件（无用户可见变化）
+- `internal/ui/settings_layout.go`（新增，无构建标签）：页签表、行结构、几何、命中判定、键盘焦点环、绘制。
+- `internal/ui/settings_text_windows.go` → `settings_text.go`（它本来就一行 Win32 都不碰）。
+- 收益是**测试覆盖**：11 个纯算术测试从 `*_windows_test.go` 挪进 `settings_layout_test.go`，
+  现在在 Windows / Linux / macOS 上都跑。验收用 `TestRenderSettingsPreview` 的 5 张 PNG
+  与改动前逐像素相同（本轮 31 张预览全部 0 差异）。
+
+### 改：`go test -race` 进 CI
+- `ubuntu-latest` job 新增 `CGO_ENABLED=1 go test -race -count=1 ./...`（runner 自带 gcc；
+  Windows 与本机都没有，所以这是唯一能跑竞态检测的地方）。说法从"`-race` 未跑"变成
+  "Linux 上的竞态检测通过"。
+
+### 实测（本轮，数字都写进 docs/ROADMAP.md §3）
+- **L5 快照扫描**：1 文件 298 µs / 50 文件 **7.02 ms** / 200 文件 **22.7 ms** —— 5 ms 门槛在第 36 个
+  文件附近越线，`snapshot_bench_test.go` 复现，下一轮按 §3 的三步做。
+- **L3 投递 churn**：一次生产 `Server.read` 往返 **1.84–1.96 µs**，本机 90 秒内 80 次快照写入
+  （53 次/分钟），10 小时约 3.2 万次 —— 结论**不做优化**，原文的"80 万"是 goroutine 累计编号。
+
+### 文档
+- `docs/PLATFORMS.md`：音频行按代码重写（Windows 全量 / macOS 只有提醒音 / Linux **完全没有播放路径**，
+  并删掉从来不存在的那份 `sound_linux.go` 引用）；新增 **config 键 × 平台实际生效** 表，
+  其中 `notifications` 与 Linux 的整个 `sound*` 区块成为下一轮的工作清单。
+
 ## [1.0.10] & [1.2.19] — 2026-11-15（全平台发布：Windows / Linux X11 / macOS AppKit + 文档重构 + CI 四端全绿）
 
 ### 跨平台浮窗与系统适配（零 cgo，`CGO_ENABLED=0`）
@@ -49,6 +90,22 @@
   - **F2 键盘行导航**（`internal/ui/keyboard.go`，展开后 `Up/Down/Home/End` + `Enter` + `Esc`）；
   - **F5 按显示器工作区记忆坐标**（`internal/config` `State.Layouts` + `internal/ui/placement.go`）。
 - **文档与版本工具链重构**：全面重构 `README.md`（中英文）、`docs/PLATFORMS.md`、`docs/ROADMAP.md`、`docs/HANDOVER.md` 与 `docs/LAUNCH.md` 为跨 Windows / Linux / macOS 的一致描述；`tools/check_versions.mjs` 对齐 `internal/app/version.go` 并增设 Linux/macOS `.tar.gz` 版本校验条目。
+
+### 1.0.11 / 1.2.20 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.11` | `pet-setup.exe` | 14,478,848 B | `E5F597A2A1069F65CDC3B33D8F6FEE39C8F870BF41712BE0ECF7C41A4DA60240` |
+| `pet-v1.0.11` | `ai-terminal-pet-1.0.11-win-x64.zip` | 5,120,909 B（17 文件） | `31CAC5CA33B719605139E38E4C5B7A76024C353F90E000F694C22AA0339E685D` |
+| `pet-v1.0.11` | `ai-terminal-pet-1.0.11-linux-amd64.tar.gz` | 5,404,810 B | `76D50984405AAB36332C5E05FD57D9F8FB22B825F5AB759147AA29C6A140A9CB` |
+| `pet-v1.0.11` | `ai-terminal-pet-1.0.11-linux-arm64.tar.gz` | 4,916,094 B | `C36C2F56EA787F9B8B49CA165ECCA139DBBD5A8939BAD7B1AA2AF600BEF8DF25` |
+| `pet-v1.0.11` | `ai-terminal-pet-1.0.11-darwin-arm64.tar.gz` | 5,116,362 B | `25128B4202CC389622CBCA26843EBF59D0489FB8DC9873E46E8D5729F293E74B` |
+| `pet-v1.0.11` | `ai-terminal-pet-1.0.11-darwin-amd64.tar.gz` | 5,505,160 B | `2B31AB062FF6F574BFCCB377E97311078E6BB8E9E691DAB8DA3FC27B4EFED478` |
+| `dsh-plugin-v1.2.20` | `dsh-ai-terminal-pet-1.2.20.tgz` | 2,065,107 B（19 文件） | `6892C039DC0B13DD93DC9F3FC0DB494F84D58E6545BB8CE479517A6F7171934F` |
+
+`AI-Terminal-Pet.exe` **4,702,208 B**（sha256 `CDCA876B…`）、`pet-statusline.exe` **3,678,720 B**
+（`563CF6FE…`）、`pet-hook.exe` **3,705,344 B**（`737C46ED…`），全部按
+`-trimpath -buildvcs=false -ldflags "-s -w"` 与 `CGO_ENABLED=0` 构建。
 
 ### 1.0.10 / 1.2.19 发布包实测清单
 

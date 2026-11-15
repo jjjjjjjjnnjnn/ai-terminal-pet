@@ -207,6 +207,7 @@ func claudePayload(input map[string]any, state, reason string, now time.Time) re
 	payload.StartedAt = reporter.Timestamp(firstPresent(input, "started_at", "startedAt"), now)
 	payload.UpdatedAt = now
 	payload.Tool = reporter.StringField(input, "tool_name")
+	payload.Title = reporter.ConsoleAnchorTitle()
 	payload.Terminal = "claude"
 	return payload.Finish(now)
 }
@@ -240,6 +241,7 @@ func antigravityPayload(input map[string]any, state, reason string, now time.Tim
 	if tool := reporter.ObjectField(input, "toolCall"); tool != nil {
 		payload.Tool = reporter.StringField(tool, "name")
 	}
+	payload.Title = reporter.ConsoleAnchorTitle()
 	payload.Terminal = "antigravity"
 	return payload.Finish(now)
 }

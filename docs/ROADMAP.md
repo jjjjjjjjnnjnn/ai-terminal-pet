@@ -1,6 +1,6 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 **2026-11-15（浮窗 1.0.10 / 插件 1.2.19 已发版）**（上一版快照为 2026-11-13 的 v1.0.7）。本文分四块：现状基线、
+> 快照时间 **2026-11-15（浮窗 1.0.11 / 插件 1.2.20 已发版）**（上一版快照为 2026-11-13 的 v1.0.7）。本文分四块：现状基线、
 > 已交付批次、扩展计划、轻量化计划，以及一组实用功能候选与非目标。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
 >
@@ -9,11 +9,11 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-15，浮窗 1.0.10 / 插件 1.2.19 已发布） |
+| 维度 | 数值（2026-11-15，浮窗 1.0.11 / 插件 1.2.20 已发布） |
 |---|---|
 | 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.10`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.19` |
+| 版本 | `1.0.11`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.20` |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,702,208 B**（4.48 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,675,136 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,701,760 B**（3.53 MiB）；三个 Windows 二进制合计 **12,079,104 B** = 11.52 MiB |
@@ -33,7 +33,7 @@
 | 自检 | `ai-terminal-pet --doctor` **11 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘** |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.19**，19 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.19`，Windows bundle） |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.20**，19 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.20`，Windows bundle） |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
 
@@ -601,12 +601,19 @@ POSIX 上 `\\.\pipe\...` 是个合法文件名、`hang.log` 的时钟语义）�
 注意 `pet-statusline` 引了 `regexp`（脱敏规则）——这是体积大头之一，可改为手写扫描器。
 **验收**：`go build` 后主程序 < 2.5 MiB，且 `node --check` 与全部单测不变。
 
-### L3 — 管道连接的 goroutine churn
+### L3 — 管道连接的 goroutine churn ✅ 已实测（2026-11-15）：不做优化
 **现状**：`hang.log` 里出现过 goroutine 编号 79 万+，说明 10 小时内创建了约 80 万个短命 goroutine——
 go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `connectPipe` 等待者。
-单次开销极小，但频率高（statusline 高频上报时可达 20+/s）。
-**做法**：先量化（在 `Server` 加计数器），确认是否需要处理；若需要，考虑给服务端加连接复用
-或把上报端改为「变化才连」。
+**实测（本轮，两个数字合起来才是答案）**：
+- **一次投递往返**：`internal/pipeserver/delivery_bench_test.go` 的 `BenchmarkDeliveryRoundTrip`
+  在 `net.Pipe` 上跑生产 `Server.read`（读→解析→update→`OK`），**1.84–1.96 µs/op**（500x，i7-14650HX）。
+  这是进程内的地板价，真实路径再加一次 dial；但 1 µs 量级说明「连接数」本身不是瓶颈。
+- **事件速率**：同一台机器 90 秒窗口内实测 **80 次快照写入 = 53 次/分钟**（约 0.9/s，6 个活跃会话），
+  远低于原文担心的「20+/s」。按此速率，10 小时约 **32,000 次投递**，而不是 80 万。
+**结论：不做**。80 万那个数字对应的是 hang.log 里出现过的最高 goroutine 编号，不能直接读作
+"创建了 80 万个"——goroutine 编号是累计分配编号，包含所有 goroutine，不只是投递的。
+真要压，只有「上报端变化才连」这一条有意义，而 L1 的 30 秒短路已经在 statusline 上做了；
+再往下压属于为 1.84 µs 增加复杂度。
 
 ### L4 — 光栅化与重绘
 **已做**：DIB 画布复用、命中缓冲复用、动画定时器按状态装/卸。
@@ -614,10 +621,24 @@ go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `conn
 面板只有 56×156（紧凑）与 200×<内容高度>（展开，1–6 行自适应）逻辑像素，收益有限——
 **建议先测再动**，别为 0.3 ms 增加复杂度。（旧版本节写的 `40×190 / 200×250` 是 v0.5.0 之前的固定几何，早已被 `drawing_compact_windows.go:23-35` 的常量取代。）
 
-### L5 — 启动与扫描路径
-**现状**：快照扫描 2 s 一次，全目录 `ReadDir`。会话多、`runtime/` 残留多时会变贵。
-**做法**：`runtime/` 里按 mtime 排序 + 只扫最近 N 个；或给扫描加「目录 mtime 未变则跳过」。
-仅在实测扫描耗时 >5 ms 时才值得做。
+### L5 — 启动与扫描路径 ❌ 实测超标，**该做**（数字见下）
+**现状**：快照扫描 5 s 一次（`internal/app/app.go` 的 `scanInterval`；本节旧文写的 2 s 已过时），全目录 `Readdir` + 每个文件完整读取与解析。
+**实测**：`internal/store/snapshot_bench_test.go`（`-benchtime 50x`，i7-14650HX，NTFS）：
+
+| 快照文件数 | 每次 `Scan()` | 单文件 |
+|---|---|---|
+| 1 | **298 µs** | 298 µs |
+| 50 | **7.02 ms** | 140 µs |
+| 200 | **22.7 ms** | 114 µs |
+
+本机 `runtime/` 现在有 7 个文件（≈0.4 ms，无感）。**门槛 5 ms 在第 36 个文件附近就被越过**
+（298 µs 固定开销 + ≈140 µs/文件），而上限是 `DefaultMaxSnapshotFiles` 256 ≈ 30 ms——
+一次扫描 30 ms 在 UI 线程之外，但每秒 5 次、每次 30 ms 的磁盘读取是可见的电量与风扇成本。
+**做法（下一轮按顺序试）**：
+1. 目录 mtime 未变则跳过整轮（最便宜，代价是「mtime 精度」这个已知坑）；
+2. 按 mtime 只保留最近 N 个候选（`retainSnapshotCandidate` 已经在做这层，改的是 N 的来源）；
+3. 解析下沉：只对「mtime + size 变了的文件」重新 `ParsePayload`，其余复用上次结果。
+**验收**：200 文件下 <5 ms，且 `TestSnapshot*` 全绿。
 
 ## 4. 实用功能候选
 
@@ -814,8 +835,10 @@ I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三�
 所以那条「正式发声排在 β 之后」的约束**已经满足**：现在可以发声，而且四个数字终于一致。
 **2026-11-12 又交付了 F9**（浮窗 1.0.1 / 插件 1.2.7），见下方 F9 小节。
 宣传素材里的每一个数字都必须是当场跑出来的（**382** 个 `func Test` / 172 项新机检查 / **4.44** MiB），
-**不要写「全量安全扫描」**：`govulncheck` 与 `gosec` 从 2026-11-12 起已跑（见 §6），但 `go test -race`
-仍缺 gcc/cgo，所以「静态扫描 + 依赖漏洞扫描通过」可以说，「安全审计通过」不能说。
+**不要写「全量安全扫描」**：`govulncheck` 与 `gosec` 从 2026-11-12 起已跑（见 §6），
+`go test -race` 自 2026-11-15 起在 CI 的 `ubuntu-latest` job 里跑（本机没有 gcc，Windows runner 也没有），
+但「竞态检测只在 Linux 上跑」这句话要跟着说，所以「静态扫描 + 依赖漏洞扫描通过 + Linux 上的竞态检测通过」
+可以说，「安全审计通过」不能说。
 
 **下一次改版本号之前请先读这一段**：`pet-v0.9.0`、`pet-v1.0.0`、`pet-v1.0.1` 三份资产都已发布且
 **不可变**；插件线的九个 tag 同理（`dsh-plugin-v1.0.0` … `v1.2.7`）。1.0.1 → 1.0.2 会是新的 tag 与新资产，
@@ -847,7 +870,9 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 
 - `hang.log` 看门狗是**事后取证**而非自愈；转储上限已压到 3 次 + 2 min 冷却 + 记录最后消息名。
 - UI 无自动化视觉回归，靠 `--doctor`（E6，已交付但只覆盖环境/安装/运行期状态，**不做视觉比对**）+ 探针脚本 + `TestRenderPreview` / `TestRenderSettingsPreview` 光栅化 PNG 人工验证。
-- `go test -race` 仍未跑（Windows 上的 `-race` 需要 gcc/cgo，本机没有）。**`govulncheck` 与 `gosec` 已于
+- `go test -race` **于 2026-11-15 移进 CI**：`linux` job 多一步 `CGO_ENABLED=1 go test -race -count=1 ./...`
+  （ubuntu runner 自带 gcc；本机 Windows 上没有，Windows runner 也不提供，所以那一步永远不在 Windows 上跑）。
+  因此现在的说法是「Linux 上的竞态检测通过」，而不是「竞态已排除」。**`govulncheck` 与 `gosec` 已于
   2026-11-12 补上**（两者都是纯 Go 程序，不需要 C 工具链）：`govulncheck@v1.9.0` 报「没有被实际调用的漏洞」
   （代码受影响 0 条；另有 2 条在 import 的包、14 条在依赖模块里，但本代码调不到），
   `gosec@v2.30.0` 在 high severity + high confidence 上是 **0 条**，排除方式与理由写在

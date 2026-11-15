@@ -393,6 +393,17 @@ jobs:
       - name: go test
         run: go test -count=1 ./...
 
+      # The race detector needs cgo and a C compiler, which the Windows job
+      # cannot provide (and this machine has no gcc either - `which gcc` is
+      # empty in WSL too). ubuntu-latest ships both, so the one dimension no
+      # developer machine can check runs here. It is a separate step with
+      # CGO_ENABLED=1 because the job-level 0 is what keeps the shipped
+      # binaries reproducible; -race never builds a shipped byte.
+      - name: go test -race
+        env:
+          CGO_ENABLED: 1
+        run: go test -race -count=1 ./...
+
       - name: Build Linux binaries
         run: |
           go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/AI-Terminal-Pet ./cmd/ai-terminal-pet
@@ -498,9 +509,11 @@ jobs:
   # that "the same source builds the same bytes"; the scanners get a toolchain
   # that matches what they ask for.
   #
-  # Neither scanner needs gcc/cgo, which is why they can run at all here -
-  # `go test -race` does need them on Windows and stays a documented gap
-  # (docs/ROADMAP.md §6).
+  # Their go.mod floors are newer than this module's, and neither needs gcc/cgo -
+  # which is why they run here. `go test -race` DOES need a C toolchain, so it
+  # lives in the `linux` job on ubuntu-latest instead (see that job's step and
+  # docs/ROADMAP.md §6): this machine has no gcc, and the Windows runner does
+  # not provide one either.
   scan:
     name: vulnerability and static analysis
     runs-on: windows-latest

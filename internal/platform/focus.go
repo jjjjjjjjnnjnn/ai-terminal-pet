@@ -97,6 +97,14 @@ func terminalWindowScore(class, exe string) int {
 	lowerClass := strings.ToLower(class)
 	lowerExe := strings.ToLower(exe)
 	switch {
+	// ConPTY's hidden helper window. It belongs to the shell inside the
+	// terminal, carries that shell's pid, and cannot be activated at all:
+	// SetForegroundWindow returns false on every one of them (measured
+	// 2026-11-15, handover §61.4). Scoring it as a terminal made a jump pick
+	// a window that could never come forward, which read as "the click did
+	// nothing".
+	case strings.Contains(lowerClass, "pseudoconsolewindow"):
+		return -1
 	case strings.Contains(lowerClass, "cascadia_hosting_window_class"):
 		return 30
 	case lowerClass == "consolewindowclass" || strings.Contains(lowerClass, "mintty"):

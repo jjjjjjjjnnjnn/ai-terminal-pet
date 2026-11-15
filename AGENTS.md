@@ -90,9 +90,10 @@ gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
 
-# 1b. The two scanners that need no C compiler (so they run here; -race needs
-#     gcc/cgo, see docs/ROADMAP.md §6). Both are pinned, and both declare a Go
-#     newer than this module's floor, so CI runs them in a separate `scan` job.
+# 1b. The two scanners that need no C compiler (so they run here). Both are pinned,
+#     and both declare a Go newer than this module's floor, so CI runs them in a
+#     separate `scan` job. `go test -race` needs cgo/gcc, which this machine
+#     does not have: CI runs it in the `linux` job on ubuntu-latest (ROADMAP §6).
 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...      # "No vulnerabilities found"
 go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -severity high -confidence high -exclude G115 \
   -exclude-rules "(cmd/ai-terminal-pet/main|internal/app/app_windows|internal/ui/app_windows|internal/reporter/approval)\.go:G703" ./...

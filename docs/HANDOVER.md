@@ -6,13 +6,17 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-15；浮窗 **1.0.10**、插件包 **1.2.19** 已发版；**§60 全平台全量化发布：Windows Win32 + Linux 纯 Go X11 + macOS 纯 Go AppKit + POSIX CLI/安装打包器 + 公开文档重构 + 四条 GitHub Actions CI 全绿**）
+## 1. 当前状态（2026-11-15；浮窗 **1.0.11**、插件包 **1.2.20** 已发版；**§61 第 61 轮：agy 会话点不跳的根因修复 + 设置布局三平台可测 + `-race` 进 CI + L3/L5 实测（一个"不做"、一个"该做"）；§60 是全平台全量化发布那一轮**）
 
-> 接手请先读本节与 **§57「跨平台施工（第 1–7 步），以及这一版为什么还没发」**（最新一轮；
-> 九个提交、三平台实测矩阵、五个"看起来对其实错"的地方、以及窗口层为什么不在这一版里），
+> 接手请先读本节与 **§61「agy 点不跳的根因、设置布局搬出 Windows 文件、`-race` 进 CI，以及 L3/L5 的两个数字」**
+> （最新一轮：三层取证、控制台标题锚点、一个被否掉的方案、没修的半边、以及两个性能数字给出"不做"和"该做"），
+> 再读 **§60「POSIX 路径/信号收口、文档全面重构与 1.0.10 / 1.2.19 全平台全量化发布」**（上一轮的收口与发版），
+> 再读 **§57「跨平台施工（第 1–7 步），以及这一版为什么还没发」**
+> （九个提交、三平台实测矩阵、五个"看起来对其实错"的地方、以及窗口层为什么不在那一版里），
 > 再读 **§56「`--doctor` 现在会看上报端接入，`--connect` 只打印」**，
 > 再读 **§55「交接：下一步是 macOS / 其他系统 —— 先盘点，别先动手」**
-> （跨平台盘点：可搬行数、今天 darwin 上编译到哪一步、五层要换什么、七步顺序与五个坑，**仍是下一步**），
+> （跨平台盘点：可搬行数、当时 darwin 上编译到哪一步、五层要换什么、七步顺序与五个坑——**那七步在第 57–60 轮已走完**，
+> 读它是为了看那五个坑与判断方式，不是为了照着再走一遍），
 > 再读 **§53「交接：上报端只剩一份实现」**（本机现在加载的是仓库里的 `reporters/opencode.js`，
 > 本地目录插件只是一次静态 re-export），再读
 > **§52「交接：两个现场缺陷已修 —— 归档即结束、设置窗口不再跟着自毁」**（1.0.8 / 1.2.17 的代码与验收）、
@@ -39,30 +43,27 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.10`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.19`**。
+- **版本**：浮窗 **`1.0.11`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.20`**。
   两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.10` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.19`。
   **工作区与本机安装目录已经与 `1.0.10` / `1.2.19` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` **4,702,208 B**，sha256 `B69CA725…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**409 个** `func Test`，
-  Windows / Ubuntu / macOS 真实 GitHub Actions runner 全部通过）；`scripts/cross-build.sh` 全 16 个包三端 `CGO_ENABLED=0` 通过；
-  上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **10/10**；
-  三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
-  `tools/check_versions.mjs` 全套版本形状一致（`node --test tools/check_versions.test.mjs` 26/26）；
-  `tests/fresh-machine.mjs --no-overlay` 全过；`tools/check_docs_links.py` **12 份**文档全解；
-  `govulncheck` + `gosec` 零告警；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
-  `--doctor` **11 项**（win/linux/macOS 覆盖环境、安装、配置、管道/socket、宿主接入、自启与判定）。
-- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.10 实测）：非测试 **131 文件 / 26,138 行**、
-  测试 **77 文件 / 11,894 行**、**409 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,702,208 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
-  `bin/pet-statusline.exe` **3,675,136 B**、`bin/pet-hook.exe` **3,701,760 B**；
-  `dist/` 里是 `1.0.10` 的六端全量产物（`ai-terminal-pet-1.0.10-win-x64.zip` 5,117,683 B、
-  `pet-setup.exe` 14,471,680 B、`linux-amd64.tar.gz` 5,404,271 B、`linux-arm64.tar.gz` 4,916,092 B、
-  `darwin-arm64.tar.gz` 5,115,500 B、`darwin-amd64.tar.gz` 5,504,624 B），
-  均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 与 `CGO_ENABLED=0` 构建，见 §26；
-  第三方直引依赖 6 个（+ 1 个间接 `golang.org/x/text`）。
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**415 个** `func Test`，
+  本机 Windows 全过；CI 四条 job 覆盖 windows / ubuntu / macOS / scan，其中 ubuntu 增加 `go test -race`）；
+  `scripts/cross-build.sh` 全 16 个包三端 `CGO_ENABLED=0` 通过；上报端逐个 `node --check` 全过；
+  `node --test reporters/opencode-events.test.mjs` 10/10；两个 `verify.mjs` 全 PASS；
+  `vendor.mjs --check` 两文件吻合（源码摘要与 1.2.20 的 `bin/` 一致）；
+  `tools/check_versions.mjs` 20 条版本形状一致（`node --test tools/check_versions.test.mjs` 26/26）；
+  `tests/fresh-machine.mjs --no-overlay` **172/172**（38.5 s）；`tools/check_docs_links.py` 12 份文档全解；
+  `govulncheck` + `gosec` 零告警（CI `scan` job）；`--doctor` 11 项（本轮 10 ok / 1 warn / 0 fail，
+  warn 是"Antigravity 只接了 statusline、没有结束信号"这条已知事实）。
+- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.11 实测）：非测试 **135 文件 / 26,324 行**、
+  测试 **84 文件 / 12,251 行**、**415 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,702,208 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `CDCA876B…`）、
+  `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`）、`bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`）。
+  三个二进制合计 **12,086,272 B** = 11.53 MiB。
 - **分发（两条线）**：
   - 插件线：npm `latest` = **1.2.19**；`dsh-plugin-v1.2.19` 的 Release 资产
     `dsh-ai-terminal-pet-1.2.19.tgz` **2,064,860 B / sha256 `40AC7D26…` / shasum `d6b0a467…`**（19 个文件，
@@ -4263,6 +4264,115 @@ hook 3,701,760 B。三个文件与 `vendor/`、本机安装目录逐字节相同
      - **Commit B (`e53c7ea`)**：将 `docs/market-index.json` 的 `source.commit` 与 `icon` 钉死在 Commit A 的真实 SHA；
      - **上游 PR 同步**：在 `awesome-dsh-plugin` 开启 PR [#15626](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15626) 并关闭旧 PR #15482，`tools/upstream-entry.mjs --check` 判定 in flight 通过；
      - **全端 CI 4/4 绿灯**：Commit B 的重跑 CI（Run `43734286878`）在 `windows-latest`、`ubuntu-latest`、`macos-latest` 与安全扫描全部通过；本机安装目录已更新为 1.0.10，`install.ps1 -VerifyOnly` 11/11 匹配，`--doctor` 10 ok / 1 warn / 0 fail。
+
+## 61. 交接：agy 点不跳的根因、设置布局搬出 Windows 文件、`-race` 进 CI，以及 L3/L5 的两个数字（2026-11-15 晚，第 61 轮；浮窗 **1.0.11** / 插件 **1.2.20**）
+
+用户报的唯一一条现场缺陷：**"对于本机的 agy，pet 无法点击自动跳转"**。本轮先取证再改代码，取证过程
+本身就是 rond 61 最有价值的部分，所以按"证据 → 机制 → 修法 → 没修的半边"记。
+
+### 61.1 取证：三层证据，每一层都能否掉一个假设
+
+1. **会话确实在面板里**：`--json` 里有 `source=antigravity-statusline`、`project` 正确、
+   `state` 跟着 agy 变。所以不是"没收到上报"。
+2. **窗口确实存在且是候选**：`EnumWindows` 快照里能列出该标签（`CASCADIA_HOSTING_WINDOW_CLASS`，
+   标题 `命令提示符 - agy` / `Windows PowerShell`），`terminalWindowScore` = 30。
+   所以不是"窗口类没被识别"。
+3. **`parentPid` 是死的**：把快照里的 `parentPid` 拿去 `Get-CimInstance` 查，40 次采样里每 2–3 秒换一个
+   （32152 / 31332 / 97196 / 17492 / 100548 …），**每一次在下一次读取时都已经不存在**。
+   `pet-statusline` 在宿主为一次 statusline 渲染而临时启动的 shell 里运行，`os.Getppid()` 记下的正是那个
+   一次性进程。`internal/platform` 的祖先链因此为空，所有候选窗口都拿不到 depth 加成，
+   只剩 `classScore`（30）< 阈值 40 → **`selectFocusWindow` 返回 false**，点击落到"找不到终端"。
+   用真实快照形状跑 `selectFocusWindow`：`ok=false`，这就是现场。
+
+### 61.2 修法：控制台标题作为跳转锚点（线协议一个字没动）
+
+`AttachConsole(pid)` + `GetConsoleTitleW` 读到的标题**就是 Windows Terminal 渲染的那个标签标题**。
+实测两条 agy：标签 `命令提示符 - agy` 的那条读回 `命令提示符 - agy`；标签 `Windows PowerShell`
+的那条读回 `Windows PowerShell`。所以：
+
+- `internal/reporter/console_windows.go`（新增）：`ConsoleAnchorTitle()` 先读**自己的**控制台
+  （statusline 是终端里那个 shell 的子进程，自己的控制台就是宿主那个，不需要 attach，
+  也就不可能弄丢 stdout 那一行）；自己读不到时才 `AttachConsole(os.Getppid())`，
+  读完 `FreeConsole` + 重新 attach 回 `GetConsoleProcessList` 里最小的那个 pid。
+- `internal/reporter/console_anchor.go`（无标签）：`sanitizeConsoleTitle` 拒绝"看起来是二进制路径"的值
+  （未设标题的控制台会返回 `…\powershell.EXE`，而任何窗口标题都不会包含它）。
+- `internal/reporter/console_posix.go`：返回空串——POSIX 上会话身份来自 pty，与窗口标题没有这层关系。
+- `cmd/pet-statusline/main.go` 与 `cmd/pet-hook/main.go`：`payload.Title = reporter.ConsoleAnchorTitle()`。
+  **`title` 本来就是"人类可读标题"**，解析器早已给完全标题匹配 +100 分，所以这不是协议变更。
+- `internal/platform/focus.go`：`PseudoConsoleWindow` 不再被算作终端。实测 ConPTY 的隐藏窗口
+  对 `SetForegroundWindow` **一律返回 false**（7 个句柄全部失败，前台窗口编号一次没变），
+  它偏偏又带着终端里那个 shell 的 pid——选中它等于"点了没反应"。
+
+**端到端复验（本机）**：把控制台标题设成 `命令提示符 - agy` → 跑新 `pet-statusline` →
+快照里 `"title":"命令提示符 - agy"` → 拿这份真实快照喂 `ResolveTarget`（`parentPid` 已死）
+→ `ok=true hwnd=0x1e61462 windowTitle="命令提示符 - agy"`。三个回归测试钉住两个半：
+`TestAntigravityConsoleTitleResolvesWithoutLiveAncestry`、`TestAntigravityConsoleTitleDoesNotBeatOwnTab`、
+`TestConsoleAnchorTitleRoundTrip`（真控制台，设置→读→复原）。
+
+### 61.3 一个被否掉的方案（记下来，别重新发明）
+
+最初的实现是"拿不到自己的标题就 attach 父进程读，再 attach 回去"。它在 Windows Terminal 里能用，
+但把 `FreeConsole` 放在 stdout 那一行之前就会让 `pet idle` 这一行落进虚空——而那一行是 statusline
+**唯一可见的产物**。所以最终只保留"读自己的控制台"这一条，attach 路径只作为父进程兜底，
+并且**在任何返回值之前**都把控制台还回去。
+
+### 61.4 没修的半边（诚实记录）
+
+从 `explorer.exe` 双击启动的 agy（进程链 `agy ← cmd ← explorer`，链上没有终端窗口），
+仍然只会得到 `ok=false`，也就是"找不到"这句诚实的回答，而不是跳到一个错误的窗口。
+要修它需要在会话身份里引入"这个 agy 属于哪个窗口"的另一种证据（例如按 `_NET_WM_PID`/hwnd 反查），
+那是下一轮的事。
+
+### 61.5 设置窗口的布局搬出 Windows 文件（零用户可见变化，收益是覆盖率）
+
+`internal/ui/settings_windows.go` 2,204 行里，只有 900 行真的碰 Win32；
+tabs/rows/geometry/hit-test/focus/drawing 都是纯算术。本轮把它们搬进：
+
+- `internal/ui/settings_layout.go`（新增，**无构建标签**）：页签表、行结构、几何、命中判定、焦点环、绘制；
+- `internal/ui/settings_text_windows.go` → `settings_text.go`（改名，它本来就一行 Win32 都不碰）；
+- `internal/ui/settings_windows.go` 剩 906 行：窗口类、DPI、消息泵、分层表面，加 6 个 `*App` 适配器。
+
+**验收是像素级的**：`TestRenderPreview` + `TestRenderSettingsPreview` 在改动前后各出 31 张 PNG，
+**逐文件 sha256 全部相同**（0 差异）。11 个纯算术测试从 `*_windows_test.go` 挪到
+`settings_layout_test.go`，现在 Linux / macOS 的 `go vet` 与 `go test` 都会跑它们——
+这就是这次重构唯一真正的产出。
+
+**顺带修掉一个真 bug**：`TestSettingsKeyboardIsOptIn` 在全量跑时偶发失败（focus index 12），
+原因是 `handleSettingsKey` 直接读真实键盘的 Shift 状态，而跑测试的时候人可能正按着 Shift。
+改成读一个可替换的 `settingsShiftDown`，测试固定它；生产行为一字未变。
+
+### 61.6 `go test -race` 进 CI（本机仍然没有 gcc）
+
+`ubuntu-latest` 的 `linux` job 增加一步 `CGO_ENABLED=1 go test -race -count=1 ./...`。
+本机没有 gcc（WSL 里也没有），Windows runner 也不提供，所以这是唯一能跑竞态检测的地方。
+说法也跟着改：**"Linux 上的竞态检测通过"**，不是"竞态已排除"（AGENTS.md §1b、ROADMAP §6 同步）。
+
+### 61.7 L3 / L5 的两个数字：一个"不做"，一个"该做"
+
+ROADMAP §3 要求"先测再动"。两个测量都写成 `*_test.go`（测试文件不进 vendor 源码摘要，
+所以记数不花版本号）：
+
+| 项 | 实测 | 结论 |
+|---|---|---|
+| **L3** 一次投递往返 | `BenchmarkDeliveryRoundTrip`（生产 `Server.read`：读→解析→update→`OK`）**1.84–1.96 µs** | **不做优化** |
+| **L3** 事件速率 | 90 s 窗口内 **80 次快照写入 = 53 次/分钟**（约 0.9/s，6 个活跃会话） | 10 小时约 3.2 万次投递，原文担心的"20+/s"不成立；"80 万"是 goroutine 累计编号，不是投递数 |
+| **L5** 快照扫描 | 1 文件 **298 µs**、50 文件 **7.02 ms**、200 文件 **22.7 ms**（≈140 µs/文件 + 298 µs 固定） | **5 ms 门槛在第 36 个文件附近越线**，该做；`scanInterval` 现在是 5 s 不是 2 s |
+
+L5 的三步做法（目录 mtime 短路 → 只保留最近 N 个 → 解析下沉）已写进 ROADMAP §3，验收是 200 文件 <5 ms。
+
+### 61.8 版本与发版
+
+浮窗 **1.0.11** / 插件 **1.2.20**（改动碰了 `internal/ui`，vendor 源码摘要必须重算，所以必须发新版本号）。
+包体 **2,065,107 B / sha256 `6892C039…` / shasum `40f63b36…` / 19 文件**；三个二进制
+`AI-Terminal-Pet.exe` 4,702,208 B（`CDCA876B…`）、`pet-statusline.exe` 3,678,720 B（`563CF6FE…`）、
+`pet-hook.exe` 3,705,344 B（`737C46ED…`）。npm `latest` = 1.2.20，上游条目跟进 PR 待开。
+
+### 61.9 下一轮从这里开始
+
+1. **L5 扫描优化**（数字在 §61.7，门槛已经越线，是唯一"该做"的性能项）；
+2. **POSIX 平权**：`docs/PLATFORMS.md` 新表的第 1、2 行——Linux/macOS 的 `notifications`
+   （没有任何气泡表面）与 Linux 的整个 `sound*` 区块；
+3. **macOS 设置窗口**：仍然**不做**（没有真机，CI 上 AppKit 窗口探针是 opt-in skip）。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 
