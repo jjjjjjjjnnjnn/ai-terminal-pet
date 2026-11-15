@@ -27,7 +27,16 @@ func controlSocketPath() string {
 	}
 	norm := strings.ToLower(strings.TrimRight(homeDir, `\/`))
 	sum := sha256.Sum256([]byte(norm))
-	return filepath.Join(dir, "ai-terminal-pet-ctl-"+hex.EncodeToString(sum[:4])+".sock")
+	name := "ai-terminal-pet-ctl-" + hex.EncodeToString(sum[:4]) + ".sock"
+	path := filepath.Join(dir, name)
+	// Keep within BSD/macOS sockaddr_un.sun_path 104-byte limit (103 chars + NUL).
+	if len(path) > 103 {
+		short := filepath.Join("/tmp", "petctl-"+hex.EncodeToString(sum[:4])+".sock")
+		if len(short) <= 103 {
+			return short
+		}
+	}
+	return path
 }
 
 func postControlMessage(action ControlAction) bool {

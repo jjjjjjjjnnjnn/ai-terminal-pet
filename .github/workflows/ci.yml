@@ -415,7 +415,7 @@ jobs:
           "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --version
           "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --connect
           "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --doctor
-          "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --reset
+          "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --quit
           sh ./scripts/install.sh --uninstall
           node scripts/package-unix.mjs --target=linux/amd64,linux/arm64 --output="$sandbox/dist"
 
@@ -478,7 +478,7 @@ jobs:
           "$install_dir/AI-Terminal-Pet" --version
           "$install_dir/AI-Terminal-Pet" --connect
           "$install_dir/AI-Terminal-Pet" --doctor
-          "$install_dir/AI-Terminal-Pet" --reset
+          "$install_dir/AI-Terminal-Pet" --quit
           sh ./scripts/install.sh --uninstall
 
   # The two scanners live in their own job for one concrete reason: both

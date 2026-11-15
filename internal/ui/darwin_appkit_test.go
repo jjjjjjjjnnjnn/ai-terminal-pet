@@ -26,7 +26,13 @@ func TestDarwinCocoaClassesAndHelpersHeadlessSafe(t *testing.T) {
 }
 
 func TestDarwinControlSocketRoundTrip(t *testing.T) {
-	tmp := t.TempDir()
+	// Keep the socket directory short: macOS sockaddr_un limits paths to 104 bytes
+	// and t.TempDir() under /var/folders/... already spends ~90 bytes.
+	tmp, err := os.MkdirTemp("/tmp", "petctl-")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(tmp) })
 	t.Setenv("TMPDIR", tmp)
 	t.Setenv("HOME", tmp)
 

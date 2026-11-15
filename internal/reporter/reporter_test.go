@@ -350,8 +350,16 @@ func TestWaitForApprovalDecisionObservesLateVeto(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read dir: %v", err)
 		}
-		if len(entries) > 0 {
-			veto := filepath.Join(directory, entries[0].Name()+".deny")
+		var pendingName string
+		for _, entry := range entries {
+			name := entry.Name()
+			if strings.HasPrefix(name, approvalPendingPrefix) && strings.HasSuffix(name, ".json") {
+				pendingName = name
+				break
+			}
+		}
+		if pendingName != "" {
+			veto := filepath.Join(directory, pendingName+".deny")
 			if err := os.WriteFile(veto, []byte(`{"decision":"deny"}`), 0600); err != nil {
 				t.Fatalf("write veto: %v", err)
 			}
