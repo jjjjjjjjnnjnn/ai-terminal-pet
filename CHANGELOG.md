@@ -41,6 +41,37 @@
 两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
 [docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
+## 报告未接入 — 2026-11-15 晚（第 56 轮；`--doctor` 第 11 项 + 只打印的 `--connect`，**尚未发版**）
+
+浮窗一直有个看不见的半边：`--doctor` 的十项检查全在看**这个项目往机器上放了什么**（安装目录、管道、
+Run 键、node），而故障实际发生的那一边是**别人家的配置**——`opencode.json` 里一条过期路径、
+一个 wrapper 的 import 目标搬走了、`pet-statusline.exe` 被删掉了。这三种看起来都像"终端闲着"，
+因为上报端是 fire-and-forget（AGENTS 第 1 条），失败是静默的。
+
+这一轮把那一半补上，并且顺手把两轮辛苦查出来的答案变成一行检查：
+
+- **`--doctor` 第 11 项 `reporters`**（`internal/connect`，8 个非测试文件 1,599 行 + 21 个 `func Test`）：
+  读 OpenCode / Claude Code / Antigravity 三份宿主配置，回答"接没接""指向的文件还在不在""能不能发结束信号"。
+  OpenCode 会**跟到第二跳**（`plugins[]` → 目录 → `index.ts` 的静态 `file://` import → 那个文件在不在），
+  这正是 §52.3 那次"宿主里加载的上报端不在仓库里"的形状。Claude Code 会跟 `node <wrapper>.js` 走到它
+  `require` 的那个安装目录桥（本机的 `pet-ipc.js`）。Antigravity 会说明它只有电平上报端时
+  **会话结束停在 `idle` 而不是 `closed`**（§53.5 查了整轮的那件事），有 `termination` 钩子才判 `ok`。
+- **判定表**：未安装 → `warn`；未接入 → `warn`；接上了但目标是我们自己的文件且不存在 → `fail`；
+  配置不是纯 JSON → `warn` 并给出出错行号，**不冒充"未接入"**。未安装判 `warn` 不是客气：
+  `tests/fresh-machine.mjs` 的 S5 断言独立安装后零 fail，而沙箱里没有 `.claude` / `.gemini` / `.config`。
+- **`--connect[=opencode|claude|antigravity]`**：打印要粘贴的片段并填好真实绝对路径（OpenCode 是百分号编码的
+  `file:///`，Claude Code 是八事件的 hooks 块，Antigravity 是 `statusLine` 块），装件缺失时先说要装什么而不是
+  打印一条注定跑不通的命令。**只打印、不写盘**——有一条测试在运行前后给三棵配置目录拍快照并比对。
+  它与 `--doctor` 共用一份读取逻辑，所以片段不可能描述出一个检查随后会判"缺失"的形态。
+- **报告不泄露配置内容**：`opencode.json` 在本机带 API key，每个 detail 行都只出现路径、条目数与事件名，
+  测试里放了一个 `sk-…` 哨兵值并断言它不出现在报告里。
+- **计数同步**：README 英中两处（英文表原来写 9 项、代码是 10 项）、`ROADMAP` §0 与 §E6 差异第 4 条、
+  `HANDOVER` §1、`main.go` 的 `usage`、AGENTS 的标准验证命令。
+
+**未发版**：这一批改了 `internal/app` 与 `cmd/`，`vendor/manifest.json` 的源码摘要必然要重算，
+所以仓库里的 `packages/dsh-ai-terminal-pet/` 暂时与已发布的 1.2.18 tarball 分叉
+（§29.5 已有同样先例）。下一次发布是浮窗 `1.0.10` / 插件 `1.2.19`，走 `docs/UPSTREAM.md` 的八步。
+
 ## 上报端来源统一 — 2026-11-14 深夜（第 53 轮；随 1.0.8 / 1.2.17 交付，不占版本号）
 
 第 52 轮发现本机真正加载的上报端是 `~/.config/opencode/plugins/terminal-pet/index.ts`——一份不在

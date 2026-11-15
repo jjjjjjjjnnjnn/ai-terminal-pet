@@ -69,7 +69,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (341 func Test across 12 packages)
+# 1. Static analysis and all unit tests (366 func Test across 13 packages)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -109,7 +109,7 @@ node tests/fresh-machine.mjs --no-overlay
 # 4. Install, then let the shipped binary prove the install
 .\scripts\install.cmd                 # cmd wrapper: RemoteSigned refuses a downloaded .ps1
 .\scripts\install.cmd -VerifyOnly     # per-file SHA256; exit 0 only when everything matches
-& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 10 checks; exit 1 on any failure
+& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --doctor   # 11 checks; exit 1 on any failure
 .\scripts\install.cmd -AddToPath      # optional: adds the install dir to HKCU Path
 .\scripts\install.cmd -Uninstall      # needs `yes` at the prompt, or -Force
 

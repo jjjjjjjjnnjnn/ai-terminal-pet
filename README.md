@@ -194,6 +194,8 @@ Installing a terminal hook is required for that terminal to report; see the next
 
 Writing your own reporter for a tool that is not listed here needs no source reading: [docs/PROTOCOL.md](docs/PROTOCOL.md) specifies the wire protocol (fields, state semantics, pipe-name derivation, acknowledgment contract, and redaction rules) that a conforming reporter must implement.
 
+The first three rows above do not have to be copied by hand: `ai-terminal-pet --connect` prints the block to paste — the percent-encoded `file:///` URL for OpenCode, the eight-event hooks object for Claude Code, the `statusLine` block for Antigravity — with the real absolute paths already filled in. It **prints only and writes nothing**: editing another product's configuration means guessing its schema, and this project does not guess. Paste it, then run `ai-terminal-pet --doctor` again: its `reporters` line reads those three configurations back and says whether each terminal is wired, whether the files it points at still exist, and whether it can even emit an end signal (with a statusline reporter alone, an Antigravity session ends at `idle`, never `closed`).
+
 The Harness side is a host-only Cordis bundle: it holds no pipe-name, state-set or snapshot logic of its own, it loads the protocol from `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` and delegates everything to it.
 
 The Harness side has a second, self-contained option since `dsh-ai-terminal-pet` `1.1.0`: a standalone DSH plugin package at [`packages/dsh-ai-terminal-pet`](packages/dsh-ai-terminal-pet), also shipped as a GitHub Release asset. The package is now **1.2.18** (tag `dsh-plugin-v1.2.18`, asset `dsh-ai-terminal-pet-1.2.18.tgz`); 1.2.15 and everything before it stay published and immutable but are superseded. 1.2.15 was the DSH 0.2.x compatibility release: `engines.dsh` moved to `>=0.2.0-0 <0.3.0-0` and `engines.node` to `>=24.9.0`, after installing the tarball into a real 0.2.0-rc.1 host and a real 0.2.2-rc.3 host. 1.2.16 changes no code either: the package now ships a Chinese README next to the English one (`README.zh.md`, which is what turns a catalogue's "only an English version exists" note into a real Chinese page) and its `dsh.catalog` summary leads with the question the overlay answers. 1.2.9 through 1.2.16 carry overlay 1.0.3 through 1.0.7 (1.2.12 and 1.2.13 both carry 1.0.6; 1.2.14, 1.2.15 and 1.2.16 all carry 1.0.7): 1.0.3 turned alerts into a decision with a written receipt (`alerts.json`, which `--json` and `--doctor` read back); 1.0.4 moved that receipt next to `config.json`, because the runtime scanner deletes any snapshot file in `runtime/` it cannot parse; 1.0.5 made a click on a session row copy its project path and answer with an on-panel receipt; 1.0.6 tracked down three phantom alerts (a vanished session no longer counts as a completion, one conversation is one row, and OpenCode 2.x events map to the states they mean); 1.0.7 rebuilt the settings window - four real type sizes instead of two, hints that wrap instead of being cut with an ellipsis, its own DPI, and a Look tab that finally switches. 1.2.7 shipped the 1.0.1 overlay, whose compact strip answers "which terminal is blocked, and for how long" without expanding the panel; 1.2.8 shipped 1.0.2, where the look itself became a setting - three named palettes, an optional per-terminal tint on each row's source name, and "start hidden". 1.2.5 is the first version that works on a machine that never ran the overlay: it declares `vendor/package.json` as CommonJS (without it, `require()` of the shipped protocol returned a namespace with no `sendStatus`, so a `DSH_PET_NO_BOOTSTRAP=1` install silently reported nothing), it reads the project path, lineage and start time from the session header instead of `process.cwd()` (the desktop Harness starts from the install directory, so every session was attributed to one wrong path), and its de-duplication signature now covers state, reason, tool, project, title and parent session instead of state alone. 1.2.4 was a wording fix (one market install read as if it covered every terminal, and it does not - the bundle mirrors **Harness** sessions out of the box, while OpenCode, Claude Code and Antigravity sessions appear only after each of those terminals gets its own reporter); 1.2.3 added the `dsh.marketplace` block a third-party storefront reads before offering a plugin to its desktop client, and 1.2.2 moved the installer from the repository root into `scripts/`, which edits Go comments, which changes the source digest `vendor/manifest.json` records. Release assets cannot be edited, so a wording or manifest fix costs a version - shipping different bytes under an unchanged version is exactly the drift this repository removes. The three install forms are verified end to end, and the 1.2.4 assets were installed again from three fresh directories after the release went out: the release tarball in **1.8 s**, the tag-pinned git source in **3.7 s**, and the repository URL in **6.5 s**, all rc=0, with the unpacked bytes matching `git show ff7f6de:` file for file (a bare `add dsh-ai-terminal-pet` still waits on the npm release described below):
@@ -250,7 +252,8 @@ The commands below assume `ai-terminal-pet` is on your PATH (`.\scripts\install.
 | `ai-terminal-pet --settings` | Open the settings window |
 | `ai-terminal-pet --quit` | Stop the running overlay |
 | `ai-terminal-pet --json` | Print the current sessions as JSON (add `--pretty` for formatted output) |
-| `ai-terminal-pet --doctor` | Run 9 environment and install checks; exit code 1 when a check fails. Again: needs the install directory on PATH, or call it by full path |
+| `ai-terminal-pet --doctor` | Run 11 environment, install and reporter-wiring checks; exit code 1 when a check fails. Again: needs the install directory on PATH, or call it by full path |
+| `ai-terminal-pet --connect` | Print the block to paste into each terminal's own configuration (add `=opencode`, `=claude` or `=antigravity` for one). Writes nothing |
 | `ai-terminal-pet --autostart` | Report the run-at-logon state |
 | `ai-terminal-pet --autostart=on` | Enable run at logon |
 | `ai-terminal-pet --autostart=off` | Disable run at logon |
@@ -571,11 +574,7 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/
 
 `scripts\install.ps1` 之所以放在 `scripts/` 而不是仓库根：市场索引器会按文件名抓根目录的 `install.ps1` 并整文正则扫描，而它确实要提到 `HKCU` 的 Run 键与 `-Recurse -Force` 清理；下沉一级就去掉了这两条误报，行为一个字没改。
 
-装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性、开机自启项以及最近一次提醒判定共 10 项。需要清理已部署的制品时运行 `.\scripts\install.cmd -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 11 file(s) match the repository, 0 warning(s)` 并以 0 退出（11 项 = 主程序 + 状态栏 shim + `pet-hook.exe` + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
-
-第 5 步是可选的：`-AddToPath` 只写 `HKCU\Environment\Path`（绝不碰 `HKLM`），写入前先把原值备份到 `<安装目录>\path-backup.txt`，目录已在 PATH 中时不做任何改动；**改完要新开一个终端**才生效；`-Uninstall` 卸载时会一并移除这条 PATH 记录（原值同样先备份，备份位置改为 `%TEMP%`），不会留下指向已删目录的死条目。不加这个开关时安装脚本不会动 PATH，请继续用全路径 `& "$env:LOCALAPPDATA\AI-Terminal-Pet\AI-Terminal-Pet.exe" --json`。
-
-装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性、开机自启项以及最近一次提醒判定共 10 项。需要清理已部署的制品时运行 `.\scripts\install.cmd -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。
+装完之后随时可以运行 `ai-terminal-pet --doctor` 自检，它会检查运行环境、安装文件、版本、运行期快照与配置、命名管道、实例存在性、node 可用性、**上报端接入**（读 OpenCode / Claude Code / Antigravity 三份配置，判断它们指向的文件还在不在）、开机自启项以及最近一次提醒判定共 11 项。需要清理已部署的制品时运行 `.\scripts\install.cmd -Uninstall`，它会先要求输入 `yes` 确认，遇到盘根或非 AI-Terminal-Pet 目录会安全拒绝，无人值守场景可加 `-Force`。第 4 步的 `-VerifyOnly` 可随时重跑同一份制品清单：全部吻合时打印 `install: verified - 11 file(s) match the repository, 0 warning(s)` 并以 0 退出（11 项 = 主程序 + 状态栏 shim + `pet-hook.exe` + `protocol.js` + DeepSeek Harness 插件包的 7 个文件）。
 
 安装完成后浮窗与状态栏 shim 已部署就绪，但终端默认不会自动推送事件；你必须按照下一节的说明，为正在使用的终端环境配置对应的上报端。
 
@@ -594,6 +593,8 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/
 | 其他任意 CLI | 在状态变化时调用 `reporters/generic.js`。支持通过命令行参数或标准输入管道传递状态。 | 一行脚本接入任意外部 CLI 或自定义脚本任务。 |
 
 如果要为上面未列出的终端自行编写上报端，无需阅读源码：[docs/PROTOCOL.md](docs/PROTOCOL.md) 完整规定了上报端必须遵守的线协议——字段定义、状态语义、管道名派生规则、`OK`/`ERR` 回执契约与脱敏要求。
+
+上表前三行不必手抄：`ai-terminal-pet --connect` 会把要粘贴的片段直接打印出来（OpenCode 是那一条百分号编码过的 `file:///` 地址，Claude Code 是八个事件的 hooks 块，Antigravity 是 `statusLine` 块），并把真实绝对路径填好。**它只打印、不写盘**——改别人的配置文件要替对方的产品猜 schema，这个项目不猜。粘完再跑一次 `ai-terminal-pet --doctor`，它的 `reporters` 一行会读这三份配置，告诉你每个终端到底接没接、指向的文件还在不在、以及它能不能发出"结束"这个信号（Antigravity 只有状态栏上报端时，会话结束会停在 `idle` 而不是 `closed`）。
 
 Harness 那一侧是 host-only 的 Cordis bundle，自身不含管道名、状态集与快照逻辑，它从 `%LOCALAPPDATA%\AI-Terminal-Pet\protocol.js` 加载协议，全部委托给这份 protocol.js。
 
@@ -653,7 +654,8 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 | `ai-terminal-pet --settings` | 打开四页设置窗口 |
 | `ai-terminal-pet --quit` | 退出正在运行的浮窗进程 |
 | `ai-terminal-pet --json` | 打印当前会话状态 JSON（可加 `--pretty`） |
-| `ai-terminal-pet --doctor` | 运行 10 项环境与安装自检，任一失败时退出码为 1。同样需要安装目录在 PATH 中，否则请用全路径调用 |
+| `ai-terminal-pet --doctor` | 运行 11 项环境、安装与上报端接入自检，任一失败时退出码为 1。同样需要安装目录在 PATH 中，否则请用全路径调用 |
+| `ai-terminal-pet --connect` | 打印要粘贴进各终端自己配置文件的片段（加 `=opencode`／`=claude`／`=antigravity` 只看一个）。**不写任何文件** |
 | `ai-terminal-pet --autostart` | 查询当前的开机自启状态 |
 | `ai-terminal-pet --autostart=on` | 设置为登录时自动启动 |
 | `ai-terminal-pet --autostart=off` | 取消开机自启设置 |
