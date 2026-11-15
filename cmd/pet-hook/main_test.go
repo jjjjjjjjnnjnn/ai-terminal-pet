@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/reporter"
 )
 
@@ -41,7 +42,7 @@ func runHook(t *testing.T, args []string, stdin string) (string, int) {
 
 func TestClaudeToolUseReportsAndDefers(t *testing.T) {
 	sent := useSender(t)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	out, code := runHook(t, []string{"--mode=claude"},
 		`{"hook_event_name":"PreToolUse","session_id":"abc","cwd":"C:\\work","tool_name":"Bash","tool_input":{"command":"ls"}}`)
 	if code != 0 {
@@ -67,7 +68,7 @@ func TestClaudeToolUseReportsAndDefers(t *testing.T) {
 
 func TestClaudeStopEventIsIdle(t *testing.T) {
 	sent := useSender(t)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	out, _ := runHook(t, []string{"--mode=claude"}, `{"hook_event_name":"Stop","session_id":"s2"}`)
 	if strings.TrimSpace(out) != "{}" {
 		t.Fatalf("stop must defer with {}, got %q", out)
@@ -79,7 +80,7 @@ func TestClaudeStopEventIsIdle(t *testing.T) {
 
 func TestClaudeSessionEndClosesTheSession(t *testing.T) {
 	sent := useSender(t)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	runHook(t, []string{"--mode=claude"}, `{"hook_event_name":"SessionEnd","session_id":"s3"}`)
 	if (*sent)[0].payload.State != "closed" {
 		t.Fatalf("SessionEnd should close the session, got %q", (*sent)[0].payload.State)
@@ -88,7 +89,7 @@ func TestClaudeSessionEndClosesTheSession(t *testing.T) {
 
 func TestAntigravityGateWithoutAutoApproveDefersToTheHost(t *testing.T) {
 	sent := useSender(t)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	out, _ := runHook(t, []string{"--mode=antigravity"},
 		`{"conversation_id":"c1","tool_confirmation_pending":true,"toolCall":{"name":"run_command"}}`)
 	if strings.TrimSpace(out) != `{"decision":"allow"}` {
@@ -101,9 +102,8 @@ func TestAntigravityGateWithoutAutoApproveDefersToTheHost(t *testing.T) {
 
 func TestDangerousCommandNeverAutoApproves(t *testing.T) {
 	sent := useSender(t)
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
-	writeConfig(t, root, `{"autoApprove":true,"autoApproveTimeoutSec":1}`)
+	dataDirectory(t)
+	writeConfig(t, `{"autoApprove":true,"autoApproveTimeoutSec":1}`)
 
 	// Claude: fall through to its own prompt, having alarmed the panel.
 	out, _ := runHook(t, []string{"--mode=claude"},
@@ -125,10 +125,9 @@ func TestDangerousCommandNeverAutoApproves(t *testing.T) {
 
 func TestAutoApproveApprovesWhenNothingVetoes(t *testing.T) {
 	sent := useSender(t)
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
-	writeConfig(t, root, `{"autoApprove":true,"autoApproveTimeoutSec":1}`)
-	if err := os.MkdirAll(filepath.Join(root, "AI-Terminal-Pet", "approvals"), 0700); err != nil {
+	dataDirectory(t)
+	writeConfig(t, `{"autoApprove":true,"autoApproveTimeoutSec":1}`)
+	if err := os.MkdirAll(home.Join("approvals"), 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
@@ -153,10 +152,9 @@ func TestAutoApproveApprovesWhenNothingVetoes(t *testing.T) {
 
 func TestAutoApproveHonoursAVetoFromTheOverlay(t *testing.T) {
 	sent := useSender(t)
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
-	writeConfig(t, root, `{"autoApprove":true,"autoApproveTimeoutSec":5}`)
-	approvals := filepath.Join(root, "AI-Terminal-Pet", "approvals")
+	dataDirectory(t)
+	writeConfig(t, `{"autoApprove":true,"autoApproveTimeoutSec":5}`)
+	approvals := home.Join("approvals")
 	if err := os.MkdirAll(approvals, 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -209,7 +207,7 @@ func TestUnknownModeStillExitsZeroAndAnswers(t *testing.T) {
 
 func TestEmptyAndMalformedStdinStillReport(t *testing.T) {
 	sent := useSender(t)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	for _, stdin := range []string{"", "   ", "not json", `[1,2,3]`, `{"hook_event_name":`} {
 		out, code := runHook(t, []string{"--mode=claude"}, stdin)
 		if code != 0 {
@@ -231,7 +229,7 @@ func TestEmptyAndMalformedStdinStillReport(t *testing.T) {
 
 func TestOversizedStdinIsRejected(t *testing.T) {
 	sent := useSender(t)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	huge := strings.Repeat("a", reporter.MaxStdinBytes+1024)
 	out, code := runHook(t, []string{"--mode=claude"}, huge)
 	if code != 0 || strings.TrimSpace(out) != "{}" {
@@ -281,7 +279,7 @@ func TestModeFlagForms(t *testing.T) {
 
 func TestPayloadsAreValidForTheServer(t *testing.T) {
 	useSender(t)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	runHook(t, []string{"--mode=claude"},
 		`{"hook_event_name":"PreToolUse","session_id":"valid","started_at":"2026-11-11T09:00:00Z","model":{"provider":"anthropic","model":"opus"}}`)
 	runHook(t, []string{"--mode=antigravity"},
@@ -326,9 +324,9 @@ func buildPayload(t *testing.T, mode, stdin string) reporter.Payload {
 	return antigravityPayload(input, state, reason, now)
 }
 
-func writeConfig(t *testing.T, root, body string) {
+func writeConfig(t *testing.T, body string) {
 	t.Helper()
-	directory := filepath.Join(root, "AI-Terminal-Pet")
+	directory := home.Directory()
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
