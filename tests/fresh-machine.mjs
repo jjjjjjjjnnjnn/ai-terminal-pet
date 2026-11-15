@@ -15,8 +15,7 @@
  *
  *   node tests/fresh-machine.mjs                # full run
  *   node tests/fresh-machine.mjs --keep         # keep the sandbox for a look
- *   node tests/fresh-machine.mjs --no-overlay   # skip the scenarios that spawn a window
- *   node tests/fresh-machine.mjs --verbose      # print every check
+ *   node tests/fresh-machine.mjs --no-overlay   # skip the scenarios that spawn a window *   node tests/fresh-machine.mjs --verbose      # print every check
  *
  * Exit code 0 means every check passed. The script requires the three binaries
  * under bin/ (build them first), Node 18+ and Windows PowerShell.
@@ -585,6 +584,14 @@ function scenarioFreshMachine(sandbox, overlayExe) {
   equal('doctor exits 1 on an uninstalled machine', doctor.status, 1)
   check('doctor names the missing install', /install files/.test(doctor.stdout || ''), describeRun(doctor))
   check('doctor prints a summary', /doctor: \d+ ok, \d+ warn, \d+ fail/.test(doctor.stdout || ''), describeRun(doctor))
+  // The reporters check reads three host configurations that do not exist here.
+  // "This machine has no OpenCode" must read as a warning: a fail would make
+  // every fresh install red, and S5 asserts zero fails after a standalone one.
+  check(
+    'doctor reports unconnected terminals as warnings, not failures',
+    /\[warn\] reporters: .*not installed/.test(doctor.stdout || '') && !/\[fail\] reporters/.test(doctor.stdout || ''),
+    describeRun(doctor)
+  )
 
   const info = runExe(overlayExe, ['--json'], sandbox.env, 15000)
   equal('--json works without a running overlay', info.status, 0)
@@ -1224,6 +1231,68 @@ function scenarioRobustness(sandbox, overlayExe, hookExe) {
 
   const stopped = runExe(overlayExe, ['--json'], { ...sandbox.env, USERPROFILE: path.join(sandbox.root, 'other-home') }, 15000)
   check('--json with no listener returns instead of hanging', stopped.status !== null, 'timeout')
+
+  // --connect and --doctor are one reader with two outputs, so the sandbox
+  // checks both: the snippet must name the installed copy it just deployed, and
+  // the reporters line must call that wiring ok. A host configuration is written
+  // by the test itself (nothing is ever written by --connect).
+  const connectText = runExe(overlayExe, ['--connect'], sandbox.env, 30000)
+  equal('--connect exits 0', connectText.status, 0)
+  // The block is JSON, so a Windows path in it carries doubled backslashes:
+  // that escaping is the point of the snippet, so the assertion uses it.
+  const escapedHookPath = path.join(sandbox.petDir, 'pet-hook.exe').replace(/\\/g, '\\\\')
+  check(
+    '--connect names the installed native hook',
+    (connectText.stdout || '').includes(escapedHookPath),
+    describeRun(connectText),
+  )
+  check(
+    '--connect prints all three terminals',
+    ['opencode', 'claude', 'antigravity'].every((name) => new RegExp('== ' + name + ' ==').test(connectText.stdout || '')),
+    describeRun(connectText),
+  )
+  check('--connect says it wrote nothing', /written nothing/.test(connectText.stdout || ''), describeRun(connectText))
+  equal(
+    'an unknown terminal is a usage error',
+    runExe(overlayExe, ['--connect=codex'], sandbox.env, 15000).status,
+    2,
+  )
+
+  // A wired Claude Code: one stale path is enough to make the whole wiring
+  // useless, and that is the failure --doctor's reporters line exists to name.
+  const claudeSettings = path.join(sandbox.userProfile, '.claude', 'settings.json')
+  mkdirSync(path.dirname(claudeSettings), { recursive: true })
+  const hookPath = path.join(sandbox.petDir, 'pet-hook.exe')
+  writeFileSync(
+    claudeSettings,
+    JSON.stringify({
+      hooks: Object.fromEntries(
+        ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Notification', 'Stop', 'SessionEnd'].map(
+          (event) => [event, [{ matcher: '*', hooks: [{ type: 'command', command: `"${hookPath}" --mode=claude` }] }]],
+        ),
+      ),
+    }),
+    'utf8',
+  )
+  const wired = runDoctor(overlayExe, sandbox.env)
+  check(
+    'doctor calls a wired Claude Code ok',
+    /[; ]claude: ok - 8 event\(s\)/.test(wired.stdout || ''),
+    describeRun(wired),
+  )
+  check('a wired machine still has no failures', /doctor: \d+ ok, \d+ warn, 0 fail/.test(wired.stdout || ''), describeRun(wired))
+
+  // Now point it at a file that is not there: the same session would simply
+  // never appear, and only this line can say why.
+  writeFileSync(claudeSettings, JSON.stringify({ hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: `"${path.join(sandbox.petDir, 'pet-hook-gone.exe')}" --mode=claude` }] }] } }), 'utf8')
+  const broken = runDoctor(overlayExe, sandbox.env)
+  check(
+    'a dangling hook path fails the reporters line',
+    /\[fail\] reporters: .*missing/.test(broken.stdout || ''),
+    describeRun(broken),
+  )
+  equal('a dangling hook path makes doctor exit 1', broken.status, 1)
+  rmSync(claudeSettings, { force: true })
 }
 
 /** S8: uninstall must leave the machine as clean as it found it. */

@@ -41,6 +41,8 @@ usage:
   ai-terminal-pet --autostart=on  run the overlay at logon
   ai-terminal-pet --autostart=off stop running the overlay at logon
   ai-terminal-pet --doctor        check the install and print one line per item
+  ai-terminal-pet --connect       print the block to paste for each terminal
+  ai-terminal-pet --connect=claude print it for one terminal (opencode|claude|antigravity)
   ai-terminal-pet --version       print the version
   ai-terminal-pet --help          print this message
 
@@ -49,7 +51,11 @@ reporter snapshots on disk, so it works whether or not the overlay is running.
 
 --doctor prints one [ok]/[warn]/[fail] line per check with the measured value,
 summarises as "doctor: N ok, M warn, K fail" and exits 1 if anything failed.
-A stopped overlay or a missing Node.js is a warning, not a failure.
+A stopped overlay or a missing Node.js is a warning, not a failure. The
+reporters line reads the host configurations that are supposed to call us.
+
+--connect prints the block to paste into each terminal's own configuration.
+It writes nothing: paste it yourself, then run --doctor to confirm.
 
 The overlay also exits on its own once no terminal session is reporting.
 `
@@ -103,6 +109,8 @@ func run(args []string) error {
 		return controlAutoStart(command)
 	case command == "--doctor":
 		return controlDoctor(args[1:])
+	case command == "--connect" || strings.HasPrefix(command, "--connect="):
+		return controlConnect(command)
 	case command == "--show":
 		// Fall through to a normal start when nothing is running, so the
 		// command is safe to bind to a hotkey.
@@ -222,6 +230,25 @@ func controlDoctor(extra []string) error {
 	if report.ExitCode() != 0 {
 		return errDoctorFailed
 	}
+	return nil
+}
+
+// controlConnect prints the paste-ready wiring for one or all terminals. It
+// never writes: --connect is a printer, and the sentence it closes with says so.
+//
+// An unknown terminal is a usage error (exit 2) rather than an empty answer, on
+// the same principle as --json rejecting "--pretry": a typo that silently prints
+// nothing leaves the user believing they have no terminals to wire.
+func controlConnect(command string) error {
+	terminal := ""
+	if strings.HasPrefix(command, "--connect=") {
+		terminal = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(command, "--connect=")))
+	}
+	text, err := app.ConnectText(terminal)
+	if err != nil {
+		return usageError("%v", err)
+	}
+	fmt.Print(text)
 	return nil
 }
 

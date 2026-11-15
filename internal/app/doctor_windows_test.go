@@ -11,6 +11,7 @@ import (
 
 	"ai-terminal-pet/internal/autostart"
 	"ai-terminal-pet/internal/config"
+	"ai-terminal-pet/internal/connect"
 )
 
 // doctorFixture builds a doctorEnv over a throwaway %LOCALAPPDATA%. Nothing
@@ -27,6 +28,7 @@ func newDoctorFixture(t *testing.T) *doctorFixture {
 	fixture := &doctorFixture{root: root}
 	fixture.env = doctorEnv{
 		localAppData: root,
+		home:         filepath.Join(root, "profile"),
 		goos:         "windows",
 		goarch:       "amd64",
 		executable:   filepath.Join(root, installDirectoryName, doctorMainExe),
@@ -61,8 +63,81 @@ func (f *doctorFixture) runtime(t *testing.T) {
 	}
 }
 
-func checkNamed(t *testing.T, report DoctorReport, name string) DoctorCheck {
+// connectAllThree lays down host configurations that are fully wired, so a test
+// asserting "every check is ok" can hold the reporters line to the same
+// standard as the rest without weakening it to a warn.
+func (f *doctorFixture) connectAllThree(t *testing.T) {
 	t.Helper()
+	install := filepath.Join(f.root, installDirectoryName)
+	// The hook binary is part of install.ps1's deployment set but not part of
+	// doctorInstallFiles (which lists the three the overlay itself needs), so a
+	// fully wired machine has to write it here.
+	writeFixtureFile(t, filepath.Join(install, connect.HookBinaryName), "stub hook")
+
+	repository := filepath.Join(f.root, "repo")
+	reporter := filepath.Join(repository, "reporters", "opencode.js")
+	writeFixtureFile(t, reporter, "module.exports = {}\n")
+	writeFixtureFile(t, filepath.Join(f.root, "profile", ".config", "opencode", "opencode.json"),
+		`{"plugins": ["`+fixtureFileURL(t, reporter)+`"]}`)
+
+	hook := filepath.Join(install, connect.HookBinaryName)
+	writeFixtureFile(t, filepath.Join(f.root, "profile", ".claude", "settings.json"), fixtureClaudeSettings(hook))
+
+	writeFixtureFile(t, filepath.Join(f.root, "profile", ".gemini", "antigravity-cli", "settings.json"),
+		`{"statusLine": {"command": "`+filepath.ToSlash(filepath.Join(install, connect.StatuslineBinaryName))+`"}}`)
+	writeFixtureFile(t, filepath.Join(f.root, "profile", ".gemini", "config", "plugins", "pet", "hooks.json"),
+		`{"pet": {"Termination": [{"command": "pet-hook.exe --mode=antigravity"}]}}`)
+}
+
+func writeFixtureFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func fixtureFileURL(t *testing.T, path string) string {
+	t.Helper()
+	value, err := connect.PathToFileURL(path)
+	if err != nil {
+		t.Fatalf("PathToFileURL(%q): %v", path, err)
+	}
+	return value
+}
+
+// fixtureClaudeSettings wires all eight events to the native hook, which is what
+// a fully connected machine looks like.
+func fixtureClaudeSettings(hook string) string {
+	events := []string{
+		"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+		"PermissionRequest", "Notification", "Stop", "SessionEnd",
+	}
+	var builder strings.Builder
+	builder.WriteString(`{"hooks": {`)
+	for index, event := range events {
+		if index > 0 {
+			builder.WriteString(",")
+		}
+		builder.WriteString(`"` + event + `": [{"matcher": "*", "hooks": [{"type": "command", "command": ` +
+			jsonCommand(`"`+hook+`" --mode=claude`) + `}]}]`)
+	}
+	builder.WriteString("}}")
+	return builder.String()
+}
+
+// jsonCommand escapes one Windows path into a JSON string. The backslashes have
+// to be doubled or the document is not JSON at all; a fixture that silently
+// produces invalid JSON would let the check pass for the wrong reason.
+func jsonCommand(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+	return `"` + escaped + `"`
+}
+
+func checkNamed(t *testing.T, report DoctorReport, name string) DoctorCheck {
 	for _, check := range report.Checks {
 		if check.Name == name {
 			return check
@@ -128,6 +203,7 @@ func TestDoctorAllGreenExitsZero(t *testing.T) {
 	fixture := newDoctorFixture(t)
 	fixture.install(t)
 	fixture.runtime(t)
+	fixture.connectAllThree(t)
 	report := runDoctor(fixture.env)
 
 	ok, warn, fail := report.Counts()

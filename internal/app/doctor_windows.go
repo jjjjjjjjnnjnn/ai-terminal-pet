@@ -31,6 +31,7 @@ import (
 
 	"ai-terminal-pet/internal/autostart"
 	"ai-terminal-pet/internal/config"
+	"ai-terminal-pet/internal/connect"
 	"ai-terminal-pet/internal/pipeserver"
 )
 
@@ -127,7 +128,11 @@ func RunDoctor() DoctorReport {
 // tree, the pipe, the registry, Node -- arrives through here, so a unit test
 // never has to depend on what happens to be installed on the test machine.
 type doctorEnv struct {
-	localAppData  string
+	localAppData string
+	// home is %USERPROFILE%. The host configurations --doctor reads through
+	// internal/connect live under it, so the check has to be able to point
+	// somewhere else than the machine's real profile in a test.
+	home          string
 	executable    string
 	executableErr error
 	goos          string
@@ -142,8 +147,13 @@ type doctorEnv struct {
 
 func defaultDoctorEnv() doctorEnv {
 	executable, executableErr := os.Executable()
+	home, homeErr := os.UserHomeDir()
+	if homeErr != nil || home == "" {
+		home = os.Getenv("USERPROFILE")
+	}
 	return doctorEnv{
 		localAppData:    os.Getenv("LOCALAPPDATA"),
+		home:            home,
 		executable:      executable,
 		executableErr:   executableErr,
 		goos:            runtime.GOOS,
@@ -224,10 +234,44 @@ func runDoctor(env doctorEnv) DoctorReport {
 		runCheck("pipe", func() DoctorCheck { return checkPipe(pipePath, connectErr) }),
 		runCheck("instance", func() DoctorCheck { return checkInstance(connectErr) }),
 		runCheck("node", func() DoctorCheck { return checkNode(env) }),
+		runCheck("reporters", func() DoctorCheck { return checkReporters(env) }),
 		runCheck("autostart", func() DoctorCheck { return checkAutoStart(env) }),
 		runCheck("alerts", func() DoctorCheck { return checkAlerts(env) }),
 	}
 	return DoctorReport{Checks: checks}
+}
+
+// checkReporters inspects the other half of the contract: the host
+// configurations that are supposed to call us.
+//
+// Every other check in this file looks at what this project put on the machine
+// (the install directory, the pipe, the Run entry). None of them can see the
+// side a reporter's silence actually comes from -- a stale path in
+// opencode.json, a wrapper whose import target moved, a statusline binary that
+// was deleted. The checks themselves live in internal/connect so that --connect
+// prints its snippets from the same reader that diagnoses them: one parser for
+// "what is wired", two outputs.
+//
+// A missing terminal is a warn and only a broken reference is a fail, which is
+// what keeps a bare sandbox installable: tests/fresh-machine.mjs asserts zero
+// fails after a standalone install, and a sandbox has no host configuration at
+// all.
+func checkReporters(env doctorEnv) DoctorCheck {
+	roots := connect.Roots{
+		Home:          env.home,
+		LocalAppData:  env.localAppData,
+		Executable:    env.executable,
+		ExecutableErr: env.executableErr,
+	}
+	findings := connect.Inspect(roots)
+	status := doctorOK
+	switch connect.Worst(findings) {
+	case connect.StatusFail:
+		status = doctorFail
+	case connect.StatusWarn:
+		status = doctorWarn
+	}
+	return DoctorCheck{Status: status, Detail: connect.Summary(findings)}
 }
 
 // checkAlerts reports the arithmetic behind the last alert decision. It is a
