@@ -39,6 +39,8 @@ import (
 	"ai-terminal-pet/internal/session"
 )
 
+const statuslineHeartbeat = 30 * time.Second
+
 func run() int {
 	now := time.Now().UTC()
 	input := reporter.DecodeStdin(reporter.ReadStdin(os.Stdin))
@@ -56,12 +58,19 @@ func run() int {
 		return 0
 	}
 
+	prev, hasPrev := reporter.ReadSnapshot(reporter.SnapshotPath(payload), now)
+	deliver := reporter.StatuslineDeliverNeeded(prev, hasPrev, payload, now, statuslineHeartbeat)
+
+	// Always refresh the snapshot on disk so TTL and --json stay current even
+	// when the pipe dial is short-circuited.
 	_ = reporter.WriteSnapshot(payload)
 
-	pipePath := pipeserver.PipePathForUser()
-	if !reporter.SendOnce(pipePath, line) && payload.State != session.StateClosed {
-		_ = reporter.LaunchApplication()
-		_ = reporter.SendOnce(pipePath, line)
+	if deliver {
+		pipePath := pipeserver.PipePathForUser()
+		if !reporter.SendOnce(pipePath, line) && payload.State != session.StateClosed {
+			_ = reporter.LaunchApplication()
+			_ = reporter.SendOnce(pipePath, line)
+		}
 	}
 
 	fmt.Println("pet " + string(payload.State))

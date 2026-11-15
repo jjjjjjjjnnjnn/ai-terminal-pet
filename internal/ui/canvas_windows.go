@@ -83,7 +83,7 @@ func (b *canvasBackend) release() {
 // drawText rasterises one string into the canvas box. GDI writes grey coverage
 // into the bitmap in white, and canvas.normalizeText turns that into the
 // requested palette colour.
-func (b *canvasBackend) drawText(target *canvas, left, top, width, height int, value string, fontHeight, weight int, flags uint32) bool {
+func (b *canvasBackend) drawText(target *canvas, left, top, width, height int, value string, fontHeight, weight int, color rgba, flags uint32) bool {
 	if !b.armed {
 		return false
 	}
@@ -103,7 +103,7 @@ func (b *canvasBackend) drawText(target *canvas, left, top, width, height int, v
 	if oldFont != 0 {
 		win.SelectObject(b.dc, oldFont)
 	}
-	_ = target
+	target.normalizeText(left, top, width, height, color)
 	return true
 }
 

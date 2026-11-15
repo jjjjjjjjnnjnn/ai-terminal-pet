@@ -152,6 +152,7 @@ func RunWith(openSettings bool) error {
 			Y:        placement.Y,
 			Zoom:     placement.Zoom,
 			Expanded: placement.Expanded,
+			Layouts:  toUILayouts(placement.Layouts),
 		},
 		OnPlacementChanged: func(value ui.Placement) {
 			saver.save(config.State{
@@ -160,6 +161,7 @@ func RunWith(openSettings bool) error {
 				Y:        value.Y,
 				Zoom:     value.Zoom,
 				Expanded: value.Expanded,
+				Layouts:  fromUILayouts(value.Layouts),
 			})
 		},
 		OnSettingsChanged: func(value ui.Settings) {
@@ -245,6 +247,7 @@ func RunWith(openSettings bool) error {
 		}
 		window.QueueSettings(uiSettings(current))
 	})
+	go watchShutdownSignals(ctx, window.Close)
 	if err := window.Run(); err != nil {
 		return fmt.Errorf("window: %w", err)
 	}
@@ -300,6 +303,28 @@ func uiSettings(settings config.Config) ui.Settings {
 		SettingsKeyboard:      settings.SettingsKeyboard,
 		SettingsTooltips:      settings.SettingsTooltips,
 	}
+}
+
+func toUILayouts(layouts map[string]config.LayoutPlacement) map[string]ui.LayoutPosition {
+	if len(layouts) == 0 {
+		return nil
+	}
+	out := make(map[string]ui.LayoutPosition, len(layouts))
+	for k, v := range layouts {
+		out[k] = ui.LayoutPosition{X: v.X, Y: v.Y}
+	}
+	return out
+}
+
+func fromUILayouts(layouts map[string]ui.LayoutPosition) map[string]config.LayoutPlacement {
+	if len(layouts) == 0 {
+		return nil
+	}
+	out := make(map[string]config.LayoutPlacement, len(layouts))
+	for k, v := range layouts {
+		out[k] = config.LayoutPlacement{X: v.X, Y: v.Y}
+	}
+	return out
 }
 
 // instanceName is the single-instance key. It is a name, not a path, because each

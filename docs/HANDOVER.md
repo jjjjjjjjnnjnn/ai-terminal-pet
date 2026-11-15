@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-15 深夜；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；§51 的两个现场缺陷已修复（§52），§53 统一了上报端，§54 修掉了 `hang.log` 的待机误报，§56 给 `--doctor` 加了第 11 项 `reporters` 并新增只打印的 `--connect`，**§57 完成了跨平台第 1–7 步中能在这台机器上验证的全部（内核/传输/目录/自启/上报端/CI 门禁），窗口层仍只有 Windows，因此 1.1.0 还没发**）
+## 1. 当前状态（2026-11-15；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；**§58 交付 Track 3（L1 statusline 管道短路 + F2 键盘行导航 + F5 按显示器布局记忆坐标）与 Track 1（全部 16 个 Go 包跨 Win/Linux/macOS 通过 `CGO_ENABLED=0`，含纯 Go Linux X11 浮窗与 WSLg 实测），未发版**）
 
 > 接手请先读本节与 **§57「跨平台施工（第 1–7 步），以及这一版为什么还没发」**（最新一轮；
 > 九个提交、三平台实测矩阵、五个"看起来对其实错"的地方、以及窗口层为什么不在这一版里），
@@ -4252,6 +4252,55 @@ hook 3,701,760 B。三个文件与 `vendor/`、本机安装目录逐字节相同
    换成真的进程间控制（unix socket 或 flock 文件），`uiAvailable()` 对 linux 返回 true，
    `scripts/windows-only-packages.txt` 里那两行随之删掉——CI 会立刻要求这么做。
 3. macOS 需要一个能跑 `GOOS=darwin go test` 的机器或 CI runner，否则它只能停在"编译通过"。
+
+## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
+
+本机为 Intel `i7-14650HX` HP OMEN Windows 11 笔记本（无苹果硬件，遵循许可与 SLA 不部署非授权 macOS VM），按用户确认选用 **零 cgo `github.com/ebitengine/purego v0.9.1` + GitHub Actions `macos-latest` 原生验证**路线交付 macOS 全端适配：
+
+### 59.1 代码共享重构（零重复实现）
+
+- `internal/app`：`platform_gui.go`（`//go:build linux || darwin`，`uiAvailable() = true`）与 `platform_nogui.go`（`!windows && !linux && !darwin`）。
+- `internal/ui`：
+  - `control_unix.go`（`//go:build linux || darwin`）：Linux 与 macOS 共用按用户派生的 Unix domain 控制 socket。
+  - `canvas_opentype.go`（`//go:build linux || darwin`）+ `canvas_fonts_linux.go` / `canvas_fonts_darwin.go`：共用纯 Go OpenType TTF/OTF/TTC 复合字体光栅化引擎，macOS 扫描 `/System/Library/Fonts`、`~/Library/Fonts` 并优先排序 `SFNS`/`SFPro`/`HelveticaNeue`/`PingFang`/`Hiragino`。
+  - `sound.go`（全平台共用）+ `sound_test.go`（纯波形测试跨 Windows/Linux/macOS 执行）+ `sound_windows_test.go`（`TestPlaySoundLive` Win32 探针）：Win32 与 macOS 共用 PCM WAV 合成与 `toneKind`。
+
+### 59.2 macOS 原生实现（全部 `CGO_ENABLED=0`）
+
+- **`internal/platform/focus_darwin.go` + `focus_darwin_test.go`**：`purego` 绑定 `CoreFoundation` / `CoreGraphics` / `AppKit`，实现 `CGWindowListCopyWindowInfo`（层 0 可见窗口枚举）、`NSWorkspace.frontmostApplication` + `CGEventSourceSecondsSinceLastEventType`（前台识别与 HID 空闲时长 `SampleForeground`）、`NSRunningApplication activateWithOptions:`（点击行回跳终端 `ActivateTarget`）。
+- **`internal/ui/cocoa_darwin.go` / `sound_darwin.go` / `clipboard_darwin.go`**：共用 AppKit loader 与 `NSAutoreleasePool` / `NSString` helper；实现 `NSSound` 异步 WAV 播报与 `NSPasteboard` 剪贴板写入。
+- **`internal/ui/darwin_geometry.go` + `darwin_geometry_test.go`**：Cocoa 左下角坐标系（`NSScreen.visibleFrame` / `setFrame:` / `NSEvent.locationInWindow` / `mouseLocation`）、直通 BGRA→预乘 RGBA 像素转换、macOS 虚拟 `keyCode` 映射与 `Cmd+Plus/Minus/0` 缩放，全部纳入三平台单测。
+- **`internal/ui/app_darwin.go` + `darwin_appkit_test.go`**：`AITerminalPetWindow` 无边框透明置顶浮窗（单标量方法 `canBecomeKeyWindow`，零 struct 值传递 IMP 回调）、`NSImageView` + `NSBitmapImageRep` 表面上传、`NSStatusBar` 状态栏菜单（显示/隐藏、重置位置、退出）、贴边收起与状态脉冲、左键拖拽/点击/右键静音或切换/键盘导航与提示音过渡提醒。
+- **CI 接入**：`.github/workflows/ci.yml` 新增 `macos` job（`runs-on: macos-latest`，`CGO_ENABLED=0`），运行 `go vet`、`go test -count=1 ./...`、编译 `darwin/arm64` 三二进制并执行无头 `pet-hook` + `--json` + `--doctor` 冒烟；`docs/PLATFORMS.md`、`docs/ROADMAP.md` 已同步更新，版本号维持 `1.0.9` / `1.2.18` 未动，待用户决定 push 到远端后在 GitHub Actions `macos-latest` 实跑验证。
+
+## 58. 交接：Track 3（L1/F2/F5）与全平台适配 + Linux 纯 Go X11 浮窗（2026-11-15，第 58 轮；**未发版**）
+
+本轮接手后按「3 然后 1」顺序执行：
+
+### 58.1 Track 3 功能与轻量化交付
+
+- **L1 statusline 管道短路**：`internal/reporter/payload.go`（`ReadSnapshot` / `StatuslineDeliverNeeded`）+ `cmd/pet-statusline/main.go`。快照仍每次刷新，字段未变且距上次投递未满 30 秒心跳窗口时跳过命名管道/socket 投递；单测覆盖 `internal/reporter/statusline_test.go`。
+- **F2 键盘行导航**：`internal/ui/keyboard.go` + `keyboard_test.go` + `drawing_compact.go`。展开面板支持 `Up`/`Down`/`Home`/`End` 选行、`Enter` 跳转终端、`Esc` 收起，Win32 与 Linux X11 共用状态机。
+- **F5 按显示器布局记忆坐标**：`internal/config/config.go`（`State.Layouts`）+ `internal/ui/placement.go` + `internal/app/run.go`。按显示器工作区签名独立保存与恢复坐标，切换外接屏不再覆盖原配置。
+
+### 58.2 Track 1 全平台扩展与 Linux 纯 Go X11 面板
+
+- **共享协议与平台抽象**：
+  - `reporters/protocol.js` 按 `process.platform` 解析 Win32/Darwin/Linux 数据目录与终端端点（命名管道 vs Unix socket）和可执行文件名，保持按用户 8-hex sha256 token 不变。
+  - `internal/reporter`（`binary_windows.go` / `binary_posix.go`、`approve.go` 改用 `home.Join("approvals")`）。
+  - `internal/platform` 拆为中立层 + `focus_linux.go`（`/proc` + X11 `_NET_CLIENT_LIST` + MIT-SCREEN-SAVER）+ `focus_darwin.go`（`SysctlKinfoProcSlice`）+ `process_posix.go` + `focus_other.go`。
+  - `internal/app`（`connect.go`、`doctor.go` + `doctor_posix.go`/`doctor_windows.go`、`platform_linux.go` 启用 `uiAvailable() = true`）与 `internal/autostart/autostart_unix_test.go` 的 macOS vet 修复。
+- **Linux 纯 Go X11 浮窗**（零 cgo、零 GTK，依赖 `github.com/jezek/xgb v1.3.1` 与 `golang.org/x/image v0.25.0`）：
+  - 共用 `internal/ui/panel_core.go` 与 `internal/ui/dock.go`；
+  - `internal/ui/app_linux.go`：32-bit TrueColor ARGB、`_MOTIF_WM_HINTS` + `_NET_WM_WINDOW_TYPE_UTILITY`、chunked `PutImage`、`_NET_WM_WINDOW_OPACITY`、XRandR + `_NET_WORKAREA`、X11 `KeyPress` 映射 F2、`SelectionRequest` 提供 `CLIPBOARD`、左键拖拽/点击/滚轮缩放/右键行静音；
+  - `internal/ui/canvas_linux.go`：扫描 `/usr/share/fonts` 与 `/mnt/c/Windows/Fonts` 构建 OpenType 复合字体链；
+  - `internal/ui/control_linux.go` & `clipboard_linux.go`：unix 控制 socket 与 X11 `CLIPBOARD`；
+  - `macOS`：`internal/ui/app_posix.go`（`//go:build !windows && !linux`）保持诚实非窗口占位。
+- **跨平台 CI 门禁更新**：`scripts/portable-packages.txt` 收录全部 16 个 Go 包，`scripts/windows-only-packages.txt` 清空说明；`docs/PLATFORMS.md` 已按实测同步。
+
+### 58.3 本轮验证边界
+
+- **未做 macOS 运行期实测**与**未做非 WSLg 原生桌面环境实测**；本轮没有改版本号（浮窗仍 `1.0.9` / 插件仍 `1.2.18`）。
 
 ## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
 

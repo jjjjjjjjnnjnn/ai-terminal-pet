@@ -1,24 +1,25 @@
-# Packages that must build for linux/amd64 and darwin/arm64.
+# Packages that must build for linux/amd64 and darwin/arm64 (with CGO_ENABLED=0).
 #
-# Every entry here is a package with no window layer in it, and the list is expected
-# to grow: adding a line is how a new piece of the platform port becomes a gate
-# instead of a claim. Removing a line is a regression CI reports.
-#
-# The three packages that are absent (cmd/ai-terminal-pet, internal/app, and the
-# window half of internal/ui) are named in windows-only-packages.txt.
+# Every package in the repository now compiles with CGO_ENABLED=0 across
+# Windows, Linux, and macOS: Linux provides a pure-Go X11 panel, and macOS
+# provides a pure-Go Cocoa/AppKit panel (github.com/ebitengine/purego) with
+# shared OpenType font rasterisation and Unix domain sockets (see docs/PLATFORMS.md).
 #
 # Paths are relative to the repository root, without a leading ./
 
+internal/app
 internal/autostart
 internal/config
 internal/connect
 internal/home
 internal/i18n
 internal/pipeserver
+internal/platform
 internal/reporter
 internal/session
 internal/store
 internal/ui
+cmd/ai-terminal-pet
 cmd/pet-hook
 cmd/pet-setup
 cmd/pet-statusline

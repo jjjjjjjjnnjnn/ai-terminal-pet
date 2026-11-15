@@ -26,6 +26,8 @@ package connect
 import (
 	"os"
 	"strings"
+
+	pethome "ai-terminal-pet/internal/home"
 )
 
 // The three hosts this project ships reporters for. The names are also the
@@ -35,11 +37,6 @@ const (
 	TerminalOpenCode    = "opencode"
 	TerminalClaude      = "claude"
 	TerminalAntigravity = "antigravity"
-
-	// homeVariable is the name a finding uses when it cannot even say which
-	// file to look for. Without it, a report would read "no (no path)", which
-	// is what one of these lines actually printed before it was named.
-	homeVariable = "USERPROFILE"
 )
 
 // TerminalNames is the order --connect prints and --doctor reports in.
@@ -110,10 +107,15 @@ type Roots struct {
 	// say "~/.claude/settings.json", not the full path, so a report line stays
 	// readable when it is pasted into an issue.
 	Home string
-	// LocalAppData is where the installer puts the binaries (%LOCALAPPDATA%).
+	// LocalAppData is where the Windows installer puts the binaries (%LOCALAPPDATA%).
 	// A native reporter reference is resolved against this prefix because
 	// that is the one copy every reporter is meant to run from.
 	LocalAppData string
+	// XDGDataHome holds $XDG_DATA_HOME when resolving Linux installs without an
+	// explicit DataDir.
+	XDGDataHome string
+	// DataDir overrides the resolved data/install directory (home.Directory()).
+	DataDir string
 	// Executable is os.Executable(). Snippets uses it to find a repository
 	// checkout when the overlay was launched straight out of bin/ -- OpenCode
 	// loads reporters/opencode.js from the checkout, which is the one path an
@@ -131,13 +133,18 @@ type Roots struct {
 // answer, and it stays a warn.
 func DefaultRoots() Roots {
 	executable, executableErr := os.Executable()
-	home, homeErr := os.UserHomeDir()
-	if homeErr != nil || home == "" {
-		home = os.Getenv("USERPROFILE")
+	homeDir, homeErr := os.UserHomeDir()
+	if homeErr != nil || homeDir == "" {
+		homeDir = os.Getenv("HOME")
+		if homeDir == "" {
+			homeDir = os.Getenv("USERPROFILE")
+		}
 	}
 	return Roots{
-		Home:          home,
+		Home:          homeDir,
 		LocalAppData:  os.Getenv("LOCALAPPDATA"),
+		XDGDataHome:   os.Getenv("XDG_DATA_HOME"),
+		DataDir:       pethome.Directory(),
 		Executable:    executable,
 		ExecutableErr: executableErr,
 	}

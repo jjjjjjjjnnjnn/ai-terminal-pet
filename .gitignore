@@ -7,6 +7,7 @@ bin/
 # suffix is added - and *.exe above does not match it. Two of these slipped into
 # a commit once (§57); naming them individually is the fix, because a pattern
 # like "pet-*" would also match reporters/ and scripts/.
+/ai-terminal-pet
 /pet-hook
 /pet-setup
 /pet-statusline

@@ -249,10 +249,9 @@ func (c *canvas) text(left, top, width, height int, value string, fontHeight, we
 	// The platform returns false when it cannot draw (no font, no glyphs).
 	// Drawing nothing is the right failure: a panel missing one label still
 	// shows the rest, while a panic would take the whole window down.
-	if !c.backend.drawText(c, left, top, width, height, value, fontHeight, weight, flags) {
+	if !c.backend.drawText(c, left, top, width, height, value, fontHeight, weight, color, flags) {
 		return
 	}
-	c.normalizeText(left, top, width, height, color)
 }
 
 // measure returns the advance width of value in pixels at the given font.

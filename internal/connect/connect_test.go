@@ -509,11 +509,29 @@ func snippetNamed(t *testing.T, snippets []Snippet, terminal string) Snippet {
 }
 
 func hookPath(roots Roots) string {
-	return filepath.Join(roots.LocalAppData, installDirectoryName, hookBinaryName)
+	return installedHookBinary(roots)
 }
 
 func statuslinePath(roots Roots) string {
-	return filepath.Join(roots.LocalAppData, installDirectoryName, statuslineBinaryName)
+	return installedStatusline(roots)
+}
+
+func TestInstallDirResolvesDataDirAndXDG(t *testing.T) {
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "custom-data")
+	roots := Roots{
+		Home:    filepath.Join(root, "profile"),
+		DataDir: dataDir,
+	}
+	if got, want := installedHookBinary(roots), filepath.Join(dataDir, hookBinaryName); got != want {
+		t.Fatalf("installedHookBinary(DataDir) = %q, want %q", got, want)
+	}
+	if got, want := installedStatusline(roots), filepath.Join(dataDir, statuslineBinaryName); got != want {
+		t.Fatalf("installedStatusline(DataDir) = %q, want %q", got, want)
+	}
+	if empty := installedHookBinary(Roots{}); empty != "" {
+		t.Fatalf("installedHookBinary(empty) = %q, want empty", empty)
+	}
 }
 
 // stringContains is strings.Contains behind a name, used where the needle is a

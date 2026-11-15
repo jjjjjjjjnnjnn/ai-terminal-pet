@@ -22,6 +22,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -431,16 +432,27 @@ func Save(path string, value Config) error {
 	return WriteFileAtomic(path, append(data, '\n'))
 }
 
+// LayoutPlacement is one remembered (x, y) origin for a specific display
+// geometry signature, so plugging or unplugging an external monitor restores
+// where the user placed the overlay on that layout instead of losing it.
+type LayoutPlacement struct {
+	X int32 `json:"x"`
+	Y int32 `json:"y"`
+}
+
+const maxSavedLayouts = 32
+
 // State is the app-owned window placement remembered between launches.
 type State struct {
 	// Placed is false until the window has actually been positioned once.
 	// Without it, a state file of all zeroes would be indistinguishable from
 	// "remembered at the top-left corner".
-	Placed   bool    `json:"placed"`
-	X        int32   `json:"x"`
-	Y        int32   `json:"y"`
-	Zoom     float64 `json:"zoom"`
-	Expanded bool    `json:"expanded"`
+	Placed   bool                       `json:"placed"`
+	X        int32                      `json:"x"`
+	Y        int32                      `json:"y"`
+	Zoom     float64                    `json:"zoom"`
+	Expanded bool                       `json:"expanded"`
+	Layouts  map[string]LayoutPlacement `json:"layouts,omitempty"`
 }
 
 // DefaultState is the placement used when nothing has been remembered yet:
@@ -455,7 +467,37 @@ func (s State) Normalize() State {
 	if math.IsNaN(s.Zoom) || math.IsInf(s.Zoom, 0) || s.Zoom < MinZoom || s.Zoom > MaxZoom {
 		s.Zoom = DefaultState().Zoom
 	}
+	if len(s.Layouts) > 0 {
+		cleaned := make(map[string]LayoutPlacement, minInt(len(s.Layouts), maxSavedLayouts))
+		keys := make([]string, 0, len(s.Layouts))
+		for key := range s.Layouts {
+			if strings.TrimSpace(key) != "" {
+				keys = append(keys, key)
+			}
+		}
+		sort.Strings(keys)
+		if len(keys) > maxSavedLayouts {
+			keys = keys[:maxSavedLayouts]
+		}
+		for _, key := range keys {
+			cleaned[key] = s.Layouts[key]
+		}
+		if len(cleaned) > 0 {
+			s.Layouts = cleaned
+		} else {
+			s.Layouts = nil
+		}
+	} else {
+		s.Layouts = nil
+	}
 	return s
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // DecodeState parses state.json bytes, returning DefaultState on any error.

@@ -18,7 +18,10 @@ package connect
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
+
+	pethome "ai-terminal-pet/internal/home"
 )
 
 // Snippet is one terminal's paste-ready answer.
@@ -75,24 +78,31 @@ func snippetFor(roots Roots, terminal string) Snippet {
 // is meant to run from. They are preferred over a repository checkout because
 // that is the set --doctor's install-files check verifies and the set the plugin
 // package bootstraps.
+func installDir(roots Roots) string {
+	if roots.DataDir != "" {
+		return roots.DataDir
+	}
+	if roots.LocalAppData != "" {
+		return filepath.Join(roots.LocalAppData, installDirectoryName)
+	}
+	return pethome.DirectoryFor(runtime.GOOS, "", roots.XDGDataHome, roots.Home)
+}
+
 func installedHookBinary(roots Roots) string {
-	return filepath.Join(roots.LocalAppData, installDirectoryName, hookBinaryName)
+	dir := installDir(roots)
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, hookBinaryName)
 }
 
 func installedStatusline(roots Roots) string {
-	return filepath.Join(roots.LocalAppData, installDirectoryName, statuslineBinaryName)
+	dir := installDir(roots)
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, statuslineBinaryName)
 }
-
-// The deployed artifact names. Duplicated as literals on purpose: scripts/
-// install.ps1 owns the deployment set, and a shared constant across a PowerShell
-// script and Go is not a thing that can exist. doctor_windows.go keeps its own
-// copy of the same three names for the same reason, and each side's check is
-// what keeps them from drifting.
-const (
-	installDirectoryName = "AI-Terminal-Pet"
-	hookBinaryName       = "pet-hook.exe"
-	statuslineBinaryName = "pet-statusline.exe"
-)
 
 // HookBinaryName and StatuslineBinaryName expose the two deployable names so a
 // test fixture (or a future doctor check in another package) can name the same
@@ -144,7 +154,7 @@ func openCodeSnippet(roots Roots) Snippet {
 		snippet.Text = "; nothing to paste yet - run this from the repository, or install first"
 		snippet.Note = "OpenCode loads plugins from a file URL, so the snippet has to name a file that exists. " +
 			"From an installed copy the repository is not reachable: clone the repository, then run " +
-			"`ai-terminal-pet --connect=opencode` from its bin\\ directory."
+			"`ai-terminal-pet --connect=opencode` from its bin/ directory."
 		return snippet
 	}
 	url, err := PathToFileURL(filepath.Join(root, "reporters", "opencode.js"))
@@ -186,7 +196,7 @@ func claudeSnippet(roots Roots) Snippet {
 	} else {
 		snippet.Missing = []string{abbreviate(roots, binary), "reporters/claude-hook.js (a repository checkout that contains it)"}
 		snippet.Text = "; nothing to paste yet - run `ai-terminal-pet --doctor` to see what is missing"
-		snippet.Note = "Every hook command needs a reporter that exists. Install with scripts\\install.ps1, then re-run --connect=claude."
+		snippet.Note = "Every hook command needs a reporter that exists. Install with " + installHint + ", then re-run --connect=claude."
 		return snippet
 	}
 
@@ -262,13 +272,13 @@ func antigravitySnippet(roots Roots) Snippet {
 	if !exists(binary) {
 		snippet.Missing = []string{abbreviate(roots, binary)}
 		snippet.Text = "; nothing to paste yet - run `ai-terminal-pet --doctor` to see what is missing"
-		snippet.Note = "The statusline command has to name an executable that exists; install with scripts\\install.ps1 first."
+		snippet.Note = "The statusline command has to name an executable that exists; install with " + installHint + " first."
 		return snippet
 	}
 	snippet.Text = "\"statusLine\": {\n  \"command\": " + jsonQuote(binary) + "\n}"
 	snippet.Note = "This is a level reporter: every render reports the current state, so a finished or terminated " +
 		"agent arrives as idle. Only a hook carrying terminationReason produces closed. Paste " +
-		"`pet-hook.exe --mode=antigravity` into a plugin's hooks.json if you need sessions to close."
+		"`" + hookBinaryName + " --mode=antigravity` into a plugin's hooks.json if you need sessions to close."
 	return snippet
 }
 

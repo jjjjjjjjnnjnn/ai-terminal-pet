@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux && !darwin
 
 package ui
 
@@ -40,7 +40,7 @@ func (b *canvasBackend) release() {}
 // Returning false rather than painting a placeholder is the honest answer: the
 // caller (canvas.text) then skips normalizeText, so the buffer keeps whatever
 // the shapes left instead of gaining a fake block where a label should be.
-func (b *canvasBackend) drawText(target *canvas, left, top, width, height int, value string, fontHeight, weight int, flags uint32) bool {
+func (b *canvasBackend) drawText(target *canvas, left, top, width, height int, value string, fontHeight, weight int, color rgba, flags uint32) bool {
 	return false
 }
 

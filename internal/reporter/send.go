@@ -24,10 +24,6 @@ import (
 	"ai-terminal-pet/internal/session"
 )
 
-// OverlayBinaryName is the overlay's own file name, which is the same on every
-// platform: the installer and the packaged plugin both look for it by name.
-const OverlayBinaryName = "AI-Terminal-Pet.exe"
-
 const (
 	// PipeDialTimeout mirrors protocol.js connectTimeoutMs' default: the
 	// overlay is local and either listening or not, so there is nothing to

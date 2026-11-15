@@ -131,7 +131,7 @@ func TestLoadMissingFilesUseDefaults(t *testing.T) {
 	if got := Load(missing); !sameConfig(got, Default()) {
 		t.Fatalf("missing config must default, got %+v", got)
 	}
-	if got := LoadState(missing); got != DefaultState() {
+	if got := LoadState(missing); !reflect.DeepEqual(got, DefaultState()) {
 		t.Fatalf("missing state must be a normalized zero, got %+v", got)
 	}
 }
@@ -283,5 +283,34 @@ func TestNormalizeRepairsAnUnknownTheme(t *testing.T) {
 	normalized := c.Normalize()
 	if normalized.Theme != ThemePaper || !normalized.PerSourceColor || !normalized.HiddenAtLaunch {
 		t.Fatalf("Normalize dropped appearance settings: %+v", normalized)
+	}
+}
+
+func TestStateLayoutsRoundTripAndNormalize(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.json")
+	input := State{
+		Placed: true,
+		X:      42,
+		Y:      84,
+		Zoom:   1.25,
+		Layouts: map[string]LayoutPlacement{
+			"0,0,1920,1040":                  {X: 100, Y: 200},
+			"  ":                             {X: 1, Y: 2},
+			"0,0,1920,1040;1920,0,3840,1080": {X: 2500, Y: 300},
+		},
+	}
+	if err := SaveState(path, input); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+	got := LoadState(path)
+	if len(got.Layouts) != 2 {
+		t.Fatalf("len(Layouts) = %d, want 2 (%+v)", len(got.Layouts), got.Layouts)
+	}
+	if got.Layouts["0,0,1920,1040"] != (LayoutPlacement{X: 100, Y: 200}) {
+		t.Fatalf("single-display layout mismatch: %+v", got.Layouts)
+	}
+	if got.Layouts["0,0,1920,1040;1920,0,3840,1080"] != (LayoutPlacement{X: 2500, Y: 300}) {
+		t.Fatalf("dual-display layout mismatch: %+v", got.Layouts)
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
-	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -46,21 +45,6 @@ const (
 	// shown at the same time.
 	menuMuteSession = 1017
 
-	// The pulse and the slide share one timer but want different frame rates.
-	//
-	// The pulse is a slow breath - about 1.1 s per cycle. Every animation
-	// tick is a full GDI raster of the layered window, so a session parked in
-	// waiting_permission used to burn CPU forever at 12.5 fps. At 160 ms
-	// (6.25 fps) the breath still reads as a breath but costs half as much.
-	// The slide is short and reads as motion, so it keeps the higher rate.
-	pulseInterval = 160
-	slideInterval = 33
-
-	// windowClassName is also the rendezvous used by Control, so a
-	// short-lived second process can find the live overlay.
-	windowClassName = "AITerminalPetWindow"
-	windowTitle     = "AI Terminal Pet"
-
 	// trayTipMax is NOTIFYICONDATA.SzTip's capacity including the NUL.
 	trayTipMax = 128
 	// trayInfoMax is SzInfo/SzInfoTitle's capacity including the NUL.
@@ -68,61 +52,7 @@ const (
 	trayTitleMax = 64
 )
 
-// Placement is the window geometry remembered between launches. The ui
-// package deliberately does not import internal/config: the app layer owns the
-// file paths and hands the UI a plain struct plus a persist callback.
-type Placement struct {
-	Placed   bool
-	X        int32
-	Y        int32
-	Zoom     float64
-	Expanded bool
-}
-
-// Options is everything the UI needs from outside. All callbacks are invoked
-// on the UI thread and may be nil.
-type Options struct {
-	// Opacity is the layered window constant alpha, 1..255.
-	Opacity uint8
-	// Settings is the initial state of the tray switches.
-	Settings Settings
-	// AutoStart is the initial state of the run-at-logon switch. It lives in
-	// the registry rather than config.json, so the UI only mirrors it.
-	AutoStart bool
-	// AutoApproveTimeoutSec is the countdown length for auto-approve.
-	// Out-of-range values fall back to 5 seconds.
-	AutoApproveTimeoutSec int
-	// OpenSettings opens the settings window right after the first paint, so
-	// `--settings` works even when it had to start the overlay itself.
-	OpenSettings bool
-	// Initial is the remembered geometry, or the zero value when the window
-	// has never been placed.
-	Initial Placement
-	// OnPlacementChanged fires after the user moves, zooms or expands the
-	// overlay so the app layer can persist it.
-	OnPlacementChanged func(Placement)
-	// OnSettingsChanged fires when a tray switch is flipped.
-	OnSettingsChanged func(Settings)
-	// OnAutoStartChanged fires when the run-at-logon switch is flipped. It
-	// returns whether the change took effect; the UI keeps the old state when
-	// it returns false, so the tick never lies about the registry.
-	OnAutoStartChanged func(bool) bool
-	// Presence is the process/window cache the attendance sampler reuses for
-	// jump-to-terminal's ranking. Sharing it means one Toolhelp snapshot serves
-	// both, instead of the sampler enumerating the desktop a second time.
-	Presence *platform.Presence
-}
-
 var activeWindow atomic.Pointer[App]
-
-type dragState struct {
-	active  bool
-	moved   bool
-	startX  int32
-	startY  int32
-	windowX int32
-	windowY int32
-}
 
 type messageEnvelope struct {
 	event win.MSG
@@ -187,6 +117,7 @@ type App struct {
 	// layered window. UI thread only.
 	surface *canvas
 	drag    dragState
+	layouts map[string]LayoutPosition
 	// animating tracks whether the pulse timer is currently installed, so
 	// syncAnimation only calls SetTimer/KillTimer on a real transition.
 	animating bool
@@ -240,6 +171,8 @@ type App struct {
 	// both the row's hover highlight and the row a right-click targets, from
 	// the same geometry the rows are drawn with.
 	contextRow int
+	// keyboard holds keyboard-driven row selection for Esc/Up/Down/Home/End/Enter.
+	keyboard keyboardNav
 	// toast is the copy receipt: the pill that says a tap on a row put a path
 	// on the clipboard. It expires on its own and is dead until a copy
 	// happens, so a panel that never copies behaves exactly as it did before.
@@ -324,6 +257,7 @@ func New(values *store.Store, options Options) *App {
 		dpi:            96,
 		zoom:           zoom,
 		expanded:       options.Initial.Expanded,
+		layouts:        cloneLayoutsWithCurrent(options.Initial.Layouts, "", 0, 0),
 		state:          session.StateIdle,
 		revision:       ^uint64(0),
 		lastAvailable:  time.Now(),
@@ -789,9 +723,12 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		a.showContextMenu(false)
 		return 0
 	case wmKeyDown:
-		if wParam == wmKeyEscape && a.expanded {
-			a.toggleExpanded()
+		if a.handlePanelKey(win32PanelKey(wParam)) {
 			return 0
+		}
+	case wmKillFocus:
+		if a.keyboard.clear() {
+			a.postRefresh()
 		}
 	case wmDPIChanged:
 		a.handleDPIChanged(wParam)
@@ -829,6 +766,48 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		return 0
 	}
 	return win.DefWindowProc(hwnd, message, wParam, lParam)
+}
+
+func win32PanelKey(code uintptr) panelKey {
+	switch code {
+	case wmKeyEscape:
+		return panelKeyEscape
+	case wmKeyUp:
+		return panelKeyUp
+	case wmKeyDownArrow:
+		return panelKeyDown
+	case wmKeyHome:
+		return panelKeyHome
+	case wmKeyEnd:
+		return panelKeyEnd
+	case wmKeyReturn:
+		return panelKeyEnter
+	default:
+		return panelKeyNone
+	}
+}
+
+func (a *App) handlePanelKey(key panelKey) bool {
+	if key == panelKeyNone {
+		return false
+	}
+	outcome := a.keyboard.handle(key, a.expanded, a.sessions)
+	if outcome.toggleExpanded {
+		a.toggleExpanded()
+		return true
+	}
+	if outcome.jump {
+		if a.jumpTo(outcome.jumpRow) {
+			a.syncTuck()
+			return true
+		}
+		return false
+	}
+	if outcome.repainted {
+		a.postRefresh()
+		return true
+	}
+	return false
 }
 
 func (a *App) handleTimer(hwnd win.HWND, timer uintptr) uintptr {
@@ -1029,22 +1008,6 @@ func (a *App) hitTest(lParam uintptr) uintptr {
 }
 
 // classifyHit is the pure, unit-tested core of hitTest: true means the
-// point lands on an opaque pixel. X must be checked against the canvas
-// width (NOT len(hit) which equals width*height); the old check allowed
-// X in [width, width*height) and Y*width+X then escaped the slice and
-// panicked ("index out of range") the moment the window was wider than
-// the canvas (zoom-out / DPI-down + margin hover), killing the process
-// with no error.log entry.
-func classifyHit(x, y, width, height int, hit []byte) bool {
-	if width <= 0 || height <= 0 || len(hit) < width*height {
-		return false
-	}
-	if x < 0 || y < 0 || x >= width || y >= height {
-		return false
-	}
-	return hit[y*width+x] >= 20
-}
-
 // beginDrag arms a press. The whole panel is draggable, including the
 // expanded body: the old code only allowed the top 40 units so that clicks on
 // the session rows could be reserved for something else, but nothing was ever
@@ -1092,33 +1055,6 @@ func (a *App) zOrder() win.HWND {
 		return win.HWND_TOPMOST
 	}
 	return win.HWND_NOTOPMOST
-}
-
-// releaseAction is what a finished drag should trigger.
-type releaseAction int
-
-const (
-	releaseNothing releaseAction = iota
-	releaseToggle
-)
-
-// decideRelease maps a completed press to the action it triggers. It is pure
-// so the invariant "a drag that moved must never also toggle the panel" is
-// locked down by a test.
-//
-// The rule is deliberately the same in both directions - a tap toggles, a drag
-// moves - so there is nothing to learn and nothing to aim at. The old code
-// read a.drag.moved AFTER calling ReleaseCapture, which dispatches
-// WM_CAPTURECHANGED synchronously to this same window and clears a.drag, so
-// moved was always observed as false: every drag additionally toggled the
-// panel, which is what "cannot drag the pet" looked like from the outside. It
-// then also required a tap to land on a 20-unit close button to collapse,
-// which is what "the panel will not close" looked like.
-func decideRelease(active, moved bool) releaseAction {
-	if !active || moved {
-		return releaseNothing
-	}
-	return releaseToggle
 }
 
 func (a *App) endDrag(x, y int) {
@@ -1191,30 +1127,7 @@ func (a *App) handleTap(x, y int) {
 // from the geometry the frame was drawn with, so "what the tap meant" and "what
 // the panel showed" cannot drift apart.
 func (a *App) tapInputs(x, y int) tapInputs {
-	if a.expanded {
-		_, hasJump := mostUrgentJump(a.sessions)
-		if row, hit := focusHit(x, y, a.width, a.height, true, hasJump, false, len(a.sessions)); hit {
-			return tapInputs{expanded: true, jumpHit: true, jumpRow: row, jumpValid: true}
-		}
-		inputs := tapInputs{expanded: true}
-		if key := a.approvals.urgentKey(a.sessions); a.options.Settings.AutoApprove && key != "" {
-			inputs.vetoArmed = true
-		}
-		if row, _, copyable := a.expandedRowCopyTarget(x, y); copyable {
-			inputs.copyRowHit = true
-			inputs.copyRow = row
-		}
-		return inputs
-	}
-	inputs := tapInputs{}
-	_, hasJump := mostUrgentJump(a.sessions)
-	_, stripCopyable := compactCopyText(a.sessions)
-	inputs.copyStripValid = stripCopyable
-	inputs.copyStripHit = compactCopyHit(x, y, a.width, a.height, stripCopyable)
-	if row, hit := focusHit(x, y, a.width, a.height, false, hasJump, stripCopyable, len(a.sessions)); hit {
-		return tapInputs{jumpHit: true, jumpRow: row, jumpValid: true}
-	}
-	return inputs
+	return buildTapInputs(a.expanded, a.options.Settings.AutoApprove, a.width, a.height, x, y, a.sessions, a.approvals)
 }
 
 // jumpTo brings the terminal that owns one session to the foreground.
@@ -1332,11 +1245,7 @@ func (a *App) zoomBy(delta float64) {
 	if delta == 0 {
 		return
 	}
-	step := 0.1
-	if delta < 0 {
-		step = -step
-	}
-	a.zoom = math.Max(0.65, math.Min(1.6, a.zoom+step))
+	a.zoom = stepZoomValue(a.zoom, delta)
 	a.load()
 	a.applyGeometry()
 	a.setTopmost()
@@ -1346,6 +1255,9 @@ func (a *App) zoomBy(delta float64) {
 
 func (a *App) toggleExpanded() {
 	a.expanded = !a.expanded
+	if !a.expanded {
+		a.keyboard.clear()
+	}
 	// A receipt is about one row (or one strip). Both stop existing the
 	// moment the panel changes shape, and a pill carried across the toggle
 	// would point at a row that is no longer on screen.
@@ -1365,7 +1277,10 @@ func (a *App) toggleExpanded() {
 
 // placement snapshots the geometry worth remembering across launches.
 func (a *App) placement() Placement {
-	return Placement{Placed: true, X: a.x, Y: a.y, Zoom: a.zoom, Expanded: a.expanded}
+	sig := layoutSignature(enumerateDisplayWorkAreas())
+	layouts := cloneLayoutsWithCurrent(a.layouts, sig, a.x, a.y)
+	a.layouts = cloneLayoutsWithCurrent(layouts, "", 0, 0)
+	return Placement{Placed: true, X: a.x, Y: a.y, Zoom: a.zoom, Expanded: a.expanded, Layouts: layouts}
 }
 
 // persistPlacement hands the current geometry to the app layer. It is called
@@ -1379,11 +1294,17 @@ func (a *App) persistPlacement() {
 }
 
 // restoreOrAnchor puts the window back where the user last left it, or falls
-// back to the right-edge anchor on a first run. The restored position is still
-// clamped to the monitor, so a saved coordinate from a disconnected display
-// cannot strand the overlay off-screen.
+// back to the right-edge anchor on a first run. Exact per-display-layout
+// coordinates take precedence so unplugging/replugging monitors preserves each
+// setup independently.
 func (a *App) restoreOrAnchor() {
 	initial := a.options.Initial
+	displays := enumerateDisplayWorkAreas()
+	if x, y, ok := resolveInitialPlacement(initial, displays, int32(a.logicalWidth()), int32(a.logicalHeight()), a.dpi); ok {
+		a.x = x
+		a.y = y
+		return
+	}
 	if !initial.Placed {
 		a.positionForWorkArea()
 		return
@@ -1629,6 +1550,7 @@ func (a *App) applyTopmost() {
 func (a *App) resetPlacement() {
 	a.zoom = 1
 	a.expanded = false
+	a.layouts = nil
 	a.width, a.height = a.logicalWidth(), a.logicalHeight()
 	a.resize()
 	a.positionForWorkArea()
@@ -1682,6 +1604,7 @@ func (a *App) hideToTray() {
 	// Snap it fully out too: it should be where the user left it when it
 	// comes back, not mid-slide.
 	a.hovering = false
+	a.keyboard.clear()
 	a.tuck, a.tuckTarget = 0, 0
 	a.applyFramePosition()
 	a.syncAnimation()
@@ -1833,15 +1756,7 @@ func (a *App) alertOnTransitions() {
 // rememberAlerts records when each conversation last spoke, so two completions
 // of one session inside the coalescing window become one noise.
 func (a *App) rememberAlerts(inputs []AlertInput, plan AlertPlan, now time.Time) {
-	if a.lastAlertAt == nil {
-		a.lastAlertAt = make(map[string]time.Time, len(inputs))
-	}
-	for index := range inputs {
-		key := sessionAlertKey(inputs[index].Session)
-		if plan.Reasons[key] == decisionDoneAway || plan.Reasons[key] == decisionDoneSeen {
-			a.lastAlertAt[key] = now
-		}
-	}
+	a.lastAlertAt = recordRememberedAlerts(a.lastAlertAt, inputs, plan, now)
 }
 
 // persistReceipt stores the decision record and keeps the in-memory copy that
@@ -1857,52 +1772,12 @@ func (a *App) persistReceipt(record alertRecord) {
 // sameAlertRecord reports whether the new record is indistinguishable from the
 // last one, so an idle 8-second tick does not rewrite the file.
 func (a *App) sameAlertRecord(record alertRecord) bool {
-	if len(a.lastAlertRecord.Sessions) != len(record.Sessions) {
-		return false
-	}
-	if a.lastAlertRecord.Balloon != record.Balloon ||
-		a.lastAlertRecord.Tone != record.Tone ||
-		a.lastAlertRecord.Presence != record.Presence ||
-		a.lastAlertRecord.Present != record.Present ||
-		a.lastAlertRecord.Attending != record.Attending ||
-		a.lastAlertRecord.Skipped != record.Skipped {
-		return false
-	}
-	for index := range record.Sessions {
-		if a.lastAlertRecord.Sessions[index] != record.Sessions[index] {
-			return false
-		}
-	}
-	return true
+	return alertRecordsEqual(a.lastAlertRecord, record)
 }
 
 // alertInputs builds the policy's view of every conversation that moved.
 func (a *App) alertInputs(previous, current map[string]alertFacts, sample attendanceState, sampleKnown bool, settings AttentionSettings) []AlertInput {
-	inputs := make([]AlertInput, 0, len(a.sessions))
-	for _, value := range a.sessions {
-		key := sessionAlertKey(value)
-		kind := session.KindOfSession(value)
-		old, existed := previous[key]
-		if existed && old.State == value.State && old.Kind == kind {
-			continue
-		}
-		in := AlertInput{
-			Session:       value,
-			Kind:          kind,
-			Previous:      old.State,
-			Existed:       existed,
-			ChangedKind:   existed && old.Kind != kind,
-			Muted:         a.mutes.has(value),
-			Subagent:      strings.TrimSpace(value.ParentSessionID) != "",
-			PresenceKnown: sampleKnown,
-		}
-		if sampleKnown {
-			in.Present = sample.Present
-			in.Attending = sample.Attending[session.Identity(value)]
-		}
-		inputs = append(inputs, in)
-	}
-	return inputs
+	return buildAlertInputs(a.sessions, a.mutes, previous, current, sample, sampleKnown)
 }
 
 // vanishedInputs reports conversations that disappeared while they were busy.
@@ -1916,76 +1791,12 @@ func (a *App) alertInputs(previous, current map[string]alertFacts, sample attend
 // Decide answers with the silent decisionVanished reason - the receipt keeps
 // the explanation, the user hears nothing.
 func (a *App) vanishedInputs(previous, current map[string]alertFacts, sample attendanceState) []AlertInput {
-	var inputs []AlertInput
-	for key, old := range previous {
-		if _, stillHere := current[key]; stillHere {
-			continue
-		}
-		if !busyState(old.State) {
-			continue
-		}
-		source, sessionID := splitAlertKey(key)
-		inputs = append(inputs, AlertInput{
-			Session:  session.Session{Source: source, SessionID: sessionID, State: session.StateClosed},
-			Kind:     session.KindNone,
-			Previous: old.State,
-			Existed:  true,
-			Present:  sample.Present,
-			Vanished: true,
-		})
-	}
-	return inputs
+	return buildVanishedInputs(previous, current, sample)
 }
 
 // attentionSettings maps the live preferences onto the policy's narrow view.
 func (a *App) attentionSettings() AttentionSettings {
-	settings := a.options.Settings
-	return AttentionSettings{
-		Notifications:   settings.Notifications,
-		Sound:           settings.Sound,
-		SoundOnWaiting:  settings.SoundOnWaiting,
-		SoundOnError:    settings.SoundOnError,
-		DonePolicy:      ValidDonePolicy(settings.DonePolicy),
-		QuietCurrent:    settings.QuietCurrent,
-		ForegroundAware: settings.ForegroundAware,
-		IdleAfter:       time.Duration(settings.IdleSeconds) * time.Second,
-		QuietSubagents:  settings.QuietSubagents,
-	}
-}
-
-// toneKind maps a decision's timbre name onto the synthesised kind constant.
-func toneKind(tone string) uint32 {
-	switch tone {
-	case toneError:
-		return beepError
-	case toneFinished:
-		return beepFinished
-	default:
-		return beepExclamation
-	}
-}
-
-// doneBalloonBody names the project in a completion balloon. The old copy was
-// the same sentence for every session, which told the user nothing actionable.
-func doneBalloonBody(value session.Session, lang i18n.Lang) string {
-	body := i18n.T(lang, i18n.KeyBalloonDoneBody)
-	if label := projectLabel(value, lang); label != "" {
-		body = label + " · " + body
-	}
-	return body
-}
-
-// presenceLabel renders the sample for the receipt, distinguishing "nobody
-// could tell" from "the user is away" - two states that read the same on the
-// panel and mean opposite things in a bug report.
-func presenceLabel(sample attendanceState, known bool) string {
-	if !known {
-		return "unknown"
-	}
-	if sample.Present {
-		return "present"
-	}
-	return "away"
+	return attentionSettingsFrom(a.options.Settings)
 }
 
 // soundForState and beepKind were the two halves of the tone decision that
@@ -2056,6 +1867,8 @@ func (a *App) present() error {
 	// enter the key would stay on screen until some unrelated refresh.
 	toast := a.toast.frame(now, a.sessions)
 	key.withToast(toast)
+	selectedRow, hasSelected := a.keyboard.selected()
+	key.withSelectedRow(selectedRow, hasSelected)
 	if key == a.lastFrame && a.surface != nil {
 		return nil
 	}
@@ -2081,20 +1894,22 @@ func (a *App) present() error {
 		target := a.surface
 		target.clear()
 		drawVerticalPanel(target, panelState{
-			Items:     a.sessions,
-			Now:       time.Now(),
-			Expanded:  a.expanded,
-			Pressed:   a.pressed,
-			Hovered:   a.hovering,
-			Lang:      a.lang,
-			Countdown: a.approvals.views(time.Now()),
-			Unread:    a.unread,
-			Muted:     a.mutes,
-			HoverRow:  a.contextRow,
-			Toast:     toast,
-			Tuck:      a.tuck,
-			Sliver:    a.sliverWidth(),
-			Dock:      a.dock,
+			Items:       a.sessions,
+			Now:         time.Now(),
+			Expanded:    a.expanded,
+			Pressed:     a.pressed,
+			Hovered:     a.hovering,
+			Lang:        a.lang,
+			Countdown:   a.approvals.views(time.Now()),
+			Unread:      a.unread,
+			Muted:       a.mutes,
+			HoverRow:    a.contextRow,
+			HasSelected: hasSelected,
+			SelectedRow: selectedRow,
+			Toast:       toast,
+			Tuck:        a.tuck,
+			Sliver:      a.sliverWidth(),
+			Dock:        a.dock,
 		})
 	}
 	a.lastFrame = key
@@ -2144,6 +1959,7 @@ func (a *App) load() {
 	// expired) lose their countdowns here, on the only path that observes
 	// store changes.
 	a.approvals.update(a.sessions, time.Now(), a.options.Settings.AutoApprove, a.approveTimeout)
+	a.keyboard.sync(a.expanded, a.sessions)
 	// The attendance sampler evaluates its own copy of the session list, so it
 	// is handed the one that was just loaded rather than reading a.sessions
 	// from another goroutine.
@@ -2227,26 +2043,14 @@ func (a *App) positionForWorkArea() {
 		a.y = 40
 		return
 	}
-	a.x = info.RcWork.Right - width - int32(24*a.dpi/96)
-	a.y = info.RcWork.Top + (info.RcWork.Bottom-info.RcWork.Top-height)/2
-	a.clampToWorkArea(info.RcWork, width, height)
+	work := displayRect{Left: info.RcWork.Left, Top: info.RcWork.Top, Right: info.RcWork.Right, Bottom: info.RcWork.Bottom}
+	a.x, a.y = defaultWorkAreaOrigin(width, height, a.dpi, work)
 }
 
 func (a *App) clampToWorkArea(work win.RECT, width, height int32) {
-	minimumX := work.Left + int32(8*a.dpi/96)
-	minimumY := work.Top + int32(8*a.dpi/96)
-	maximumX := work.Right - width - int32(8*a.dpi/96)
-	maximumY := work.Bottom - height - int32(8*a.dpi/96)
-	if maximumX < minimumX {
-		a.x = work.Left
-	} else {
-		a.x = max32(minimumX, min32(a.x, maximumX))
-	}
-	if maximumY < minimumY {
-		a.y = work.Top
-	} else {
-		a.y = max32(minimumY, min32(a.y, maximumY))
-	}
+	a.x, a.y = clampPositionToWorkArea(a.x, a.y, width, height, a.dpi, displayRect{
+		Left: work.Left, Top: work.Top, Right: work.Right, Bottom: work.Bottom,
+	})
 }
 
 func (a *App) handleDPIChanged(wParam uintptr) {
@@ -2278,30 +2082,4 @@ func (a *App) windowDpi() uint32 {
 
 func (a *App) window() win.HWND {
 	return win.HWND(a.handle.Load())
-}
-
-func scaledDimension(base int, dpi uint32, zoom float64) int {
-	value := int(math.Round(float64(base) * float64(dpi) / 96 * zoom))
-	return maxInt(value, 32)
-}
-
-func abs32(value int32) int32 {
-	if value < 0 {
-		return -value
-	}
-	return value
-}
-
-func min32(left, right int32) int32 {
-	if left < right {
-		return left
-	}
-	return right
-}
-
-func max32(left, right int32) int32 {
-	if left > right {
-		return left
-	}
-	return right
 }

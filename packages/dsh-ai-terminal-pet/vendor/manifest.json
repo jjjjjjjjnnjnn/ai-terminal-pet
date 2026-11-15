@@ -3,17 +3,17 @@
   "generatedBy": "scripts/vendor.mjs",
   "goVersion": "go1.27.0",
   "source": {
-    "files": 82,
-    "sha256": "16741307139db43fb482a2033f65797a957c5d424398e8986ab90005b279a2f1"
+    "files": 116,
+    "sha256": "17c513e52512ff591bf13c9a21c7344c8afacd3167b1585621a1abba42267f56"
   },
   "overlay": {
     "file": "vendor/AI-Terminal-Pet.exe",
-    "bytes": 4655616,
-    "sha256": "b407e50ab8da6136dead92e3198736cea0ef9a2cf3dfd8f201a2fc85e2528963"
+    "bytes": 4702208,
+    "sha256": "fc7c92fdd671d588177ba6b8e051a68cb50a0dd017b645bb0baf967ddeed1274"
   },
   "protocol": {
     "file": "vendor/protocol.js",
-    "bytes": 20914,
-    "sha256": "5e197db6c9aae4fca8c727fec045ca3af2bc0bd31df68ca5bf7d00865e074275"
+    "bytes": 21753,
+    "sha256": "01f48e789777060eb552d5801cddbdc130302a31a77a15ca010aae43da13a9b6"
   }
 }

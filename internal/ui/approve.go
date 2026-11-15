@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/session"
 )
 
@@ -54,13 +55,8 @@ type approvalDeny struct {
 }
 
 // approvalsDir is where hooks and the overlay exchange pending/deny files.
-// Missing LOCALAPPDATA means "" and every operation below becomes a no-op.
 func approvalsDir() string {
-	base := os.Getenv("LOCALAPPDATA")
-	if base == "" {
-		return ""
-	}
-	return filepath.Join(base, "AI-Terminal-Pet", "approvals")
+	return home.Join("approvals")
 }
 
 // sanitizeApprovalStem maps arbitrary text onto [A-Za-z0-9_-], truncated to

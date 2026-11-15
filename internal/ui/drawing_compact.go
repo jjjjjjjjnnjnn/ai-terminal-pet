@@ -127,6 +127,10 @@ type renderedKey struct {
 	toastRow    int32
 	toastTick   int64
 	toastFailed bool
+	// selectedSlot encodes the keyboard-selected expanded row as (row+1),
+	// leaving 0 for "no keyboard selection" so row 0 and absent selection
+	// cannot collide in zero-valued keys.
+	selectedSlot int32
 }
 
 // withToast folds the live receipt into the frame key. It is a method rather
@@ -137,6 +141,15 @@ func (k *renderedKey) withToast(p panelToast) {
 	k.toastRow = p.row
 	k.toastTick = p.tick
 	k.toastFailed = p.failed
+}
+
+// withSelectedRow folds keyboard row selection into the frame key.
+func (k *renderedKey) withSelectedRow(row int, active bool) {
+	if !active || row < 0 {
+		k.selectedSlot = 0
+		return
+	}
+	k.selectedSlot = int32(row + 1)
 }
 
 func frameKey(width, height int, digest uint64, state session.State, count int, expanded, pressed, hovered bool, tuck float64, animating bool, now time.Time, lang i18n.Lang, approveSec int64, theme string, perSource bool, unreadRows, mutedRows uint64, hoverRow int) renderedKey {
@@ -204,6 +217,11 @@ type panelState struct {
 	// rather than a local because the row highlight is part of the frame the
 	// key hashes (see renderedKey.hoverRow).
 	HoverRow int
+	// HasSelected and SelectedRow carry the keyboard-selected row (only
+	// rendered when HasSelected is true, so zero-valued panelState never
+	// highlights row 0 on open).
+	HasSelected bool
+	SelectedRow int
 	// Toast is the live copy receipt, zero when there is none. It is drawn
 	// over the compact subject line or over one expanded row.
 	Toast panelToast
@@ -259,7 +277,11 @@ func drawVerticalPanel(target *canvas, state panelState) {
 	if state.Tuck < 1 {
 		target.setAlphaScale(1 - state.Tuck)
 		if state.Expanded {
-			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised, state.Lang, state.Countdown, state.Unread, state.Muted, state.HoverRow)
+			selectedRow := -1
+			if state.HasSelected {
+				selectedRow = state.SelectedRow
+			}
+			drawVerticalExpanded(target, items, state.Now, aggregate, accent, raised, state.Lang, state.Countdown, state.Unread, state.Muted, state.HoverRow, selectedRow)
 			// The receipt is an overlay on a row that was just drawn: it goes
 			// after the rows, so the pill is not covered by the next row's
 			// fill, and inside the fade so it slides with the contents.
@@ -473,7 +495,7 @@ func compactSubject(items []session.Session, state session.State, lang i18n.Lang
 	return projectLabel(items[0], lang), colors.Secondary
 }
 
-func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba, lang i18n.Lang, countdown map[string]approvalView, unread *unreadSet, mutes *muteSet, hoverRow int) {
+func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time, state session.State, accent, raised rgba, lang i18n.Lang, countdown map[string]approvalView, unread *unreadSet, mutes *muteSet, hoverRow, selectedRow int) {
 	width := target.width
 	height := target.height
 	unit := float64(width) / expandedWidth
@@ -516,7 +538,7 @@ func drawVerticalExpanded(target *canvas, items []session.Session, now time.Time
 			if mutes != nil && mutes.has(items[index]) {
 				mark |= unreadMarkMuted
 			}
-			drawVerticalSession(target, items[index], left, rowTop, rowWidth, rowHeight, now, value, lang, view, ok, mark, hoverRow == index)
+			drawVerticalSession(target, items[index], left, rowTop, rowWidth, rowHeight, now, value, lang, view, ok, mark, hoverRow == index, selectedRow == index)
 		}
 		if hidden := len(items) - rows; hidden > 0 {
 			y := top + rows*value(expandedRowHeight)
@@ -590,7 +612,7 @@ const (
 // While an auto-approve countdown runs for the session, the second line's
 // right half becomes the ticking Allow (Ns) plus a draining bar, so the
 // user sees exactly how long they have to veto.
-func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int, lang i18n.Lang, view approvalView, hasCountdown bool, mark int, hovered bool) {
+func drawVerticalSession(target *canvas, current session.Session, left, top, width, height int, now time.Time, scale func(int) int, lang i18n.Lang, view approvalView, hasCountdown bool, mark int, hovered, selected bool) {
 	target.fillRounded(left, top, width, height, 6, colors.RaisedRow)
 	accent := stateColor(current.State)
 	// The rail is the one place a row uses a large patch of colour. Keeping it
@@ -613,6 +635,13 @@ func drawVerticalSession(target *canvas, current session.Session, left, top, wid
 		hover.A = 200
 		target.fillRounded(left, top, width, height, 6, hover)
 		target.fillRounded(left+scale(1), top+scale(1), scale(3), height-scale(2), 2, rail)
+	}
+	// Keyboard selection draws a crisp focus outline in Accent so moving with
+	// arrow keys is unmistakable on every palette even when the pointer is away.
+	if selected {
+		ring := colors.Accent
+		ring.A = 220
+		target.outlineRounded(left, top, width, height, 6, 1, ring)
 	}
 
 	textLeft := left + scale(9)

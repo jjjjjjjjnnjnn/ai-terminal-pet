@@ -504,7 +504,7 @@ DeepSeek Harness 桥是现成的第三个接入样例（`integrations/deepseek-h
 管道命名算法、回执契约、脱敏规则写成规范；README 给出 5 行以内的接入示例（shell alias / Makefile / 编辑器 task）。
 **验收**：不读源码也能写出一个合规上报端。
 
-### E3 — 跨平台（macOS / Linux）⏳ 内核已迁（2026-11-15，§57），**窗口层未做** —— 因此 1.1.0 未发
+### E3 — 跨平台（macOS / Linux）⏳ 全 16 包可跨编，Linux X11 面板已落地（2026-11-15，§58）；**macOS 窗口层未做** —— 因此 1.1.0 暂未发
 **动机**：目前 UI 层与平台层直接调 Win32，无法移植。核心逻辑（session/store/pipeserver 的协议部分）其实已平台无关。
 **盘点结果（2026-11-15 实测，17,238 行非测试 Go）**：
 
@@ -545,11 +545,13 @@ POSIX 上 `\\.\pipe\...` 是个合法文件名、`hang.log` 的时钟语义）�
 - **自启**：Windows HKCU Run / macOS LaunchAgent / Linux XDG desktop entry，Manager 语义共用。
 - **CI 门禁**：`scripts/portable-packages.txt`（必须能编）与 `scripts/windows-only-packages.txt`
   （必须编不了）双向检查，任何一边漂移都会红。
-- **窗口层**：未做。`internal/ui/canvas_posix.go` 是编译桩（有 buffer、不画字），
-  `internal/app` 用 `ErrNoWindowLayer` 明确拒绝在没有面板的平台启动。原因是产品事实：
-  没有面板就没有产品，而 Linux 的 X11 客户端或 GTK3+cgo、以及 macOS 的 AppKit，
-  都不是一次会话能写完并验证的东西（本机没有 Mac；WSL 镜像里连中文字体都没有）。
-  详见 [docs/PLATFORMS.md](PLATFORMS.md)。
+- **第 58 轮增量（§58，全 16 包跨平台 + Linux 纯 Go X11 浮窗）**：
+  - `internal/platform`、`internal/app`、`cmd/ai-terminal-pet` 全部消除 Win32 编译锁；`scripts/portable-packages.txt` 收录全部 **16** 个 Go 包，`scripts/windows-only-packages.txt` 清空。
+  - **Linux X11 面板**：`internal/ui/app_linux.go` + `canvas_opentype.go` + `canvas_fonts_linux.go` + `control_unix.go` + `clipboard_linux.go` 基于纯 Go `github.com/jezek/xgb` 与 `golang.org/x/image`（零 cgo、零 GTK），支持 32-bit ARGB 透明、`_NET_WM_WINDOW_OPACITY` 脉冲、chunked `PutImage`、OpenType 字体链、X11 `CLIPBOARD`、RandR/workarea 布局记忆、EWMH 焦点回跳（`/proc` + `_NET_CLIENT_LIST`）与 unix 控制 socket。已在 WSL2 Ubuntu + WSLg `DISPLAY=:0` 实跑 Linux 测试与端到端 smoke。
+  - **第 59 轮增量（§59，macOS 纯 Go Cocoa/AppKit 适配 + CI `macos-latest`）**：
+    - 在无本地 Mac 硬件环境下（基于硬件排查说明未启用违规黑苹果/非授权 macOS 虚拟机），采用 `github.com/ebitengine/purego v0.9.1`（`CGO_ENABLED=0` 零 cgo）完成完整 macOS 原生能力：`internal/platform/focus_darwin.go`（`CGWindowListCopyWindowInfo`、`CGEventSourceSecondsSinceLastEventType`、`NSWorkspace` / `NSRunningApplication`）、`internal/ui/app_darwin.go`（`NSApplication` + 无边框透明置顶 `AITerminalPetWindow` + `NSImageView` + `NSStatusBar` 菜单 + 鼠标/拖拽/滚轮缩放/键盘导航）、`cocoa_darwin.go` / `clipboard_darwin.go`（`NSPasteboard`）/ `sound_darwin.go`（共享 `sound.go` WAV 合成 + Cocoa `NSSound`）。
+    - 与 Linux 共享 `canvas_opentype.go`（拆出 `canvas_fonts_darwin.go` 扫描 `/System/Library/Fonts` 与 `~/Library/Fonts`）、`control_unix.go`（Unix 控制 socket）、`internal/app/platform_gui.go`（`uiAvailable() = true`），以及与 Windows 共享 `sound.go` WAV 合成器；纯 Cocoa 坐标/像素/按键转换抽入无标签 `darwin_geometry.go` 并在三平台全部运行单测。
+    - `.github/workflows/ci.yml` 新增 `macos` job（`runs-on: macos-latest`，实机运行 `go vet`、`go test -count=1 ./...`、编译 macOS `arm64` 三二进制并执行无头 CLI/hook 冒烟；物理屏幕窗口交互仍以 `PET_COCOA_PROBE=1` 作为 opt-in 探针）。详见 [docs/PLATFORMS.md](PLATFORMS.md)。
 
 
 ### E6 — `--doctor` 自检 ✅ 已交付（2026-11-10，见 §1i）
@@ -574,8 +576,9 @@ POSIX 上 `\\.\pipe\...` 是个合法文件名、`hang.log` 的时钟语义）�
 实测 0.95–1.5 s，其中绝大部分是进程创建被 AV 钩挂扫描，不是我们的代码。
 **可做的**：
 1. 缩小二进制（见 L2）——镜像越小，AV 全量扫描越便宜。
-2. 上报端在**状态未变化时直接短路**：`pet-statusline` 先读 `runtime/` 里自己的上一个快照，
-   若 `state`/`reason`/`project` 全同则跳过管道投递（快照仍写，保证 TTL）。可省掉每次渲染的 IPC 往返。
+2. ✅ **已落地（`internal/reporter/payload.go` + `cmd/pet-statusline/main.go`，§58）**：`pet-statusline`
+   先读 `runtime/` 里同会话上一次快照（`ReadSnapshot`），`StatuslineDeliverNeeded` 对比状态字段并保留
+   30 秒心跳保活（故意不比较易变的 `ParentPID`）；未变时直接写完快照就跳过管道投递，减少 IPC 往返。
 3. AV 排除目录（需管理员，用户决策）——docs/archive/BASELINE-20260924.md §13 已记录这是唯一能真正压到亚秒的手段。
 4. 已落地：`--reset`/`--toggle` 等控制路径不再走 `app.Run()`，避免控制命令意外拉起常驻实例。
 
@@ -642,8 +645,8 @@ v0.9.0 之后（2026-11-10，未发版，见 §1i）又交付了四项**扩展�
 | **F10** | **提醒层：一个纯函数决定「要不要打扰」，并留下可回答的判定记录** —— **已交付（2026-11-12，1.0.3）**，见下方 F10 小节 | **高** | **中**（三种请求要分开、前台/闲置要采样、逐会话静音与未读要持久化） |
 | **F8** | 会话行点击复制项目路径（面板内回执，避免"点了没反应"）——**已交付（2026-11-13，1.0.5）**，见下方 F8 小节 | 高 | **中**（回执是时间驱动的绘制元素，紧凑条拆成两个命中区） |
 | **F12** | 设置窗口可读可用：外观页签真的能点、字号升到系统档位、说明换行、键盘可达与 tooltip —— **已交付（2026-11-13，1.0.7）**，见下方 F12 小节 | 高 | **中**（GDI 字号吸附要实测、行高要按内容算、降档要按工作区） |
-| F2 | 键盘快捷键：`Esc` 收起（已有）、方向键在会话行间移动、`Enter` 跳转 | 中 | 中 |
-| F5 | 记住所在显示器（多屏场景下按显示器恢复，而不是全局坐标） | 中 | 中 |
+| F2 | 键盘快捷键：`Esc` 收起、方向键/`Home`/`End` 在会话行间移动、`Enter` 跳转 —— **已交付（§58，`keyboard.go`）** | 中 | 中 |
+| F5 | 记住所在显示器（按显示器工作区签名保存/恢复坐标，`State.Layouts`） —— **已交付（§58，`placement.go`）** | 中 | 中 |
 | F1 | 悬停展开面板时显示完整会话明细（就地浮层） | 中 | 中 |
 | ~~F9~~ | ~~紧凑态显示「最久等待了多久」~~ **已交付（2026-11-12，1.0.1）**，见下方 F9 小节 | 中 | 低 |
 

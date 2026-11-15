@@ -24,6 +24,7 @@ import (
 	"ai-terminal-pet/internal/app"
 	"ai-terminal-pet/internal/autostart"
 	"ai-terminal-pet/internal/config"
+	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/ui"
 )
 
@@ -265,11 +266,10 @@ func usageError(format string, args ...any) error {
 // persists a fresh anchor straight after wmReset, so deleting first only
 // matters for the "nothing was running" path.
 func clearState() error {
-	root := os.Getenv("LOCALAPPDATA")
-	if root == "" {
-		return errors.New("LOCALAPPDATA is not set")
+	path := home.Join(config.StateFileName)
+	if path == "" {
+		return errors.New("data directory is not set")
 	}
-	path := filepath.Join(root, "AI-Terminal-Pet", config.StateFileName)
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
@@ -277,15 +277,16 @@ func clearState() error {
 }
 
 func writeError(value error) {
-	root := os.Getenv("LOCALAPPDATA")
-	if root == "" || value == nil {
+	if value == nil {
 		return
 	}
-	directory := filepath.Join(root, "AI-Terminal-Pet")
-	if err := os.MkdirAll(directory, 0700); err != nil {
+	path := home.Join("error.log")
+	if path == "" {
 		return
 	}
-	path := filepath.Join(directory, "error.log")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return
+	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return

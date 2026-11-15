@@ -347,6 +347,140 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Native Linux (ubuntu-latest) build and headless verification with CGO_ENABLED=0.
+  # Pure-Go X11 windowing, OpenType font scanning, XDG autostart, Unix control
+  # socket, and CLI/reporter flows run on real Ubuntu alongside the full
+  # cross-platform compilation gate.
+  linux:
+    name: build and verify (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      GOFLAGS: -mod=readonly
+      GO111MODULE: on
+      CGO_ENABLED: 0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Show toolchain versions
+        run: |
+          go version
+          node --version
+          uname -a
+
+      - name: Cross-platform build gate
+        run: bash scripts/cross-build.sh
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -count=1 ./...
+
+      - name: Build Linux binaries
+        run: |
+          go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/AI-Terminal-Pet ./cmd/ai-terminal-pet
+          go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-statusline ./cmd/pet-statusline
+          go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-hook ./cmd/pet-hook
+
+      - name: Headless Linux CLI, install, and hook smoke test
+        run: |
+          sandbox="$(mktemp -d)"
+          trap 'rm -rf "$sandbox"' EXIT
+          export HOME="$sandbox"
+          export TMPDIR="$sandbox/tmp"
+          export XDG_DATA_HOME="$sandbox/data"
+          export XDG_CONFIG_HOME="$sandbox/config"
+          mkdir -p "$TMPDIR" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
+          sh ./scripts/install.sh
+          sh ./scripts/install.sh --verify-only
+          printf '%s' '{"session_id":"linux-ci-1","cwd":"/tmp/demo","hook_event_name":"PreToolUse","tool_name":"Bash"}' | "$XDG_DATA_HOME/ai-terminal-pet/pet-hook" --mode=claude
+          "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --json --pretty | grep -q '"sessionId": "linux-ci-1"'
+          "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --version
+          "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --connect
+          "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --doctor
+          "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --reset
+          sh ./scripts/install.sh --uninstall
+          node scripts/package-unix.mjs --target=linux/amd64,linux/arm64 --output="$sandbox/dist"
+
+  # Native macOS (darwin/arm64) build and headless verification with CGO_ENABLED=0.
+  # Live WindowServer probes stay opt-in (PET_COCOA_PROBE=1), while Objective-C
+  # runtime bindings, OpenType font scanning, LaunchAgent autostart, Unix control
+  # socket, Process/CGWindow queries, and CLI/reporter flows run on real macOS.
+  macos:
+    name: build and verify (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    env:
+      GOFLAGS: -mod=readonly
+      GO111MODULE: on
+      CGO_ENABLED: 0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Show toolchain versions
+        run: |
+          go version
+          uname -a
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -count=1 ./...
+
+      - name: Build macOS binaries
+        run: |
+          go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/AI-Terminal-Pet ./cmd/ai-terminal-pet
+          go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-statusline ./cmd/pet-statusline
+          go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-hook ./cmd/pet-hook
+
+      - name: Headless macOS CLI, install, and hook smoke test
+        run: |
+          sandbox="$(mktemp -d)"
+          trap 'rm -rf "$sandbox"' EXIT
+          export HOME="$sandbox"
+          export TMPDIR="$sandbox/tmp"
+          export XDG_DATA_HOME="$sandbox/data"
+          mkdir -p "$TMPDIR" "$XDG_DATA_HOME"
+          sh ./scripts/install.sh
+          sh ./scripts/install.sh --verify-only
+          install_dir="$HOME/Library/Application Support/AI-Terminal-Pet"
+          printf '%s' '{"session_id":"mac-ci-1","cwd":"/tmp/demo","hook_event_name":"PreToolUse","tool_name":"Bash"}' | "$install_dir/pet-hook" --mode=claude
+          "$install_dir/AI-Terminal-Pet" --json --pretty | grep -q '"sessionId": "mac-ci-1"'
+          "$install_dir/AI-Terminal-Pet" --version
+          "$install_dir/AI-Terminal-Pet" --connect
+          "$install_dir/AI-Terminal-Pet" --doctor
+          "$install_dir/AI-Terminal-Pet" --reset
+          sh ./scripts/install.sh --uninstall
+
   # The two scanners live in their own job for one concrete reason: both
   # `golang.org/x/vuln@v1.9.0` and `gosec@v2.30.0` declare `go 1.26.0` in their
   # own go.mod, while the build job installs the newest 1.23.x patch because

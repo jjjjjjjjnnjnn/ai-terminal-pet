@@ -2,6 +2,7 @@ package reporter
 
 import (
 	"testing"
+	"time"
 
 	"ai-terminal-pet/internal/session"
 )
@@ -131,5 +132,76 @@ func TestStatuslineSessionIDPrefersConversationID(t *testing.T) {
 		if got := AntigravitySessionID(testCase.input); got != testCase.want {
 			t.Errorf("got %q, want %q", got, testCase.want)
 		}
+	}
+}
+
+func TestStatuslineDeliverNeededShortCircuitsUnchangedSnapshots(t *testing.T) {
+	dataDirectory(t)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	base := NewPayload(now)
+	base.Source = "antigravity-statusline"
+	base.SessionID = "ses-l1"
+	base.Project = "/repo/demo"
+	base.State = session.StateWorking
+	base.Reason = "agent_state"
+	base.Tool = "Bash"
+	base.Model = "gemini"
+	base.Terminal = "antigravity"
+	base = base.Finish(now)
+
+	// Missing snapshot must deliver.
+	if !StatuslineDeliverNeeded(session.Session{}, false, base, now, 30*time.Second) {
+		t.Fatal("missing prior snapshot must trigger pipe delivery")
+	}
+
+	if !WriteSnapshot(base) {
+		t.Fatal("WriteSnapshot failed")
+	}
+	prev, ok := ReadSnapshot(SnapshotPath(base), now)
+	if !ok {
+		t.Fatal("ReadSnapshot did not load the written snapshot")
+	}
+
+	// Same semantic fields within heartbeat budget: skip pipe dial, even if
+	// ephemeral ParentPID changed across runner invocations.
+	repeat := base
+	repeat.ParentPID = base.ParentPID + 999
+	repeat.UpdatedAt = now.Add(5 * time.Second)
+	if StatuslineDeliverNeeded(prev, true, repeat, now.Add(5*time.Second), 30*time.Second) {
+		t.Fatal("identical status within heartbeat budget should short-circuit delivery")
+	}
+
+	// Once heartbeat interval elapses while non-closed, deliver again.
+	if !StatuslineDeliverNeeded(prev, true, repeat, now.Add(30*time.Second), 30*time.Second) {
+		t.Fatal("heartbeat expiration must trigger delivery")
+	}
+
+	// Any semantic change must deliver immediately.
+	changedState := repeat
+	changedState.State = session.StateWaitingPermission
+	if !StatuslineDeliverNeeded(prev, true, changedState, now.Add(2*time.Second), 30*time.Second) {
+		t.Fatal("state change must trigger delivery")
+	}
+
+	changedReason := repeat
+	changedReason.Reason = "tool_confirmation_pending"
+	if !StatuslineDeliverNeeded(prev, true, changedReason, now.Add(2*time.Second), 30*time.Second) {
+		t.Fatal("reason change must trigger delivery")
+	}
+
+	changedProject := repeat
+	changedProject.Project = "/repo/other"
+	if !StatuslineDeliverNeeded(prev, true, changedProject, now.Add(2*time.Second), 30*time.Second) {
+		t.Fatal("project change must trigger delivery")
+	}
+
+	// Repeated closed state never dials again even after heartbeat interval.
+	prevClosed := prev
+	prevClosed.State = session.StateClosed
+	nextClosed := repeat
+	nextClosed.State = session.StateClosed
+	if StatuslineDeliverNeeded(prevClosed, true, nextClosed, now.Add(2*time.Minute), 30*time.Second) {
+		t.Fatal("repeated closed state should never need pipe delivery")
 	}
 }

@@ -174,6 +174,57 @@ func SnapshotPath(p Payload) string {
 	return filepath.Join(directory, name)
 }
 
+// ReadSnapshot reads and parses one previously written snapshot file. It returns
+// (zero, false) when the file is missing, unreadable or invalid so callers can
+// treat "no usable prior state" the same way.
+func ReadSnapshot(path string, now time.Time) (session.Session, bool) {
+	if path == "" {
+		return session.Session{}, false
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return session.Session{}, false
+	}
+	parsed, err := session.ParsePayload(raw, now)
+	if err != nil {
+		return session.Session{}, false
+	}
+	return parsed, true
+}
+
+// StatuslineDeliverNeeded reports whether a statusline refresh should dial the
+// overlay pipe instead of only refreshing the snapshot on disk.
+//
+// Statusline runners re-render on every UI tick; dialing when state, reason,
+// project, tool, model, title, parent session or identity did not change adds
+// redundant IPC churn for no visible change. A periodic heartbeat still dials
+// once per interval while non-closed so a restarted overlay catches up.
+func StatuslineDeliverNeeded(prev session.Session, hasPrev bool, next Payload, now time.Time, heartbeat time.Duration) bool {
+	if !hasPrev {
+		return true
+	}
+	if prev.Source != next.Source ||
+		prev.SessionID != next.SessionID ||
+		prev.PID != next.PID ||
+		prev.ParentSessionID != next.ParentSessionID ||
+		prev.Project != next.Project ||
+		prev.Title != next.Title ||
+		prev.Model != next.Model ||
+		prev.State != next.State ||
+		prev.Reason != next.Reason ||
+		prev.Tool != next.Tool ||
+		prev.Terminal != next.Terminal {
+		return true
+	}
+	if next.State == session.StateClosed {
+		return false
+	}
+	if heartbeat > 0 && !prev.UpdatedAt.IsZero() && now.Sub(prev.UpdatedAt) >= heartbeat {
+		return true
+	}
+	return false
+}
+
 // WriteSnapshot stores the payload atomically: temp file in the same
 // directory, then rename. The scanner never sees a half-written JSON body, and
 // a crash leaves only a ".pet-*.tmp" that the overlay sweeps on its next start.

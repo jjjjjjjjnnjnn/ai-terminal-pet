@@ -8,7 +8,6 @@ const path = require("node:path")
 const { spawn } = require("node:child_process")
 
 const SCHEMA_VERSION = "ai-terminal-pet.v1"
-const PIPE_BASE_PATH = "\\\\.\\pipe\\ai-terminal-pet-v1"
 
 function pipeScopeToken() {
   let home = ""
@@ -23,8 +22,21 @@ function pipeScopeToken() {
   return crypto.createHash("sha256").update(normalized, "utf8").digest("hex").slice(0, 8)
 }
 
+function socketDirectory() {
+  return process.env.XDG_RUNTIME_DIR || process.env.TMPDIR || os.tmpdir()
+}
+
+function resolvePipePath(token) {
+  if (process.platform === "win32") {
+    const base = "\\\\.\\pipe\\ai-terminal-pet-v1"
+    return token ? `${base}-${token}` : base
+  }
+  const base = path.join(socketDirectory(), "ai-terminal-pet-v1")
+  return token ? `${base}-${token}.sock` : `${base}.sock`
+}
+
 const PIPE_SCOPE_TOKEN = pipeScopeToken()
-const PIPE_PATH = PIPE_SCOPE_TOKEN ? `${PIPE_BASE_PATH}-${PIPE_SCOPE_TOKEN}` : PIPE_BASE_PATH
+const PIPE_PATH = resolvePipePath(PIPE_SCOPE_TOKEN)
 const MAX_STDIN_BYTES = 1 << 20
 const STDIN_TIMEOUT_MS = 2000
 const STATES = new Set(["idle", "thinking", "working", "tool_use", "waiting_permission", "error", "closed"])
@@ -208,10 +220,34 @@ function readStdin(options = {}) {
   })
 }
 
+function dataDirectory() {
+  if (process.platform === "win32") {
+    return process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "AI-Terminal-Pet") : null
+  }
+  let home = ""
+  try {
+    home = os.homedir() || ""
+  } catch {
+    home = ""
+  }
+  if (process.platform === "darwin") {
+    return home ? path.join(home, "Library", "Application Support", "AI-Terminal-Pet") : null
+  }
+  const xdg = process.env.XDG_DATA_HOME
+  if (xdg && path.isAbsolute(xdg)) {
+    return path.join(xdg, "ai-terminal-pet")
+  }
+  return home ? path.join(home, ".local", "share", "ai-terminal-pet") : null
+}
+
+function overlayBinaryName() {
+  return process.platform === "win32" ? "AI-Terminal-Pet.exe" : "AI-Terminal-Pet"
+}
+
 function runtimeDirectory(options) {
   if (options && typeof options.runtimeDir === "string" && options.runtimeDir) return options.runtimeDir
-  if (!process.env.LOCALAPPDATA) return null
-  return path.join(process.env.LOCALAPPDATA, "AI-Terminal-Pet", "runtime")
+  const root = dataDirectory()
+  return root ? path.join(root, "runtime") : null
 }
 
 function filenamePart(value, fallback) {
@@ -260,7 +296,7 @@ function removeRuntimeSnapshot(payload, options = {}) {
 }
 
 function executablePath() {
-  const root = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "AI-Terminal-Pet") : null
+  const root = dataDirectory()
   const override = process.env.AI_TERMINAL_PET_EXE
   if (override) {
     if (!root) return null
@@ -271,7 +307,7 @@ function executablePath() {
     if (relative.startsWith("..") || path.isAbsolute(relative)) return null
     return resolved
   }
-  return root ? path.join(root, "AI-Terminal-Pet.exe") : null
+  return root ? path.join(root, overlayBinaryName()) : null
 }
 
 function launchApplication() {
@@ -387,8 +423,9 @@ function isDangerousCommand(...parts) {
 function loadPetConfig() {
   const fallback = { autoApprove: false, autoApproveTimeoutSec: DEFAULT_APPROVE_TIMEOUT_SEC }
   try {
-    if (!process.env.LOCALAPPDATA) return fallback
-    const raw = fs.readFileSync(path.join(process.env.LOCALAPPDATA, "AI-Terminal-Pet", "config.json"), "utf8")
+    const root = dataDirectory()
+    if (!root) return fallback
+    const raw = fs.readFileSync(path.join(root, "config.json"), "utf8")
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== "object") return fallback
     const timeout = Number(parsed.autoApproveTimeoutSec)
@@ -404,8 +441,8 @@ function loadPetConfig() {
 }
 
 function approvalsDirectory() {
-  if (!process.env.LOCALAPPDATA) return null
-  return path.join(process.env.LOCALAPPDATA, "AI-Terminal-Pet", "approvals")
+  const root = dataDirectory()
+  return root ? path.join(root, "approvals") : null
 }
 
 // sanitizeStem mirrors sanitizeApprovalStem in internal/ui: only

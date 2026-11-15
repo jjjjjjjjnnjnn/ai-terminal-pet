@@ -89,7 +89,7 @@ func readAutostartFile(t *testing.T, root string) string {
 	t.Helper()
 	candidates := []string{
 		filepath.Join(root, "Library", "LaunchAgents", "org.ai-terminal-pet.overlay.plist"),
-		filepath.Join(root, "config", "autostart", desktopEntryName),
+		filepath.Join(root, "config", "autostart", "ai-terminal-pet.desktop"),
 	}
 	for _, path := range candidates {
 		data, err := os.ReadFile(path)
