@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+﻿import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
@@ -221,5 +221,7 @@ test('check() stops at a broken overlay source instead of guessing', () => {
   const manifests = { root: '1.2.14', package_: '1.2.14', index: '1.2.14' }
   const failures = check(docs(), manifests, 'var Version = 1', claims)
   assert.equal(failures.length, 1)
-  assert.match(failures[0], /internal\/app\/app_windows\.go/)
+  // The source moved to version.go when the lifecycle split for the platform port;
+  // the rule being tested is that the failure names whichever file the script read.
+  assert.match(failures[0], /internal\/app\/version\.go/)
 })
