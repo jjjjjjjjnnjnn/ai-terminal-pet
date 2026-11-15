@@ -37,6 +37,12 @@ type SnapshotScanner struct {
 	// Nil keeps the legacy TTL-only behaviour, which the offline tests use.
 	KeepAlive func(session.Session) bool
 	MaxFiles  int
+	// Cache reuses a previous scan's parse result for files whose size and
+	// mtime have not moved. Nil means "read everything" - the default for
+	// one-shot callers (--json) and for every test that wants the uncooked
+	// path. The overlay sets one so a 5 s tick over 200 files does not pay
+	// for 200 unchanged reads (handover §62).
+	Cache *SnapshotCache
 }
 
 type snapshotFile struct {
@@ -111,41 +117,72 @@ func (s SnapshotScanner) ScanWithKeys() ([]session.Session, map[string]bool) {
 
 	items := make([]session.Session, 0, len(candidates))
 	keys := make(map[string]bool, len(candidates))
+	seenPaths := make(map[string]bool, len(candidates))
 	cutoff := now.Add(-ttl)
 	for _, candidate := range candidates {
-		data, info, err := readSnapshot(candidate.path)
-		if err != nil {
-			if errors.Is(err, errSnapshotOversized) {
-				removeSnapshotIfUnchanged(candidate.path, info)
+		seenPaths[candidate.path] = true
+		value, cached := s.Cache.lookup(candidate.path, candidate.info)
+		var info os.FileInfo
+		if !cached {
+			var data []byte
+			data, info, err = readSnapshot(candidate.path)
+			if err != nil {
+				s.Cache.forget(candidate.path)
+				if errors.Is(err, errSnapshotOversized) {
+					removeSnapshotIfUnchanged(candidate.path, info)
+				}
+				continue
 			}
-			continue
+			value, err = session.ParsePayload(data, now)
+			if err != nil {
+				s.Cache.forget(candidate.path)
+				removeSnapshotIfUnchanged(candidate.path, info)
+				continue
+			}
 		}
-		value, err := session.ParsePayload(data, now)
-		if err != nil {
-			removeSnapshotIfUnchanged(candidate.path, info)
-			continue
+		// A cache hit carries no post-read FileInfo (there was no read), so the
+		// removal guard falls back to the one Readdir returned for this pass.
+		// Without that fallback every "this file must go" branch below silently
+		// did nothing on a hit: an expired snapshot stayed on disk forever while
+		// being dropped from the panel on every tick - a leak the uncached
+		// scanner never had, and the one thing this cache could quietly break.
+		if info == nil {
+			info = candidate.info
+		}
+		// A file that survives this scan is a file whose payload did not change,
+		// so its parse result is worth keeping. Removals below drop the entry,
+		// which is the only way a cached value could outlive its file.
+		if info != nil {
+			s.Cache.store(candidate.path, info, value)
 		}
 		if value.UpdatedAt.Before(cutoff) && (s.KeepAlive == nil || !s.KeepAlive(value)) {
+			s.Cache.forget(candidate.path)
 			removeSnapshotIfUnchanged(candidate.path, info)
 			continue
 		}
 		if value.State == session.StateClosed {
 			if s.Alive != nil && processBacked(value.Source) && !s.Alive(value.PID) {
+				s.Cache.forget(candidate.path)
 				removeSnapshotIfUnchanged(candidate.path, info)
 				continue
 			}
+			s.Cache.forget(candidate.path)
 			removeSnapshotIfUnchanged(candidate.path, info)
 			items = append(items, value)
 			continue
 		}
 		if s.Alive != nil && processBacked(value.Source) && !s.Alive(value.PID) &&
 			(s.KeepAlive == nil || !s.KeepAlive(value)) {
+			s.Cache.forget(candidate.path)
 			removeSnapshotIfUnchanged(candidate.path, info)
 			continue
 		}
 		keys[key(value)] = true
 		items = append(items, value)
 	}
+	// Forget everything this scan did not even see, so a long-lived overlay does
+	// not remember every conversation it has ever read.
+	s.Cache.retain(seenPaths)
 	return items, keys
 }
 

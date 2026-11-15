@@ -1,6 +1,6 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 **2026-11-15（浮窗 1.0.11 / 插件 1.2.20 已发版）**（上一版快照为 2026-11-13 的 v1.0.7）。本文分四块：现状基线、
+> 快照时间 **2026-11-15（浮窗 1.0.12 / 插件 1.2.21 已发版）**（上一版快照为 2026-11-13 的 v1.0.7）。本文分四块：现状基线、
 > 已交付批次、扩展计划、轻量化计划，以及一组实用功能候选与非目标。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
 >
@@ -9,15 +9,15 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-15，浮窗 1.0.11 / 插件 1.2.20 已发布） |
+| 维度 | 数值（2026-11-15，浮窗 1.0.12 / 插件 1.2.21 已发布） |
 |---|---|
 | 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.11`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.20` |
+| 版本 | `1.0.12`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.21` |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,702,208 B**（4.48 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,675,136 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,701,760 B**（3.53 MiB）；三个 Windows 二进制合计 **12,079,104 B** = 11.52 MiB |
-| 代码量 | Go 非测试源码 **131 文件 / 26,138 行**、测试 **77 文件 / 11,894 行**（**409** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本） |
+| 代码量 | Go 非测试源码 **135 文件 / 26,324 行**、测试 **84 文件 / 12,251 行**（**415** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本） |
 | 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
@@ -25,15 +25,15 @@
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
 | 本地端点 | Windows `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>` · Linux `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` · macOS `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` |
 | 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline` / `pet-hook` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
-| 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标 |
+| 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标；**L5 快照扫描按身份/size/mtime 复用上次解析**（200 文件 22.7 ms → 0.51 ms） |
 | 持久化 | `state.json`（位置/缩放/展开/`layouts`）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run` / `LaunchAgent` / XDG `.desktop`（开机自启）· `approvals/` |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--connect[=HOST]/--doctor/--version/--help` |
-| 单测与门禁 | **409 个 `func Test`** across all packages（Windows + Linux + macOS 全量通过） |
+| 单测与门禁 | **415 个 `func Test`** across all packages（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race` |
 | 持续集成 | `.github/workflows/ci.yml`：四条并行 Job — `windows-latest`（全套单测/构建/打包/fresh-machine/版本链接检查）、`ubuntu-latest`（`cross-build.sh` / `go test` / Linux 二进制 / `install.sh` + tar 校验）、`macos-latest`（`go vet` / `go test` / Darwin 二进制 / `install.sh` + hook 冒烟）、`scan`（`govulncheck` + `gosec`） |
 | 自检 | `ai-terminal-pet --doctor` **11 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘** |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.20**，19 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.20`，Windows bundle） |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.21**，19 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.21`，Windows bundle） |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
 
@@ -621,24 +621,35 @@ go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `conn
 面板只有 56×156（紧凑）与 200×<内容高度>（展开，1–6 行自适应）逻辑像素，收益有限——
 **建议先测再动**，别为 0.3 ms 增加复杂度。（旧版本节写的 `40×190 / 200×250` 是 v0.5.0 之前的固定几何，早已被 `drawing_compact_windows.go:23-35` 的常量取代。）
 
-### L5 — 启动与扫描路径 ❌ 实测超标，**该做**（数字见下）
+### L5 — 启动与扫描路径 ✅ 已交付（2026-11-15，按 mtime/size 复用上次解析）
 **现状**：快照扫描 5 s 一次（`internal/app/app.go` 的 `scanInterval`；本节旧文写的 2 s 已过时），全目录 `Readdir` + 每个文件完整读取与解析。
-**实测**：`internal/store/snapshot_bench_test.go`（`-benchtime 50x`，i7-14650HX，NTFS）：
 
-| 快照文件数 | 每次 `Scan()` | 单文件 |
+**实测（第 61 轮，`internal/store/snapshot_bench_test.go`，`-benchtime 30x`，i7-14650HX / NTFS / 带 AV 过滤）**：
+
+| 快照文件数 | 未缓存 | 已缓存（稳态） |
 |---|---|---|
-| 1 | **298 µs** | 298 µs |
-| 50 | **7.02 ms** | 140 µs |
-| 200 | **22.7 ms** | 114 µs |
+| 1 | 298 µs | 113 µs |
+| 50 | 7.02 ms | **0.52 ms** |
+| 200 | **22.7 ms** | **0.51 ms** |
 
-本机 `runtime/` 现在有 7 个文件（≈0.4 ms，无感）。**门槛 5 ms 在第 36 个文件附近就被越过**
-（298 µs 固定开销 + ≈140 µs/文件），而上限是 `DefaultMaxSnapshotFiles` 256 ≈ 30 ms——
-一次扫描 30 ms 在 UI 线程之外，但每秒 5 次、每次 30 ms 的磁盘读取是可见的电量与风扇成本。
-**做法（下一轮按顺序试）**：
-1. 目录 mtime 未变则跳过整轮（最便宜，代价是「mtime 精度」这个已知坑）；
-2. 按 mtime 只保留最近 N 个候选（`retainSnapshotCandidate` 已经在做这层，改的是 N 的来源）；
-3. 解析下沉：只对「mtime + size 变了的文件」重新 `ParsePayload`，其余复用上次结果。
-**验收**：200 文件下 <5 ms，且 `TestSnapshot*` 全绿。
+按项拆开（同一台机，500 次迭代）：`os.Lstat` **31.3 µs**、`readSnapshot`（4 次 stat + 一次 read）**89.6 µs**、
+`session.ParsePayload` **5.1 µs**、单个候选端到端 **98.1 µs**。**解析只占 5%，元数据调用占 90%**——
+所以要减的不是"少解析"，而是"少碰盘"。
+
+**做法（已落地）**：`internal/store/snapshot_cache.go` 的 `SnapshotCache`，按 **文件身份 + size + mtime** 命中即复用上次的
+`session.Session`；`SnapshotScanner.Cache` 是**可选指针**，nil 就是旧行为（`--json` 等一次性调用者与全部既有测试仍走这条路）；
+`internal/app/run.go` 的常驻 scanner 传 `store.NewSnapshotCache()`。删除一律仍走 `removeSnapshotIfUnchanged`（先重新 stat 再删）。
+
+**三个硬约束（都有测试钉住）**：
+1. **不能靠元数据骗过去**：报告端是 temp+rename 写盘，所以重写会落成**新文件**，`os.SameFile` 能看出来——
+   实测把 mtime 手工改回、字节长度也保持一致之后 `SameFile(缓存那份, 新 stat) = false`；
+2. **命中时必须仍能删文件**：`removeSnapshotIfUnchanged` 需要 `FileInfo`，而命中路径没有 read 也就没有 post-read stat，
+   于是补上"退回用 Readdir 那份"的兜底——**这是本轮唯一一个真 bug**，缺它会静默泄漏过期/宿主已死的快照文件
+   （面板照旧丢弃、文件永远留着）。两条测试在去掉兜底后**确实失败**，补回后通过，这就是它们存在的理由；
+3. **上限仍成立**：225 文件的目录在本机实测 5 次扫描 **0.50–0.61 ms**，门槛是 5 ms，验收满足。
+
+**一个如实记录的测量事实**：NTFS 在这台机器上 40 次 temp+rename 里**复用过 1 次文件索引**。所以守卫是
+"身份 **且** size **且** mtime"三个字段，而不是只看身份；配合"删除前重新 stat"，最坏情况是一次陈旧读取，不会误删文件。
 
 ## 4. 实用功能候选
 

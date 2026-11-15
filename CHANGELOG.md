@@ -33,6 +33,28 @@
 已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 
+## [1.0.12] & [1.2.21] — 2026-11-15（L5：快照扫描不再每 5 秒重读整目录）
+
+### 改：常驻 scanner 复用上次解析结果（`internal/store/snapshot_cache.go`）
+- **背景（上一轮实测）**：一次 `Scan()` 在 50 个快照时 **7.02 ms**、200 个时 **22.7 ms**，而 `scanInterval` 是 5 s；
+  按项拆开，解析只占 5%（5.1 µs），元数据调用占 90%（`os.Lstat` 31.3 µs、`readSnapshot` 89.6 µs）。
+  所以要减的不是"少解析"，是"少碰盘"。
+- **做法**：`SnapshotCache` 以 **文件身份 + size + mtime** 为键复用上次的 `session.Session`。
+  `SnapshotScanner.Cache` 是**可选指针**：nil 就是旧行为（`--json` 等一次性调用者与全部既有测试仍走这条），
+  只有 `internal/app/run.go` 的常驻 scanner 传入 `store.NewSnapshotCache()`。
+- **稳态实测**（`-benchtime 30x`，本机 NTFS + AV）：200 文件 **22.7 ms → 0.51 ms**；本机 225 文件目录 5 次扫描 0.50–0.61 ms
+  （门槛 5 ms）。
+- **修掉本轮唯一的真 bug**：缓存命中时没有 post-read 的 `FileInfo`，而删除守卫
+  `removeSnapshotIfUnchanged` 在 `expected == nil` 时直接返回——过期快照、宿主已死的快照于是**面板丢行但文件永远留着**。
+  补上"退回用 Readdir 那份"的兜底；两条测试在去掉兜底后确实失败、补回后通过。
+- **三条安全性质都有测试**：temp+rename 的重写会落成新文件（`os.SameFile` 能看出来，实测连 mtime 手工改回也照样命中新值）；
+  命中路径仍然能删文件；225 文件 0.5 ms。**如实记录**：NTFS 在这台机上 40 次 temp+rename 里复用过 1 次文件索引，
+  所以守卫是"身份 **且** size **且** mtime"，且删除前一定重新 stat——最坏情况是一次陈旧读取，不会误删文件。
+
+### 文档
+- `docs/ROADMAP.md` §3 L5 从"待测"改为"已交付"，附未缓存/已缓存对照表与三个硬约束。
+- 基线行更新：415 个 `func Test`、135 文件 / 26,324 行非测试、84 文件 / 12,251 行测试。
+
 ## [1.0.11] & [1.2.20] — 2026-11-15（一处现场缺陷：agy 会话点不跳；附带设置布局三平台可测）
 
 ### 修：Antigravity（agy）会话点「跳转」不生效

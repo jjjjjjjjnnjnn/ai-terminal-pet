@@ -2,15 +2,18 @@ package store
 
 // ROADMAP §3 L5 asks one question before anybody optimises anything: how long
 // does the snapshot scan actually take, and does it grow with the file count?
-// The answer decides whether "skip the directory when its mtime has not changed"
-// or "only scan the newest N" is worth its complexity. This file is the
-// measurement, and its numbers are quoted in docs/ROADMAP.md §3.
+// The answer decides what is worth doing. Its numbers are quoted in
+// docs/ROADMAP.md §3.
 //
 // It is a *_test.go file on purpose: test sources are excluded from the overlay's
 // vendored source digest, so recording a number here costs no version bump and
 // cannot make packages/dsh-ai-terminal-pet stale.
 //
 //	go test ./internal/store -run XXX -bench SnapshotScan -benchtime 50x
+//
+// The Uncached variants are the ones from the measurement round (they read every
+// file every tick); the Cached variants are the shipped path, where a file whose
+// size and mtime have not moved reuses its previous parse.
 
 import (
 	"fmt"
@@ -20,11 +23,14 @@ import (
 	"time"
 )
 
-func BenchmarkSnapshotScan1(b *testing.B)   { benchmarkSnapshotScan(b, 1) }
-func BenchmarkSnapshotScan50(b *testing.B)  { benchmarkSnapshotScan(b, 50) }
-func BenchmarkSnapshotScan200(b *testing.B) { benchmarkSnapshotScan(b, 200) }
+func BenchmarkSnapshotScanUncached1(b *testing.B)   { benchmarkSnapshotScan(b, 1, false) }
+func BenchmarkSnapshotScanUncached50(b *testing.B)  { benchmarkSnapshotScan(b, 50, false) }
+func BenchmarkSnapshotScanUncached200(b *testing.B) { benchmarkSnapshotScan(b, 200, false) }
+func BenchmarkSnapshotScanCached1(b *testing.B)     { benchmarkSnapshotScan(b, 1, true) }
+func BenchmarkSnapshotScanCached50(b *testing.B)    { benchmarkSnapshotScan(b, 50, true) }
+func BenchmarkSnapshotScanCached200(b *testing.B)   { benchmarkSnapshotScan(b, 200, true) }
 
-func benchmarkSnapshotScan(b *testing.B, count int) {
+func benchmarkSnapshotScan(b *testing.B, count int, cached bool) {
 	b.Helper()
 	directory := b.TempDir()
 	for index := 0; index < count; index++ {
@@ -34,6 +40,14 @@ func benchmarkSnapshotScan(b *testing.B, count int) {
 		}
 	}
 	scanner := SnapshotScanner{Directory: directory, Now: time.Now}
+	if cached {
+		scanner.Cache = NewSnapshotCache()
+		// Warm it: the point of the comparison is the steady state a 5 s tick
+		// lives in, not the first pass after a restart.
+		if items := scanner.Scan(); len(items) != count {
+			b.Fatalf("warm scan returned %d of %d snapshots", len(items), count)
+		}
+	}
 	b.ResetTimer()
 	for iteration := 0; iteration < b.N; iteration++ {
 		if items := scanner.Scan(); len(items) != count {

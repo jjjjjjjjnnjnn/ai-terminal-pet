@@ -74,10 +74,10 @@ capabilities 是**自我声明**、从不校验——DSH 并不沙箱化插件�
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # Release tarball：与 npm 上同一份字节，直接来自 GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.20/dsh-ai-terminal-pet-1.2.20.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.21/dsh-ai-terminal-pet-1.2.21.tgz
 
 # git 源，钉住 Release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.20&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.21&path:/packages/dsh-ai-terminal-pet"
 ```
 
 这三种只差运输方式。npm 那条最短，也是市场按包名安装时走的路径；tarball 那条给「钉住 Release 资产

@@ -94,6 +94,10 @@ func RunWith(openSettings bool) error {
 		Now:       time.Now,
 		Alive:     presence.ProcessAlive,
 		KeepAlive: presence.SessionAlive,
+		// This scanner runs on a 5 s tick for the life of the process, and most
+		// ticks see files nobody wrote to. Measured cost of re-reading 200
+		// unchanged snapshots: 22.7 ms; with the cache: 0.45 ms (handover §62).
+		Cache: store.NewSnapshotCache(),
 	}
 	if err := scanner.Err(); err != nil {
 		return err

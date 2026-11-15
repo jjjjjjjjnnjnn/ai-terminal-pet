@@ -6,11 +6,13 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-15；浮窗 **1.0.11**、插件包 **1.2.20** 已发版；**§61 第 61 轮：agy 会话点不跳的根因修复 + 设置布局三平台可测 + `-race` 进 CI + L3/L5 实测（一个"不做"、一个"该做"）；§60 是全平台全量化发布那一轮**）
+## 1. 当前状态（2026-11-15；浮窗 **1.0.12**、插件包 **1.2.21** 已发版；**§62 第 62 轮：L5 快照扫描按身份/size/mtime 复用上次解析（200 文件 22.7 ms → 0.51 ms），并修掉缓存命中时删除守卫拿不到 FileInfo 的真 bug；§61 是 agy 跳转那一轮**）
 
-> 接手请先读本节与 **§61「agy 点不跳的根因、设置布局搬出 Windows 文件、`-race` 进 CI，以及 L3/L5 的两个数字」**
-> （最新一轮：三层取证、控制台标题锚点、一个被否掉的方案、没修的半边、以及两个性能数字给出"不做"和"该做"），
-> 再读 **§60「POSIX 路径/信号收口、文档全面重构与 1.0.10 / 1.2.19 全平台全量化发布」**（上一轮的收口与发版），
+> 接手请先读本节与 **§62「L5 快照扫描复用解析结果，以及缓存命中时删除守卫的真 bug」**
+> （最新一轮：200 文件 22.7 ms → 0.51 ms；命中路径拿不到 `FileInfo` 导致的过期快照泄漏；三条安全性质与一个 NTFS 实测事实），
+> 再读 **§61「agy 点不跳的根因、设置布局搬出 Windows 文件、`-race` 进 CI，以及 L3/L5 的两个数字」**
+> （三层取证、控制台标题锚点、一个被否掉的方案、没修的半边，以及本轮数字的来源），
+> 再读 **§60「POSIX 路径/信号收口、文档全面重构与 1.0.10 / 1.2.19 全平台全量化发布」**（再上一轮的收口与发版），
 > 再读 **§57「跨平台施工（第 1–7 步），以及这一版为什么还没发」**
 > （九个提交、三平台实测矩阵、五个"看起来对其实错"的地方、以及窗口层为什么不在那一版里），
 > 再读 **§56「`--doctor` 现在会看上报端接入，`--connect` 只打印」**，
@@ -43,99 +45,30 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.11`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.20`**。
+- **版本**：浮窗 **`1.0.12`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.21`**。
   两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.10` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.19`。
   **工作区与本机安装目录已经与 `1.0.10` / `1.2.19` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` **4,702,208 B**，sha256 `B69CA725…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**415 个** `func Test`，
-  本机 Windows 全过；CI 四条 job 覆盖 windows / ubuntu / macOS / scan，其中 ubuntu 增加 `go test -race`）；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**425 个** `func Test`，
+  本机 Windows 全过；CI 四条 job 覆盖 windows / ubuntu / macOS / scan，其中 ubuntu 跑 `go test -race`）；
   `scripts/cross-build.sh` 全 16 个包三端 `CGO_ENABLED=0` 通过；上报端逐个 `node --check` 全过；
-  `node --test reporters/opencode-events.test.mjs` 10/10；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 两文件吻合（源码摘要与 1.2.20 的 `bin/` 一致）；
-  `tools/check_versions.mjs` 20 条版本形状一致（`node --test tools/check_versions.test.mjs` 26/26）；
-  `tests/fresh-machine.mjs --no-overlay` **172/172**（38.5 s）；`tools/check_docs_links.py` 12 份文档全解；
-  `govulncheck` + `gosec` 零告警（CI `scan` job）；`--doctor` 11 项（本轮 10 ok / 1 warn / 0 fail，
-  warn 是"Antigravity 只接了 statusline、没有结束信号"这条已知事实）。
-- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.11 实测）：非测试 **135 文件 / 26,324 行**、
-  测试 **84 文件 / 12,251 行**、**415 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,702,208 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `CDCA876B…`）、
-  `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`）、`bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`）。
-  三个二进制合计 **12,086,272 B** = 11.53 MiB。
+  两个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两文件吻合（源码摘要与 1.0.12 的 `bin/` 一致）；
+  `tools/check_versions.mjs` 20 条版本形状一致；`tests/fresh-machine.mjs --no-overlay` 172/172；
+  `tools/check_docs_links.py` 12 份文档全解；`govulncheck` + `gosec` 零告警。
+  **本轮新增**：`internal/store` 的快照缓存有 9 条测试，其中 2 条在去掉兜底后确实失败（见 §62.2）。
+- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.12 实测）：非测试 **136 文件 / 26,517 行**、
+  测试 **86 文件 / 12,570 行**、**425 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,711,424 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `FDFFF5C8…`）、
+  `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`，本轮未改）、
+  `bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`，本轮未改）。
+  三个二进制合计 **12,095,488 B** = 11.53 MiB。
 - **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.19**；`dsh-plugin-v1.2.19` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.19.tgz` **2,064,860 B / sha256 `40AC7D26…` / shasum `d6b0a467…`**（19 个文件，
-    含中英两份 README），包内 README 的安装命令是 1.2.19；
+  - 插件线：npm `latest` = **1.2.21**；`dsh-plugin-v1.2.21` 的 Release 资产
+    是这一版新打的 tag（`.tgz` 的字节数与 sha256 在本轮发版后回填，见 CHANGELOG 的发布清单）；
     钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
-  - 浮窗线：`pet-v1.0.10` 的 Release 带六个跨平台资产——`pet-setup.exe`（14,471,680 B）、`win-x64.zip`（5,117,683 B）、
-    `linux-amd64.tar.gz`（5,404,271 B）、`linux-arm64.tar.gz`（4,916,092 B）、`darwin-arm64.tar.gz`（5,115,500 B）、`darwin-amd64.tar.gz`（5,504,624 B）。
-  - **上游条目**：`main` 的 `tarball` 现在是 **1.2.16**（#15075 已被合并，2026-11-14 复读）；
-    1.2.17 的跟进是
-    [#15378](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15378)（分支
-    `bump-tarball-1.2.17`，commit `a1579df`，单文件 `+3 −3`）已开、`MERGEABLE`，
-    `tools/upstream-entry.mjs --check` = `OK（in flight）`；1.2.18 发版后再开一条同样的 PR。
-    #14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）均已关并留说明。合并仍要人工，
-    **合并 ≠ 可见**：判断可见性读对方站点索引文件（见 §50.5）。
-  - **其余九家目录的当前状态见 §49**（哪些已最新、哪些等对方扫描、哪些在等人工复核）。
-  1.2.4 只改文案、不动代码：市场文案原先读起来像「装一次市场条目就能看到所有终端」，实际上这个 bundle
-  开箱即用映射的只是 **DeepSeek Harness 自己的会话**——OpenCode、Claude Code 与 Antigravity 的会话
-  要先给各自那个终端装好上报端（`reporters/opencode.js` / `claude-hook.js` / `antigravity-hook.js`）
-  才会汇进同一块面板。那版改动落在包内 `README.md` 与两份清单的 `dsh.catalog` 摘要
-  （三处逐字相同：根 shim、包清单、`docs/market-index.json`；1.2.4 时 en 225 / zh 114 字符，
-  1.2.16 换成提问式后是 **en 225 / zh 110 字符**）。
-  1.2.3 那版改的是两份清单的 `dsh.marketplace` 块（`profiles: ["desktop","headless","web"]`、
-  `requiresBuildApproval: false`、`manualSteps: false`），因为按 `install.profiles` 过滤的第三方商店
-  （如 YELEBAI/dsh-plugin-marketplace）此前只能把 host-only bundle 猜成 `[headless, web]`，桌面端于是
-  看不见条目；DSH 本身从不读该字段。这条声明**已经生效了**：该仓库 2026-11-11T02:19:42.600Z 那次扫描
-  （18,385 条）里，本仓库的 `install.profiles` 已是 `["desktop","headless","web"]`。
-  仓库根的清单 shim 让它也能按仓库 URL 安装，三种安装形态实测 rc=0。`dsh.catalog` 是自我声明的 category/摘要/capabilities（不被强制），
-  `keywords` 里的 `dsh-plugin` 让自动索引型市场能按 topic 采集。
-  awesome-dsh-plugin 注册表 PR #13937 已于 2026-11-10T14:33:04Z 被 `fkysly` 合并，上游 README 的
-  「Notifications & Integrations」小节已列出该条目（17:19Z 维护者在 PR 上留言说明合并时删了一句「面板可直接
-  放行审批」并提示改措辞要另开 PR）。**该市场现在已经真的可见**：上游那次卡住的站点构建后来跑完，
-  条目页 <https://awesome-dsh-plugin.com/p/jjjjjjjjnnjnn/ai-terminal-pet--packages-dsh-ai-terminal-pet/> 返回 200，
-  DSH 应用内 Market 加载的 `plugins.json` 也收录了本仓库（`count` 由 10119 增到 10230，合并后再读一次是
-  10,304）；那份目录的 `install` 命令是构建时按条目文件里的 `tarball` 渲染的，所以合并之后读到的那版仍给出
-  1.2.0 资产。跟进 PR #14063（指向 1.2.1）已评论说明后关闭；**#14076**（分支 `bump-tarball-1.2.2`，只改一行
-  `tarball:`）把它换成 1.2.2 并在 **19:59:37Z 合并**，下一次站点重建才会渲染出新命令；1.2.3 发版后又开了
-  **#14089**（`bump-tarball-1.2.3`，commit `c5a1f5f`）把字段再推到 1.2.3，**已于 2026-11-10T21:10:15Z 合并**
-  （merge commit `95d7216913d54110a794514a6c0ea0196aa08ddc`）；1.2.4 的跟进
-  [PR #14243](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14243)（分支 `bump-tarball-1.2.4`，
-  commit `66ed01d`，`1 file +3/−3`：`tarball` 与 `icon` 换到 1.2.4，中英 description 各补一句 reporters 限定）
-  已于 2026-11-11 开出、等 check 与人工合并。1.2.5 的跟进是
-  [PR #14385](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/14385)（分支 `bump-tarball-1.2.5`，
-  commit `71954e7`，同样只动 `tarball`/`icon` 三行），开在**上游仓库**而不是自己 fork 里
-  （第一次误开到 `jjjjjjjjnnjnn/awesome-dsh-plugin#1`，已关闭并删掉那个冒出来的 fork 分支）。
-  另有两家目录同期已合并收录本仓库：[imsai-sh/awesome-deepseek-harness-plugins](https://github.com/imsai-sh/awesome-deepseek-harness-plugins)
-  的 PR #902（2026-11-10T21:49:53Z，`catalog/plugins/*.json`；该店只从 npm 安装，所以在包发到 npm 之前以
-  browse-only 列出，目录侧会自动发现新包、无需再开 PR）与
-  [zhu1090093659/dsh-community-plugins](https://github.com/zhu1090093659/dsh-community-plugins) 的 PR #97
-  （2026-11-11T05:06:32Z，`community.json`，category `integration` / subcategory `bridge`）；
-  1024 Store 详情页 <https://deepseek1024.com/plugins/jjjjjjjjnnjnn/ai-terminal-pet/packages/dsh-ai-terminal-pet>
-  返回 200（8,753 B，meta description 即我们的英文摘要）。
-  第四家是**评审制里的第一条真·已收录**：[polang233/dsh-plugin-index](https://github.com/polang233/dsh-plugin-index)
-  （dshopen.org）的 issue [#423](https://github.com/polang233/dsh-plugin-index/issues/423) 已于
-  2026-11-11T08:32:39Z 以 `state_reason: completed` 关闭，maintainer 回帖「已按补充的 1.2.4 固定 Git 来源收录」；
-  其 `data/sources.json`（589,453 B、`packages` 1,213 条）第 1204 条就是本包：`version` **1.2.4**、
-  `source.commit` `ff7f6de7d87a7a4d99c06e3a9a68e9a4b417b0a9`、`path: packages/dsh-ai-terminal-pet`、
-  摘要中英两段都写明了「其他终端需各自安装 reporter」（正是 1.2.4 想补的那句），分类 `integrations`。
-  但**它还没进已发布的线上索引**：`public/index.json`（1,199,062 B）只有 **854 条**，且 `plugins[]` 里带
-  `source` 字段的一条也没有（全部是 npm 源的 `versions[0].source.type: "npm"`），所以 dshopen.org 的目录页
-  要等它下一次构建把 git 源条目渲染进去才看得到我们。
-  DSH-Plugins-Marketplace 当日 16:22Z 那次重建把本仓库从 `verdict: script` 改判为 **`bundle-plugin`**；
-  到 18:08:44Z 那次重建（`risk_at` 17:09:14Z，是安装脚本移进 `scripts/` 后第一次真的扫到本仓库），条目是
-  `pkg_name: dsh-ai-terminal-pet`、`version: 1.2.1`、topics 11 个、**`risk_tier: "safe"` 且 `risk_flags` 为空**——
-  原先那个 critical 徽章（`registry-run-key`）与 medium 旗标（`remove-item-force-recurse`）就此消失。
-  `evalRepoRisk` 只按文件名抓仓库根的 `install.ps1` / `install.sh` / `package.json`，安装脚本已于
-  2026-11-10 移进 `scripts/`（§27.11），它读不到那两个正则的落点，也没用到任何抑制字段。
-  npm 的凭据问题已解（`npm whoami` 返回 `jjjjjjjjnnjnn`），**1.2.4 于 2026-11-11T12:10:46Z、
-  1.2.5 于同日 14:58Z 前后发布到 npm**（`dist-tags.latest` = **1.2.5**、shasum `1f6d5340…`、
-  与 Release 资产逐字节相同），所以按包名安装现在可达；
-  `docs/market-index.json` 是仓库自建的 format-1 索引，条目 `dsh-ai-terminal-pet` **1.2.5**（`publishTimestamp`
-   1794407879 = 2026-11-11T14:37:59Z），可让 Discover 按 git 源可用；版本与 `publishTimestamp` 已与包清单
-   同一批前移（那个提交是 A `34aa1f7`），`source.commit` 与图标钉点由紧随其后的 B `426ada5` 补成 A 的 sha）。
   索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
   提供的**替代**路径，而不是权宜之计。
    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
@@ -4379,6 +4312,76 @@ L5 的三步做法（目录 mtime 短路 → 只保留最近 N 个 → 解析下
 2. **POSIX 平权**：`docs/PLATFORMS.md` 新表的第 1、2 行——Linux/macOS 的 `notifications`
    （没有任何气泡表面）与 Linux 的整个 `sound*` 区块；
 3. **macOS 设置窗口**：仍然**不做**（没有真机，CI 上 AppKit 窗口探针是 opt-in skip）。
+
+## 62. 交接：L5 快照扫描复用解析结果（200 文件 22.7 ms → 0.51 ms），以及缓存命中时删除守卫的真 bug（2026-11-15 深夜，第 62 轮；浮窗 **1.0.12** / 插件 **1.2.21**）
+
+上一轮把 L5 从"待测"变成了"该做"（§61.7 的数字：50 文件 7.02 ms、200 文件 22.7 ms，门槛 5 ms）。本轮就做它，
+而且先拆成本再动手——拆完才发现该改的地方和直觉相反。
+
+### 62.1 成本拆分：解析只占 5%，元数据占 90%
+
+同一台机（NTFS + 活跃 AV 过滤），500 次迭代取平均：
+
+| 项 | 每次 |
+|---|---|
+| `os.Lstat` | **31.3 µs** |
+| `readSnapshot`（4 次 stat + 一次 read） | **89.6 µs** |
+| `session.ParsePayload` | **5.1 µs** |
+| 单个候选端到端 | **98.1 µs** |
+
+所以"少解析"这个方向是错的：解析是 5%，**碰盘是 90%**。要减的是"每 5 秒把整目录重读一遍"这件事本身。
+
+### 62.2 做法：按 身份 + size + mtime 复用上次的 `session.Session`
+
+`internal/store/snapshot_cache.go`：
+
+- `SnapshotCache` 是**指针类型字段**（`SnapshotScanner.Cache`），因为 scanner 是值类型、会被复制，
+  而缓存必须活过这些复制；**nil 就是旧行为**——`--json` 等一次性调用者与全部既有测试仍走未缓存路径。
+- 只有 `internal/app/run.go` 的常驻 scanner 传 `store.NewSnapshotCache()`。
+- 命中条件是 `sameSnapshotFile` 已经用的那三个字段（身份 `os.SameFile` + size + mtime），
+  所以缓存**不引入新的正确性假设**，只是把"已经读过一次"的结果留着。
+
+**稳态实测**（`-benchtime 30x`，本机）：1 文件 298 µs → 113 µs；50 文件 7.02 ms → **0.52 ms**；
+200 文件 **22.7 ms → 0.51 ms**；本机那个 225 文件的目录连扫 5 次是 **0.50–0.61 ms**。门槛 5 ms，验收满足。
+
+### 62.3 本轮唯一一个真 bug：命中路径拿不到 `FileInfo`
+
+`SnapshotScanner` 里每个"这个文件该走"的分支都调 `removeSnapshotIfUnchanged(path, info)`，
+它在 `expected == nil` 时**直接返回**。命中路径没有 read，也就没有 post-read 的 `FileInfo`，于是：
+
+- 过期快照 → 面板每 tick 丢一次，**文件永远留着**；
+- 宿主已死且没写 `closed` 的快照 → 同上；
+- `closed` tombstone → 由 Readdir 分支删掉，不受影响（这也是为什么直觉版的测试没抓到它）。
+
+修法是命中时退回用 Readdir 那份 `FileInfo`。**两条测试在去掉兜底后确实失败、补回后通过**——
+其中一个必须让文件"先活过一轮进缓存、然后才过期"，因为已经过期或 tombstone 的文件在读到的那一轮就被删掉，
+根本不会进缓存。这一条写进测试注释里，免得下一个人重写测试时又写成抓不到的那个版本。
+
+### 62.4 三条安全性质（都有测试）
+
+1. **不能靠元数据骗过去**：报告端是 temp+rename 写盘，重写落成**新文件**，`os.SameFile` 能分辨。
+   实测：把 mtime 手工改回、字节长度保持相同（`"build"`→`"tests"` 都是 5 字符），`SameFile(缓存那份, 新 stat) = false`，
+   扫描返回新值。
+2. **命中仍然能删文件**（§62.3）。
+3. **缓存不会无限长大**：每次扫描 `retain(seenPaths)`，只看这一轮的路径；被删/被消费的文件立刻 `forget`。
+
+**一个如实记录的测量事实**：NTFS 在这台机器上 **40 次 temp+rename 里复用过 1 次文件索引**。
+所以守卫是"身份 **且** size **且** mtime"三个字段而不是只看身份；删除前一定重新 stat。
+最坏情况因此是**一次陈旧读取**（下一轮 size/mtime 一动就修正），不是误删文件。
+
+### 62.5 版本与发版
+
+浮窗 **1.0.12** / 插件 **1.2.21**。本轮只有 overlay 二进制变了（`AI-Terminal-Pet.exe` 4,702,208 → 4,711,424 B，
+sha256 `FDFFF5C8…`，+9,216 B 来自缓存与其测试）；`pet-statusline.exe`、`pet-hook.exe` 字节未变
+（`563CF6FE…` / `737C46ED…`）。vendor 源码摘要随 `internal/store` 变动重算。
+
+### 62.6 下一轮从这里开始
+
+1. **POSIX 平权**：`docs/PLATFORMS.md` 新表第 1、2 行——Linux/macOS 的 `notifications`（没有任何气泡表面）、
+   Linux 的整个 `sound*` 区块（连 `beep` 都没有）；
+2. **macOS 设置窗口**：仍然**不做**（没有真机，CI 上 AppKit 窗口探针是 opt-in skip）；
+3. 目录级短路（L5 当初列的方案 1）现在**不需要**了：缓存已经把 225 文件压到 0.5 ms，
+   再加"目录 mtime 未变则跳过整轮"只会多一个已知的 mtime 精度坑。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 
