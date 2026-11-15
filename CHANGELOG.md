@@ -113,6 +113,21 @@
   - **F5 按显示器工作区记忆坐标**（`internal/config` `State.Layouts` + `internal/ui/placement.go`）。
 - **文档与版本工具链重构**：全面重构 `README.md`（中英文）、`docs/PLATFORMS.md`、`docs/ROADMAP.md`、`docs/HANDOVER.md` 与 `docs/LAUNCH.md` 为跨 Windows / Linux / macOS 的一致描述；`tools/check_versions.mjs` 对齐 `internal/app/version.go` 并增设 Linux/macOS `.tar.gz` 版本校验条目。
 
+### 1.0.12 / 1.2.21 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.12` | `pet-setup.exe` | 14,488,064 B | `E12CED26600B1653E6517CBE1AD4B8A663ED8802B39736CE53FA074E4151BAF3` |
+| `pet-v1.0.12` | `ai-terminal-pet-1.0.12-win-x64.zip` | 5,124,007 B（17 文件） | `91EB9A28FFE65D2BF91666AE6174C0C6D2D5303F5B9D5D6FA7FB99CF4A49B222` |
+| `pet-v1.0.12` | `ai-terminal-pet-1.0.12-linux-amd64.tar.gz` | 5,408,196 B | `CB877D410A5C31232CAA71A765ED80C138E31E9C34800D130432B8B46F7B7340` |
+| `pet-v1.0.12` | `ai-terminal-pet-1.0.12-linux-arm64.tar.gz` | 4,917,838 B | `4921A63E0586314CFA8EDDA541ED2BBC912BF9E71F671643694D5C485DADF643` |
+| `pet-v1.0.12` | `ai-terminal-pet-1.0.12-darwin-arm64.tar.gz` | 5,118,238 B | `376F07289F7452372A1D143B70A700C04A2231E39350BE7748CB313666B2FDCA` |
+| `pet-v1.0.12` | `ai-terminal-pet-1.0.12-darwin-amd64.tar.gz` | 5,508,372 B | `28F0FF4074C69F18CEF4CD1B3E07F26337E85A80C06147FD5D10A97C172D25C2` |
+| `dsh-plugin-v1.2.21` | `dsh-ai-terminal-pet-1.2.21.tgz` | 2,067,752 B（19 文件） | `AF26A6715914433AB352DC02ABD5CB79948FF41EAD15A8A7719C9ACB0E43D424` |
+
+`AI-Terminal-Pet.exe` **4,711,424 B**（sha256 `FDFFF5C8…`）；`pet-statusline.exe` 与 `pet-hook.exe`
+本轮未改动，仍是 `563CF6FE…` / `737C46ED…`。
+
 ### 1.0.11 / 1.2.20 发布包实测清单
 
 | Release | 资产 | 字节数 | SHA-256 |
