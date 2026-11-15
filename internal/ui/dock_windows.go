@@ -26,17 +26,6 @@ import (
 // a.x/a.y stay exactly where the user put them and no geometry change writes
 // to them.
 
-// dockSide is the screen edge the panel hugs. Only left and right are
-// supported: the overlay is a tall vertical strip, and sliding it into the top
-// or bottom edge would hide the very content it exists to show.
-type dockSide int
-
-const (
-	dockNone dockSide = iota
-	dockLeft
-	dockRight
-)
-
 // dockTolerance is how close to a work-area edge counts as hugging it. It is
 // generous on purpose: the default anchor leaves a margin, and a user who
 // drags the strip up against an edge means to dock it there.

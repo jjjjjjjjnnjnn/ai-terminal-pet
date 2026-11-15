@@ -52,13 +52,15 @@ func TestAwakeElapsedReadsHundredNanosecondUnits(t *testing.T) {
 	}
 }
 
-func TestInterruptTicksIsAvailableOnThisWindows(t *testing.T) {
-	// If this fails the watchdog silently stops reporting real stalls, which is
-	// a worse outcome than a red test: the alternative clock is the one that
-	// produced six false positives.
+// TestInterruptTicksAnswersOnEveryPlatform pins the clock itself: a zero reading
+// means "no clock", and the watchdog answers that by staying quiet - which would
+// silently disable the stall report instead of failing loudly. It used to say
+// "OnThisWindows" because there was only one implementation; now the rule is the
+// same on both and the assertion has to hold on both.
+func TestInterruptTicksAnswersOnEveryPlatform(t *testing.T) {
 	first := interruptTicks()
 	if first == 0 {
-		t.Fatal("QueryUnbiasedInterruptTime returned nothing")
+		t.Fatal("the awake-time clock returned nothing, so the watchdog would stay silent")
 	}
 	time.Sleep(20 * time.Millisecond)
 	second := interruptTicks()

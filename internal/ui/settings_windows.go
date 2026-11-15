@@ -58,14 +58,13 @@ const (
 // settingsContentWidth is the width of the right-hand column.
 const settingsContentWidth = settingsWidth - settingsMargin - settingsContentLeft
 
-// Settings text sizes. config.json stores these names (internal/config owns the
-// list); the ui package compares against them, and a test in internal/app pins
-// the two together.
-const (
-	textSizeSmall    = "small"
-	textSizeStandard = "standard"
-	textSizeLarge    = "large"
-)
+// Settings text sizes are in textsizes.go: config.json stores those names
+// (internal/config owns the list), the ui package compares against them, and a
+// test in internal/app pins the two together.
+
+// settingsRowsTop and the text-size names live in textsizes.go / settings_rows.go: they
+// are config names and layout numbers, not window state. Keeping them here made
+// paint_cost_test.go unbuildable on a platform without a window layer.
 
 // settingsTypeRamp is the type scale of the settings window: one requested cell
 // height per role, in logical pixels at 96 DPI.
@@ -122,26 +121,8 @@ func normalizeTextSize(value string) string {
 	return textSizeStandard
 }
 
-// Row kinds. The height of a row follows from what it has to contain: a toggle
-// shares its line with the label, a slider and a segment need a line below it.
-const (
-	rowToggle = iota
-	rowSlider
-	rowSegment
-	rowStepper
-	rowButton
-	rowNote
-)
-
-// Row height parts, in logical pixels at 96 DPI. The height of a row is these
-// parts added up rather than one number per kind, because a hint may need one or
-// two lines and a fixed height either wastes space or clips the second line.
-const (
-	settingsTitleBand = 24
-	settingsHintLine  = 17
-	settingsRowPad    = 10
-	settingsBandGap   = 4
-)
+// Row kinds and their height arithmetic live in settings_rows.go: the layout is
+// platform-neutral and settings_text.go needs it without a window.
 
 func settingsRowHeight(kind, hintLines int) int {
 	if hintLines < 1 {
@@ -1753,7 +1734,7 @@ func (a *App) paintSettings() error {
 	defer win.ReleaseDC(0, screenDC)
 	destination := win.POINT{X: a.settingsX, Y: a.settingsY}
 	dimensions := win.SIZE{CX: int32(geometry.width), CY: int32(geometry.height)}
-	return updateLayeredWindow(win.HWND(handle), screenDC, &destination, dimensions, a.settingsSurface.dc, 255)
+	return updateLayeredWindow(win.HWND(handle), screenDC, &destination, dimensions, a.settingsSurface.backend.dc, 255)
 }
 
 func (a *App) handleSettingsMessage(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {

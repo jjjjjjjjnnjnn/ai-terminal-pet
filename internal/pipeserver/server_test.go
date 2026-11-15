@@ -7,6 +7,8 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -121,12 +123,43 @@ func TestPipePathForUserMatchesReporterAlgorithm(t *testing.T) {
 	// Mixed case plus a trailing separator so the assertion still pins the shared
 	// Go/JS contract: lower-case the home dir, trim trailing separators, then hash.
 	// The expected suffix is derived here instead of hard-coding a machine literal.
-	t.Setenv("USERPROFILE", `C:\Users\Pet-Test\`)
-	home := sha256.Sum256([]byte(`c:\users\pet-test`))
-	want := PipePath + "-" + hex.EncodeToString(home[:4])
-	if got := PipePathForUser(); got != want {
-		t.Fatalf("pipe path mismatch: got %q want %q", got, want)
+	//
+	// The *container* is platform-dependent now (a named pipe on Windows, a unix
+	// socket elsewhere), so the assertion is about the token: whatever base the
+	// platform chose, the endpoint must carry this 8-character hash. That is
+	// exactly what reporters/protocol.js computes, and it is the half that must
+	// never drift.
+	home := os.Getenv("HOME")
+	if runtime.GOOS == "windows" {
+		home = os.Getenv("USERPROFILE")
 	}
+	t.Setenv(homeVariableForTest(), `C:\Users\Pet-Test\`)
+	sum := sha256.Sum256([]byte(`c:\users\pet-test`))
+	digest := hex.EncodeToString(sum[:4])
+
+	want := pipeBasePath() + "-" + digest
+	if runtime.GOOS != "windows" {
+		// On unix the token goes inside the socket file name, so the expected
+		// shape ends with .sock. Deriving it from the same base keeps the test
+		// honest about the contract rather than about punctuation.
+		want = pipeBasePath() + "-" + digest + ".sock"
+	}
+	if got := PipePathForUser(); got != want {
+		t.Fatalf("endpoint mismatch: got %q want %q", got, want)
+	}
+	if token := pipeScopeToken(`C:\Users\Pet-Test\`); token != digest {
+		t.Fatalf("token = %q, want %q", token, digest)
+	}
+	_ = home
+}
+
+// homeVariableForTest names the environment variable os.UserHomeDir reads on this
+// platform, so one test can pin both sides of the contract.
+func homeVariableForTest() string {
+	if runtime.GOOS == "windows" {
+		return "USERPROFILE"
+	}
+	return "HOME"
 }
 
 func TestReadPayloadDeadline(t *testing.T) {

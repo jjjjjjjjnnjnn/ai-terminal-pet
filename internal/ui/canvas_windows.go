@@ -1,4 +1,17 @@
+//go:build windows
+
 package ui
+
+// The Windows backend: GDI behind the canvas.
+//
+// canvas.go owns the buffer and every drawing primitive; this file owns the three
+// things only GDI can do - a device context to rasterise text into, a font cache,
+// and the DIB section whose pixels become the canvas's pixels.
+//
+// The struct used to be the canvas itself (dc, bitmap, old HGDIOBJ, pixels all in
+// one). Splitting it is handover §55.6 step 2: the twelve drawing files never
+// touched those handles, they only called methods, so the type they need is a
+// buffer plus a backend with three verbs.
 
 import (
 	"syscall"
@@ -7,57 +20,20 @@ import (
 	win "github.com/lxn/win"
 )
 
-type rgba struct {
-	R uint8
-	G uint8
-	B uint8
-	A uint8
-}
-
-const (
-	maxCanvasDimension = 4096
-	maxCanvasPixels    = 16 * 1024 * 1024
-)
-
-type canvas struct {
+// canvasBackend is the Windows side of one canvas.
+type canvasBackend struct {
 	dc     win.HDC
 	bitmap win.HBITMAP
 	old    win.HGDIOBJ
-	width  int
-	height int
-	stride int
-	pixels []byte
-	// alphaScale multiplies every colour's alpha as it is blended, so a whole
-	// layer can be faded without rewriting the palette. The dock slide uses it
-	// to fade the panel's contents out while its silhouette slides into the
-	// screen edge. Reset to 1 when the layer is done.
-	alphaScale float64
+	armed  bool
 }
 
-// setAlphaScale sets the multiplier applied to every subsequent draw. Values
-// outside 0..1 are clamped; 1 (the default) is a no-op.
-func (c *canvas) setAlphaScale(scale float64) {
-	if scale < 0 {
-		scale = 0
-	}
-	if scale > 1 {
-		scale = 1
-	}
-	c.alphaScale = scale
-}
-
-// scaledAlpha applies the current layer fade to a colour's alpha.
-func (c *canvas) scaledAlpha(value uint8) float64 {
-	if c.alphaScale >= 1 {
-		return float64(value)
-	}
-	return float64(value) * c.alphaScale
-}
-
-func newCanvas(width, height int) (*canvas, error) {
-	if width < 1 || height < 1 || width > maxCanvasDimension || height > maxCanvasDimension || width > maxCanvasPixels/height {
-		return nil, syscall.EINVAL
-	}
+// prepare creates the DIB section and returns its bits as the canvas buffer.
+//
+// Returning the slice rather than filling one is the whole reason for this
+// split: text is rasterised by GDI into the bitmap's memory, so if the primitives
+// blended into a separate allocation the glyphs would land somewhere else.
+func (b *canvasBackend) prepare(width, height int) ([]byte, error) {
 	dc := win.CreateCompatibleDC(0)
 	if dc == 0 {
 		return nil, syscall.EINVAL
@@ -83,182 +59,84 @@ func newCanvas(width, height int) (*canvas, error) {
 		win.DeleteDC(dc)
 		return nil, syscall.EINVAL
 	}
-	result := &canvas{
-		dc:     dc,
-		bitmap: bitmap,
-		old:    old,
-		width:  width,
-		height: height,
-		stride: width * 4,
-		pixels: unsafe.Slice((*byte)(bits), width*height*4),
-		// Zero would mean "fade everything to nothing", which is a nasty way
-		// to fail for a field whose whole job is to default to no-op.
-		alphaScale: 1,
-	}
-	result.clear()
-	return result, nil
+	b.dc = dc
+	b.bitmap = bitmap
+	b.old = old
+	b.armed = true
+	return unsafe.Slice((*byte)(bits), width*height*4), nil
 }
 
-func (c *canvas) close() {
-	if c == nil || c.dc == 0 {
+// release gives the handles back. Idempotent so a resize that closes a surface
+// twice cannot fault.
+func (b *canvasBackend) release() {
+	if !b.armed {
 		return
 	}
-	win.SelectObject(c.dc, c.old)
-	win.DeleteObject(win.HGDIOBJ(c.bitmap))
-	win.DeleteDC(c.dc)
-	c.dc = 0
-	c.bitmap = 0
-	c.pixels = nil
+	win.SelectObject(b.dc, b.old)
+	win.DeleteObject(win.HGDIOBJ(b.bitmap))
+	win.DeleteDC(b.dc)
+	b.dc = 0
+	b.bitmap = 0
+	b.armed = false
 }
 
-func (c *canvas) clear() {
-	for index := range c.pixels {
-		c.pixels[index] = 0
-	}
-}
-
-func (c *canvas) fillRect(left, top, width, height int, value rgba) {
-	c.fillRounded(left, top, width, height, 0, value)
-}
-
-func (c *canvas) fillRounded(left, top, width, height, radius int, value rgba) {
-	if width <= 0 || height <= 0 || value.A == 0 {
-		return
-	}
-	if radius < 0 {
-		radius = 0
-	}
-	if radius*2 > width {
-		radius = width / 2
-	}
-	if radius*2 > height {
-		radius = height / 2
-	}
-	right := left + width
-	bottom := top + height
-	for y := top; y < bottom; y++ {
-		for x := left; x < right; x++ {
-			if c.insideRounded(x, y, left, top, right, bottom, radius) {
-				c.blend(x, y, value)
-			}
-		}
-	}
-}
-
-func (c *canvas) outlineRounded(left, top, width, height, radius, thickness int, value rgba) {
-	if width <= 0 || height <= 0 || thickness <= 0 || value.A == 0 {
-		return
-	}
-	if radius < thickness {
-		radius = thickness
-	}
-	if radius*2 > width {
-		radius = width / 2
-	}
-	if radius*2 > height {
-		radius = height / 2
-	}
-	right := left + width
-	bottom := top + height
-	innerLeft := left + thickness
-	innerTop := top + thickness
-	innerRight := right - thickness
-	innerBottom := bottom - thickness
-	innerRadius := maxInt(radius-thickness, 0)
-	for y := top; y < bottom; y++ {
-		for x := left; x < right; x++ {
-			outer := c.insideRounded(x, y, left, top, right, bottom, radius)
-			inner := c.insideRounded(x, y, innerLeft, innerTop, innerRight, innerBottom, innerRadius)
-			if outer && !inner {
-				c.blend(x, y, value)
-			}
-		}
-	}
-}
-
-func (c *canvas) fillEllipse(left, top, width, height int, value rgba) {
-	if width <= 0 || height <= 0 || value.A == 0 {
-		return
-	}
-	radiusX := float64(width) / 2
-	radiusY := float64(height) / 2
-	centerX := float64(left) + radiusX
-	centerY := float64(top) + radiusY
-	for y := top; y < top+height; y++ {
-		for x := left; x < left+width; x++ {
-			dx := (float64(x) + 0.5 - centerX) / radiusX
-			dy := (float64(y) + 0.5 - centerY) / radiusY
-			if dx*dx+dy*dy <= 1 {
-				c.blend(x, y, value)
-			}
-		}
-	}
-}
-
-func (c *canvas) line(x1, y1, x2, y2, width int, value rgba) {
-	if width < 1 {
-		width = 1
-	}
-	minimumX := minInt(x1, x2) - width
-	maximumX := maxInt(x1, x2) + width
-	minimumY := minInt(y1, y2) - width
-	maximumY := maxInt(y1, y2) + width
-	radius := float64(width) / 2
-	radiusSquared := radius * radius
-	for y := minimumY; y <= maximumY; y++ {
-		for x := minimumX; x <= maximumX; x++ {
-			px := float64(x) + 0.5
-			py := float64(y) + 0.5
-			vx := float64(x2 - x1)
-			vy := float64(y2 - y1)
-			segment := vx*vx + vy*vy
-			projection := 0.0
-			if segment > 0 {
-				projection = ((px-float64(x1))*vx + (py-float64(y1))*vy) / segment
-				projection = mathClamp(projection, 0, 1)
-			}
-			nearestX := float64(x1) + projection*vx
-			nearestY := float64(y1) + projection*vy
-			deltaX := px - nearestX
-			deltaY := py - nearestY
-			if deltaX*deltaX+deltaY*deltaY <= radiusSquared {
-				c.blend(x, y, value)
-			}
-		}
-	}
-}
-
-func (c *canvas) text(left, top, width, height int, value string, fontHeight, weight int, color rgba, flags uint32) {
-	if value == "" || width <= 0 || height <= 0 {
-		return
-	}
-	if fontHeight < 1 {
-		fontHeight = 1
+// drawText rasterises one string into the canvas box. GDI writes grey coverage
+// into the bitmap in white, and canvas.normalizeText turns that into the
+// requested palette colour.
+func (b *canvasBackend) drawText(target *canvas, left, top, width, height int, value string, fontHeight, weight int, flags uint32) bool {
+	if !b.armed {
+		return false
 	}
 	encoded, err := syscall.UTF16FromString(value)
 	if err != nil || len(encoded) == 0 {
-		return
+		return false
 	}
 	font := cachedFont(fontHeight, weight)
 	if font == 0 {
-		return
+		return false
 	}
-	oldFont := win.SelectObject(c.dc, win.HGDIOBJ(font))
-	win.SetBkMode(c.dc, win.TRANSPARENT)
-	win.SetTextColor(c.dc, win.RGB(color.R, color.G, color.B))
+	oldFont := win.SelectObject(b.dc, win.HGDIOBJ(font))
+	win.SetBkMode(b.dc, win.TRANSPARENT)
+	win.SetTextColor(b.dc, win.RGB(255, 255, 255))
 	bounds := win.RECT{Left: int32(left), Top: int32(top), Right: int32(left + width), Bottom: int32(top + height)}
-	win.DrawTextEx(c.dc, &encoded[0], int32(len(encoded)-1), &bounds, flags, nil)
+	win.DrawTextEx(b.dc, &encoded[0], int32(len(encoded)-1), &bounds, flags, nil)
 	if oldFont != 0 {
-		win.SelectObject(c.dc, oldFont)
+		win.SelectObject(b.dc, oldFont)
 	}
-	c.normalizeText(left, top, width, height, color)
+	_ = target
+	return true
 }
 
-// fontCache avoids CreateFontIndirect/DeleteObject churn: the 50ms
-// animation timer repaints at 20FPS in waiting/error states, each frame
-// issuing ~10 text() calls. Only a handful of distinct (height, weight)
-// pairs exist, so a process-lifetime cache is bounded. Single-threaded
-// use only (all present() calls run on the UI thread); no eviction.
+// measureText returns the advance width in pixels.
+func (b *canvasBackend) measureText(value string, fontHeight, weight int) int {
+	if !b.armed {
+		return 0
+	}
+	encoded, err := syscall.UTF16FromString(value)
+	if err != nil || len(encoded) < 2 {
+		return 0
+	}
+	font := cachedFont(fontHeight, weight)
+	if font == 0 {
+		return 0
+	}
+	oldFont := win.SelectObject(b.dc, win.HGDIOBJ(font))
+	var size win.SIZE
+	ok := win.GetTextExtentPoint32(b.dc, &encoded[0], int32(len(encoded)-1), &size)
+	if oldFont != 0 {
+		win.SelectObject(b.dc, oldFont)
+	}
+	if !ok {
+		return 0
+	}
+	return int(size.CX)
+}
+
+// fontCache avoids CreateFontIndirect/DeleteObject churn: the 50ms animation
+// timer repaints at 20FPS in waiting/error states, each frame issuing ~10 text()
+// calls. Only a handful of distinct (height, weight) pairs exist, so a
+// process-lifetime cache is bounded. Single-threaded use only (all present()
+// calls run on the UI thread); no eviction.
 var fontCache = make(map[uint64]win.HFONT)
 
 func cachedFont(fontHeight, weight int) win.HFONT {
@@ -282,181 +160,4 @@ func cachedFont(fontHeight, weight int) win.HFONT {
 	}
 	fontCache[key] = font
 	return font
-}
-
-func (c *canvas) insideRounded(x, y, left, top, right, bottom, radius int) bool {
-	if x < left || x >= right || y < top || y >= bottom {
-		return false
-	}
-	if radius == 0 {
-		return true
-	}
-	cornerX := x
-	cornerY := y
-	if x < left+radius {
-		cornerX = left + radius
-	} else if x >= right-radius {
-		cornerX = right - radius - 1
-	}
-	if y < top+radius {
-		cornerY = top + radius
-	} else if y >= bottom-radius {
-		cornerY = bottom - radius - 1
-	}
-	dx := x - cornerX
-	dy := y - cornerY
-	return dx*dx+dy*dy <= radius*radius
-}
-
-func (c *canvas) blend(x, y int, value rgba) {
-	if x < 0 || y < 0 || x >= c.width || y >= c.height || value.A == 0 {
-		return
-	}
-	offset := y*c.stride + x*4
-	destinationA := float64(c.pixels[offset+3])
-	sourceA := c.scaledAlpha(value.A)
-	if sourceA <= 0 {
-		return
-	}
-	outputA := sourceA + destinationA*(255-sourceA)/255
-	if outputA <= 0 {
-		c.pixels[offset] = 0
-		c.pixels[offset+1] = 0
-		c.pixels[offset+2] = 0
-		c.pixels[offset+3] = 0
-		return
-	}
-	weight := destinationA * (255 - sourceA) / 255
-	blue := (float64(value.B)*sourceA + float64(c.pixels[offset])*weight) / outputA
-	green := (float64(value.G)*sourceA + float64(c.pixels[offset+1])*weight) / outputA
-	red := (float64(value.R)*sourceA + float64(c.pixels[offset+2])*weight) / outputA
-	c.pixels[offset] = clampChannel(blue)
-	c.pixels[offset+1] = clampChannel(green)
-	c.pixels[offset+2] = clampChannel(red)
-	c.pixels[offset+3] = clampChannel(outputA)
-}
-
-func (c *canvas) normalizeText(left, top, width, height int, color rgba) {
-	maximum := maxInt(int(color.R), maxInt(int(color.G), int(color.B)))
-	scale := c.alphaScale
-	if maximum == 0 || color.A == 0 || scale <= 0 {
-		return
-	}
-	for y := top; y < top+height; y++ {
-		for x := left; x < left+width; x++ {
-			if x < 0 || y < 0 || x >= c.width || y >= c.height {
-				continue
-			}
-			offset := y*c.stride + x*4
-			if c.pixels[offset+3] != 0 {
-				continue
-			}
-			value := maxInt(int(c.pixels[offset]), maxInt(int(c.pixels[offset+1]), int(c.pixels[offset+2])))
-			if value == 0 {
-				continue
-			}
-			alpha := clampChannel(float64(value) * 255 / float64(maximum) * scale)
-			c.pixels[offset] = clampChannel(float64(color.B) * float64(alpha) / 255)
-			c.pixels[offset+1] = clampChannel(float64(color.G) * float64(alpha) / 255)
-			c.pixels[offset+2] = clampChannel(float64(color.R) * float64(alpha) / 255)
-			c.pixels[offset+3] = alpha
-		}
-	}
-}
-
-// measure returns the advance width of value in pixels at the given font.
-func (c *canvas) measure(value string, fontHeight, weight int) int {
-	if value == "" {
-		return 0
-	}
-	encoded, err := syscall.UTF16FromString(value)
-	if err != nil || len(encoded) < 2 {
-		return 0
-	}
-	font := cachedFont(fontHeight, weight)
-	if font == 0 {
-		return 0
-	}
-	oldFont := win.SelectObject(c.dc, win.HGDIOBJ(font))
-	var size win.SIZE
-	ok := win.GetTextExtentPoint32(c.dc, &encoded[0], int32(len(encoded)-1), &size)
-	if oldFont != 0 {
-		win.SelectObject(c.dc, oldFont)
-	}
-	if !ok {
-		return 0
-	}
-	return int(size.CX)
-}
-
-// fitText trims value with a trailing ellipsis until it fits maxWidth.
-//
-// A layered window has no scrollbar and no tooltip, so text that does not fit
-// is not merely clipped, it is lost. DT_END_ELLIPSIS cannot help in a
-// DT_WORDBREAK box (the two flags are mutually exclusive), which is how long
-// project names used to spill straight out of both sides of the strip.
-func (c *canvas) fitText(value string, fontHeight, weight, maxWidth int) string {
-	if value == "" || maxWidth <= 0 {
-		return ""
-	}
-	if c.measure(value, fontHeight, weight) <= maxWidth {
-		return value
-	}
-	const ellipsis = "…"
-	runes := []rune(value)
-	for len(runes) > 0 {
-		runes = runes[:len(runes)-1]
-		candidate := string(runes) + ellipsis
-		if c.measure(candidate, fontHeight, weight) <= maxWidth {
-			return candidate
-		}
-	}
-	return ""
-}
-
-// hitMapInto writes the alpha channel into a caller-owned buffer so the
-// 20 FPS alert animation does not allocate a fresh width*height slice on
-// every frame. The buffer must be at least width*height bytes.
-func (c *canvas) hitMapInto(result []byte) {
-	if len(result) < c.width*c.height {
-		return
-	}
-	result = result[:c.width*c.height]
-	for index := 0; index < len(result); index++ {
-		result[index] = c.pixels[index*4+3]
-	}
-}
-
-func clampChannel(value float64) uint8 {
-	if value <= 0 {
-		return 0
-	}
-	if value >= 255 {
-		return 255
-	}
-	return uint8(value + 0.5)
-}
-
-func minInt(left, right int) int {
-	if left < right {
-		return left
-	}
-	return right
-}
-
-func maxInt(left, right int) int {
-	if left > right {
-		return left
-	}
-	return right
-}
-
-func mathClamp(value, minimum, maximum float64) float64 {
-	if value < minimum {
-		return minimum
-	}
-	if value > maximum {
-		return maximum
-	}
-	return value
 }

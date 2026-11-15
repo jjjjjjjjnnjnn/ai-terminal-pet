@@ -3,7 +3,7 @@ package connect
 // The file URL encoder/decoder.
 //
 // OpenCode loads a plugin by URL, and the one form known to work on this machine
-// is the one sitting in %USERPROFILE%\.config\opencode\plugins\terminal-pet\
+// is the one sitting in the Windows profile's opencode\plugins\terminal-pet\
 // index.ts (handover §53.1):
 //
 //	file:///C:/Users/rongj/Desktop/%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91/ai-terminal-pet/reporters/opencode.js
@@ -17,12 +17,18 @@ package connect
 //  2. percent-encoding. The repository lives under a non-ASCII directory
 //     (项目开发), and the loader takes the raw URL.
 //
-// This machine's working index.ts is the golden sample for both properties, and
+// The Windows wrapper is the golden sample for both properties, and
 // fileurl_test.go asserts it byte for byte rather than assuming.
+//
+// Where the path itself is spelled is a platform question, so the spelling lives
+// in localpath_<goos>.go: Windows converts separators and a drive letter, POSIX
+// does not. That split is what lets this file - and therefore the whole
+// `--connect` / `reporters` check - be compiled and tested for darwin and linux
+// (handover §55.6 step 3).
 //
 // Written by hand rather than with net/url: this package is linked into the
 // overlay binary, and net/url drags in net/netip and the URL parser for what is
-// here a byte-escape loop. The measured difference is in handover §56.10.
+// here a byte-escape loop. The measured difference is in handover §56.9.
 
 import (
 	"errors"
@@ -31,14 +37,15 @@ import (
 )
 
 // PathToFileURL renders an absolute local path as the file URL a host can load.
-// Both separators are accepted on input; output is always forward slashes,
-// because a backslash inside a URL is an escape, not a separator.
+// Both separators are accepted on input on Windows; output is always forward
+// slashes, because a backslash inside a URL is an escape, not a separator.
 func PathToFileURL(local string) (string, error) {
 	trimmed := strings.TrimSpace(local)
 	if trimmed == "" {
 		return "", errors.New("empty path")
+
 	}
-	slashed := strings.ReplaceAll(trimmed, `\`, "/")
+	slashed := fromLocalPath(trimmed)
 	if strings.HasPrefix(slashed, "//") {
 		// \\server\share\x -> file://server/share/x: the server name is a host
 		// component and cannot be percent-encoded into the path.
@@ -61,15 +68,9 @@ func PathToFileURL(local string) (string, error) {
 	return "file://" + escapeURLPath(slashed), nil
 }
 
-// hasDriveLetter reports "C:...", the only non-slash-prefixed form Windows
-// accepts as absolute.
-func hasDriveLetter(value string) bool {
-	return len(value) >= 2 && value[1] == ':'
-}
-
 // FileURLToPath is the inverse of PathToFileURL. It also accepts the shapes a
-// user may have pasted by hand: percent-encoded drive letters, mixed
-// separators, surrounding quotes, and a bare path that was never a URL.
+// user may have pasted by hand: percent-encoded paths, mixed separators,
+// surrounding quotes, and a bare path that was never a URL.
 func FileURLToPath(ref string) (string, error) {
 	trimmed := unquote(strings.TrimSpace(ref))
 	if trimmed == "" {
@@ -80,34 +81,33 @@ func FileURLToPath(ref string) (string, error) {
 			return "", fmt.Errorf("%q is a URL with a scheme other than file:", trimmed)
 		}
 		// Already a path: the common shape for the JS reporters.
-		return strings.ReplaceAll(trimmed, "/", `\`), nil
+		return toLocalPath(trimmed), nil
 	}
 	rest := trimmed[len("file:"):]
 	if strings.HasPrefix(rest, "//") {
 		rest = rest[2:]
 		if strings.HasPrefix(rest, "/") {
-			// file:///C:/x -- the three-slash form.
-			return decodedPathToWindows(rest), nil
+			// file:///C:/x or file:///home/you/x -- the three-slash form. The
+			// platform decides what the leading slash means.
+			return decodedPath(rest), nil
 		}
 		host, tail, found := strings.Cut(rest, "/")
 		if !found {
 			return "", fmt.Errorf("%q is a file URL with a host but no path", trimmed)
 		}
-		// file://server/share/x -> \\server\share\x
+		// file://server/share/x -> the platform's own network-path spelling.
 		decoded, err := percentDecode(tail)
 		if err != nil {
 			return "", err
 		}
-		return `\\` + host + `\` + strings.ReplaceAll(decoded, "/", `\`), nil
+		return toLocalPath("//" + host + "/" + decoded), nil
 	}
 	// file:C:/x -- how a naive encoder writes it.
-	return decodedPathToWindows(rest), nil
+	return decodedPath(rest), nil
 }
 
-// decodedPathToWindows turns a URL path into a Windows path: "/C:/Users/x"
-// becomes "C:\Users\x". A single leading slash before a drive letter is URL
-// syntax, not a path element.
-func decodedPathToWindows(escaped string) string {
+// decodedPath resolves the escapes and hands the spelling to the platform.
+func decodedPath(escaped string) string {
 	decoded, err := percentDecode(escaped)
 	if err != nil {
 		// A malformed escape is not a path. Returning the raw text keeps the
@@ -115,13 +115,10 @@ func decodedPathToWindows(escaped string) string {
 		// says what the config pointed at.
 		decoded = escaped
 	}
-	if len(decoded) >= 3 && decoded[0] == '/' && decoded[2] == ':' {
-		decoded = decoded[1:]
-	}
-	return strings.ReplaceAll(decoded, "/", `\`)
+	return toLocalPath(decoded)
 }
 
-// unreserved is RFC 3986's "never needs escaping" set, plus the two separators a
+// isUnreserved is RFC 3986's "never needs escaping" set, plus the two separators a
 // file path needs to stay readable: ':' for the drive letter, '/' for structure.
 func isUnreserved(value byte) bool {
 	switch {

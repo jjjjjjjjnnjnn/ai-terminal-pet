@@ -1,3 +1,5 @@
+//go:build windows
+
 package ui
 
 // Measuring, not asserting: how long does one settings raster take on this

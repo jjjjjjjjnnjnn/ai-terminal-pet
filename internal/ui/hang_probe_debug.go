@@ -1,4 +1,4 @@
-//go:build petdebug
+//go:build windows && petdebug
 
 package ui
 

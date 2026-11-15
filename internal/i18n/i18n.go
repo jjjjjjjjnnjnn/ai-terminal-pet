@@ -9,8 +9,6 @@ package i18n
 
 import (
 	"strings"
-	"syscall"
-	"unsafe"
 )
 
 // Lang is a display language the overlay can render.
@@ -72,36 +70,17 @@ func Resolve(setting Setting, systemLocale string) Lang {
 // SystemLocale returns the host OS locale name ("zh-CN", "en-US", ...)
 // or "" when it cannot be determined. Callers treat "" as English via
 // NormalizeLang.
+//
+// The per-platform lookup lives in systemlocale_<goos>.go: GetUserDefaultLocaleName
+// on Windows, the LANG/LC_ALL pair on darwin and linux. That split is the whole
+// reason this package can be built for darwin and linux at all (handover §55.6
+// step 1: it failed on syscall.NewLazyDLL, not on anything about languages).
 func SystemLocale() string {
-	name, err := systemLocaleWindows()
+	name, err := systemLocale()
 	if err != nil || name == "" {
 		return ""
 	}
 	return name
-}
-
-var (
-	modKernel32                  = syscall.NewLazyDLL("kernel32.dll")
-	procGetUserDefaultLocaleName = modKernel32.NewProc("GetUserDefaultLocaleName")
-)
-
-// systemLocaleWindows reads the user default locale via the Win32 API.
-// LOCALE_NAME_MAX_LENGTH is 85; anything longer is truncated, which is
-// still enough to detect the language prefix we care about.
-func systemLocaleWindows() (string, error) {
-	const maxLen = 85
-	buf := make([]uint16, maxLen)
-	ret, _, err := procGetUserDefaultLocaleName.Call(
-		uintptr(unsafe.Pointer(&buf[0])),
-		uintptr(maxLen),
-	)
-	if ret == 0 {
-		if err != nil && err != syscall.Errno(0) {
-			return "", err
-		}
-		return "", syscall.EINVAL
-	}
-	return syscall.UTF16ToString(buf), nil
 }
 
 // Keys for T. New UI copy must reuse these instead of adding literals.
