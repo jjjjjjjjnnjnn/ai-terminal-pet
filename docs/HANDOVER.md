@@ -44,8 +44,10 @@
   （只改兼容声明），**`dsh-plugin-v1.2.16` 是第 50 轮打的**（中文 README + 市场文案，同样没动代码，
   见 §50），**`pet-v1.0.8` 与 `dsh-plugin-v1.2.17` 是第 52 轮打的**（§52 的两个现场缺陷修复），
   **`pet-v1.0.9` 与 `dsh-plugin-v1.2.18` 是第 54 轮打的**（§54 把看门狗换成了清醒时钟）。
-  **工作区与 tag 已经同步**：`bin/`、`packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的
-  `AI-Terminal-Pet.exe` 三份逐字节相同（**4,556,288 B**，sha256 `CEA9F46F…`）。
+  **工作区与本机安装目录已经同步，但与 tag 不再逐字节相同**：`bin/`、
+  `packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的 `AI-Terminal-Pet.exe` 三份相同
+  （**4,649,472 B**，sha256 `0A2F1B86…`）；`pet-v1.0.9` 那份是 **4,556,288 B / `CEA9F46F…`**，
+  §56 这一批尚未发版，所以两者不同是预期的——下一次发布是 `1.0.10` / `1.2.19`（见 §56.10）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**366 个** `func Test`，
@@ -61,7 +63,7 @@
   与 `internal/app` 的 `connect_windows.go`（49 行 + 155 行测试 / 4 个测试）。
   旧口径的 17,238 与本轮实测的 HEAD 值（53 文件 / 16,118 行）**本来就差 1,120 行**——
   那一版用的是另一种统计方法，所以引用总数请现跑一遍，别照抄。
-  `bin/AI-Terminal-Pet.exe` **4,556,288 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
+  `bin/AI-Terminal-Pet.exe` **4,649,472 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**；
   `dist/` 里是 1.0.9 的产物（`ai-terminal-pet-1.0.9-win-x64.zip` 5,054,467 B、
   `pet-setup.exe` 14,309,888 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
