@@ -110,7 +110,7 @@ func run(args []string) error {
 	case command == "--doctor":
 		return controlDoctor(args[1:])
 	case command == "--connect" || strings.HasPrefix(command, "--connect="):
-		return controlConnect(command)
+		return controlConnect(command, args[1:])
 	case command == "--show":
 		// Fall through to a normal start when nothing is running, so the
 		// command is safe to bind to a hotkey.
@@ -239,7 +239,10 @@ func controlDoctor(extra []string) error {
 // An unknown terminal is a usage error (exit 2) rather than an empty answer, on
 // the same principle as --json rejecting "--pretry": a typo that silently prints
 // nothing leaves the user believing they have no terminals to wire.
-func controlConnect(command string) error {
+func controlConnect(command string, extra []string) error {
+	for _, value := range extra {
+		return usageError("unknown argument %q for --connect", value)
+	}
 	terminal := ""
 	if strings.HasPrefix(command, "--connect=") {
 		terminal = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(command, "--connect=")))
