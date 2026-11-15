@@ -14,7 +14,7 @@
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
 | 版本 | `1.0.9`（`internal/app/app_windows.go:44` 的 `const Version`）；插件包 `1.2.18` |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,649,984 B**（4.43 MiB）`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,655,616 B**（4.44 MiB）`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,918,336 B** = 11.37 MiB |
 | 代码量 | Go 非测试源码 **61 文件 / 17,717 行**、测试 **59 文件 / 9,662 行**（**366** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
@@ -557,9 +557,9 @@ POSIX 上 `\\.\pipe\...` 是个合法文件名、`hang.log` 的时钟语义）�
 4. 已落地：`--reset`/`--toggle` 等控制路径不再走 `app.Run()`，避免控制命令意外拉起常驻实例。
 
 ### L2 — 二进制体积（4.43 MiB；2.5 MiB 的目标已按实测作废，见 HANDOVER §56.10）
-**现状**：主程序 **4,649,984 B**（4.43 MiB，+92,672 B 来自 §56 的 `internal/connect` 与 `net/url`）、
-状态行 shim **3,664,896 B**、原生 hook **3,697,152 B**，
-三者合计 **12,011,872 B** = 11.46 MiB。共享内核 `internal/reporter` 让 shim 比共享前（3,643,392 B）
+**现状**：主程序 **4,655,616 B**（4.44 MiB，+92,672 B 来自 §56 的 `internal/connect` 与 `net/url`）、
+状态行 shim **3,669,504 B**、原生 hook **3,701,760 B**，
+三者合计 **12,026,880 B** = 11.47 MiB。共享内核 `internal/reporter` 让 shim 比共享前（3,643,392 B）
 长了 **21,504 B**，hook 也因此不再各写一份脱敏/投递逻辑——用 21 KB 换掉一份会漂移的重复实现。
 1.0.8 又在主程序上加了 **1,024 B**（`internal/ui/lifetime.go` 与两个诊断构建文件）。
 本版新增 `--doctor` 让主程序比 v0.9.0 的 4,178,432 B 增加了 **193,536 B**（约 +189 KiB，+4.6%），

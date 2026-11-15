@@ -46,7 +46,7 @@
   **`pet-v1.0.9` 与 `dsh-plugin-v1.2.18` 是第 54 轮打的**（§54 把看门狗换成了清醒时钟）。
   **工作区与本机安装目录已经同步，但与 tag 不再逐字节相同**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的 `AI-Terminal-Pet.exe` 三份相同
-  （**4,649,984 B**，sha256 `205A3BDE…`）；`pet-v1.0.9` 那份是 **4,556,288 B / `CEA9F46F…`**，
+  （**4,655,616 B**，sha256 `B407E50A…`）；`pet-v1.0.9` 那份是 **4,556,288 B / `CEA9F46F…`**，
   §56 这一批尚未发版，所以两者不同是预期的——下一次发布是 `1.0.10` / `1.2.19`（见 §56.10）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
@@ -63,8 +63,8 @@
   与 `internal/app` 的 `connect_windows.go`（49 行 + 155 行测试 / 4 个测试）。
   旧口径的 17,238 与本轮实测的 HEAD 值（53 文件 / 16,118 行）**本来就差 1,120 行**——
   那一版用的是另一种统计方法，所以引用总数请现跑一遍，别照抄。
-  `bin/AI-Terminal-Pet.exe` **4,649,984 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
-  `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**；
+  `bin/AI-Terminal-Pet.exe` **4,655,616 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
+  `bin/pet-statusline.exe` **3,669,504 B**、`bin/pet-hook.exe` **3,701,760 B**；
   `dist/` 里是 1.0.9 的产物（`ai-terminal-pet-1.0.9-win-x64.zip` 5,054,467 B、
   `pet-setup.exe` 14,309,888 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
   均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
@@ -4061,7 +4061,7 @@ go test -count=1 ./...                      -> 13 个包全 ok（366 个 func Te
 node tests/fresh-machine.mjs --no-overlay   -> PASS 172/172 checks（§54 是 162）
 node tools/check_versions.mjs               -> 18 个版本形状一致；node --test 26/26
 python tools/check_docs_links.py            -> 12 份文档全部解析
-node packages/dsh-ai-terminal-pet/scripts/vendor.mjs  -> 重算（vendor exe 4,649,984 B）
+node packages/dsh-ai-terminal-pet/scripts/vendor.mjs  -> 重算（vendor exe 4,655,616 B）
 node .../verify.mjs                         -> VERIFY PASSED
 & AI-Terminal-Pet.exe --doctor              -> 9 ok / 2 warn / 0 fail，exit 0
 & AI-Terminal-Pet.exe --connect             -> 三段齐全，exit 0；--connect=codex -> exit 2 + 列出三个名字
