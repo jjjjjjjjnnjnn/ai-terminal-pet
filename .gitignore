@@ -3,6 +3,14 @@
 *.disabled
 bin/
 
+# Bare `go build ./cmd/<tool>` writes this on a POSIX shell, where no .exe
+# suffix is added - and *.exe above does not match it. Two of these slipped into
+# a commit once (§57); naming them individually is the fix, because a pattern
+# like "pet-*" would also match reporters/ and scripts/.
+/pet-hook
+/pet-setup
+/pet-statusline
+
 # The portable release zip and its staging tree (scripts/package.ps1). These are
 # release artifacts uploaded to GitHub, not source: the zip is ~5 MB of binaries
 # that are rebuilt from the same source anyway, so committing it would only make
