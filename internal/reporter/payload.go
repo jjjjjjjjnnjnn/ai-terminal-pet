@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/session"
 )
 
@@ -142,15 +143,21 @@ func (p Payload) Validate(now time.Time) error {
 	return err
 }
 
-// RuntimeDirectory is %LOCALAPPDATA%\AI-Terminal-Pet\runtime, the directory the
-// overlay's snapshot scanner watches. An empty result means the environment is
-// unusable and every disk-side operation becomes a no-op.
+// RuntimeDirectory is <data directory>/runtime, the directory the overlay's
+// snapshot scanner watches. An empty result means the environment is unusable
+// and every disk-side operation becomes a no-op.
+//
+// The data directory comes from internal/home, which is the single place that
+// knows the per-platform layout (handover §55.4 ②). Before that package existed,
+// this function read LOCALAPPDATA directly - and reporters/protocol.js read it
+// again in JavaScript, which is how the two sides could disagree about where a
+// snapshot lives without anything failing loudly.
 func RuntimeDirectory() string {
-	root := os.Getenv("LOCALAPPDATA")
-	if root == "" {
+	directory := home.Directory()
+	if directory == "" {
 		return ""
 	}
-	return filepath.Join(root, "AI-Terminal-Pet", "runtime")
+	return filepath.Join(directory, "runtime")
 }
 
 // SnapshotPath is the file the overlay would read this payload back from. The

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/session"
 )
 
@@ -164,9 +165,8 @@ func TestPayloadFinishRepairsOutOfRangeFields(t *testing.T) {
 }
 
 func TestWriteSnapshotRoundTrips(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
-	directory := filepath.Join(root, "AI-Terminal-Pet", "runtime")
+	dataDirectory(t)
+	directory := home.Join("runtime")
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -208,8 +208,7 @@ func TestWriteSnapshotRoundTrips(t *testing.T) {
 // the directory would drop that first report silently. sendStatus in
 // protocol.js calls mkdirSync({recursive:true}) for the same reason.
 func TestWriteSnapshotCreatesAMissingRuntimeDirectory(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
+	dataDirectory(t)
 	now := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
 	payload := NewPayload(now)
 	payload.Source = "claude-hook"
@@ -218,7 +217,7 @@ func TestWriteSnapshotCreatesAMissingRuntimeDirectory(t *testing.T) {
 	payload.State = session.StateWorking
 	payload = payload.Finish(now)
 
-	if _, err := os.Stat(filepath.Join(root, "AI-Terminal-Pet", "runtime")); !os.IsNotExist(err) {
+	if _, err := os.Stat(home.Join("runtime")); !os.IsNotExist(err) {
 		t.Fatalf("the test expected no runtime directory to exist yet: %v", err)
 	}
 	if !WriteSnapshot(payload) {
@@ -237,7 +236,7 @@ func TestWriteSnapshotCreatesAMissingRuntimeDirectory(t *testing.T) {
 // it has to be quiet, bounded and non-fatal. The pipe name is overridden
 // because the real user pipe may well have a live listener.
 func TestSendWithoutListenerFailsQuietly(t *testing.T) {
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	now := time.Now().UTC()
 	payload := NewPayload(now)
 	payload.Source = "claude-hook"
@@ -255,14 +254,13 @@ func TestSendWithoutListenerFailsQuietly(t *testing.T) {
 }
 
 func TestApprovalPlanModes(t *testing.T) {
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+	dataDirectory(t)
 	if mode, timeout := ApprovalPlan("Bash: ls"); mode != ApprovalOff || timeout != 0 {
 		t.Fatalf("a missing config.json must mean auto-approve off, got %q/%v", mode, timeout)
 	}
 
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
-	directory := filepath.Join(root, "AI-Terminal-Pet")
+	dataDirectory(t)
+	directory := home.Directory()
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -285,9 +283,8 @@ func TestApprovalPlanModes(t *testing.T) {
 }
 
 func TestApprovalPendingFileAndVeto(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
-	directory := filepath.Join(root, "AI-Terminal-Pet", "approvals")
+	dataDirectory(t)
+	directory := home.Join("approvals")
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -338,9 +335,8 @@ func TestApprovalPendingFileAndVeto(t *testing.T) {
 // A veto that arrives while the hook is waiting has to end the wait, which is
 // the whole contract between the overlay and this binary.
 func TestWaitForApprovalDecisionObservesLateVeto(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv("LOCALAPPDATA", root)
-	directory := filepath.Join(root, "AI-Terminal-Pet", "approvals")
+	dataDirectory(t)
+	directory := home.Join("approvals")
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -372,7 +368,7 @@ func TestWaitForApprovalDecisionObservesLateVeto(t *testing.T) {
 }
 
 func TestWaitForApprovalDecisionFailsClosedWithoutADirectory(t *testing.T) {
-	t.Setenv("LOCALAPPDATA", "")
+	dataDirectoryMissing(t)
 	request := ApprovalRequest{Source: "claude-hook", SessionID: "s1", PID: 11}
 	if decision := WaitForApprovalDecision(request, 50*time.Millisecond); decision != "deny" {
 		t.Fatalf("an unfilable request must answer deny, got %q", decision)

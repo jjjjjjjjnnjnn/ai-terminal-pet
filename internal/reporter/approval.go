@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ai-terminal-pet/internal/config"
+	"ai-terminal-pet/internal/home"
 )
 
 // Auto-approve handshake, hook side. The overlay is a read-only panel: it can
@@ -88,11 +89,11 @@ type AutoApproveConfig struct {
 // return the disabled fallback, which is also config.Default's answer.
 func LoadAutoApproveConfig() AutoApproveConfig {
 	fallback := AutoApproveConfig{Enabled: false, TimeoutSec: DefaultApproveTimeoutSec}
-	root := os.Getenv("LOCALAPPDATA")
-	if root == "" {
+	directory := home.Directory()
+	if directory == "" {
 		return fallback
 	}
-	data, err := os.ReadFile(filepath.Join(root, "AI-Terminal-Pet", config.FileName))
+	data, err := os.ReadFile(filepath.Join(directory, config.FileName))
 	if err != nil {
 		return fallback
 	}
@@ -137,11 +138,11 @@ func ApprovalPlan(toolText string) (ApprovalMode, time.Duration) {
 
 // ApprovalsDirectory is where hooks and the overlay exchange files.
 func ApprovalsDirectory() string {
-	root := os.Getenv("LOCALAPPDATA")
-	if root == "" {
+	directory := home.Directory()
+	if directory == "" {
 		return ""
 	}
-	return filepath.Join(root, "AI-Terminal-Pet", "approvals")
+	return filepath.Join(directory, "approvals")
 }
 
 // SanitizeApprovalStem mirrors protocol.js sanitizeStem and

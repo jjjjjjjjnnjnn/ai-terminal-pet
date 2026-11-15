@@ -1,77 +1,91 @@
 package reporter
 
+// The portable half of the delivery tests: what a reporter does when the overlay
+// answers, and what the snapshot/acknowledgement ordering has to guarantee.
+//
+// Two pieces moved to files of their own:
+//
+//   - the retry classification, because the errors it classifies are the OS's
+//     (a named pipe's ERROR_PIPE_BUSY on Windows, EACCES on a socket owned by
+//     another user here): send_windows_test.go and send_unix_test.go.
+//   - the denied-pipe probe, which needs winio to build a pipe with a DACL that
+//     refuses this caller - a shape unix does not have.
+
 import (
-	"io/fs"
 	"os"
 	"testing"
 	"time"
-
-	winio "github.com/Microsoft/go-winio"
-	"golang.org/x/sys/windows"
 )
 
-// The retry budget is the reporter's entire cost when delivery is impossible,
-// because the host waits for this process. Getting the classification wrong in
-// either direction is a real bug: treating "denied" as retryable adds the whole
-// budget to every single host event, and treating "no listener yet" as final
-// throws away the report the launch was supposed to enable.
-func TestRetryableDialErrorClassification(t *testing.T) {
-	cases := []struct {
-		name  string
-		err   error
-		retry bool
-	}{
-		{"no listener yet", &fs.PathError{Op: "open", Path: `\\.\pipe\x`, Err: windows.ERROR_FILE_NOT_FOUND}, true},
-		{"every instance busy", &fs.PathError{Op: "open", Path: `\\.\pipe\x`, Err: windows.ERROR_PIPE_BUSY}, true},
-		{"access denied", &fs.PathError{Op: "open", Path: `\\.\pipe\x`, Err: windows.ERROR_ACCESS_DENIED}, false},
-		{"broken pipe", &fs.PathError{Op: "open", Path: `\\.\pipe\x`, Err: windows.ERROR_BROKEN_PIPE}, false},
-		{"nil", nil, false},
-	}
-	for _, testCase := range cases {
-		if got := retryableDialError(testCase.err); got != testCase.retry {
-			t.Errorf("%s: retryableDialError = %v, want %v", testCase.name, got, testCase.retry)
-		}
-	}
-}
-
-// A pipe whose DACL grants only SYSTEM is the cheap local stand-in for the
-// real-world case this guards: a reporter whose token can never open that
-// pipe. Send must come back immediately instead of burning the retry budget.
-func TestSendStopsImmediatelyWhenThePipeRefusesTheCaller(t *testing.T) {
-	if testing.Short() {
-		t.Skip("creates a real named pipe")
-	}
-	path := `\\.\pipe\ai-terminal-pet-test-denied-` + itoa(os.Getpid())
-	listener, err := winio.ListenPipe(path, &winio.PipeConfig{
-		SecurityDescriptor: "D:P(A;;GRGW;;;SY)",
-	})
-	if err != nil {
-		t.Skipf("cannot create the probe pipe: %v", err)
-	}
-	defer listener.Close()
-	go func() {
-		connection, acceptErr := listener.Accept()
-		if acceptErr == nil {
-			connection.Close()
-		}
-	}()
-
-	t.Setenv("LOCALAPPDATA", t.TempDir())
+// Send must file the snapshot before it dials, so a report that arrives while the
+// overlay is still starting is read from disk by the next scan instead of being
+// lost. This is the ordering protocol.js documents and the one reason the
+// snapshot write comes first.
+func TestSendWritesTheSnapshotEvenWhenDeliveryFails(t *testing.T) {
+	dataDirectory(t)
 	now := time.Now().UTC()
 	payload := NewPayload(now)
 	payload.Source = "claude-hook"
-	payload.SessionID = "denied"
-	payload.PID = 21
+	payload.SessionID = "snapshot-only"
+	payload.PID = 22
 	payload = payload.Finish(now)
 
-	started := time.Now()
-	ok := Send(payload, SendOptions{Retry: 750 * time.Millisecond, PipePath: path})
-	elapsed := time.Since(started)
-
-	if ok {
-		t.Fatal("Send claimed success against a pipe that denies this caller")
+	path := SnapshotPath(payload)
+	if path == "" {
+		t.Fatal("no snapshot path for this payload")
 	}
-	if elapsed > 300*time.Millisecond {
-		t.Fatalf("Send spent %v retrying a permanent denial; the host pays that on every event", elapsed)
+	if _, err := os.Stat(path); err == nil {
+		t.Fatal("the snapshot exists before Send ran")
+	}
+
+	// A pipe path nobody is listening on: delivery fails, the snapshot stays.
+	ok := Send(payload, SendOptions{
+		Retry:          30 * time.Millisecond,
+		ConnectTimeout: 10 * time.Millisecond,
+		PipePath:       "definitely-not-listening",
+	})
+	if ok {
+		t.Fatal("Send claimed success with no listener")
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the snapshot was not filed: %v", err)
+	}
+}
+
+// A payload the server would reject must not leave a snapshot behind: the scanner
+// would keep re-reading a file it cannot parse and deleting it, once per scan.
+//
+// The payload is built past Finish's reach on purpose. Finish repairs everything
+// out of range (an unknown state becomes idle, a bad pid is replaced), so the only
+// way to reach the validate branch is a field Finish does not correct - the schema
+// version, which is the one thing a reporter must never guess.
+func TestSendSkipsTheSnapshotForAnInvalidPayload(t *testing.T) {
+	dataDirectory(t)
+	now := time.Now().UTC()
+	payload := NewPayload(now)
+	payload.Source = "claude-hook"
+	payload.SessionID = "invalid"
+	payload.PID = 23
+	payload = payload.Finish(now)
+	// Finish repairs everything out of range (an unknown state becomes idle, a
+	// bad pid is replaced) and rewrites the schema version, so the only way to
+	// reach Send's validate branch is to change a field *after* Finish - which is
+	// exactly the shape of a future caller that forgets to go through it.
+	payload.SchemaVersion = "ai-terminal-pet.v999"
+
+	path := SnapshotPath(payload)
+	ok := Send(payload, SendOptions{
+		Retry:          30 * time.Millisecond,
+		ConnectTimeout: 10 * time.Millisecond,
+		PipePath:       "definitely-not-listening",
+	})
+	if ok {
+		t.Fatal("Send claimed success for an invalid payload")
+	}
+	if path == "" {
+		return
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Fatal("an invalid payload left a snapshot the scanner will loop on")
 	}
 }

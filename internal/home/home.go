@@ -52,17 +52,16 @@ func DirectoryFor(goos, localAppData, xdgDataHome, homeDir string) string {
 
 // windowsDirectory is %LOCALAPPDATA%\AI-Terminal-Pet.
 //
-// A Windows process with a profile but no LOCALAPPDATA is rare but real (a host
-// started under a stripped environment); falling back to the profile keeps that
-// machine's overlay able to persist instead of losing its settings silently.
+// A missing LOCALAPPDATA yields an empty directory - no state, not a guessed path.
+// That is the behaviour this project has always had, and two reporter tests pin
+// it: an approval request that cannot be filed must answer deny, and a payload that
+// cannot be filed must not be sent. Falling back to the profile (which an earlier
+// draft of this file did) would have made those two cases unreachable on Windows.
 func windowsDirectory(localAppData, homeDir string) string {
-	if localAppData != "" {
-		return joinNative(localAppData, WindowsDirectoryName)
+	if localAppData == "" {
+		return ""
 	}
-	if homeDir != "" {
-		return joinNative(homeDir, "AppData", "Local", WindowsDirectoryName)
-	}
-	return ""
+	return joinNative(localAppData, WindowsDirectoryName)
 }
 
 // darwinDirectory is ~/Library/Application Support/AI-Terminal-Pet.

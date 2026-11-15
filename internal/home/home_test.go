@@ -34,10 +34,10 @@ func TestDirectoryForMatchesEachPlatformsConvention(t *testing.T) {
 			wantExactly: `C:\Users\example\AppData\Local\AI-Terminal-Pet`,
 		},
 		{
-			name:        "windows falls back to the profile when LOCALAPPDATA is missing",
-			goos:        "windows",
-			homeDir:     `C:\Users\example`,
-			wantExactly: `C:\Users\example\AppData\Local\AI-Terminal-Pet`,
+			name:       "windows with no LOCALAPPDATA is empty, not a guessed path",
+			goos:       "windows",
+			homeDir:    `C:\Users\example`,
+			wantSuffix: []string{""},
 		},
 		{
 			name:       "windows with nothing at all is empty, not relative",

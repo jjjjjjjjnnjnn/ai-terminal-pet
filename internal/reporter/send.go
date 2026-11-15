@@ -1,22 +1,32 @@
 package reporter
 
+// Delivery: write the runtime snapshot, then hand one line to the overlay and
+// require the exact "OK".
+//
+// Everything here used to be Windows-only because of three lines in one function -
+// the dial, one error constant and the child's creation flags - while the retry
+// policy, the snapshot ordering and the acknowledgement contract had nothing to do
+// with the OS. Those three lines now live in dial_<goos>.go, and this file is what
+// cmd/pet-hook and cmd/pet-statusline both run (handover §55.6 step 5).
+
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 
+	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/pipeserver"
 	"ai-terminal-pet/internal/session"
-	winio "github.com/Microsoft/go-winio"
-	"golang.org/x/sys/windows"
 )
+
+// OverlayBinaryName is the overlay's own file name, which is the same on every
+// platform: the installer and the packaged plugin both look for it by name.
+const OverlayBinaryName = "AI-Terminal-Pet.exe"
 
 const (
 	// PipeDialTimeout mirrors protocol.js connectTimeoutMs' default: the
@@ -39,7 +49,7 @@ type SendOptions struct {
 	Retry time.Duration
 	// ConnectTimeout caps a single dial.
 	ConnectTimeout time.Duration
-	// Launch allows starting AI-Terminal-Pet.exe when the pipe is absent.
+	// Launch allows starting the overlay when the pipe is absent.
 	Launch bool
 	// PipePath overrides the per-user pipe (tests).
 	PipePath string
@@ -58,8 +68,7 @@ func SendOnce(pipePath string, line []byte) bool {
 // not listening yet" (worth a launch and a retry) from "this process will never
 // be allowed in" (retrying only burns the reporter's budget).
 func sendOnce(pipePath string, line []byte) (bool, error) {
-	timeout := PipeDialTimeout
-	conn, err := winio.DialPipe(pipePath, &timeout)
+	conn, err := dial(pipePath, PipeDialTimeout)
 	if err != nil {
 		return false, err
 	}
@@ -79,26 +88,6 @@ func sendOnce(pipePath string, line []byte) (bool, error) {
 	return true, nil
 }
 
-// retryableDialError reports whether another attempt could plausibly succeed.
-//
-// The distinction is not cosmetic. A hook runs once per host event and the host
-// waits for it, so when delivery is impossible the retry budget is pure added
-// latency. "No listener yet" is transient: one launch and one retry can fix it.
-// "Access is denied" is not: it means this token will never open that pipe -
-// typically a process at a lower mandatory integrity level than the one that
-// created the pipe, which happens when the executable itself lives in a
-// low-integrity-labelled directory. Every remaining attempt would fail in
-// microseconds and the reporter would still pay the whole budget.
-func retryableDialError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, windows.ERROR_PIPE_BUSY) {
-		return true
-	}
-	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ERROR_FILE_NOT_FOUND)
-}
-
 // Send writes the runtime snapshot and then delivers the payload, retrying
 // until the budget is spent. It returns true only when the server
 // acknowledged the line.
@@ -107,6 +96,11 @@ func retryableDialError(err error) bool {
 // snapshot lands first, so even an overlay that has to be launched reads this
 // session from disk on its next scan. That is what keeps a report filed during
 // startup from being lost.
+//
+// Send validates *after* Finish-correcting the payload, which is why
+// TestSendSkipsTheSnapshotForAnInvalidPayload has to build one that Finish cannot
+// repair (an unknown schema version): Finish exists so a reporter never has to
+// choose between filing a snapshot the scanner will loop on and dropping a report.
 func Send(p Payload, options SendOptions) bool {
 	if options.Retry <= 0 {
 		options.Retry = DefaultRetryBudget
@@ -160,15 +154,14 @@ func Send(p Payload, options SendOptions) bool {
 
 // ApplicationPath is the installed overlay this user should launch, or "" when
 // there is nothing to launch. AI_TERMINAL_PET_EXE is honoured only when it
-// resolves inside the install directory, mirroring protocol.js: a reporter
-// that would run an arbitrary path from the environment is a way to turn a
-// config typo into code execution.
+// resolves inside the install directory, mirroring protocol.js: a reporter that
+// would run an arbitrary path from the environment is a way to turn a config typo
+// into code execution.
 func ApplicationPath() string {
-	root := os.Getenv("LOCALAPPDATA")
-	if root == "" {
+	directory := home.Directory()
+	if directory == "" {
 		return ""
 	}
-	directory := filepath.Join(root, "AI-Terminal-Pet")
 	if override := os.Getenv("AI_TERMINAL_PET_EXE"); override != "" {
 		if os.Getenv("AI_TERMINAL_PET_ALLOW_UNSAFE_EXE") == "1" {
 			return override
@@ -183,7 +176,7 @@ func ApplicationPath() string {
 		}
 		return absolute
 	}
-	return filepath.Join(directory, "AI-Terminal-Pet.exe")
+	return filepath.Join(directory, OverlayBinaryName)
 }
 
 // LaunchApplication starts the overlay detached, once, and ignores every
@@ -198,12 +191,7 @@ func LaunchApplication() bool {
 		return false
 	}
 	cmd := exec.Command(executable)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow: true,
-		// DETACHED_PROCESS (0x00000008); the literal avoids a dependency
-		// for a single constant.
-		CreationFlags: 0x00000008,
-	}
+	cmd.SysProcAttr = detachProcess()
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
 	return cmd.Start() == nil
 }
