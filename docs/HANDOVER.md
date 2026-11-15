@@ -3692,12 +3692,28 @@ QueryUnbiasedInterruptTime  96.17 h since boot   （只算清醒）
 
 ### 54.3 发版（1.0.9 / 1.2.18）
 
-按 `docs/UPSTREAM.md` §2 走完：版本 → 三二进制 → `vendor.mjs`（源码摘要 `2aab36f6…`，42 个文件；
-overlay 4,556,288 B / `ddade226…`）→ A 提交 → 双 tag → 双 Release → npm → B 提交钉 `source.commit`/`icon`
-→ 上游 PR。资产见 CHANGELOG 的 `[1.0.9]` 一节，三个都从公网 URL 下载回来重哈希核对过。
+按 `docs/UPSTREAM.md` §2 走完，逐条落地并在发出去之后**当场核对**：
+
+1. `Version` → **1.0.9**；三个二进制按 `-trimpath -buildvcs=false -ldflags "-s -w"` 重编（浮窗
+   **4,556,288 B**、statusline 3,664,896 B、hook 3,697,152 B）；`vendor.mjs` 重算清单
+   （源码摘要 `2aab36f6…`，42 个文件；overlay `ddade226…`）。
+2. A 提交 `1d47473`：版本 + 两份清单 + 索引 `versions[0].version` / `publishTimestamp` + CHANGELOG
+   + README / ROADMAP / HANDOVER / LAUNCH + AGENTS 的 `func Test` 计数。CI run `43691668564` **success**。
+3. 双 tag：`pet-v1.0.9` / `dsh-plugin-v1.2.18`。
+4. 双 Release，三个资产**从公网 URL 下载回来重哈希**，与本地逐字节一致（GitHub 记的 `digest` 也一致）：
+   zip **5,054,467 B / `81F9FAB4…`**、`pet-setup.exe` **14,309,888 B / `3C22B4A7…`**、
+   tgz **2,006,574 B / `08A6FE06…`**。
+5. `npm publish` 之后 `npm view dsh-ai-terminal-pet version` = **1.2.18**（`dist-tags.latest`）。
+6. B 提交 `ff7a106`：索引 `source.commit` 与 `icon` 钉到 `1d47473`。CI **success**。
+7. 上游条目：[PR #15482](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15482)
+   （分支 `bump-tarball-1.2.18`，commit `5f64040`，`MERGEABLE`），`--check` = **OK（in flight）**。
+   上一轮那条 **#15378（1.2.17）已 `MERGED`**。合并仍要人工。
 
 **为什么这一轮要占一个版本号**：改的是 `internal/ui`（浮窗行为），而插件包自带一份 vendor 二进制，
 按规矩 vendor 变了就必须换插件版本。若只发浮窗，新装 DSH 的人会拿到 1.0.8 的浮窗。
+
+本机升级：`scripts\install.cmd` 装到 1.0.9，`-VerifyOnly` **11/11**、`--version` = 1.0.9、
+`--doctor` **10 ok / 0 warn / 0 fail**。
 
 ### 54.4 顺手修掉一条真实的测试夹具缺陷（suite 的 launch stub 会互相拉起）
 
