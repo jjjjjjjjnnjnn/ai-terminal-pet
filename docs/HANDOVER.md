@@ -4258,7 +4258,11 @@ hook 3,701,760 B。三个文件与 `vendor/`、本机安装目录逐字节相同
    - 修复合入 `00e177e` 后 Run `43731837246` 四端全部一次通过（Windows 1m45s、Linux 1m2s、macOS 50s、scan 1m7s）。
 4. **文档重构与多平台发版**：
    - 重构 `README.md`（中英文）、`docs/PLATFORMS.md`、`docs/ROADMAP.md`、`docs/HANDOVER.md`、`CHANGELOG.md`、`docs/LAUNCH.md` 与 `packages/dsh-ai-terminal-pet/README*.md`，并在 `tools/check_versions.mjs` 对齐 `internal/app/version.go` 与 Unix `.tar.gz` 命名检查。
-   - 按 `docs/UPSTREAM.md` 两步发布：Commit A 携带 `1.0.10` / `1.2.19` 全端二进制与市场索引时间戳并打 `pet-v1.0.10`（上传 Win `setup.exe` + `win-x64.zip` + 四份 Unix `.tar.gz`）与 `dsh-plugin-v1.2.19`；Commit B 钉死 `docs/market-index.json` 的真实 `source.commit` 与 `icon` SHA。
+   - 按 `docs/UPSTREAM.md` 两步发布：
+     - **Commit A (`4e7823b`)**：落地版本号、二进制及市场时间戳，发布 GitHub Release `pet-v1.0.10`（6 个跨平台资产）与 `dsh-plugin-v1.2.19`（`.tgz`），成功将 `dsh-ai-terminal-pet@1.2.19` 推送至 npm registry；
+     - **Commit B (`e53c7ea`)**：将 `docs/market-index.json` 的 `source.commit` 与 `icon` 钉死在 Commit A 的真实 SHA；
+     - **上游 PR 同步**：在 `awesome-dsh-plugin` 开启 PR [#15626](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15626) 并关闭旧 PR #15482，`tools/upstream-entry.mjs --check` 判定 in flight 通过；
+     - **全端 CI 4/4 绿灯**：Commit B 的重跑 CI（Run `43734286878`）在 `windows-latest`、`ubuntu-latest`、`macos-latest` 与安全扫描全部通过；本机安装目录已更新为 1.0.10，`install.ps1 -VerifyOnly` 11/11 匹配，`--doctor` 10 ok / 1 warn / 0 fail。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 
