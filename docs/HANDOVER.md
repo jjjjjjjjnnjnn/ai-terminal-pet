@@ -6,10 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-15 晚；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；§51 的两个现场缺陷已修复（§52），§53 统一了上报端，§54 修掉了 `hang.log` 的待机误报；§56 给 `--doctor` 加了第 11 项 `reporters` 并新增只打印的 `--connect`；**跨平台仍是下一步，先去读 §55 的盘点**）
+## 1. 当前状态（2026-11-15 深夜；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；§51 的两个现场缺陷已修复（§52），§53 统一了上报端，§54 修掉了 `hang.log` 的待机误报，§56 给 `--doctor` 加了第 11 项 `reporters` 并新增只打印的 `--connect`，**§57 完成了跨平台第 1–7 步中能在这台机器上验证的全部（内核/传输/目录/自启/上报端/CI 门禁），窗口层仍只有 Windows，因此 1.1.0 还没发**）
 
-> 接手请先读本节与 **§56「`--doctor` 现在会看上报端接入，`--connect` 只打印」**（最新一轮；
-> 只做了 Windows 侧、未发版），再读 **§55「交接：下一步是 macOS / 其他系统 —— 先盘点，别先动手」**
+> 接手请先读本节与 **§57「跨平台施工（第 1–7 步），以及这一版为什么还没发」**（最新一轮；
+> 九个提交、三平台实测矩阵、五个"看起来对其实错"的地方、以及窗口层为什么不在这一版里），
+> 再读 **§56「`--doctor` 现在会看上报端接入，`--connect` 只打印」**，
+> 再读 **§55「交接：下一步是 macOS / 其他系统 —— 先盘点，别先动手」**
 > （跨平台盘点：可搬行数、今天 darwin 上编译到哪一步、五层要换什么、七步顺序与五个坑，**仍是下一步**），
 > 再读 **§53「交接：上报端只剩一份实现」**（本机现在加载的是仓库里的 `reporters/opencode.js`，
 > 本地目录插件只是一次静态 re-export），再读
@@ -47,18 +49,19 @@
   **工作区与本机安装目录已经同步，但与 tag 不再逐字节相同**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的 `AI-Terminal-Pet.exe` 三份相同
   （**4,655,616 B**，sha256 `B407E50A…`）；`pet-v1.0.9` 那份是 **4,556,288 B / `CEA9F46F…`**，
-  §56 这一批尚未发版，所以两者不同是预期的——下一次发布是 `1.0.10` / `1.2.19`（见 §56.10）。
+  §56 这一批尚未发版，所以两者不同是预期的——下一次发布用新的次版本号（见 §56.10 与 §57.7）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**366 个** `func Test`，
   13 个包；§56 新增 `internal/connect` 的 25 个）；上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **10/10**；
   三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
-  `tools/check_versions.mjs` **18 个版本形状全一致**（`node --test tools/check_versions.test.mjs` 24/24）；
-  `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
+  `tools/check_versions.mjs` **18 个版本形状全一致**（`node --test tools/check_versions.test.mjs` 26/26）；
+  `tests/fresh-machine.mjs --no-overlay` **172/172**；`tools/check_docs_links.py` **12 份**文档全解；
   `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
   `--doctor` **11 项**（本机 10 ok / 1 warn / 0 fail；那一条 warn 是 Antigravity 只有状态栏上报端，见 §56）。
-- **规模**（`git ls-files '*.go'` + 逐文件行数，本轮实测）：非测试 **61 文件 / 17,717 行**、
-  测试 **59 文件 / 9,662 行**、**366 个 `func Test` / 13 个包**（§54 那一轮是 53 / 17,238、57 / 9,471、341 / 12）。
+- **规模**（`git ls-files '*.go'` + 逐文件行数，本轮实测）：非测试 **95 文件 / 19,355 行**、
+  测试 **68 文件 / 10,339 行**、**382 个 `func Test` / 14 个包**（§54 那一轮是 53 / 17,238、57 / 9,471、341 / 12）。
+  §57 的跨平台施工把 9 个新文件（每平台一份实现）与 2 个新包加了进来，所以文件数涨得比行数快。
   §56 新增的是 `internal/connect`（8 个非测试文件 1,599 行 + 1 个测试文件 627 行 / 21 个 `func Test`）
   与 `internal/app` 的 `connect_windows.go`（49 行 + 155 行测试 / 4 个测试）。
   旧口径的 17,238 与本轮实测的 HEAD 值（53 文件 / 16,118 行）**本来就差 1,120 行**——
@@ -4118,6 +4121,137 @@ S5 的 `0 fail` 是 §56.3 第 1 条存在的理由。本轮给 S1 与 S7 各加
    `connect_windows.go`（仍在 `_windows` 里），`internal/connect` 则整包不含 Win32——E3 时那 8 个文件
    可以原样搬，`roots.go` 是唯一要按平台回答不同的地方。
 3. 如果之后有人报"某个终端不出现"，第一步不是查上报端代码，是跑 `--doctor` 看 `reporters` 那一行。
+
+## 57. 交接：跨平台施工（第 1–7 步），以及这一版为什么还没发（2026-11-15 深夜，第 57 轮；**未发版**）
+
+用户的要求是"按 §55.6 第 1 步动跨平台，把跨平台和适配全系统做成下一个版本号"。这一轮把 §55.6
+的七步里能在这台机器上验证的部分全部做完了，**但窗口层没有做**——所以 1.1.0 现在还不能发，
+理由写在 §57.7。
+
+### 57.1 现在的实测矩阵（跑出来的，不是读出来的）
+
+```
+PACKAGE                            windows  linux    darwin
+./cmd/ai-terminal-pet              ok       FAIL     FAIL     ← 窗口层
+./cmd/pet-hook                     ok       ok       ok
+./cmd/pet-setup                    ok       ok       ok
+./cmd/pet-statusline               ok       ok       ok
+./internal/app                     ok       FAIL     FAIL     ← ui.New/Options/Placement
+./internal/autostart               ok       ok       ok
+./internal/config                  ok       ok       ok
+./internal/connect                 ok       ok       ok
+./internal/home                    ok       ok       ok
+./internal/i18n                    ok       ok       ok
+./internal/pipeserver              ok       ok       ok
+./internal/reporter                ok       ok       ok
+./internal/session                 ok       ok       ok
+./internal/store                   ok       ok       ok
+./internal/ui                      ok       ok       ok
+```
+
+Linux 的测试**真的跑起来了**（WSL2 Ubuntu 26.04 + go1.27.4，CGO_ENABLED=0）：
+`cmd/pet-hook`、`cmd/pet-setup`、`internal/{autostart,config,connect,home,i18n,pipeserver,
+reporter,session,store,ui}` 全部 ok。darwin/arm64 只做过 `go build` 与 `go vet`——
+**这台机器没有 Mac，darwin 的运行时行为一律是未验证**。
+
+### 57.2 九个提交，每一步都能独立验证
+
+| 提交 | 内容 | 关键点 |
+|---|---|---|
+| `a501a22` | 第 1–2 步：纯逻辑从 Windows 文件里切出来 | `attention_keys.go`（400 行策略）、`hang.go`+`awclock_*.go`、`canvas.go`（16 个绘制原语）、10 个文件去掉 `_windows` 后缀、`pipeserver/server.go`+`transport_*.go`、`connect` 的 `localpath_*.go` |
+| `f626078` | 第 3、5 步：数据目录与上报端 | 新包 `internal/home`（三平台布局，Windows 那行**一个字都没改**）；`send.go` 不再 import go-winio / x-sys-windows；重试策略按平台各一张表 |
+| `52935c5` | 第 7 步之一：自启 | Windows HKCU Run / LaunchAgent plist / XDG desktop entry，Manager 语义共用 |
+| `8299a5a` | 测试夹具修正 | 三个 auto-approve 测试之前会写进测试者真实的 `~/.local/share` |
+| `01a39b8` | 第 6–7 步：`internal/app` 生命周期 | `run.go` + `app.go` + `platform_*.go` + `flock_*.go` + `version.go`；`ErrNoWindowLayer`；新文档 `docs/PLATFORMS.md` |
+| `b6d5791` | `ControlAction`/`Control` 中性化 | posix 版回答 `false`，调用方于是回落并报 `ErrNoWindowLayer` |
+| `089b595` | 第 4 步：CI 门禁 | 两份清单（必须能编 / 必须编不了）双向检查 |
+| `dfda2e7` | 重新 vendor | 摘要必然变，`vendor:check` 先红后绿 |
+| `411ed3c` | 工具跟随 | `check_versions` 读 `version.go` |
+
+### 57.3 五个"看起来对、其实错"的地方（都修了）
+
+1. **`internal/home` 的第一版在 Windows 上给 LOCALAPPDATA 缺失加了 profile 回落**。两个
+   上报端测试立刻变红：`WaitForApprovalDecisionFailsClosedWithoutADirectory`（不可归档的
+   请求必须回答 deny）与 `SendSkipsTheSnapshotForAnInvalidPayload`（不可归档的负载不该发送）。
+   因为代码从此再也看不到"没有目录"这个状态。**规则改成显式的：Windows 上没
+   LOCALAPPDATA = 没有磁盘状态，不猜路径。**
+2. **测试只设 LOCALAPPDATA**：跨平台之后这就是错的，linux 会把快照写进测试者真实的主目录，
+   下一条断言便在临时目录里找不到它。现在每个包里都有**一个** helper，把四个变量一起指向
+   临时树。
+3. **unix 的 `retryableDialError` 起初只查 `fs.ErrPermission`**：实测 dial 一个 unix socket
+   的 EACCES 是通过 `*net.OpError` / `*os.SyscallError` 包起来的，`errors.Is` 才找得到。
+   现在同时比对 `syscall.EACCES`/`EPERM`，并有一条真 socket（chmod 000）的探针证明
+   `Send` 在 750 ms 预算里立刻返回。
+4. **`canvas` 的 buffer 必须是 DIB 的位**：GDI 把文字直接画进 DIB 内存，如果原语混进另一
+   块分配，字形就会落到别的地方。所以 `prepare` 返回 slice，而不是接收一个 slice 去填。
+5. **`scripts/cross-build.sh` 的 `cd "$(dirname "$0")/../.."` 多跳了一级**：以
+   `scripts/cross-build.sh` 调用时解析到仓库外，第一次跑就报"清单文件不存在"。
+
+### 57.4 刻意没有统一的东西
+
+- **`SessionAlive` 在 POSIX 上只是 signal-0 探针**，文件里写明了理由：§21、§43、§51、§52
+  的四次缺陷全部来自"证据比 Windows 少却沿用同一条规则"。一个平台可以用更少的信号，但不
+  能继承一条它没有证据支撑的规则。这条限制进了 `docs/PLATFORMS.md`，不只是注释。
+- **`canvas_posix.go` 不画字**：`drawText` 返回 false，`measureText` 是按字数的估算。它是
+  编译桩，名字里就写着它是缺的那一块；面板在 linux 上因此不存在，而不是画出一个没有文字的
+  假面板。
+- **`ErrNoWindowLayer`**：没有窗口层的构建会明确报错并指出去看 `docs/PLATFORMS.md`。
+  启动一个谁也看不见的窗口，与 §51 花整轮消灭的"浮窗就是不出现"无法区分。
+
+### 57.5 顺手修掉的三处文档/工具失准
+
+- `README.md` 的 "Known limits" 原来写"仅限 Windows"，现在写成三平台的能力表并指向
+  `docs/PLATFORMS.md`（中英各一处）。
+- `docs/PROTOCOL.md` 里指向 `server_windows.go` / `approve_windows.go` 的行号引用全部跟着
+  文件走（契约一个字没变）。
+- `tools/check_versions.mjs` 与 `scripts/package.ps1` 改读 `internal/app/version.go`；
+  `tools/check_versions.test.mjs` 里那条断言也随之更新（**那条测试在 CI 上红过一次**，
+  正是"断言写死了文件名"的典型）。
+
+### 57.6 门禁（全部实跑）
+
+```
+gofmt -l .                                  -> 空
+go vet ./...                                -> exit 0
+go test -count=1 ./...                      -> 14 个包全 ok（382 个 func Test）
+node tests/fresh-machine.mjs --no-overlay   -> PASS 172/172
+node tools/check_versions.mjs               -> 18 个形状一致；node --test 26/26
+python tools/check_docs_links.py            -> 12 份文档全部解析
+vendor.mjs --check / verify.mjs             -> 吻合 / VERIFY PASSED
+install.cmd -VerifyOnly                     -> 11 file(s) match，0 warning
+scripts/cross-build.sh（WSL 实跑）          -> 两个方向都通过
+CI run 43714564544 / 最新一次               -> success（含新增的跨平台门禁）
+```
+
+二进制：主程序 **4,655,616 B**（4.44 MiB，sha256 `b407e50a…`）、shim 3,669,504 B、
+hook 3,701,760 B。三个文件与 `vendor/`、本机安装目录逐字节相同。
+
+### 57.7 为什么 1.1.0 现在不发（诚实清单）
+
+发不了的不是流程，是**产品**：Windows 之外没有面板，而面板就是本产品。
+
+- **Linux 窗口层**（X11 客户端或 GTK）：没写。WSLg 里 X server 可以连（实测 X0 socket
+  存在、握手返回 X.Org vendor），但仓库目录里没有字体（只有 DejaVu，**没有中文字体**），
+  一个中文字幕的面板在这里会画成方块；`x/image` 可以拉到（proxy 通），但那意味着新的渲染
+  管线。这是一次独立施工，不是一次会话的收尾工作。
+- **macOS 窗口层**：无法在本机编译验证，更无法运行。写 1,500 行没人跑过的 ObjC/AppKit
+  代码进发布物，与"每条声明都要能当场验证"的规矩冲突。
+- **因此这一版收在这里**：内核、传输、数据目录、自启、上报端、`--doctor`、`--connect`、
+  CI 门禁全部跨平台并且**在这台机器上验证过**；剩下的窗口层是下一轮的第一件事，详见
+  `docs/PLATFORMS.md` 的"what is still missing"与 §55.4 ④。
+- 版本常量仍是 **1.0.9**、插件仍是 **1.2.18**，npm/Release 未动。`vendor/manifest.json`
+  已随源码重算，所以下一次发布**必须是新版本号**（浮窗走次版本号，插件随之换号）——
+  与 §56.10 记录的结论一致。
+
+### 57.8 下一轮从哪里开始
+
+1. **Linux 窗口层**：先做一次"能不能画"的最小验证（X11 CreateWindow + PutImage 推一张
+   512×512 的纯色位图到 WSLg，截图确认），再决定 X11 客户端 vs GTK。中文字体必须先装并
+   实测（WSL 镜像里没有）。
+2. 窗口层落地后，`internal/ui/canvas_posix.go` 的 `drawText` 换成真字形光栅，`control_posix.go`
+   换成真的进程间控制（unix socket 或 flock 文件），`uiAvailable()` 对 linux 返回 true，
+   `scripts/windows-only-packages.txt` 里那两行随之删掉——CI 会立刻要求这么做。
+3. macOS 需要一个能跑 `GOOS=darwin go test` 的机器或 CI runner，否则它只能停在"编译通过"。
 
 ## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
 

@@ -17,7 +17,7 @@
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,655,616 B**（4.44 MiB）`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,918,336 B** = 11.37 MiB |
-| 代码量 | Go 非测试源码 **61 文件 / 17,717 行**、测试 **59 文件 / 9,662 行**（**366** 个 `func Test`）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
+| 代码量 | Go 非测试源码 **95 文件 / 19,355 行**、测试 **68 文件 / 10,339 行**（**382** 个 `func Test`，§57 的跨平台施工把每平台的实现拆成了独立文件）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
 | 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
@@ -28,7 +28,7 @@
 | 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟（**可见的设置窗口算"仍在使用"**，见 `internal/ui/lifetime.go`）；扫描 5 s / 存活探测 10 s |
 | 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run`（开机自启）· `approvals\`（auto-approve 握手） |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--doctor/--version/--help` |
-| 单测 | **366 个 `func Test`**（ui 150 / app 42 / platform 28 / store 27 / reporter 23 / connect 21 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 8 / pipeserver 7 / i18n 3） |
+| 单测 | **382 个 `func Test`**（ui 150 / app 42 / platform 28 / store 27 / reporter 27 / connect 25 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 10 / pipeserver 7 / i18n 5 / home 4） |
 | 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tools/check_versions.mjs` 与它的规则测试 / `tests/fresh-machine.mjs --no-overlay`（172 \u9879）/ `python tools/check_docs_links.py` / `scripts/package.ps1` 打 zip 并上传 artifact |
 | 自检 | `ai-terminal-pet --doctor` **11 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置（见 §E6 与 HANDOVER §56） |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 打印要粘贴的片段并填好绝对路径，**只打印不写盘**；与 `--doctor` 的 `reporters` 项共用 `internal/connect` 的同一份读取逻辑 |
@@ -504,7 +504,7 @@ DeepSeek Harness 桥是现成的第三个接入样例（`integrations/deepseek-h
 管道命名算法、回执契约、脱敏规则写成规范；README 给出 5 行以内的接入示例（shell alias / Makefile / 编辑器 task）。
 **验收**：不读源码也能写出一个合规上报端。
 
-### E3 — 跨平台（macOS / Linux）⏳ 未开工，但已盘点（2026-11-15，见 HANDOVER §55）
+### E3 — 跨平台（macOS / Linux）⏳ 内核已迁（2026-11-15，§57），**窗口层未做** —— 因此 1.1.0 未发
 **动机**：目前 UI 层与平台层直接调 Win32，无法移植。核心逻辑（session/store/pipeserver 的协议部分）其实已平台无关。
 **盘点结果（2026-11-15 实测，17,238 行非测试 Go）**：
 
@@ -528,6 +528,29 @@ IPC 从命名管道换到 Unix domain socket，`PipePathForUser` 的 hash 算法
 七步顺序、每步验收、以及五个会踩的坑（清单字段的副作用、测试夹具自启动循环、目录来源被拆开、
 POSIX 上 `\\.\pipe\...` 是个合法文件名、`hang.log` 的时钟语义）写在
 [docs/HANDOVER.md](HANDOVER.md) **§55.6 / §55.7**。**不要在第 1 步之前动呈现层。**
+
+**施工结果（2026-11-15 深夜，§57）**：七步里的 **1–5 与第 7 步的前半**已完成，并且在这台机器上
+逐项验证过；第 6 步（呈现层）没做。实测矩阵（`GOOS=linux|darwin go build` + WSL 里真跑测试）：
+
+| | windows | linux | darwin |
+|---|---|---|---|
+| 13 个包（store/session/config/i18n/connect/home/reporter/pipeserver/autostart/ui + 三个 cmd） | ok | ok | ok |
+| `internal/app`、`cmd/ai-terminal-pet` | ok | 只差 `ui.New/Options/Placement` | 同左 |
+
+- **新包 `internal/home`**：数据目录的唯一答案（Windows 仍是 `%LOCALAPPDATA%\AI-Terminal-Pet`，
+  一个字都没改）。二十多个 Go 文件与 `reporters/protocol.js` 原本各自拼这条路径。
+- **传输层**：`pipeserver` 拆成 `server.go`（协议）+ `transport_<goos>.go`（唯一一句传输调用）；
+  reporter 的 `dial_<goos>.go` 同理。**按用户派生的 8 位 token 一个字没动**，容器从命名管道换成
+  `$XDG_RUNTIME_DIR/…sock`（104 字节上限在 listen 前检查）。
+- **自启**：Windows HKCU Run / macOS LaunchAgent / Linux XDG desktop entry，Manager 语义共用。
+- **CI 门禁**：`scripts/portable-packages.txt`（必须能编）与 `scripts/windows-only-packages.txt`
+  （必须编不了）双向检查，任何一边漂移都会红。
+- **窗口层**：未做。`internal/ui/canvas_posix.go` 是编译桩（有 buffer、不画字），
+  `internal/app` 用 `ErrNoWindowLayer` 明确拒绝在没有面板的平台启动。原因是产品事实：
+  没有面板就没有产品，而 Linux 的 X11 客户端或 GTK3+cgo、以及 macOS 的 AppKit，
+  都不是一次会话能写完并验证的东西（本机没有 Mac；WSL 镜像里连中文字体都没有）。
+  详见 [docs/PLATFORMS.md](PLATFORMS.md)。
+
 
 ### E6 — `--doctor` 自检 ✅ 已交付（2026-11-10，见 §1i）
 **动机**：本轮的排查花了大量时间在「进程活着但窗口不可见」这类无声故障上。
@@ -787,7 +810,7 @@ I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三�
 **β 已交付**（浮窗 1.0.0 / 插件 1.2.6，`pet-v1.0.0` 与 `dsh-plugin-v1.2.6` 双 Release，npm `latest` = 1.2.6），
 所以那条「正式发声排在 β 之后」的约束**已经满足**：现在可以发声，而且四个数字终于一致。
 **2026-11-12 又交付了 F9**（浮窗 1.0.1 / 插件 1.2.7），见下方 F9 小节。
-宣传素材里的每一个数字都必须是当场跑出来的（**366** 个 `func Test` / 172 项新机检查 / **4.36** MiB），
+宣传素材里的每一个数字都必须是当场跑出来的（**382** 个 `func Test` / 172 项新机检查 / **4.44** MiB），
 **不要写「全量安全扫描」**：`govulncheck` 与 `gosec` 从 2026-11-12 起已跑（见 §6），但 `go test -race`
 仍缺 gcc/cgo，所以「静态扫描 + 依赖漏洞扫描通过」可以说，「安全审计通过」不能说。
 
