@@ -337,55 +337,9 @@ func New(values *store.Store, options Options) *App {
 	}
 }
 
-// ControlAction identifies a command one process can send to the live
-// overlay. The second process is short lived: it finds the window by class
-// name and posts the message, then exits. PostMessage is asynchronous and
-// safe across threads, so a missing or busy window can never block it.
-type ControlAction int
-
-const (
-	// ControlActivate reveals the overlay (same path as a tray click).
-	ControlActivate ControlAction = iota
-	// ControlToggle flips compact/expanded.
-	ControlToggle
-	// ControlQuit asks the overlay to close and exit.
-	ControlQuit
-	// ControlReset drops the remembered geometry and re-anchors.
-	ControlReset
-	// ControlSettings opens the settings window. It is a separate action so a
-	// hotkey or a shortcut can reach it without going through the tray.
-	ControlSettings
-)
-
-// Control sends action to an already-running instance and reports whether one
-// was found. A missing window is a plain false, never an error: callers use it
-// to decide whether to fall back to starting a fresh instance.
-func Control(action ControlAction) bool {
-	name, err := syscall.UTF16FromString(windowClassName)
-	if err != nil {
-		return false
-	}
-	handle := win.FindWindow(&name[0], nil)
-	if handle == 0 {
-		return false
-	}
-	var message uint32
-	switch action {
-	case ControlActivate:
-		message = wmActivate
-	case ControlToggle:
-		message = wmToggle
-	case ControlQuit:
-		message = wmClose
-	case ControlReset:
-		message = wmReset
-	case ControlSettings:
-		message = wmSettings
-	default:
-		return false
-	}
-	return win.PostMessage(handle, message, 0, 0) != 0
-}
+// ControlAction, ControlActivate..ControlSettings and Control live in control.go and
+// control_windows.go: the action names are shared by the CLI, the tray and the
+// installer, and only the delivery is Win32 (handover §55.6 step 7).
 
 func (a *App) Refresh() {
 	a.postRefresh()
