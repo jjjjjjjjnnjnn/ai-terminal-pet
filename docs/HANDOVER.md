@@ -4365,7 +4365,13 @@ L5 的三步做法（目录 mtime 短路 → 只保留最近 N 个 → 解析下
 浮窗 **1.0.11** / 插件 **1.2.20**（改动碰了 `internal/ui`，vendor 源码摘要必须重算，所以必须发新版本号）。
 包体 **2,065,107 B / sha256 `6892C039…` / shasum `40f63b36…` / 19 文件**；三个二进制
 `AI-Terminal-Pet.exe` 4,702,208 B（`CDCA876B…`）、`pet-statusline.exe` 3,678,720 B（`563CF6FE…`）、
-`pet-hook.exe` 3,705,344 B（`737C46ED…`）。npm `latest` = 1.2.20，上游条目跟进 PR 待开。
+`pet-hook.exe` 3,705,344 B（`737C46ED…`）。npm `latest` = **1.2.20**（发布后 90 秒复查 `npm view dist-tags.latest` 得到 1.2.20）；
+上游条目跟进 PR [#15670](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15670)
+（分支 `bump-tarball-1.2.20`，commit `252ad60`，单文件 `+1 −1`，`MERGEABLE`）已开、
+`tools/upstream-entry.mjs --check` = OK（in flight）；合并仍要人工，**合并 ≠ 可见**。
+两个 tag（`pet-v1.0.11` / `dsh-plugin-v1.2.20`）已推；CI 四条 job 全绿（Run `43754035174`），
+其中 macOS 那次第一次是缓存解压撞车触发的 SIGSEGV（`gtar: Cannot open: File exists`），
+**重跑后绿**——不是代码问题，但下次遇到 macOS 只在 `go test` 就挂，先看缓存解压那几行。
 
 ### 61.9 下一轮从这里开始
 
