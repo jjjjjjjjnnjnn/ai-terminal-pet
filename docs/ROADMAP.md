@@ -13,7 +13,7 @@
 |---|---|
 | 平台 | Windows only（Win32 分层窗口 + 命名管道） |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.9`（`internal/app/app_windows.go:29` 的 `const Version`）；插件包 `1.2.18` |
+| 版本 | `1.0.9`（`internal/app/app_windows.go:44` 的 `const Version`）；插件包 `1.2.18` |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,556,288 B**（4.36 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,918,336 B** = 11.37 MiB |
@@ -503,12 +503,30 @@ DeepSeek Harness 桥是现成的第三个接入样例（`integrations/deepseek-h
 管道命名算法、回执契约、脱敏规则写成规范；README 给出 5 行以内的接入示例（shell alias / Makefile / 编辑器 task）。
 **验收**：不读源码也能写出一个合规上报端。
 
-### E3 — 跨平台（macOS / Linux）⏳ 未开工
+### E3 — 跨平台（macOS / Linux）⏳ 未开工，但已盘点（2026-11-15，见 HANDOVER §55）
 **动机**：目前 UI 层与平台层直接调 Win32，无法移植。核心逻辑（session/store/pipeserver 的协议部分）其实已平台无关。
+**盘点结果（2026-11-15 实测，17,238 行非测试 Go）**：
+
+| 档 | 判据 | 行数 | 占比 |
+|---|---|---|---|
+| portable | 不 import 平台包，纯 Go | **5,650** | 32.8% |
+| rename-only | 带 `_windows.go` 后缀但**一个 Win32 调用都没有**（只是被后缀挡住） | **3,887** | 22.5% |
+| needs-port | 真有 `win.` / `syscall.` / `unsafe.` | **7,701** | 44.7% |
+
+`internal/ui` 的 12 个 rename-only 文件（2,927 行）只调用 `canvas` 的图案原语，所以新平台只要实现
+那 16 个方法，`drawing_*.go` / `settings_text_windows.go` 一行都不用改。今天在
+`GOOS=darwin go build ./...` 上**只有 store / session / config / pet-setup 能过**；
+`i18n` 与 `ui` 的失败是"纯逻辑被放进了 Windows 文件"（`systemLocaleWindows`、`defaultIdleSeconds`），
+不是真的平台绑定——这就是第一步先做它们的理由。
+
 **做法**：把 `internal/ui` 的窗口实现抽成接口（`Presenter`），Win32 实现留在 `_windows.go`，
 新增 `_darwin.go` / `_linux.go`（macOS 用 NSWindow + NSVisualEffectView，Linux 用 GTK/Wayland layer-shell）。
-IPC 从命名管道换成 Unix domain socket，`PipePathForUser` 的 hash 算法保持不变以免破坏跨语言契约。
+IPC 从命名管道换到 Unix domain socket，`PipePathForUser` 的 hash 算法保持不变以免破坏跨语言契约
+（`docs/PROTOCOL.md` §3.1 要同时改，按 §11 的不兼容变更策略走）。
 **注意**：这是一次真正的架构改动，建议先做 E2（协议文档）再动，否则契约会跟着实现漂移。
+七步顺序、每步验收、以及五个会踩的坑（清单字段的副作用、测试夹具自启动循环、目录来源被拆开、
+POSIX 上 `\\.\pipe\...` 是个合法文件名、`hang.log` 的时钟语义）写在
+[docs/HANDOVER.md](HANDOVER.md) **§55.6 / §55.7**。**不要在第 1 步之前动呈现层。**
 
 ### E6 — `--doctor` 自检 ✅ 已交付（2026-11-10，见 §1i）
 **动机**：本轮的排查花了大量时间在「进程活着但窗口不可见」这类无声故障上。
@@ -787,6 +805,9 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 ## 5. 非目标
 
 - **不做终端复用器或日志查看器**：本项目的定位是「一眼可辨的状态指示」，不是替代终端。
+- **不做跨平台的"降级版"**：macOS / Linux 的版本要么把平台层真正换掉（进程、前台、闲置、窗口、
+  socket 全部有等价物），要么就不发。把存在性简化成"pid 活着"或把 `--doctor` 留空，
+  等于把 §21/§43/§51/§52 修掉的缺陷重新引入一遍——那种"看起来能跑"的移植是负资产。
 - **不做账号/云同步/遥测上报**：全部数据留在本机，`runtime/` 与 `state.json` 不离开 `%LOCALAPPDATA%`。
 - **不做外部推送网关**（Discord / Bark / Gotify / 飞书 / Server酱 / WxPusher / 自定义 Webhook）：提醒只在本机（气泡 + 合成音 + 面板标记）。README 与包清单都声明 `no-network`，那是这个项目唯一的一条强承诺；一次外部推送就要引入 HTTP 客户端、凭据文件、重试与失败记录，并把「不出网」这句话删掉。人不在电脑前时，缺的是回来的理由而不是推送通道——面板与未读标记会一直在。
 - **不引入 UI 框架**：零外部 UI 依赖是有意为之，它让二进制保持单文件、无运行时依赖。

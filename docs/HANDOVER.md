@@ -6,10 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-14 晚；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；§51 的两个现场缺陷已修复，见 §52；§53 统一了上报端，§54 修掉了 `hang.log` 的待机误报）
+## 1. 当前状态（2026-11-15 晚；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；§51 的两个现场缺陷已修复（§52），§53 统一了上报端，§54 修掉了 `hang.log` 的待机误报；**下一个会话做跨平台，先去读 §55 的盘点**）
 
-> 接手请先读本节、**§53「交接：上报端只剩一份实现」**（最新一轮；本机现在加载的是仓库里的
-> `reporters/opencode.js`，本地目录插件只是一次静态 re-export），再读
+> 接手请先读本节与 **§55「交接：下一步是 macOS / 其他系统 —— 先盘点，别先动手」**（最新一轮；
+> 只盘点、未改代码：可搬行数、今天 darwin 上编译到哪一步、五层要换什么、七步顺序与五个坑），
+> 再读 **§53「交接：上报端只剩一份实现」**（本机现在加载的是仓库里的 `reporters/opencode.js`，
+> 本地目录插件只是一次静态 re-export），再读
 > **§52「交接：两个现场缺陷已修 —— 归档即结束、设置窗口不再跟着自毁」**（1.0.8 / 1.2.17 的代码与验收）、
 > **§51「交接：两个现场缺陷」**（只取证的那一轮）、
 > **§50「中文 README 与市场文案」**、
@@ -34,7 +36,7 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.9`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.18`**。
+- **版本**：浮窗 **`1.0.9`**（`internal/app/app_windows.go:44` 的 `const Version`），插件包 **`1.2.18`**。
   两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7`/`v1.0.8`/`v1.0.9` 与
   `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`/`v1.2.17`/`v1.2.18`。
   **`pet-v1.0.7` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）；**`dsh-plugin-v1.2.15` 是第 48 轮打的**
@@ -3730,6 +3732,218 @@ mutex 会挡住第二个实例，所以这个互相拉起平时不发作——�
    下次真出"未响应"时，用它的时间戳去对动作，而不是再改绘制（§53.6 已排除绘制）。
 2. Antigravity 若真报"关掉还留着"：装 hook（`terminationReason`），不要改 statusline 的映射（§53.5）。
 3. 面板与 `--json` 的去重规则：别为了"统一"改掉（§51.4、§52.5）。
+
+## 55. 交接：下一步是 macOS / 其他系统 —— 先盘点，别先动手（2026-11-15 晚，第 55 轮；只盘点，**没有改代码、没有发版**）
+
+下一位要做的是一次**架构改动**（[ROADMAP §2 E3](ROADMAP.md)）。这一轮什么都没改，只把"要搬的东西到底有多大、
+哪一块已经天然可移植、哪一块必须先决定"量出来，并且**每条都跑过**，不是读代码猜的。
+
+### 55.1 起点（实测，别凭记忆）
+
+| 项 | 值 |
+|---|---|
+| 当前提交 | `78c6981`（`git log --oneline -3` 复核） |
+| 版本 | 浮窗 **1.0.9** / 插件包 **1.2.18**，npm `latest` = 1.2.18 |
+| 分支状态 | 工作区干净；CI 三次连绿（`43692026500`、`43691668564`、`43692383065`） |
+| 上游条目 | **1.2.17 的 #15378 已 MERGED**；1.2.18 的 [#15482](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15482) 在飞、`MERGEABLE` |
+| 平台 | **Windows only**。`GOFLAGS=-mod=readonly`，`go 1.23.0` 是下限（本机 go1.27.0） |
+
+三条与这一轮直接相关的现状：
+
+1. `internal/autostart`、`internal/pipeserver`、`internal/platform`、`internal/app` **整个包都是
+   `_windows.go`**——交叉编译时 go 会直接说 `build constraints exclude all Go files`，不是"有错"。
+2. 两个 `verify.mjs` 与 `docs/market-index.json` 都断言过 `platforms`/`engines`；
+   `dsh.bundle.platforms: ["win32"]` 写死在**两个清单**里，而
+   [§49](HANDOVER.md) 记过：**dsh-plugin.org 正是按这个字段把它标成 Windows-only 的**。
+   这个字段是有外部效果的，不是注释。
+3. 上一轮（§54.4）刚踩过一次"测试夹具自己是被测对象"的坑；跨平台这件事会制造同一类坑
+   （见 §55.7）。
+
+### 55.2 代码盘点：17,238 行非测试 Go 里，多少能直接搬
+
+用这三档给每个非测试文件分类（判据：有没有 `win.` / `lxn/win` / `syscall.` / `unsafe.`）：
+
+| 档 | 含义 | 行数 | 文件 |
+|---|---|---|---|
+| **portable** | 已经是纯 Go，不 import 平台包 | **5,650 行（32.8%）** | 26 个（cmd 5 / reporter 7 / store 2 / session 2 / config 1 / i18n 1 / ui 8） |
+| **rename-only** | 带 `_windows.go` 后缀，但一个 Win32 调用都没有：纯粹被后缀挡住 | **3,887 行（22.5%）** | 14 个（app 1 / platform 1 / ui 12） |
+| **needs-port** | 真的有 Win32 / syscall / unsafe | **7,701 行（44.7%）** | 12 个（ui 7 / platform 3 / app 1 / autostart 1；pipeserver 另计，见下） |
+
+按包看（`needs-port` / `rename-only` / `portable`，单位行）：
+
+```
+internal/ui           6,047 / 2,927 /   753     (19 个 _windows.go + 8 个纯 Go)
+internal/app            606 /   687 /     0     (app_windows.go 与 doctor_windows.go)
+internal/platform       590 /   273 /     0     (attend/focus/presence 三个 Win32 文件)
+internal/pipeserver     187（传输一层）/  0 /     0       ← 见 §55.4，它只差"换传输"
+internal/autostart      271 /     0 /     0     (整个包都在注册表里)
+internal/reporter         0 /     0 / 1,418     (7 个文件，只有 send.go 里 3 处 Windows)
+internal/store            0 /     0 /   850
+internal/session          0 /     0 /   325
+internal/config           0 /     0 /   569
+internal/i18n             0 /     0 /   661     ← 但见 §55.3，它有一个 Win32 调用
+reporters/*.js            0 /     0 /   —       （Node 侧，见 §55.4）
+```
+
+**`internal/ui` 那 12 个 "rename-only" 文件是最值钱的一笔**：`drawing_windows.go`（360）、
+`drawing_compact_windows.go`（783）、`focus_windows.go`（332）、`settings_text_windows.go`（208）、
+`mute_windows.go`（242）、`receipt_windows.go`（162）、`copy_toast_windows.go`（170）、
+`rows_windows.go`（71）、`pulse_windows.go`（50）、`tap_windows.go`（72）、`attention_windows.go`（129）、
+`approve_windows.go`（348）。它们只调用 `canvas` 的图案原语（见 §55.5），所以**只要新平台提供同样
+那 16 个方法，这 2,927 行一行都不用改**。
+
+### 55.3 今天在 darwin 上到底能编译到哪一步（实测）
+
+```powershell
+$env:GOOS='darwin'; $env:GOARCH='arm64'; go build ./...
+```
+
+结果（原样，值得记住——`build constraints exclude all Go files` 与"编译错误"是两种不同的失败）：
+
+| 包 | darwin 结果 |
+|---|---|
+| `internal/store` / `internal/session` / `internal/config` | **OK，并 `go vet` 也通过** |
+| `cmd/pet-setup` | **OK**（它嵌的是 Windows 载荷，但代码本身平台无关） |
+| `internal/i18n` | **FAIL**：`undefined: syscall.NewLazyDLL`（`i18n.go:84`）、`undefined: syscall.UTF16ToString`（`:104`）——`SystemLocale()` 是纯逻辑，`systemLocaleWindows()` 却写在了同一个文件里 |
+| `internal/ui` | **FAIL**：`undefined: defaultIdleSeconds`（`attention.go:72`）——它定义在 `app_windows.go:31`，而这个函数是**纯策略** |
+| `internal/platform` / `pipeserver` / `autostart` / `app` | **FAIL**：`build constraints exclude all Go files` |
+| `internal/reporter` | **FAIL**：`imports golang.org/x/sys/windows`（`send.go:18`，另有 `winio` 与 `syscall.SysProcAttr`，全在同一个文件里） |
+| `cmd/ai-terminal-pet` / `pet-statusline` / `pet-hook` | **FAIL**：传递依赖上面几个 |
+
+**测试的可搬比例**：`341` 个 `func Test` 里，**177 个在 `_windows_test.go`**、
+**164 个在普通测试文件**；而这 164 个里今天能跑起来的只有 **71 个**
+（store 27 + session 11 + config 22 + pet-setup 11）。另外 93 个（app 19 / reporter 23 / ui 35 /
+pet-hook 13 / i18n 3）**属于纯逻辑、只是所在包今天在 darwin 上编译不了**——也就是说
+"能搬的测试比能跑的编译单元多"，这正是 §55.8 第一步要拿到的收益。
+
+### 55.4 五层要换的东西（每层都写清"现在依赖什么 / 换成什么 / 风险"）
+
+**① 传输：命名管道 → Unix domain socket**
+
+- Go 侧只有一处真正的 Win32：`internal/pipeserver/server_windows.go:67` 的
+  `winio.ListenPipe(path, &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GRGW;;;OW)(A;;GRGW;;;SY)", ...})`。
+  其余 187 行（读一行 JSON、5 s 读超时、精确回 `OK`、最多 32 条并发）**与传输无关**。
+- Node 侧更简单：`reporters/protocol.js` 的 `sendOnce` 用的是
+  `net.createConnection({ path: pipePath })`，**同一个 API 在 POSIX 上连接的就是 Unix socket**；
+  要改的只有 `PIPE_BASE_PATH`（`:9` 的 `\\.\pipe\ai-terminal-pet-v1`）这一个常量。
+- Go 侧的 `internal/reporter/send.go` 有 3 处（`winio.DialPipe`、`windows.ERROR_PIPE_BUSY`、
+  `syscall.SysProcAttr{HideWindow, DETACHED_PROCESS}`），都在同一个文件里。
+- **风险**：macOS 的 socket 路径上限是 **104 字符**，而管道名是
+  `\\.\pipe\ai-terminal-pet-v1-<8hex>`（不含 home 的绝对路径），所以换成
+  `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` 是够的——但**不要**把它塞进 home 哈希路径里。
+- **不能动的是哈希**：`PipePathForUser()` 与 `pipeScopeToken()` 都是
+  `sha256(lower(home) 去尾部分隔符) 前 4 字节（8 hex）`。这一步是跨语言契约，
+  由 `TestPipePathForUserMatchesReporterAlgorithm` 钉着（`USERPROFILE=C:\Users\Pet-Test\` → `sha256("c:\users\pet-test")`）。
+  **容器可以换，哈希不能换**；但 `docs/PROTOCOL.md` §3.1 现在的标题是"管道名算法"、
+  正文写的是 Win32 路径，所以这次改动必须同时改 PROTOCOL.md，并按 §11 的不兼容变更策略走一遍
+  （第三方实现需要知道"同一台机器是哪个平台"）。
+
+**② 数据目录：`%LOCALAPPDATA%` → 平台目录**
+
+- `23` 个 Go 文件读 `LOCALAPPDATA`（`internal/app` 是唯一决定目录的地方，`:73-78`），
+  `protocol.js` 有 5 处（`runtime/`、`config.json`、`approvals/` 与可执行文件路径）。
+- 建议一个 `config.DataDirectory()`（darwin: `os.UserConfigDir()` 即 `~/Library/Application Support`，
+  linux: `$XDG_DATA_HOME`），**Go 与 Node 两侧都调它**，不要各自拼字符串——
+  现在就是两边各拼一遍，`runtime/` 的契约靠 §2 的文档与测试对齐。
+- **`--json` 的契约写了"只读快照、不连 GUI"**（§52 之后仍成立），它读的就是这个目录。
+
+**③ 存在性 / 前台 / 客户输入：`internal/platform`（863 行 Win32）**
+
+这一层是**最难也最容易做错**的一块，因为它是 §21/§43/§51/§52 全部教训的载体：
+
+| 现在用什么 | 干什么 | darwin 的等价物 | 风险 |
+|---|---|---|---|
+| `CreateToolhelp32Snapshot` + Process32First/Next | 进程表（`ProcessAlive`） | `syscall.Kill(pid, 0)` 或 `ps -o`；Go 没有内置枚举 | 低 |
+| `EnumWindows` + `GetWindowTextW` | "这个会话的终端窗口还在吗" | Accessibility（`AXUIElement`，**需要用户在系统设置里授权**）或退化到"只看 pid" | **高**：这是产品级取舍——没有授权就没有窗口标题证据 |
+| `GetForegroundWindow` / 焦点归属 | 跳转与"你在看哪个会话" | `NSWorkspace.frontmostApplication`（可以，但窗口级要 Accessibility） | 中 |
+| `GetLastInputInfo` | 你走开了多久（提醒层） | `CGEventSource.secondsSinceLastEventType`，或 `ioreg -c IOHIDSystem` 的 `HIDIdleTime` | 中 |
+
+**不要**为了让 macOS 编译通过就把 `SessionAlive` 简化成"pid 活着"：§51/§52 的两条缺陷正是
+"按进程判定存在性"造成的。反过来说，这一层如果必须退化，**要把它写进 README 的 Known limits 与
+`--doctor`**，而不是悄悄少一条证据。
+
+**④ 呈现层 `internal/ui`（6,047 行真 Win32）**
+
+- `canvas_windows.go`（462 行）是 GDI 光栅化：16 个方法（`clear` / `fillRect` / `fillRounded` /
+  `outlineRounded` / `fillEllipse` / `line` / `text` / `measure` / `fitText` / `hitMapInto` /
+  `setAlphaScale` / `insideRounded` / `blend` / `normalizeText` / `close` / `scaledAlpha`）。
+  **两个绘制文件只用到其中 9 个**（`clear/fillRect/fillRounded/outlineRounded/fillEllipse/line/text/measure/fitText`），
+  外加 `setAlphaScale` 与 `hitMapInto`。所以新平台的 `canvas` 只要实现这套签名，
+  `drawing_*.go` 与 `settings_text_windows.go` 不改。
+- `app_windows.go`（2,549 行）是窗口 + 消息泵 + 托盘 + 拖拽 + 贴边 + DPI + 跳转。macOS 版本是
+  `NSWindow`（无边框、透明、`NSWindowLevel`）+ `NSStatusItem`；**关键约束不变**：
+  分层窗口没有子控件，命中测试必须与绘制同源（§F8 的教训）。
+- `settings_windows.go`（2,222 行）+ `settingsTypeRamps`：**字号梯子是在 GDI 上量出来的**
+  （§44 的表格：GDI 把 11/12/13 px 都吸附成 8 px em）。Core Text 的吸附规则不同，
+  三张表需要**在新的渲染器上重新量**，`TestSettingsTypeRampStaysOrdered` 的判据（4 个 DPI 下量宽度、层级不塌）
+  仍然适用，但期望值要重取。别把 GDI 的数直接抄过去。
+- `sound_windows.go`：`PlaySoundW` 播内存里的 WAV（winmm）。darwin 用 `NSSound` / `AudioToolbox`，
+  或 `afplay`（但 `afplay` 是另一个进程，会引入 §L1 的进程创建税）。
+- `hang.go`（上一轮刚换的时钟）：`QueryUnbiasedInterruptTime`。**darwin 要重新回答"清醒时间"
+  这个问题**——`mach_absolute_time` 与 `mach_continuous_time` 的区别正是 §54 那张表要的东西，
+  但**先测再选**，不要抄结论。
+- **cgo 是这一层绕不开的决定**：AppKit 无法用纯 Go 调用。三条候选各有代价，下一个会话要先拍板：
+  ① 少量 `.m` + cgo（编译期依赖，运行时仍是系统框架，不违反 AGENTS 第 3 条的"零外部运行时 DLL"精神，但"单文件静态编译"这句话就变了）；
+  ② 外部 helper 进程（保住纯 Go，但每次绘制的 IPC 成本与生命期管理都是新问题）；
+  ③ 纯 Go 软件光栅只用于"面板看不见的预览/测试"，真窗口仍需要 ①。
+
+**⑤ 外围：自启、安装、自检、CI**
+
+- `internal/autostart`（271 行，HKCU `Run`）→ macOS `~/Library/LaunchAgents/*.plist`。
+- `cmd/pet-setup`（421 行，嵌 Windows 载荷 + 跑 `install.ps1`）→ macOS 需要 `.app` bundle 或 tar + `install.sh`；
+  它现在"能编 darwin"只是因为 Go 代码本身无关平台，**里面的载荷是 Windows 的**。
+- `internal/app/doctor_windows.go`（606 行、10 项）→ 需要一个 darwin 版本，否则 `--doctor` 在新平台上是空的。
+  注意它**故意不碰互斥体**（§E6），darwin 侧同样不要用"锁文件存在"当实例证据。
+- CI 只有两个 `windows-latest` job。**最便宜的第一道跨平台门禁**是
+  `GOOS=darwin GOARCH=arm64 go build ./...`（不需要 mac runner、不需要 cgo）。等测试也能跑时，
+  再决定要不要加 `macos-latest`（它会真的花 minutes）。
+
+### 55.5 一条必须守住的设计边界
+
+`internal/session`、`internal/store`、`internal/config`、`internal/reporter`（除 `send.go` 的 3 处）
+**今天就是平台无关的，并且这些包承载的是协议契约**。搬平台时**不要**顺手"为 macOS 优化"
+它们——`session.ParsePayload`、`store.Reconcile` 的 2 分钟宽限、`reporter` 的脱敏与幂等
+是 §21–§54 的结论，跨平台不需要也不应该改。任何改动都要先说明"为什么这条规则与平台有关"。
+
+### 55.6 提交顺序（按这个顺序，每一小步都能验证）
+
+| 步 | 做什么 | 验收 |
+|---|---|---|
+| **1** | 把 `defaultIdleSeconds` 与 `systemLocaleWindows` 挪出 Windows 文件（`attention.go` 现在依赖 `app_windows.go` 的常量；`i18n` 的 Win32 调用占着 `SystemLocale()` 的位置） | `GOOS=darwin go build ./internal/i18n ./internal/ui` 有进展；Windows 全套不变（`go test ./...` 仍 341） |
+| **2** | 把 12 个 rename-only 文件去掉 `_windows` 后缀 | `GOOS=darwin go vet ./internal/ui` 只剩真 Win32 文件报错；Windows 构建与测试逐字节等价（除了 build 依赖） |
+| **3** | `config.DataDirectory()` + `protocol.js` 同步（Go/Node 都调它） | 现有 `runtime/` 契约测试仍在 Windows 上过；加一条"目录来自同一个函数"的测试 |
+| **4** | CI 加 `GOOS=darwin go build ./...` 门禁（此时仍有包不通过，所以先只对已通过的包列表） | CI 绿；一旦有人往纯 Go 包里塞 `syscall` 就会红 |
+| **5** | 传输层：`pipeserver` 抽一个 `Listener` 接口，`_windows` = winio、`_darwin` = `net.Listen("unix")`；`reporter/send.go` 的 3 处同样处理 | `PROTOCOL.md` §3.1 同步；哈希 golden 测试仍过；两侧（Go/JS）在 macOS 上互连实测 |
+| **6** | 呈现层：`canvas` 的 16 个方法 + 窗口/托盘/DPI 的 darwin 实现（先拍板 cgo 形状） | `PET_PREVIEW_DIR` 渲染出 PNG（§视觉验证那条命令在 darwin 上也要能跑） |
+| **7** | `platform`（存在性/前台/闲置）+ `--doctor` + 自启 + 安装 | §51/§52 的行为矩阵在新平台重跑一遍（归档、关窗、自毁） |
+
+**不要在第 1 步之前动呈现层。** 第 1、2 步是纯机械的，而且它们会把"能跑测试的包"从 4 个变成
+更多——那才是继续往下搬的支点。
+
+### 55.7 这次会冒出来的坑（按 §54.4 那一类记）
+
+1. **清单字段的副作用**：`platforms: ["win32"]` 出现在**两个**清单里，`verify.mjs` 断言它们一致，
+   而 dsh-plugin.org 用它给仓库贴 Windows-only。要加 darwin 就必须**同一次提交**里改两处，
+   并且**需要一个新版本号**（已发布资产不可变）——这与"改代码才换版本"是两条独立的规则。
+2. **测试夹具的自启动循环**：§54.4 刚修了一个（stub 是上报端、于是拉起自己）。
+   跨平台会引入同样形状的东西：macOS 上 `AI_TERMINAL_PET_EXE` 指向 `.app` 里还是外面、
+   `open` 与直接 spawn 的生命期不同，**会造出"一个测试留下 N 个进程"**。判据与 §54.4 修完后一样：
+   `Get-Process`/`pgrep` 计数为 0，而不是"看起来跑完了"。
+3. **`LOCALAPPDATA` 是唯一目录来源这件事会被拆开**。现在 `internal/app` 一处决定目录，Node 侧另拼一遍。
+   第 3 步如果只改一侧，`--json` 会读空、`--doctor` 会报 runtime 为空，而错误信息会指向"没有会话"。
+   判据：`--json` 的 `generatedAt` 与 `runtime/` 的文件时间在同一侧。
+4. **管道名的"看起来一样"陷阱**：`\\.\pipe\...` 在 POSIX 上是一个合法文件名（会创建出奇怪的相对路径），
+   不会报错。所以传输层换掉之后，**旧常量必须删掉而不是留着当默认值**。
+5. **`hang.log` 的时钟语义**（§54）：新平台如果直接 `time.Since`，§54 的误报会**原样复现**。
+   先量两个时钟的差再选。
+
+### 55.8 这一轮没做的事（诚实清单）
+
+- **没有改任何代码、没有发版**：工作区只多了这一节与 ROADMAP 的 E3 盘点表。浮窗仍是 1.0.9、
+  插件包仍是 1.2.18、三个 Release 资产字节未动。
+- 没有试过真机 macOS（本机只有 Windows），所以 §55.4 的"darwin 等价物"全部标成**候选**而不是结论；
+  凡是标了"先测再选"的地方，下一个会话**必须量**。
+- 没有决定 cgo 的三种形状（§55.4 ④）；那是要用户拍板的产品/工程取舍，不是能用测试决定的事。
 
 ## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
 

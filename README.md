@@ -333,7 +333,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 ### Known limits
 
-- **Windows only**: The overlay relies directly on Win32 layered windows and Windows named pipes; macOS and Linux are not supported.
+- **Windows only**: The overlay relies directly on Win32 layered windows and Windows named pipes; macOS and Linux are not supported. A port is being inventoried, not announced: the exact size of the work is in [docs/HANDOVER.md](docs/HANDOVER.md) §55, and the seven-step order is in [docs/ROADMAP.md](docs/ROADMAP.md) §2 E3.
 
 - **Process creation overhead**: Antivirus scanning hooks can make each Node.js process launch take roughly 1s; using the native `pet-hook.exe` / `pet-statusline.exe` binaries or adding an AV exclusion for the install folder reduces this latency. The delay comes from process scanning rather than application code.
 
@@ -355,7 +355,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 - **Standalone installer**: a *signed* `pet-setup.exe` / `.msi`. The unsigned single-file installer already ships (`pet-setup.exe`, built from `cmd/pet-setup`); what is missing is the certificate, and MSI packaging for enterprise distribution.
 
-- **Cross-platform support**: Extracting the UI layer behind a presenter interface with Unix domain socket transport for macOS and Linux (not started).
+- **Cross-platform support**: Extracting the UI layer behind a presenter interface with Unix domain socket transport for macOS and Linux. Inventoried, not started: 5,650 of the 17,238 non-test Go lines are already portable and another 3,887 only carry a `_windows` suffix, so the first two steps are mechanical - the exact split, the five platform layers that really need replacing, and the seven-step order are in [docs/HANDOVER.md](docs/HANDOVER.md) §55.
 
 - **Binary size reduction**: Bring the main executable under 2.5 MiB (currently 4.36 MiB) by stripping reflection metadata and dropping unused packages, and replace the regexp-based redaction in pet-statusline with a hand-written scanner.
 
@@ -742,7 +742,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 ### 已知限制
 
-- **仅限 Windows**：仅基于 Win32 分层窗口与 Windows 命名管道构建，不支持 macOS 或 Linux。
+- **仅限 Windows**：仅基于 Win32 分层窗口与 Windows 命名管道构建，不支持 macOS 或 Linux。跨平台**只在盘点阶段**，没有承诺：工作量与七步顺序见 [docs/HANDOVER.md](docs/HANDOVER.md) §55 与 [docs/ROADMAP.md](docs/ROADMAP.md) §2 E3。
 - **杀毒软件增加进程启动开销**：在部分开启杀毒软件钩子的机器上，频繁启动 Node 进程会导致可感知的延迟；建议改用原生 `pet-hook.exe` / `pet-statusline.exe`，并为安装目录配置杀毒排除项。
 - **低完整性工作目录**：若整棵目录树带 Low 强制完整性标签，其中的可执行文件继承该标签，而 Low 完整性进程打不开浮窗的命名管道（浮窗跑在 Medium）。在这种目录里直接用 `bin\` 下的二进制测试会静默投递不到，请先复制到安装目录或 `%TEMP%` 再跑；安装后的副本不受影响。
 - **还没有代码签名**：不使用 DeepSeek Harness 的 Windows 用户现在有**两个**成品包可下——自解压的 `pet-setup.exe` 与便携 zip，都由 `scripts/package.ps1` 打出、随 GitHub Release 发布——但既没有 `.msi` 也没有代码签名。首次运行会撞 SmartScreen 的「未知发布者」提示；在签名到位之前，每个包里那份逐文件 `SHA256SUMS.txt` 才是诚实的来源证明。签名过的单文件安装包在路线图上。

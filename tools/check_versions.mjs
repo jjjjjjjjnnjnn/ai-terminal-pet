@@ -162,7 +162,7 @@ export const CLAIMS = [
   {
     id: 'roadmap baseline row',
     file: 'docs/ROADMAP.md',
-    pattern: /\| 版本 \| `(\d+\.\d+\.\d+)`（`internal\/app\/app_windows\.go:29` 的 `const Version`）；插件包 `(\d+\.\d+\.\d+)` \|/g,
+    pattern: /\| 版本 \| `(\d+\.\d+\.\d+)`（`internal\/app\/app_windows\.go:44` 的 `const Version`）；插件包 `(\d+\.\d+\.\d+)` \|/g,
     expect: ['overlay', 'plugin'],
     count: 1
   },
@@ -176,7 +176,7 @@ export const CLAIMS = [
   {
     id: 'handover version bullet',
     file: 'docs/HANDOVER.md',
-    pattern: /浮窗 \*\*`(\d+\.\d+\.\d+)`\*\*（`internal\/app\/app_windows\.go:29` 的 `const Version`），插件包 \*\*`(\d+\.\d+\.\d+)`\*\*/g,
+    pattern: /浮窗 \*\*`(\d+\.\d+\.\d+)`\*\*（`internal\/app\/app_windows\.go:44` 的 `const Version`），插件包 \*\*`(\d+\.\d+\.\d+)`\*\*/g,
     expect: ['overlay', 'plugin'],
     count: 1
   },
