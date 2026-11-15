@@ -5,4 +5,4 @@ package app
 // release checklist that bumps it; tools/check_versions.mjs parses this file.
 //
 // This file has no build tag: a platform without a window layer still has a version.
-const Version = "1.0.9"
+const Version = "1.0.10"

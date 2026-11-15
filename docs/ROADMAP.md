@@ -1,39 +1,39 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 **2026-11-13（浮窗 1.0.7 / 插件 1.2.14 已发版）**（上一版快照为 2026-11-10 的 v0.9.0 与未发版增量）。本文分四块：现状基线、
+> 快照时间 **2026-11-15（浮窗 1.0.10 / 插件 1.2.19 已发版）**（上一版快照为 2026-11-13 的 v1.0.7）。本文分四块：现状基线、
 > 已交付批次、扩展计划、轻量化计划，以及一组实用功能候选与非目标。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
 >
-> 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§27；按版本发布的变更摘要在
+> 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§27 与 §35–§60；按版本发布的变更摘要在
 > [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-14，浮窗 1.0.8 / 插件 1.2.17 已发布） |
+| 维度 | 数值（2026-11-15，浮窗 1.0.10 / 插件 1.2.19 已发布） |
 |---|---|
-| 平台 | Windows only（Win32 分层窗口 + 命名管道） |
+| 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.9`（`internal/app/app_windows.go:44` 的 `const Version`）；插件包 `1.2.18` |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,655,616 B**（4.44 MiB）`-trimpath -buildvcs=false -ldflags "-s -w"`） |
-| 状态行 shim | `bin/pet-statusline.exe` **3,664,896 B**（3.50 MiB） |
-| 原生 hook | `bin/pet-hook.exe` **3,697,152 B**（3.53 MiB）；三个二进制合计 **11,918,336 B** = 11.37 MiB |
-| 代码量 | Go 非测试源码 **95 文件 / 19,355 行**、测试 **68 文件 / 10,339 行**（**382** 个 `func Test`，§57 的跨平台施工把每平台的实现拆成了独立文件）；JS **14 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本，数两遍会重复 570 行） |
-| 第三方依赖 | 3 个，均为库引用、无 vendor：go-winio v0.6.2(MIT) / lxn/win(BSD) / x/sys v0.10.0(BSD) |
-| 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（2026-09-26 实测，v0.9.0 **未复测**） |
-| 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行（常量仍单源于 `internal/ui/drawing_compact_windows.go:23-35`） |
-| 设置窗口 | 第二个顶层窗口类 `AITerminalPetSettings`，四页签 general/sound/sessions/look，高度按内容自适应、屏幕放不下时按字号降档（第 44 轮）；字号可设小/标准/大 |
+| 版本 | `1.0.10`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.19` |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,702,208 B**（4.48 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 状态行 shim | `bin/pet-statusline.exe` **3,675,136 B**（3.50 MiB） |
+| 原生 hook | `bin/pet-hook.exe` **3,701,760 B**（3.53 MiB）；三个 Windows 二进制合计 **12,079,104 B** = 11.52 MiB |
+| 代码量 | Go 非测试源码 **131 文件 / 26,138 行**、测试 **77 文件 / 11,894 行**（**409** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本） |
+| 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
+| 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |
+| 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
+| 设置窗口 | Windows：第二个顶层窗口类 `AITerminalPetSettings`（四页签 general/sound/sessions/look）；Linux/macOS：直接编辑 `config.json`（详情见 [docs/PLATFORMS.md](PLATFORMS.md)） |
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
-| 管道 | `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>`（按用户隔离，跨语言 golden 测试锁定） |
-| 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline.exe` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
-| 生命周期 | 按需拉起（reporter 发现管道不存在就拉起）；会话**存在性由 OS 观测**（进程表 + 终端窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟（**可见的设置窗口算"仍在使用"**，见 `internal/ui/lifetime.go`）；扫描 5 s / 存活探测 10 s |
-| 持久化 | `state.json`（位置/缩放/展开）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run`（开机自启）· `approvals\`（auto-approve 握手） |
-| 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--doctor/--version/--help` |
-| 单测 | **382 个 `func Test`**（ui 150 / app 42 / platform 28 / store 27 / reporter 27 / connect 25 / config 22 / cmd-pet-hook 13 / cmd-pet-setup 11 / session 11 / autostart 10 / pipeserver 7 / i18n 5 / home 4） |
-| 持续集成 | `.github/workflows/ci.yml`：`windows-latest` 上跑 `gofmt -l` / `go vet` / `go test -count=1` / 三个 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建 / 逐文件 `node --check` / `node integrations/deepseek-harness/verify.mjs` / 插件包 `vendor.mjs --check` 与 `verify.mjs` / `tools/check_versions.mjs` 与它的规则测试 / `tests/fresh-machine.mjs --no-overlay`（172 \u9879）/ `python tools/check_docs_links.py` / `scripts/package.ps1` 打 zip 并上传 artifact |
-| 自检 | `ai-terminal-pet --doctor` **11 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置（见 §E6 与 HANDOVER §56） |
-| 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 打印要粘贴的片段并填好绝对路径，**只打印不写盘**；与 `--doctor` 的 `reporters` 项共用 `internal/connect` 的同一份读取逻辑 |
+| 本地端点 | Windows `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>` · Linux `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` · macOS `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` |
+| 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline` / `pet-hook` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
+| 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标 |
+| 持久化 | `state.json`（位置/缩放/展开/`layouts`）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run` / `LaunchAgent` / XDG `.desktop`（开机自启）· `approvals/` |
+| 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--connect[=HOST]/--doctor/--version/--help` |
+| 单测与门禁 | **409 个 `func Test`** across all packages（Windows + Linux + macOS 全量通过） |
+| 持续集成 | `.github/workflows/ci.yml`：四条并行 Job — `windows-latest`（全套单测/构建/打包/fresh-machine/版本链接检查）、`ubuntu-latest`（`cross-build.sh` / `go test` / Linux 二进制 / `install.sh` + tar 校验）、`macos-latest`（`go vet` / `go test` / Darwin 二进制 / `install.sh` + hook 冒烟）、`scan`（`govulncheck` + `gosec`） |
+| 自检 | `ai-terminal-pet --doctor` **11 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
+| 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘** |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.17**，19 个文件含 vendor 与 `vendor/manifest.json`）；release tag `dsh-plugin-v1.2.17`，资产字节与 sha256 见 CHANGELOG 的 `[1.0.8]` 一节，npm 包与 Release 资产**解包后逐文件相同**（npm 会重打包，`.tgz` 字节本就不同）；`engines.dsh >=0.2.0-0 <0.3.0-0` 是在真实 0.2.0-rc.1 与 0.2.2-rc.3 宿主上装过并 `--dump-config` 验过的 |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.19**，19 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.19`，Windows bundle） |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
 

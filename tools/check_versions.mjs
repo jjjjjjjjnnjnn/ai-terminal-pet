@@ -97,6 +97,20 @@ export const CLAIMS = [
     count: 2
   },
   {
+    id: 'readme linux amd64 tarball name (en + zh)',
+    file: 'README.md',
+    pattern: /ai-terminal-pet-(\d+\.\d+\.\d+)-linux-amd64\.tar\.gz/g,
+    expect: ['overlay'],
+    count: 2
+  },
+  {
+    id: 'readme darwin arm64 tarball name (en + zh)',
+    file: 'README.md',
+    pattern: /ai-terminal-pet-(\d+\.\d+\.\d+)-darwin-arm64\.tar\.gz/g,
+    expect: ['overlay'],
+    count: 2
+  },
+  {
     id: 'readme tarball install URL (en + zh)',
     file: 'README.md',
     pattern: /releases\/download\/dsh-plugin-v(\d+\.\d+\.\d+)\/dsh-ai-terminal-pet-(\d+\.\d+\.\d+)\.tgz/g,
@@ -162,7 +176,7 @@ export const CLAIMS = [
   {
     id: 'roadmap baseline row',
     file: 'docs/ROADMAP.md',
-    pattern: /\| 版本 \| `(\d+\.\d+\.\d+)`（`internal\/app\/app_windows\.go:44` 的 `const Version`）；插件包 `(\d+\.\d+\.\d+)` \|/g,
+    pattern: /\| 版本 \| `(\d+\.\d+\.\d+)`（`internal\/app\/version\.go` 的 `const Version`）；插件包 `(\d+\.\d+\.\d+)` \|/g,
     expect: ['overlay', 'plugin'],
     count: 1
   },
@@ -176,7 +190,7 @@ export const CLAIMS = [
   {
     id: 'handover version bullet',
     file: 'docs/HANDOVER.md',
-    pattern: /浮窗 \*\*`(\d+\.\d+\.\d+)`\*\*（`internal\/app\/app_windows\.go:44` 的 `const Version`），插件包 \*\*`(\d+\.\d+\.\d+)`\*\*/g,
+    pattern: /浮窗 \*\*`(\d+\.\d+\.\d+)`\*\*（`internal\/app\/version\.go` 的 `const Version`），插件包 \*\*`(\d+\.\d+\.\d+)`\*\*/g,
     expect: ['overlay', 'plugin'],
     count: 1
   },

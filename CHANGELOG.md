@@ -6,7 +6,7 @@
 
 ## 关于版本号：请先读这一段
 
-版本常量是 `internal/app/app_windows.go` 里的 `Version`。它在历史上的落地方式并不规整，
+版本常量是 `internal/app/version.go` 里的 `Version`（v0.9.0 – v1.0.9 期间曾位于 `internal/app/app_windows.go`）。它在历史上的落地方式并不规整，
 读本文件时请以此为准：
 
 | 版本 | 发布日期 | 版本常量的实际情况 | 详细 runbook |
@@ -30,18 +30,41 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.8**（tag `pet-v1.0.8`）/ **1.2.17**（tag `dsh-plugin-v1.2.17`）：这一批是第 51 轮记下的
-两个现场缺陷——归档的 OpenCode 会话仍占一行，以及设置窗口会跟着空闲自毁的进程一起消失
-（见下面的 `[1.0.8]` 一节）。此前浮窗本体 **1.0.7**（tag `pet-v1.0.7`）、插件包 **1.2.16**
-（tag `dsh-plugin-v1.2.16`）都已发布且不可变；下面几段原本标着 `[Unreleased]`/批次标题的段落记录的是 1.0.2 之前的
-三批工作，它们分别在 1.0.0 / 1.2.6 那次换版本号（`df4fcf6`）与 2026-11-12 的无版本号批次里交付
-（`[Unreleased]` 只能属于「还没发出去的东西」，留着它会和本段第一句直接矛盾）。
+已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
-原先写在这一段的「浮窗停在 0.9.0、插件包 1.2.5」是当时的事实，现在是历史。
-两条线的**上架**（把上游目录条目指到新版本）不是「顺手」的事，它有自己的工具、规则与清单：
-[docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
-## 报告未接入 — 2026-11-15 晚（第 56 轮；`--doctor` 第 11 项 + 只打印的 `--connect`，**尚未发版**）
+## [1.0.10] & [1.2.19] — 2026-11-15（全平台发布：Windows / Linux X11 / macOS AppKit + 文档重构 + CI 四端全绿）
+
+### 跨平台浮窗与系统适配（零 cgo，`CGO_ENABLED=0`）
+
+- **全包可跨编译**：全部 16 个 Go 包跨 `windows/amd64`、`linux/amd64`、`linux/arm64`、`darwin/arm64`、`darwin/amd64` 零 cgo 编译通过（`scripts/cross-build.sh`，`windows-only-packages.txt` 已清空）。
+- **Linux 纯 Go X11 ARGB 浮窗**（`internal/ui/app_linux.go` + `canvas_opentype.go` + `canvas_fonts_linux.go` + `clipboard_linux.go`、`internal/platform/focus_linux.go`、`internal/autostart/autostart_linux.go`）：基于 `github.com/jezek/xgb v1.3.1` 与 `golang.org/x/image v0.25.0`，支持 32-bit ARGB 透明、XRandR/`_NET_WORKAREA`、EWMH 窗口聚焦、OpenType 复合字体光栅化、X11 `CLIPBOARD` 与 XDG `.desktop` 自启，已在 WSLg `DISPLAY=:0` 实测渲染并在 `ubuntu-latest` CI 运行测试与安装链路。
+- **macOS 纯 Go AppKit 浮窗**（`internal/ui/app_darwin.go` + `cocoa_darwin.go` + `darwin_geometry.go` + `sound_darwin.go` + `clipboard_darwin.go`、`internal/platform/focus_darwin.go`、`internal/autostart/autostart_darwin.go`）：基于 `github.com/ebitengine/purego v0.9.1` 调用 Objective-C / CoreGraphics / AppKit（`NSWindow` / `NSImageView` / `NSStatusBar` / `NSSound` / `NSPasteboard` / `CGWindowListCopyWindowInfo` / `NSRunningApplication` / `LaunchAgent`），全部单测、几何测试、Objective-C 运行时绑定与 `sun_path`（`<104B`）Unix socket 修复已在真实 `macos-latest` CI runner 跑通（交互图形界面探针保留 `PET_COCOA_PROBE=1`）。
+- **POSIX CLI / 信号 / 接入向导与打包安装器**：
+  - `cmd/ai-terminal-pet/main.go` 统一切换 `internal/home.Join(...)` 解析 `--reset` 与 `error.log`，新增跨平台 `SIGINT`/`SIGTERM` 优雅退出刷新；
+  - `internal/connect` 补齐 Linux/macOS XDG/`HOME` 配置根目录及无 `.exe` 原生二进制路径，`--doctor` 11 项检查与 `--connect` 只读向导全面覆盖三系统；
+  - 新增 `scripts/install.sh`（支持 `--verify-only`、`--uninstall [--purge]`、`--no-link`）与 `scripts/package-unix.mjs`（构建 `linux/amd64`、`linux/arm64`、`darwin/arm64`、`darwin/amd64` `.tar.gz` 压缩包，内含可执行权限与 `SHA256SUMS.txt`）。
+- **Track 3 功能与轻量化**：
+  - **L1 statusline 管道短路**（`cmd/pet-statusline` + `internal/reporter/payload.go`）；
+  - **F2 键盘行导航**（`internal/ui/keyboard.go`，展开后 `Up/Down/Home/End` + `Enter` + `Esc`）；
+  - **F5 按显示器工作区记忆坐标**（`internal/config` `State.Layouts` + `internal/ui/placement.go`）。
+- **文档与版本工具链重构**：全面重构 `README.md`（中英文）、`docs/PLATFORMS.md`、`docs/ROADMAP.md`、`docs/HANDOVER.md` 与 `docs/LAUNCH.md` 为跨 Windows / Linux / macOS 的一致描述；`tools/check_versions.mjs` 对齐 `internal/app/version.go` 并增设 Linux/macOS `.tar.gz` 版本校验条目。
+
+### 1.0.10 / 1.2.19 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.10` | `pet-setup.exe` | 14,471,680 B | `37D90EAF5445BAA3946B2E29ED054CA68CBA3B0711A91BE31CE139E6FB2700D0` |
+| `pet-v1.0.10` | `ai-terminal-pet-1.0.10-win-x64.zip` | 5,117,683 B（17 文件） | `FB59661EED9BD714367755C8F466B718354A455B8A85F23BA95FA261A6B066D7` |
+| `pet-v1.0.10` | `ai-terminal-pet-1.0.10-linux-amd64.tar.gz` | 5,404,271 B | `304AC7565E3C1B3CC6ADD93211B2547811747705002009D3324328E6AAD50C64` |
+| `pet-v1.0.10` | `ai-terminal-pet-1.0.10-linux-arm64.tar.gz` | 4,916,092 B | `3613916DF11E5AF282B57A06EB49F2DB4877449DCB360057016E3DC9B2FDB5EF` |
+| `pet-v1.0.10` | `ai-terminal-pet-1.0.10-darwin-arm64.tar.gz` | 5,115,500 B | `415C8ADACBEDBC98DD884C255F69FBFDB7E80C9C88877CCD3BCF825A2B7DF5AB` |
+| `pet-v1.0.10` | `ai-terminal-pet-1.0.10-darwin-amd64.tar.gz` | 5,504,624 B | `36E1D269B0E4F0994453B0245E05809A69B684F32C753A86CDB7505CE597B1A1` |
+| `dsh-plugin-v1.2.19` | `dsh-ai-terminal-pet-1.2.19.tgz` | 2,064,860 B（19 文件，shasum `d6b0a467…`） | `40AC7D266DEEB3C7058DE909CEA43E521299A1866B76581450DAD82A12BA7887` |
+
+*(注：下方「报告未接入 — 第 56 轮」为本轮一并随 `1.0.10` 合入的历史开发小节留存。)*
+
+## 报告未接入 — 2026-11-15 晚（第 56 轮，随 1.0.10 交付）
 
 浮窗一直有个看不见的半边：`--doctor` 的十项检查全在看**这个项目往机器上放了什么**（安装目录、管道、
 Run 键、node），而故障实际发生的那一边是**别人家的配置**——`opencode.json` 里一条过期路径、

@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-15；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；**§58 交付 Track 3（L1 statusline 管道短路 + F2 键盘行导航 + F5 按显示器布局记忆坐标）与 Track 1（全部 16 个 Go 包跨 Win/Linux/macOS 通过 `CGO_ENABLED=0`，含纯 Go Linux X11 浮窗与 WSLg 实测），未发版**）
+## 1. 当前状态（2026-11-15；浮窗 **1.0.10**、插件包 **1.2.19** 已发版；**§60 全平台全量化发布：Windows Win32 + Linux 纯 Go X11 + macOS 纯 Go AppKit + POSIX CLI/安装打包器 + 公开文档重构 + 四条 GitHub Actions CI 全绿**）
 
 > 接手请先读本节与 **§57「跨平台施工（第 1–7 步），以及这一版为什么还没发」**（最新一轮；
 > 九个提交、三平台实测矩阵、五个"看起来对其实错"的地方、以及窗口层为什么不在这一版里），
@@ -39,48 +39,37 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.9`**（`internal/app/app_windows.go:44` 的 `const Version`），插件包 **`1.2.18`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7`/`v1.0.8`/`v1.0.9` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`/`v1.2.17`/`v1.2.18`。
-  **`pet-v1.0.7` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）；**`dsh-plugin-v1.2.15` 是第 48 轮打的**
-  （只改兼容声明），**`dsh-plugin-v1.2.16` 是第 50 轮打的**（中文 README + 市场文案，同样没动代码，
-  见 §50），**`pet-v1.0.8` 与 `dsh-plugin-v1.2.17` 是第 52 轮打的**（§52 的两个现场缺陷修复），
-  **`pet-v1.0.9` 与 `dsh-plugin-v1.2.18` 是第 54 轮打的**（§54 把看门狗换成了清醒时钟）。
-  **工作区与本机安装目录已经同步，但与 tag 不再逐字节相同**：`bin/`、
-  `packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的 `AI-Terminal-Pet.exe` 三份相同
-  （**4,655,616 B**，sha256 `B407E50A…`）；`pet-v1.0.9` 那份是 **4,556,288 B / `CEA9F46F…`**，
-  §56 这一批尚未发版，所以两者不同是预期的——下一次发布用新的次版本号（见 §56.10 与 §57.7）。
+- **版本**：浮窗 **`1.0.10`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.19`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.10` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.19`。
+  **工作区与本机安装目录已经与 `1.0.10` / `1.2.19` 同步**：`bin/`、
+  `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
+  （`AI-Terminal-Pet.exe` **4,702,208 B**，sha256 `B69CA725…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**366 个** `func Test`，
-  13 个包；§56 新增 `internal/connect` 的 25 个）；上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **10/10**；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**409 个** `func Test`，
+  Windows / Ubuntu / macOS 真实 GitHub Actions runner 全部通过）；`scripts/cross-build.sh` 全 16 个包三端 `CGO_ENABLED=0` 通过；
+  上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **10/10**；
   三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
-  `tools/check_versions.mjs` **18 个版本形状全一致**（`node --test tools/check_versions.test.mjs` 26/26）；
-  `tests/fresh-machine.mjs --no-overlay` **172/172**；`tools/check_docs_links.py` **12 份**文档全解；
-  `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
-  `--doctor` **11 项**（本机 10 ok / 1 warn / 0 fail；那一条 warn 是 Antigravity 只有状态栏上报端，见 §56）。
-- **规模**（`git ls-files '*.go'` + 逐文件行数，本轮实测）：非测试 **95 文件 / 19,355 行**、
-  测试 **68 文件 / 10,339 行**、**382 个 `func Test` / 14 个包**（§54 那一轮是 53 / 17,238、57 / 9,471、341 / 12）。
-  §57 的跨平台施工把 9 个新文件（每平台一份实现）与 2 个新包加了进来，所以文件数涨得比行数快。
-  §56 新增的是 `internal/connect`（8 个非测试文件 1,599 行 + 1 个测试文件 627 行 / 21 个 `func Test`）
-  与 `internal/app` 的 `connect_windows.go`（49 行 + 155 行测试 / 4 个测试）。
-  旧口径的 17,238 与本轮实测的 HEAD 值（53 文件 / 16,118 行）**本来就差 1,120 行**——
-  那一版用的是另一种统计方法，所以引用总数请现跑一遍，别照抄。
-  `bin/AI-Terminal-Pet.exe` **4,655,616 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
-  `bin/pet-statusline.exe` **3,669,504 B**、`bin/pet-hook.exe` **3,701,760 B**；
-  `dist/` 里是 1.0.9 的产物（`ai-terminal-pet-1.0.9-win-x64.zip` 5,054,467 B、
-  `pet-setup.exe` 14,309,888 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
-  均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
-  第三方依赖 3 个。
-- **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.18**（发版后 `npm view` 核对）；`dsh-plugin-v1.2.18` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.18.tgz` **2,006,574 B / sha256 `08A6FE06…` / shasum `bf28e3b1…`**（19 个文件，
-    含中英两份 README），包内 README 的安装命令是 1.2.18；
-    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §52，`icon` 同一 sha；
-    索引里的 `engines.dsh` 与包内声明一致，`verify.mjs` 断言这一点）。
-  - 浮窗线：`pet-v1.0.9` 的 Release 带两个资产——`ai-terminal-pet-1.0.9-win-x64.zip`
-    **5,054,467 B / sha256 `81F9FAB4…`**（17 个文件）与 `pet-setup.exe` **14,309,888 B / sha256 `3C22B4A7…`**；
-    `pet-v1.0.8` 及更早的每一个 tag 仍在（不可变，已被取代）。
+  `tools/check_versions.mjs` 全套版本形状一致（`node --test tools/check_versions.test.mjs` 26/26）；
+  `tests/fresh-machine.mjs --no-overlay` 全过；`tools/check_docs_links.py` **12 份**文档全解；
+  `govulncheck` + `gosec` 零告警；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
+  `--doctor` **11 项**（win/linux/macOS 覆盖环境、安装、配置、管道/socket、宿主接入、自启与判定）。
+- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.10 实测）：非测试 **131 文件 / 26,138 行**、
+  测试 **77 文件 / 11,894 行**、**409 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,702,208 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同）、
+  `bin/pet-statusline.exe` **3,675,136 B**、`bin/pet-hook.exe` **3,701,760 B**；
+  `dist/` 里是 `1.0.10` 的六端全量产物（`ai-terminal-pet-1.0.10-win-x64.zip` 5,117,683 B、
+  `pet-setup.exe` 14,471,680 B、`linux-amd64.tar.gz` 5,404,271 B、`linux-arm64.tar.gz` 4,916,092 B、
+  `darwin-arm64.tar.gz` 5,115,500 B、`darwin-amd64.tar.gz` 5,504,624 B），
+  均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 与 `CGO_ENABLED=0` 构建，见 §26；
+  第三方直引依赖 6 个（+ 1 个间接 `golang.org/x/text`）。
+- **分发（两条线）**：
+  - 插件线：npm `latest` = **1.2.19**；`dsh-plugin-v1.2.19` 的 Release 资产
+    `dsh-ai-terminal-pet-1.2.19.tgz` **2,064,860 B / sha256 `40AC7D26…` / shasum `d6b0a467…`**（19 个文件，
+    含中英两份 README），包内 README 的安装命令是 1.2.19；
+    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
+  - 浮窗线：`pet-v1.0.10` 的 Release 带六个跨平台资产——`pet-setup.exe`（14,471,680 B）、`win-x64.zip`（5,117,683 B）、
+    `linux-amd64.tar.gz`（5,404,271 B）、`linux-arm64.tar.gz`（4,916,092 B）、`darwin-arm64.tar.gz`（5,115,500 B）、`darwin-amd64.tar.gz`（5,504,624 B）。
   - **上游条目**：`main` 的 `tarball` 现在是 **1.2.16**（#15075 已被合并，2026-11-14 复读）；
     1.2.17 的跟进是
     [#15378](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15378)（分支
@@ -4252,6 +4241,24 @@ hook 3,701,760 B。三个文件与 `vendor/`、本机安装目录逐字节相同
    换成真的进程间控制（unix socket 或 flock 文件），`uiAvailable()` 对 linux 返回 true，
    `scripts/windows-only-packages.txt` 里那两行随之删掉——CI 会立刻要求这么做。
 3. macOS 需要一个能跑 `GOOS=darwin go test` 的机器或 CI runner，否则它只能停在"编译通过"。
+
+## 60. 交接：POSIX 路径/信号收口、文档全面重构与 1.0.10 / 1.2.19 全平台全量化发布（2026-11-15，第 60 轮；**已发版**）
+
+本轮完成第 56–59 轮所有跨平台与功能工作的收口、三系统 CI 联调排错、公开文档重构并按双提交规则发布 **`pet-v1.0.10`** 与 **`dsh-plugin-v1.2.19`**：
+
+1. **POSIX 运行时与接入向导修复**：
+   - `cmd/ai-terminal-pet/main.go`（`main_test.go`）：`--reset` 与 `error.log` 统一改用 `internal/home.Join`，不再读 Win32 专属 `%LOCALAPPDATA%`。
+   - `internal/app/signals_unix.go` / `signals_windows.go`：捕获 `SIGINT` / `SIGTERM` 并优雅关闭窗口、刷新 `config.json` / `state.json`。
+   - `internal/connect`（`binary_windows.go` / `binary_unix.go` / `roots.go` / `snippet.go` / `internal/app/doctor.go`）：自动按系统区分 XDG/`$HOME` 路径与无 `.exe` 二进制文件名。
+2. **POSIX 安装与全平台打包器**：
+   - 新增 `scripts/install.sh`（可执行权限 `100755`）：支持 Linux/macOS 标准数据目录安装、`~/.local/bin/ai-terminal-pet` 软链、`--verify-only` 与 `--uninstall [--purge]`。
+   - 新增 `scripts/package-unix.mjs`：无外部依赖交叉打包 `linux/amd64`、`linux/arm64`、`darwin/arm64`、`darwin/amd64` 四个 `.tar.gz` 归档及 `SHA256SUMS.txt`；WSL2 Ubuntu 实测解压校验、安装、`pet-hook`、`--json`、`--doctor` 与 `--uninstall` 通过。
+3. **三系统 CI (`windows-latest` / `ubuntu-latest` / `macos-latest`) + `scan` 全绿验证**：
+   - 借助真机 CI Run `43730668303` 与 `43731376911` 暴露并一次根治三处跨平台问题：① macOS `sun_path`（104 字节上限）导致 `t.TempDir()` 超长控制 socket `bind` 失败（`internal/ui/control_unix.go` + `darwin_appkit_test.go`）；② Linux `GOMODCACHE` 在沙盒 `HOME` 中产生只读权限导致退出 `rm -rf` 失败（`.github/workflows/ci.yml`）；③ `TestWaitForApprovalDecisionObservesLateVeto` 误命中 `config.WriteFileAtomic` 的临时文件名（`internal/reporter/reporter_test.go`）。
+   - 修复合入 `00e177e` 后 Run `43731837246` 四端全部一次通过（Windows 1m45s、Linux 1m2s、macOS 50s、scan 1m7s）。
+4. **文档重构与多平台发版**：
+   - 重构 `README.md`（中英文）、`docs/PLATFORMS.md`、`docs/ROADMAP.md`、`docs/HANDOVER.md`、`CHANGELOG.md`、`docs/LAUNCH.md` 与 `packages/dsh-ai-terminal-pet/README*.md`，并在 `tools/check_versions.mjs` 对齐 `internal/app/version.go` 与 Unix `.tar.gz` 命名检查。
+   - 按 `docs/UPSTREAM.md` 两步发布：Commit A 携带 `1.0.10` / `1.2.19` 全端二进制与市场索引时间戳并打 `pet-v1.0.10`（上传 Win `setup.exe` + `win-x64.zip` + 四份 Unix `.tar.gz`）与 `dsh-plugin-v1.2.19`；Commit B 钉死 `docs/market-index.json` 的真实 `source.commit` 与 `icon` SHA。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 

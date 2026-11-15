@@ -93,10 +93,10 @@ tarball, or by pinning the release tag. All three are verified end to end:
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # release tarball: same bytes as the npm release, straight from the GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.18/dsh-ai-terminal-pet-1.2.18.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.19/dsh-ai-terminal-pet-1.2.19.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.18&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.19&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Those three differ only in transport. The npm path is the shortest and the one a
@@ -160,9 +160,7 @@ keeps working without an overlay.
 
 ## The overlay itself is still standalone
 
-This bundle is a convenience. The overlay is a Go application that installs
-normally with `scripts/install.ps1` from the repository, and every other reporter
-(Claude Code, OpenCode, Antigravity, generic) talks to the same named pipe.
+This bundle is a Windows convenience. The standalone overlay itself is a zero-cgo Go application that runs across Windows (Win32), Linux (pure-Go X11 ARGB), and macOS (pure-Go AppKit via purego), installing with `scripts/install.ps1` on Windows or `scripts/install.sh` on macOS/Linux, and every other reporter (Claude Code, OpenCode, Antigravity, generic) talks to the same per-user endpoint (a Windows named pipe, or a Unix domain socket elsewhere).
 Those reporters are separate installs, not part of this package: a terminal that
 has none of them hooked reports nothing, in this install or in any other. A
 machine that only wants the overlay does not need this package; a machine that

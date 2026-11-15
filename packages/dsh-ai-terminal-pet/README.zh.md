@@ -74,10 +74,10 @@ capabilities 是**自我声明**、从不校验——DSH 并不沙箱化插件�
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # Release tarball：与 npm 上同一份字节，直接来自 GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.18/dsh-ai-terminal-pet-1.2.18.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.19/dsh-ai-terminal-pet-1.2.19.tgz
 
 # git 源，钉住 Release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.18&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.19&path:/packages/dsh-ai-terminal-pet"
 ```
 
 这三种只差运输方式。npm 那条最短，也是市场按包名安装时走的路径；tarball 那条给「钉住 Release 资产
@@ -125,8 +125,7 @@ dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-term
 
 ## 浮窗本身仍然是独立的
 
-这个 bundle 是便利，不是前提。浮窗是一个 Go 程序，用仓库里的 `scripts/install.ps1` 就能正常安装；
-其它每一个上报端（Claude Code、OpenCode、Antigravity、generic）说的都是同一条命名管道。
+这个 bundle 是 Windows 端的便利装法。独立的浮窗本体是一个零 cgo Go 程序，支持 Windows（Win32）、Linux（纯 Go X11 ARGB）与 macOS（纯 Go `purego` AppKit），在 Windows 上通过 `scripts/install.ps1` 安装、在 macOS/Linux 上通过 `scripts/install.sh` 安装；其它每一个上报端（Claude Code、OpenCode、Antigravity、generic）都走同一套按用户隔离的本地端点（Windows 命名管道 / POSIX Unix domain socket）。
 那些上报端是**另外安装**的，不属于这个包：一个终端没挂任何上报端，它在哪种装法里都不会上报。
 只想要浮窗的机器不需要这个包；只想要插件的机器则会自动得到一份浮窗。
 

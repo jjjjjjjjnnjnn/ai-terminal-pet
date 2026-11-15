@@ -1,64 +1,36 @@
-# PLATFORMS — what runs where, measured
+# Platform support
 
-> Snapshot: **2026-11-15**, overlay `1.0.9`, plugin `1.2.18` (Track 3 + cross-platform Windows Win32 + Linux X11 + pure-Go macOS AppKit).
-> Capabilities marked **local-verified** were executed on this machine (Windows 11 + WSL2 Ubuntu + WSLg `DISPLAY=:0`) plus `CGO_ENABLED=0` cross-builds (`linux/amd64`, `darwin/arm64`, `darwin/amd64`); macOS runtime execution runs in GitHub Actions `macos-latest` (`ci.yml` `macos` job, `PET_COCOA_PROBE=1` remains opt-in for interactive desktop windows).
+Three platforms compile cleanly with `CGO_ENABLED=0` across all 16 Go packages and zero Node.js npm dependencies. Every row below records what is implemented and how it was checked.
 
-## The short version
+| Capability | Windows (Win32) | Linux (X11) | macOS (AppKit / Cocoa) | How verified |
+|---|---|---|---|---|
+| **Toolchain & runtime dependencies** | Native Win32 (`CGO_ENABLED=0`, no GTK/WebView) | Pure-Go `xgb` X11 client (`CGO_ENABLED=0`, no cgo/libgtk) | Pure-Go `purego` Objective-C / CoreGraphics (`CGO_ENABLED=0`, no cgo) | `scripts/cross-build.sh` + CI on `windows-latest`, `ubuntu-latest`, `macos-latest` |
+| **Reporters (`reporters/*.js`, `pet-hook`, `pet-statusline`)** | Named pipe `\\.\pipe\ai-terminal-pet-v1-<8hex>` + snapshots | Unix domain socket `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` + snapshots | Unix domain socket `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` + snapshots | `go test -count=1 ./...` on Win + Ubuntu CI + macOS CI + WSL2 e2e |
+| **Host discovery (`--doctor`, `--connect`)** | `%APPDATA%` / `%USERPROFILE%` + `.exe` shims | `$XDG_CONFIG_HOME` / `$HOME` + POSIX shims | `$HOME/.config` / `$HOME` + POSIX shims | `internal/connect/connect_test.go` + `connect_unix_test.go` + headless CI `--doctor`/`--connect` |
+| **Single instance & control IPC** | Per-user named mutex + `WM_USER` / IPC | `flock` lock file + Unix domain control socket | `flock` lock file + Unix domain control socket (`<104B` `sun_path` safe) | Win32 unit tests + Linux X11 + `TestDarwinControlSocketRoundTrip` on `macos-latest` |
+| **Floating panel (`internal/ui`)** | Full layered ARGB DIB window + DPI + dock/auto-hide + theme + F2 keyboard | Pure-Go 32-bit ARGB X11 utility window (`PutImage`, `_NET_WORKAREA`, XRandR, `_MOTIF_WM_HINTS`, F2 keyboard) | Pure-Go borderless floating `NSWindow` (`NSImageView`, `NSStatusBar`, F2/`Cmd+±/0` zoom, dock, drag, mute) | Win32 full suite + real WSLg live smoke (`DISPLAY=:0`) + `macos-latest` headless AppKit/geometry tests (`PET_COCOA_PROBE=1` opt-in for WindowServer) |
+| **Text rasterization (`internal/ui`)** | Win32 GDI `DrawTextW` / `ClearType` | Pure-Go OpenType glyph rasterizer (`golang.org/x/image/font/opentype`) scanning `/usr/share/fonts` + Windows fallback | Pure-Go OpenType rasterizer scanning `/System/Library/Fonts`, `/Library/Fonts`, `~/Library/Fonts` | `TestLinuxFontRasterization` + OpenType unit tests on Win/Ubuntu/macOS |
+| **Settings UI** | Dedicated four-tab Win32 settings window (`AITerminalPetSettings`) | Edit `config.json` directly (CLI `--settings` prints guidance until native settings UI arrives) | Edit `config.json` directly (`internal/ui/settings_windows.go` is Win32-only so far) | Verified in Win32 preview suite & POSIX headless behavior |
+| **Tray / menu bar icon** | `Shell_NotifyIconW` tray icon + context menu | Desktop-neutral panel gestures (right-click/middle-click/dock); no XEmbed tray | `NSStatusBar` menu bar item (`Show/Hide`, `Reset Position`, `Quit`) | Win32 live tray + macOS `app_darwin.go` bindings |
+| **Process & window presence / focus jump** | Win32 process snapshot + `HWND` enumeration + `SetForegroundWindow` | `/proc` scan + X11 `_NET_CLIENT_LIST` + MIT-SCREEN-SAVER idle + WM activation | `sysctl` `kinfo_proc` + `CGWindowListCopyWindowInfo` + `NSWorkspace` / `NSRunningApplication.activateWithOptions:` | `internal/platform` tests across Win / Linux / macOS CI |
+| **Audio cues** | Synthesized WAV PCM via `winmm` `PlaySoundW` (`sound_windows.go`) | Silent placeholder (`sound_linux.go`) | Synthesized WAV PCM played async via AppKit `NSSound` (`sound_darwin.go`) | `TestToneForTransition` on all 3 OSes; `TestPlaySoundLive` Win32 live probe |
+| **Clipboard copy** | Win32 `OpenClipboard` / `SetClipboardData` | X11 `CLIPBOARD` `SelectionRequest` owner | `NSPasteboard` general pasteboard (`clipboard_darwin.go`) | Win32 + Linux X11 + macOS unit bindings |
+| **Autostart** | `HKCU\...\Run` registry key (`--autostart=on/off`) | XDG `~/.config/autostart/ai-terminal-pet.desktop` | LaunchAgent `~/Library/LaunchAgents/io.github.jjjjjjjjnnjnn.ai-terminal-pet.plist` | `internal/autostart` unit tests on Windows + Ubuntu + macOS CI |
+| **Installer & release archives** | `pet-setup.exe`, `ai-terminal-pet-<ver>-win-x64.zip`, `scripts/install.cmd` (`install.ps1`) | `ai-terminal-pet-<ver>-linux-{amd64,arm64}.tar.gz`, `scripts/install.sh` | `ai-terminal-pet-<ver>-darwin-{arm64,amd64}.tar.gz`, `scripts/install.sh` | Packaged & sha256-verified on Windows + WSL2 Ubuntu + `ubuntu-latest` + `macos-latest` CI |
 
-| Capability | Windows | Linux | macOS |
-|---|---|---|---|
-| `pet-hook` (native hook reporter) | ✅ | ✅ | ✅ (CI `macos-latest`) |
-| `pet-statusline` (statusline shim) | ✅ | ✅ | ✅ (CI `macos-latest`) |
-| `--json` | ✅ | ✅ | ✅ |
-| `--doctor` (11 checks) | ✅ | ✅ | ✅ (`doctor_posix.go`) |
-| `--connect` (prints, never writes) | ✅ | ✅ | ✅ |
-| `--autostart` | ✅ HKCU Run | ✅ XDG desktop entry | ✅ LaunchAgent |
-| named pipe / unix socket transport | ✅ | ✅ | ✅ |
-| **the floating panel (the product)** | ✅ (Win32) | ✅ (pure-Go X11 ARGB) | ✅ (pure-Go Cocoa/AppKit via `purego`) |
-| alert sound synthesis | ✅ (PCM `PlaySoundW`) | ❌ not yet | ✅ (shared PCM WAV + Cocoa `NSSound`) |
-| clipboard copy | ✅ (Win32) | ✅ (X11 `CLIPBOARD`) | ✅ (Cocoa `NSPasteboard`) |
-| jump-to-terminal focus & idle detection | ✅ | ✅ (X11 EWMH + `/proc`) | ✅ (CoreGraphics + `NSWorkspace` + `NSRunningApplication`) |
-| tray menu / status item | ✅ (Win32 tray + balloon) | ❌ not yet | ✅ (`NSStatusBar` toggle / reset / quit) |
-| settings window | ✅ | ❌ (edits config / tray pending) | ❌ (edits config; dedicated Cocoa settings UI pending) |
+## Data directories and IPC endpoints
 
-So: **all 16 Go packages compile cleanly with `CGO_ENABLED=0` across Windows, Linux, and macOS** with **zero cgo dependencies anywhere in the repository**. Shared code covers the pixel buffer & 16 drawing primitives (`canvas.go`), PCM WAV synthesis (`sound.go`), OpenType glyph rasterizer (`canvas_opentype.go` on `linux || darwin`), per-user Unix domain control sockets (`control_unix.go` on `linux || darwin`), and panel geometry/dock/alert/tap/keyboard state machines.
+Implemented identically in Go (`internal/home`, `internal/pipeserver`) and Node.js (`reporters/protocol.js`) and locked by cross-language tests:
 
-## Architecture of the window backends
+- **Windows**: `%LOCALAPPDATA%\AI-Terminal-Pet` · named pipe `\\.\pipe\ai-terminal-pet-v1-<sha256(lower(home))[0..8]>`
+- **macOS**: `~/Library/Application Support/AI-Terminal-Pet` · socket `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock`
+- **Linux**: `$XDG_DATA_HOME/ai-terminal-pet` (or `~/.local/share/ai-terminal-pet`) · socket `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` (or `/tmp/ai-terminal-pet-<uid>-v1-<8hex>.sock`)
 
-- **Windows (`internal/ui/*_windows.go`, `sound_windows.go`, `platform/focus_windows.go`)**: Win32 layered window (`UpdateLayeredWindow` + GDI text/DIB, `settings_windows.go`, tray icon, PCM `PlaySoundW` audio).
-- **Linux (`internal/ui/app_linux.go`, `canvas_opentype.go` + `canvas_fonts_linux.go`, `control_unix.go`, `clipboard_linux.go`)**: Pure-Go X11 (`github.com/jezek/xgb` + `randr` + `bigreq`, zero cgo / zero GTK), 32-bit TrueColor ARGB visual, `_NET_WM_WINDOW_OPACITY` pulse/opacity, chunked `PutImage` upload, OpenType TTF/OTF/TTC glyph rendering across `/usr/share/fonts` and `/mnt/c/Windows/Fonts`, per-user unix control socket, X11 `CLIPBOARD` selection owner, and EWMH jump-to-terminal (`_NET_CLIENT_LIST` + `/proc`).
-- **macOS (`internal/ui/app_darwin.go`, `cocoa_darwin.go`, `darwin_geometry.go`, `canvas_fonts_darwin.go`, `sound_darwin.go`, `clipboard_darwin.go`, `platform/focus_darwin.go`)**: Pure-Go Objective-C runtime (`github.com/ebitengine/purego v0.9.1`, zero cgo) driving AppKit `NSApplication` + borderless transparent floating `NSWindow` (`AITerminalPetWindow`) + `NSImageView` (`NSBitmapImageRep` premultiplied RGBA upload), `NSScreen.visibleFrame` multi-display coordinate transforms, `NSStatusBar` menu bar item, `NSPasteboard` clipboard copy, shared WAV synthesis played via `NSSound`, OpenType TTF/OTF/TTC glyph rendering across `/System/Library/Fonts` and `~/Library/Fonts`, `CGWindowListCopyWindowInfo` / `CGEventSourceSecondsSinceLastEventType` / `NSRunningApplication` focus & idle queries, and shared Unix domain control sockets (`control_unix.go`).
-- **Other POSIX (`*_posix.go` / `*_nogui.go` with `!windows && !linux && !darwin`)**: Explicit compile-safe non-window stubs returning `ErrNoWindowLayer`.
+## CI cross-build contract
 
-## What was measured, and how
-
-```text
-# Windows: full repository verification
-gofmt -l . ; go vet ./... ; go test -count=1 ./...
-
-# Linux (cross-compiled with CGO_ENABLED=0 on Windows, executed inside WSL2 Ubuntu)
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/... ./internal/...
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go vet ./...
-# WSL2 Ubuntu (DISPLAY=:0 PET_X11_PROBE=1): Linux test suite + live X11 E2E smoke: OK
-
-# macOS: zero-cgo arm64 + amd64 cross-vet/build & test compilation on Windows + CI job on macos-latest
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go vet ./...
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build ./cmd/... ./internal/...
-GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go vet ./...
-GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/... ./internal/...
-# Native darwin/arm64 execution & headless CLI/socket/ObjC tests: GitHub Actions `.github/workflows/ci.yml` (`macos` job on `macos-latest`)
-```
-
-Per package across platforms (`CGO_ENABLED=0`):
-
-| Package | windows | linux | darwin |
-|---|---|---|---|
-| `internal/{config,connect,home,i18n,pipeserver,reporter,session,store}` | ok | ok (tested in WSL2) | ok (CI `macos-latest` + local arm64/amd64 build+vet) |
-| `internal/{autostart,platform,ui,app}` | ok | ok (tested in WSL2) | ok (CI `macos-latest` + local arm64/amd64 build+vet) |
-| `cmd/{ai-terminal-pet,pet-hook,pet-setup,pet-statusline}` | ok | ok (tested on WSLg) | ok (CI `macos-latest` + local arm64/amd64 build+vet) |
-
-## Remaining platform gaps
-
-- **Live interactive desktop probing on a physical Mac display (`PET_COCOA_PROBE=1`)**: `ci.yml` `macos-latest` exercises `go test -count=1 ./...` (Objective-C class registration, AppKit loading, Unix control socket round-trip, pure Cocoa coordinate/pixel/keycode tests) and headless native `arm64` CLI/hook binaries; live physical monitor WindowServer visuals / notch offset / multi-Space gestures require an interactive macOS desktop session (`PET_COCOA_PROBE=1`).
-- **Native Linux DEs outside WSLg**: the X11 panel, OpenType renderer, unix control socket, and E2E pipeline ran cleanly against WSLg XWayland (`DISPLAY=:0`), whereas native GNOME/KDE/XFCE compositor interactions, tray protocols (SNI/AppIndicator), and Linux desktop sound playback remain unverified.
-- **Dedicated Cocoa/X11 settings GUI & POSIX installer**: `settings_windows.go` provides the native four-tab settings dialog on Windows; Linux & macOS edit `config.json` and use CLI/tray controls until native settings dialogs and `.tar.gz`/`.pkg` installers are added.
+1. **GitHub Actions runners**: `windows-latest` (`verify` + `scan`), `ubuntu-latest` (`linux` — builds & tests Linux binaries, headless install/hook/CLI smoke, `.tar.gz` SHA-256 verification), and `macos-latest` (`macos` — native `darwin/arm64` Go tests, binary builds, headless install/hook/CLI smoke).
+2. **`scripts/cross-build.sh`** asserts that all packages in [scripts/portable-packages.txt](../scripts/portable-packages.txt) (every package in this repository — 16 packages) build cleanly with `CGO_ENABLED=0` for `windows/amd64`, `linux/amd64`, and `darwin/arm64`, while [scripts/windows-only-packages.txt](../scripts/windows-only-packages.txt) stays empty.
+3. **Host-windowed gaps still open cleanly**:
+   - On Linux & macOS, edit `config.json` directly instead of opening a native settings dialog (`--settings` logs/prints guidance cleanly).
+   - Linux audio notifications stay silent (`internal/ui/sound_linux.go`) so zero ALSA/PulseAudio/cgo dependencies are required.
+   - Live interactive WindowServer GUI on physical Apple hardware (and non-WSLg desktop environments such as GNOME/KDE/Wayland+XWayland) remains opt-in verified (`PET_COCOA_PROBE=1` on macOS, WSLg X11 live-tested on Linux).
