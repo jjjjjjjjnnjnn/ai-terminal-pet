@@ -1448,7 +1448,7 @@ func settingsProcedure(hwnd win.HWND, message uint32, wParam, lParam uintptr) ui
 	}
 	// The hang watchdog watches this timestamp, and the settings window runs on
 	// the same thread as the overlay, so its messages have to refresh it too.
-	window.lastDispatchNs.Store(time.Now().UnixNano())
+	window.lastDispatchTicks.Store(interruptTicks())
 	return window.handleSettingsMessage(hwnd, message, wParam, lParam)
 }
 
@@ -1655,11 +1655,30 @@ func (a *App) clampSettingsToWorkArea() {
 		return
 	}
 	margin := int32(a.settingsGeometry.scale(8))
-	width := int32(a.settingsGeometry.width)
-	height := int32(a.settingsGeometry.height)
+	a.settingsX, a.settingsY = clampOriginToWorkArea(
+		work, margin,
+		int32(a.settingsGeometry.width), int32(a.settingsGeometry.height),
+		a.settingsX, a.settingsY,
+	)
+}
+
+// clampOriginToWorkArea is the whole rule as a pure function, so it can be
+// checked against work areas this machine does not have (negative coordinates
+// for a monitor left of the primary, a work area smaller than the window, the
+// taskbar on a different edge).
+//
+// It is the third candidate from HANDOVER §51.3: "the DPI reflow puts the
+// window outside the work area, so the user reads it as gone". On a single
+// monitor it cannot happen - the window is centred on the overlay's work area
+// and this clamp is applied on open, on every reflow, and twice on
+// WM_DPICHANGED - but "cannot happen" is exactly the claim worth writing down
+// as a test rather than as a comment.
+func clampOriginToWorkArea(work win.RECT, margin, width, height, x, y int32) (int32, int32) {
 	minimumX := work.Left + margin
 	maximumX := work.Right - width - margin
 	if maximumX < minimumX {
+		// The window is wider than the work area: pin the left edge to the
+		// margin instead of letting a negative range choose an arbitrary value.
 		maximumX = minimumX
 	}
 	minimumY := work.Top + margin
@@ -1667,18 +1686,19 @@ func (a *App) clampSettingsToWorkArea() {
 	if maximumY < minimumY {
 		maximumY = minimumY
 	}
-	if a.settingsX < minimumX {
-		a.settingsX = minimumX
+	if x < minimumX {
+		x = minimumX
 	}
-	if a.settingsX > maximumX {
-		a.settingsX = maximumX
+	if x > maximumX {
+		x = maximumX
 	}
-	if a.settingsY < minimumY {
-		a.settingsY = minimumY
+	if y < minimumY {
+		y = minimumY
 	}
-	if a.settingsY > maximumY {
-		a.settingsY = maximumY
+	if y > maximumY {
+		y = maximumY
 	}
+	return x, y
 }
 
 func (a *App) paintSettings() error {

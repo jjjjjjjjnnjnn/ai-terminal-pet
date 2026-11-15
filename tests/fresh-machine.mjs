@@ -688,8 +688,21 @@ async function scenarioPluginOnEmptyMachine(sandbox, pkg) {
       // Keep every launch attempt inside the sandbox. protocol.js accepts an
       // override only when it resolves inside the install directory, so the
       // stub lives there; withSandboxEnv restores the variable afterwards.
+      //
+      // The stub must be INERT, and this used to be a copy of pet-statusline.exe
+      // - which is itself a reporter: with no overlay listening it launches
+      // AI_TERMINAL_PET_EXE to start one, which here is the stub, which launches
+      // itself. Measured on a machine where the overlay happened to be stopped
+      // (2026-11-15): one plugin report left 23 stub processes alive, and S8's
+      // uninstall then failed with "access denied" because a running stub held
+      // the file open. `hostname.exe` writes a line to a stdout nobody reads and
+      // exits; that is the whole contract this stub needs.
+      const stubSource = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'hostname.exe')
+      if (!existsSync(stubSource)) {
+        console.log('   note: cannot find ' + stubSource + '; the launch stub will be a copy of the statusline instead')
+      }
       const stub = path.join(sandbox.petDir, 'harness-launch-stub.exe')
-      writeFileSync(stub, readFileSync(path.join(sandbox.bin, 'pet-statusline.exe')))
+      writeFileSync(stub, readFileSync(existsSync(stubSource) ? stubSource : path.join(sandbox.bin, 'pet-statusline.exe')))
       process.env.AI_TERMINAL_PET_EXE = stub
 
       // bootstrap() is memoized: the second call must return the very same

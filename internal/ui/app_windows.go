@@ -362,11 +362,13 @@ type App struct {
 	trayAdded       bool
 	refreshPending  atomic.Bool
 	activatePending atomic.Bool
-	// lastDispatchNs records the last time windowProcedure was entered
-	// (any nesting level, including modal menu loops). A watchdog dumps
-	// goroutine stacks when this goes stale while a window exists.
-	lastDispatchNs atomic.Int64
-	lastHangDumpNs atomic.Int64
+	// lastDispatchTicks records the unbiased interrupt time at the last
+	// windowProcedure entry (any nesting level, including modal menu loops).
+	// It is deliberately not a wall clock: a watchdog that measured wall time
+	// reported every resume from standby as a six-second freeze (see hang.go).
+	// Zero means "no dispatch has been recorded yet".
+	lastDispatchTicks atomic.Uint64
+	lastHangDumpTicks atomic.Uint64
 	// lastMessage is the most recent window message id, recorded so a hang
 	// dump can name the message the UI thread was last asked to handle.
 	lastMessage atomic.Uint32
@@ -671,7 +673,7 @@ func (a *App) Run() error {
 	if a.options.OpenSettings {
 		a.openSettings()
 	}
-	a.lastDispatchNs.Store(time.Now().UnixNano())
+	a.lastDispatchTicks.Store(interruptTicks())
 	watchStop := make(chan struct{})
 	defer close(watchStop)
 	go a.watchHang(watchStop)
@@ -706,17 +708,18 @@ func procedure(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {
 	window := activeWindow.Load()
 	if window != nil {
 		window.lastMessage.Store(message)
-		window.lastDispatchNs.Store(time.Now().UnixNano())
+		window.lastDispatchTicks.Store(interruptTicks())
 		return window.handleMessage(hwnd, message, wParam, lParam)
 	}
 	return win.DefWindowProc(hwnd, message, wParam, lParam)
 }
 
 // watchHang dumps all goroutine stacks to hang.log when the UI thread
-// stops dispatching for longer than stallThreshold while the window
+// stops dispatching for longer than hangStallThreshold while the window
 // exists. Idle blocking inside GetMessage does NOT trigger this because
 // GetMessage itself returns (timers fire at 50ms) and every dispatch
-// refreshes lastDispatchNs.
+// refreshes lastDispatchTicks. Standby does not trigger it either: the clock
+// is the unbiased interrupt time, so a resume cannot look like a freeze.
 //
 // Dumps are bounded on purpose. The previous unbounded, 60s-throttled
 // version appended 370 KB of identical stacks over a single 80-minute
@@ -724,10 +727,6 @@ func procedure(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {
 // diagnosis. A stall that repeats after maxDumps is the same stall; the
 // first dump already carries the stack that matters.
 func (a *App) watchHang(stop <-chan struct{}) {
-	const stallThreshold = 6 * time.Second
-	const dumpCooldown = 2 * time.Minute
-	const maxDumps = 3
-	const maxHangLog = 256 << 10
 	dumps := 0
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -735,25 +734,35 @@ func (a *App) watchHang(stop <-chan struct{}) {
 		select {
 		case <-stop:
 			return
-		case now := <-ticker.C:
-			if dumps >= maxDumps || a.handle.Load() == 0 {
+		case <-ticker.C:
+			if dumps >= hangMaxDumps || a.handle.Load() == 0 {
 				continue
 			}
-			last := a.lastDispatchNs.Load()
-			if last == 0 || now.Sub(time.Unix(0, last)) < stallThreshold {
+			// Two readings of the same shrink-wrapped clock: how long the UI
+			// thread has gone without dispatching, and how long since the last
+			// dump. Standby time is excluded from both, which is what makes a
+			// resume stop looking like a freeze. See hang.go.
+			now := interruptTicks()
+			last := a.lastDispatchTicks.Load()
+			if now == 0 || last == 0 {
 				continue
 			}
-			if now.Sub(time.Unix(0, a.lastHangDumpNs.Load())) < dumpCooldown {
+			lastDump := a.lastHangDumpTicks.Load()
+			sinceLastDump := hangDumpCooldown
+			if lastDump != 0 {
+				sinceLastDump = awakeElapsed(lastDump, now)
+			}
+			if !hangDue(awakeElapsed(last, now), sinceLastDump) {
 				continue
 			}
-			a.lastHangDumpNs.Store(now.UnixNano())
+			a.lastHangDumpTicks.Store(now)
 			dumps++
-			writeHangLog(now, maxHangLog, a.lastMessage.Load(), dumps, maxDumps)
+			writeHangLog(time.Now(), hangLogMaxBytes, a.lastMessage.Load(), dumps, hangMaxDumps, awakeElapsed(last, now))
 		}
 	}
 }
 
-func writeHangLog(now time.Time, maxBytes int64, lastMessage uint32, dump, maxDumps int) {
+func writeHangLog(now time.Time, maxBytes int64, lastMessage uint32, dump, maxDumps int, quiet time.Duration) {
 	root := os.Getenv("LOCALAPPDATA")
 	if root == "" {
 		return
@@ -771,8 +780,8 @@ func writeHangLog(now time.Time, maxBytes int64, lastMessage uint32, dump, maxDu
 		return
 	}
 	defer file.Close()
-	fmt.Fprintf(file, "=== stall %d/%d at %s lastMessage=%s goroutines=%d ===\n",
-		dump, maxDumps, now.Format(time.RFC3339), messageName(lastMessage), runtime.NumGoroutine())
+	fmt.Fprintf(file, "=== stall %d/%d at %s lastMessage=%s awakeQuiet=%s goroutines=%d ===\n",
+		dump, maxDumps, now.Format(time.RFC3339), messageName(lastMessage), quiet.Round(time.Millisecond), runtime.NumGoroutine())
 	_ = pprof.Lookup("goroutine").WriteTo(file, 2)
 }
 
@@ -833,6 +842,11 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 		return 1
 	case wmRefresh:
 		a.refreshPending.Store(false)
+		// The diagnostic stall probe (hang_probe_debug.go): release builds
+		// return zero, so this line costs a call and nothing else.
+		if delay := a.probeStallDelay(); delay > 0 {
+			time.Sleep(delay)
+		}
 		if pending := a.pendingSettings.Swap(nil); pending != nil {
 			a.applyQueuedSettings(*pending)
 		}

@@ -61,6 +61,96 @@ state/reason/tool 去重，节流只会推迟要紧的第一次上报）、管�
 
 用户目录里保留 `index.ts.bak-20261114-fork`（对旧分支的**尽力复原**，不是逐字节备份，也没被验证过）。
 
+## [1.0.9] — 2026-11-15（第 54 轮：`hang.log` 的"卡死"有一半是待机，看门狗改用清醒时钟）
+
+第 51 轮把 `hang.log` 里那六次 `WM_TIMER` stall 列为"设置窗口消失"的候选之一。这一轮先把它们
+和系统自己的电源事件对了一次表，结论是：**它们不是卡死**。
+
+| `hang.log` 的转储时刻（本地） | 同一秒的系统事件 |
+|---|---|
+| 2026-11-06 07:59:26 | Kernel-Power **507**「系统正在退出待机状态」06:59:26.560Z（本地 07:59:26.560） |
+| 2026-11-13 09:47:22 | Kernel-Power **507** 08:47:22.789Z（本地 09:47:22.789） |
+| 2026-11-14 04:07:53 | Kernel-Power **507** 03:07:53.061Z（本地 04:07:53.061） |
+
+三次全部落在**同一秒**，而三个 goroutine 转储里 `goroutine 1` 都停在 `win.GetMessage`——即
+"在等消息"，不在任何一段我们的代码里。机制也很直白：看门狗用的是 `time.Now`，而**它把机器睡眠
+的时间也算作流逝**。本机两个时钟的实测差：
+
+```
+GetTickCount64             102.73 h since boot   （含待机）
+QueryUnbiasedInterruptTime  96.17 h since boot   （只算清醒）
+                         差 394 分钟被当作"流逝"
+```
+
+所以任何一次超过 6 秒的睡眠，一醒来就同时满足"6 秒没有分发"。这也说明 §51.3 的候选 2 一直被
+一份**待机证据**支撑着。
+
+### Fixed
+
+- **`watchHang` 改用 `QueryUnbiasedInterruptTime`**（`internal/ui/hang.go`）。这个 API 的语义就是
+  "不含待机"，所以待机时间**进不了这个数字**——是属性，不是需要记得应用的过滤器。`time.Now`
+  仍用于写日志的时间戳（人读的），判定用两个 100 ns 读数相减。
+- 转储头多了一个字段：`awakeQuiet=8.001s`。以前那个数字只能靠猜，现在它直接写着"UI 线程清醒时
+  已经多久没分发"。
+
+### Added
+
+- `internal/ui/hang.go`：`interruptTicks` / `awakeElapsed` / `hangDue` 三个纯函数，阈值与冷却也
+  搬到这里（原来散在 `watchHang` 里）。
+- `internal/ui/hang_test.go`（3 条）+ `internal/ui/hang_watchdog_windows_test.go`（2 条，
+  其中一个带两个子用例）：**待机不报、真卡死照报、没有时钟就不报**。后两条真的把看门狗跑起来
+  （只给 handle、时钟与 `LOCALAPPDATA`，不需要窗口），因为"待机不能触发"这件事只有跑一遍才算数。
+- 诊断构建里的**真卡死探针**（`-tags petdebug` + `PET_HANG_PROBE_MS`）：发布构建返回常数 0，
+  一个字节都不多。它存在的原因和 §52 的退出日志一样——"新时钟没有把卡死一起静音"需要一个真的卡死。
+
+### Changed
+
+- **`clampSettingsToWorkArea` 的规则抽成纯函数 `clampOriginToWorkArea`**
+  （`internal/ui/settings_windows.go`），新增 `settings_clamp_windows_test.go` 7 个用例：负坐标的
+  副屏、比窗口还矮的工作区、比窗口还窄、正好贴角。这是 §51.3 的候选 3，单屏机器上本来就不可能
+  发生，所以它值得的是一张测试表，不是一句注释。
+- **版本**：浮窗 **1.0.9**、插件包 **1.2.18**（插件携带新的 vendor 二进制，因此必须换号）。
+
+### Numbers
+
+`gofmt -l .` 无输出 / `go vet ./...` 0 / `go test -count=1 ./...` 12 包全过（**341** 个 `func Test`，
+ui 150）/ 上报端逐个 `node --check` 全过 / `node --test reporters/opencode-events.test.mjs` 10/10 /
+三个 `verify.mjs` 全 PASS / `vendor.mjs --check` 两个文件吻合（源码摘要 `2aab36f6…`，42 个文件；overlay
+4,556,288 B / `ddade226…`）/ `tools/check_versions.mjs` 18 个形状全一致 / `tests/fresh-machine.mjs
+--no-overlay` 162/162 / `tools/check_docs_links.py` 12 份全解。
+
+规模：Go 非测试源码 **53 文件 / 17,238 行**、测试 **57 文件 / 9,471 行**；
+`bin/AI-Terminal-Pet.exe` **4,556,288 B**（+1,024 B）、`bin/pet-statusline.exe` 3,664,896 B、
+`bin/pet-hook.exe` 3,697,152 B。
+
+发布资产（本机实测）：
+
+| 资产 | 大小 | sha256 |
+|---|---|---|
+| `ai-terminal-pet-1.0.9-win-x64.zip`（17 文件） | **5,054,467 B** | `81F9FAB415B2DB4F80F94177900679F8F4B45AE8667E2395F5BFF29D3D6829FF` |
+| `pet-setup.exe` | **14,309,888 B** | `3C22B4A7E5CE36986258976541246752E366FAA7791069C7E5AB7A6E89ED82DC` |
+| `dsh-ai-terminal-pet-1.2.18.tgz`（19 文件） | **2,006,574 B** | `08A6FE0660880083376BCB2561F0998BC483FD432C2059D2BBB50087D0AFF78C` |
+
+shasum `bf28e3b16fed75b9f02dfd62493359766d122164`。
+
+### 54.4 顺带修掉一条真实的测试基础设施缺陷：suite 的 launch stub 会自我复制
+
+`tests/fresh-machine.mjs` 的 S3 把 `AI_TERMINAL_PET_EXE` 指向 `harness-launch-stub.exe`，好让插件的
+"拉起浮窗"落在沙箱里；这个 stub 原来是 **`pet-statusline.exe` 的副本**——而 statusline 自己就是上报端，
+管道不在时它也会去拉起 `AI_TERMINAL_PET_EXE`，也就是**它自己**。于是：
+
+- 主机上**浮窗恰好没在跑**时（本机 2026-11-15 早上就是），一次插件上报会留下 **23 个** stub 进程；
+- 这些进程持有 `pet-fresh-*` 目录里的 exe 句柄，S8 的 `-Uninstall` 于是报
+  `harness-launch-stub.exe 的访问被拒绝`，套件变成 **159/162**，而失败原因和被测行为毫无关系；
+- 主机的浮窗在跑时 mutex 会挡住第二次实例，所以这个互相拉起不会发生——这就是它一直没被发现的原因。
+
+**修法**：stub 换成一个**惰性**程序（`%SystemRoot%\System32\hostname.exe`，写一行到没人读的 stdout
+就退出；找不到时回退到旧行为并打印一行说明）。修完 **162/162**，且沙箱目录能被删掉。
+
+这条记在这里而不是只写在提交里，是因为它看起来像"测试太脆"，实际是**测试夹具里的一个自启动循环**：
+以后任何把 `AI_TERMINAL_PET_EXE` 指向上报端的地方都会踩同一个坑，而判据（`Get-Process -Name
+harness-launch-stub` 的计数、S8 的"访问被拒绝"）都写在这一节里。
+
 ## [1.0.8] — 2026-11-14（第 52 轮：归档的会话不再占一行，设置窗口不再被空闲自毁带走）
 
 第 51 轮只取证、没动代码，把用户的两句话变成了可证伪的机制：

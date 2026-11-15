@@ -34,7 +34,14 @@ import (
 // OpenCode conversation now ends its row (the host emits `session.archived`,
 // not `session.deleted`), and a visible settings window keeps the process
 // alive instead of letting the session-less idle timer quit underneath it.
-const Version = "1.0.8"
+//
+// 1.0.9 stops the hang watchdog from reporting standby as a stall. hang.log
+// held six "6 s stalls"; three of them landed on the same second as the
+// system's own "exiting standby" event, and the clock the watchdog used
+// (time.Now) counts the hours the machine spends asleep - 394 minutes on the
+// machine that reported them. QueryUnbiasedInterruptTime excludes that time,
+// so a resume can no longer look like a freeze. See internal/ui/hang.go.
+const Version = "1.0.9"
 
 func Run() error {
 	return RunWith(false)

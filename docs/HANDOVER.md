@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-14 晚；浮窗 **1.0.8**、插件包 **1.2.17** 已发版；§51 的两个现场缺陷已修复，见 §52）
+## 1. 当前状态（2026-11-14 晚；浮窗 **1.0.9**、插件包 **1.2.18** 已发版；§51 的两个现场缺陷已修复，见 §52；§53 统一了上报端，§54 修掉了 `hang.log` 的待机误报）
 
 > 接手请先读本节、**§53「交接：上报端只剩一份实现」**（最新一轮；本机现在加载的是仓库里的
 > `reporters/opencode.js`，本地目录插件只是一次静态 re-export），再读
@@ -34,45 +34,46 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.8`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.17`**。
-  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7`/`v1.0.8` 与
-  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`/`v1.2.17`。
+- **版本**：浮窗 **`1.0.9`**（`internal/app/app_windows.go:29` 的 `const Version`），插件包 **`1.2.18`**。
+  两条版本线各有 tag：`pet-v1.0.0`/`v1.0.1`/`v1.0.2`/`v1.0.3`/`v1.0.4`/`v1.0.5`/`v1.0.6`/`v1.0.7`/`v1.0.8`/`v1.0.9` 与
+  `dsh-plugin-v1.2.6`/`v1.2.7`/`v1.2.8`/`v1.2.9`/`v1.2.10`/`v1.2.11`/`v1.2.12`/`v1.2.13`/`v1.2.14`/`v1.2.15`/`v1.2.16`/`v1.2.17`/`v1.2.18`。
   **`pet-v1.0.7` 是第 45 轮打的**（代码是第 44 轮的，见 §44 与 §45）；**`dsh-plugin-v1.2.15` 是第 48 轮打的**
   （只改兼容声明），**`dsh-plugin-v1.2.16` 是第 50 轮打的**（中文 README + 市场文案，同样没动代码，
-  见 §50），**`pet-v1.0.8` 与 `dsh-plugin-v1.2.17` 是第 52 轮打的**（§52 的两个现场缺陷修复）。
+  见 §50），**`pet-v1.0.8` 与 `dsh-plugin-v1.2.17` 是第 52 轮打的**（§52 的两个现场缺陷修复），
+  **`pet-v1.0.9` 与 `dsh-plugin-v1.2.18` 是第 54 轮打的**（§54 把看门狗换成了清醒时钟）。
   **工作区与 tag 已经同步**：`bin/`、`packages/dsh-ai-terminal-pet/vendor/` 与本机安装目录里的
-  `AI-Terminal-Pet.exe` 三份逐字节相同（**4,555,264 B**，sha256 `CB881ACE…`）。
+  `AI-Terminal-Pet.exe` 三份逐字节相同（**4,556,288 B**，sha256 `CEA9F46F…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**334 个** `func Test`，
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**341 个** `func Test`，
   12 个包）；上报端逐个 `node --check` 全过；`node --test reporters/opencode-events.test.mjs` **10/10**；
   三个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两个文件吻合；
   `tools/check_versions.mjs` **18 个版本形状全一致**（`node --test tools/check_versions.test.mjs` 24/24）；
   `tests/fresh-machine.mjs --no-overlay` **162/162**；`tools/check_docs_links.py` **12 份**文档全解；
   `tools/upstream-entry.test.mjs` 8/8；`scripts\install.cmd -VerifyOnly` **11/11 `[ok]`**；
   `--doctor` **10 项**（本机 10 ok / 0 warn / 0 fail）。
-- **规模**：Go 非测试源码 **50 文件 / 17,068 行**、测试 **53 文件 / 9,087 行**（334 个 `func Test`，
+- **规模**：Go 非测试源码 **53 文件 / 17,238 行**、测试 **57 文件 / 9,471 行**（341 个 `func Test`，
   外加 `cmd/pet-setup` 的 11 个）；
-  `bin/AI-Terminal-Pet.exe` **4,555,264 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
+  `bin/AI-Terminal-Pet.exe` **4,556,288 B**（与 `vendor/AI-Terminal-Pet.exe`、本机安装目录逐字节相同）、
   `bin/pet-statusline.exe` **3,664,896 B**、`bin/pet-hook.exe` **3,697,152 B**；
-  `dist/` 里是 1.0.8 的产物（`ai-terminal-pet-1.0.8-win-x64.zip` 5,054,322 B、
-  `pet-setup.exe` 14,308,864 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
+  `dist/` 里是 1.0.9 的产物（`ai-terminal-pet-1.0.9-win-x64.zip` 5,054,467 B、
+  `pet-setup.exe` 14,309,888 B；**只留当前版本**，更早的按 tag 与 Release 取，见 §47.1），
   均按 `-trimpath -buildvcs=false -ldflags "-s -w"` 构建，见 §26；
   第三方依赖 3 个。
 - **分发（两条线各四个入口）**：
-  - 插件线：npm `latest` = **1.2.17**（发版后 `npm view` 核对）；`dsh-plugin-v1.2.17` 的 Release 资产
-    `dsh-ai-terminal-pet-1.2.17.tgz` **2,006,574 B / sha256 `5D4B2AA8…` / shasum `a7c660a3…`**（19 个文件，
-    含中英两份 README），包内 README 的安装命令是 1.2.17；
+  - 插件线：npm `latest` = **1.2.18**（发版后 `npm view` 核对）；`dsh-plugin-v1.2.18` 的 Release 资产
+    `dsh-ai-terminal-pet-1.2.18.tgz` **2,006,574 B / sha256 `08A6FE06…` / shasum `bf28e3b1…`**（19 个文件，
+    含中英两份 README），包内 README 的安装命令是 1.2.18；
     钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 见 §52，`icon` 同一 sha；
     索引里的 `engines.dsh` 与包内声明一致，`verify.mjs` 断言这一点）。
-  - 浮窗线：`pet-v1.0.8` 的 Release 带两个资产——`ai-terminal-pet-1.0.8-win-x64.zip`
-    **5,054,322 B / sha256 `C8FE834A…`**（17 个文件）与 `pet-setup.exe` **14,308,864 B / sha256 `2EBF0E7E…`**；
-    `pet-v1.0.7` 及更早的每一个 tag 仍在（不可变，已被取代）。
+  - 浮窗线：`pet-v1.0.9` 的 Release 带两个资产——`ai-terminal-pet-1.0.9-win-x64.zip`
+    **5,054,467 B / sha256 `81F9FAB4…`**（17 个文件）与 `pet-setup.exe` **14,309,888 B / sha256 `3C22B4A7…`**；
+    `pet-v1.0.8` 及更早的每一个 tag 仍在（不可变，已被取代）。
   - **上游条目**：`main` 的 `tarball` 现在是 **1.2.16**（#15075 已被合并，2026-11-14 复读）；
     1.2.17 的跟进是
     [#15378](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15378)（分支
     `bump-tarball-1.2.17`，commit `a1579df`，单文件 `+3 −3`）已开、`MERGEABLE`，
-    `tools/upstream-entry.mjs --check` = `OK（in flight）`。
+    `tools/upstream-entry.mjs --check` = `OK（in flight）`；1.2.18 发版后再开一条同样的 PR。
     #14990（1.2.13）、#14945（1.2.11）、#14899（1.2.10）均已关并留说明。合并仍要人工，
     **合并 ≠ 可见**：判断可见性读对方站点索引文件（见 §50.5）。
   - **其余九家目录的当前状态见 §49**（哪些已最新、哪些等对方扫描、哪些在等人工复核）。
@@ -3640,6 +3641,79 @@ export default plugin
    所以不是它；若用户再报"未响应"，下一步用同一台机器上的 `hang.log` 时间戳去对
    `WM_DPICHANGED` 与托盘/贴边动作，而不是继续改绘制。
 4. **面板与 `--json` 的去重规则**：不要为了"统一"改掉。
+
+## 54. 交接：`hang.log` 的"卡死"有一半是待机（2026-11-15 早，第 54 轮；浮窗 1.0.9 / 插件 1.2.18）
+
+第 51 轮把 `hang.log` 里那六次 `WM_TIMER` stall 当成"设置窗口消失"的候选证据之一（§51.3 候选 2）。
+这一轮先做了一件便宜得多的事：**把它们和系统自己的电源事件对表**。结论是它们不是卡死，
+而 §51.3 的候选 2 一直由一份待机证据支撑着。
+
+### 54.1 对表的方法与结果（这台机器上可以重跑）
+
+两路数据都用 UTC 对齐：`hang.log` 的转储头写的是带 `+01:00` 偏移的本地时间，而
+`Get-WinEvent` 读出来的是 UTC，所以先换算再比。
+
+```powershell
+Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Kernel-Power'; Id=506,507} -MaxEvents 400 |
+  ForEach-Object { '{0}|{1}' -f $_.TimeCreated.ToUniversalTime().ToString('o'), $_.Id }
+```
+
+| `hang.log` 转储（本地） | 最近的 507（退出待机） | 差 |
+|---|---|---|
+| 2026-11-06 07:59:26 | 06:59:26.560Z → 本地 07:59:26.560 | **同一秒** |
+| 2026-11-13 09:47:22 | 08:47:22.789Z → 本地 09:47:22.789 | **同一秒** |
+| 2026-11-14 04:07:53 | 03:07:53.061Z → 本地 04:07:53.061 | **同一秒** |
+
+三次全部同一秒（日志保留期只到 2026-10-25，所以十月那三次对不上，但那三次的
+`goroutine 1` 也停在 `GetMessage`）。**机制**：看门狗用的是 `time.Now`，它**把睡眠算作流逝**：
+
+```
+GetTickCount64             102.73 h since boot   （含待机）
+QueryUnbiasedInterruptTime  96.17 h since boot   （只算清醒）
+                          差 394 分钟
+```
+
+所以一次超过 6 秒的睡眠，一醒来就"满足"6 秒无分发。
+
+### 54.2 改法与证据
+
+- `internal/ui/hang.go` 新增：`interruptTicks()`（`QueryUnbiasedInterruptTime`，100 ns 单位）、
+  `awakeElapsed()`、`hangDue()`。判定只吃清醒时间；`time.Now` 只用于日志里给人读的时间戳。
+- 转储头多一个字段：`awakeQuiet=8.001s`（以前只能靠猜；现在它写着"UI 线程清醒时多久没分发"）。
+- **待机不会触发**这件事只有跑一遍才算数，所以有两条会**真的启动看门狗**的测试
+  （`hang_watchdog_windows_test.go`：只给 handle、时钟与 `LOCALAPPDATA`，不需要窗口）：
+  ① 清醒 8 秒静默 → 必须转储，且头里 `awakeQuiet` 等于实测值；② 3 毫秒（待机恢复的形态）
+  → 必须静默；③ 时钟缺失 → 必须静默（宁可少报，不要误报）。
+- **真卡死照旧报**：诊断构建 `-tags petdebug` + `PET_HANG_PROBE_MS=12000` 让刷新处理器故意阻塞
+  12 秒，看门狗必须转储。发布构建里这个钩子是常数 0（`hang_probe_release.go`）。
+- §51.3 候选 3（DPI 重排把窗口移出工作区）也顺手做了：`clampSettingsToWorkArea` 的规则抽成纯函数
+  `clampOriginToWorkArea`，`settings_clamp_windows_test.go` 覆盖负坐标副屏、比窗口还矮/窄的工作区、
+  正好贴角。单屏机器上它本来就不可能出错，所以它值得一张表而不是一句注释。
+
+### 54.3 发版（1.0.9 / 1.2.18）
+
+按 `docs/UPSTREAM.md` §2 走完：版本 → 三二进制 → `vendor.mjs`（源码摘要 `2aab36f6…`，42 个文件；
+overlay 4,556,288 B / `ddade226…`）→ A 提交 → 双 tag → 双 Release → npm → B 提交钉 `source.commit`/`icon`
+→ 上游 PR。资产见 CHANGELOG 的 `[1.0.9]` 一节，三个都从公网 URL 下载回来重哈希核对过。
+
+**为什么这一轮要占一个版本号**：改的是 `internal/ui`（浮窗行为），而插件包自带一份 vendor 二进制，
+按规矩 vendor 变了就必须换插件版本。若只发浮窗，新装 DSH 的人会拿到 1.0.8 的浮窗。
+
+### 54.4 顺手修掉一条真实的测试夹具缺陷（suite 的 launch stub 会互相拉起）
+
+`tests/fresh-machine.mjs` 的 S3 把 `AI_TERMINAL_PET_EXE` 指向 `harness-launch-stub.exe`，而那个 stub
+原来是 **`pet-statusline.exe` 的副本**——statusline 自己也是上报端，管道不在时它会拉起
+`AI_TERMINAL_PET_EXE`，也就是**它自己**。本机的浮窗正好没在跑时，一次插件上报留下 **23 个** stub，
+它们持有沙箱里 exe 的句柄，S8 的 `-Uninstall` 于是报 `访问被拒绝`，套件 **159/162**。主机浮窗在跑时
+mutex 会挡住第二个实例，所以这个互相拉起平时不发作——这就是它一直没被发现的原因。stub 换成惰性的
+`hostname.exe` 之后 **162/162**。
+
+### 54.5 下一轮
+
+1. 设置窗口的 `WM_DPICHANGED` 与托盘/贴边动作：`hang.log` 现在能给出**真实**的清醒静默时长，
+   下次真出"未响应"时，用它的时间戳去对动作，而不是再改绘制（§53.6 已排除绘制）。
+2. Antigravity 若真报"关掉还留着"：装 hook（`terminationReason`），不要改 statusline 的映射（§53.5）。
+3. 面板与 `--json` 的去重规则：别为了"统一"改掉（§51.4、§52.5）。
 
 ## 50. 中文 README 与市场文案（2026-11-13 深夜，第 50 轮；只改文档与自述字段）
 
