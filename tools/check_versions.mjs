@@ -1,11 +1,11 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * Fail when a document states a version that the source of truth disagrees with.
  *
  * Why this exists
  * ---------------
  * This repository ships two version lines - the overlay (`pet-v*`, the constant
- * in internal/app/app_windows.go) and the DSH plugin package (`dsh-plugin-v*`,
+ * in internal/app/version.go) and the DSH plugin package (`dsh-plugin-v*`,
  * packages/dsh-ai-terminal-pet/package.json) - and about a dozen sentences in
  * the documentation name one of them. Nothing used to read those sentences, so
  * they rotted exactly as fast as nobody looked:
@@ -48,7 +48,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-const OVERLAY_SOURCE = 'internal/app/app_windows.go'
+const OVERLAY_SOURCE = 'internal/app/version.go'
 const ROOT_MANIFEST = 'package.json'
 const PACKAGE_MANIFEST = 'packages/dsh-ai-terminal-pet/package.json'
 const PACKAGE_README = 'packages/dsh-ai-terminal-pet/README.md'

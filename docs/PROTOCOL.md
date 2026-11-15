@@ -3,10 +3,10 @@
 > 目标读者：想给 **别的 CLI** 写一个第三方 reporter 的人。
 > 本文所有内容都取自真实代码，行号即出处：
 > 唯一事实来源是 [reporters/protocol.js](../reporters/protocol.js)（570 行，CommonJS），
-> 服务端契约在 [internal/pipeserver/server_windows.go](../internal/pipeserver/server_windows.go)
+> 服务端契约在 [internal/pipeserver/server_windows.go](../internal/pipeserver/server.go)
 > 与 [internal/session/session.go](../internal/session/session.go)，
 > 快照回退在 [internal/store/snapshot.go](../internal/store/snapshot.go)，
-> auto-approve 浮窗侧在 [internal/ui/approve_windows.go](../internal/ui/approve_windows.go)。
+> auto-approve 浮窗侧在 [internal/ui/approve_windows.go](../internal/ui/approve.go)。
 > 写实现前请先读 §3 的传输契约和 §4 的字段表，其余章节按需查。
 
 ## 1. 一句话模型
@@ -21,7 +21,7 @@ reporter **永远不能让宿主 CLI 失败**：不抛异常、不阻塞、不�
 | --- | --- | --- |
 | 版本字符串 | `ai-terminal-pet.v1` | `reporters/protocol.js:10`、`internal/session/session.go:16` |
 | 载荷上限 | 1 MiB（1048576 B，含换行符前的内容） | `session.go:17` `MaxPayloadBytes = 1 << 20`；`protocol.js:28` |
-| 传输编码 | UTF-8，一行以 `\n` 结束 | `server_windows.go:164` `ReadSlice('\n')` |
+| 传输编码 | UTF-8，一行以 `\n` 结束 | `server.go readPayload` `ReadSlice('\n')` |
 
 `schemaVersion` 在线上是可选的：Go 端收到空值会补成 `ai-terminal-pet.v1`（`session.go:133-135`），
 收到**别的**值直接 `unsupported schema version` → `ERR`。第三方实现请总是显式带上。
@@ -38,7 +38,7 @@ reporter **永远不能让宿主 CLI 失败**：不抛异常、不阻塞、不�
 
 | 端 | 函数 | 出处 |
 | --- | --- | --- |
-| Go（服务端） | `PipePathForUser()` | `internal/pipeserver/server_windows.go:37-45` |
+| Go（服务端） | `PipePathForUser()` | `internal/pipeserver/server.go` `PipePathForUser` |
 | JS（客户端） | `pipeScopeToken()` | `reporters/protocol.js:13-24` |
 
 Go 侧：`strings.ToLower(strings.TrimRight(os.UserHomeDir(), \`\\/\`))` → `sha256.Sum256` → `hex(sum[:4])`；
@@ -52,7 +52,7 @@ home 为空时**两边都不加后缀**，退化成 `\\.\pipe\ai-terminal-pet-v1
 
 服务端用 `winio.ListenPipe`，安全描述符 `D:P(A;;GRGW;;;OW)(A;;GRGW;;;SY)`
 （仅当前用户 + LocalSystem），InputBuffer 64 KiB / OutputBuffer 4 KiB，最多 32 条并发连接
-（`server_windows.go:23`）。
+（`server.go maxConnections`）。
 
 ### 3.2 请求：一行 JSON，然后半关闭
 
@@ -62,7 +62,7 @@ home 为空时**两边都不加后缀**，退化成 `\\.\pipe\ai-terminal-pet-v1
 
 `protocol.js:291-327` 的 `sendOnce()` 就是这条契约的实现（`socket.once("connect", () => socket.end(line, "utf8"))`）。
 **不要**先等 `drain`、不要关闭前再发第二行、不要握手——服务端每连接只读一行
-（`server_windows.go:137-158` `read()` → `readPayload()`）。
+（`server.go read/readPayload` `read()` → `readPayload()`）。
 
 ### 3.3 应答：只认精确的 `OK`
 
@@ -80,9 +80,9 @@ home 为空时**两边都不加后缀**，退化成 `\\.\pipe\ai-terminal-pet-v1
 | 现象 | 原因 | 出处 |
 | --- | --- | --- |
 | `ENOENT` | 没有进程在监听（浮窗未运行） | 客户端 `net.createConnection` 错误 |
-| `ETIMEDOUT` | 服务端 5 s 内没读到完整一行 | `server_windows.go:24` `connectionReadTimeout = 5 * time.Second` |
+| `ETIMEDOUT` | 服务端 5 s 内没读到完整一行 | `server.go connectionReadTimeout = 5 * time.Second` |
 | `EBADREPLY` | 回了非 `OK` 的内容，或连接提前断开 | `protocol.js:308-313` |
-| 连接被直接丢弃 | 并发连接已达 32 条 | `server_windows.go:23,178` `maxConnections = 32` |
+| 连接被直接丢弃 | 并发连接已达 32 条 | `server.go maxConnections = 32` |
 | `ERR` | 载荷校验失败 | `session.go:131-190` |
 
 `sendStatus` 的重试策略（`protocol.js:519-547`）：默认总预算 `retryMs = 5000`、
@@ -207,20 +207,20 @@ Go 端是 5 分钟、JS 钳到 4 分钟，中间那 1 分钟是给时钟漂移/�
 
 keepalive 的意义：reporter 只在**状态变化**时写快照，一个跑了十分钟的 `working` 会话
 时间戳会很旧但完全活着。只按 TTL 删文件曾导致面板和 `--json` 丢会话，所以
-`KeepAlive`（`internal/app/app_windows.go:74,537` 传 `presence.SessionAlive`）把"宿主还在"作为第二判据。
+`KeepAlive`（`internal/app/run.go` 传 `presence.SessionAlive`）把"宿主还在"作为第二判据。
 
 ## 7. auto-approve 的 `approvals/` 握手
 
 浮窗是只读面板，点不到别人终端里的"允许"。所以自动批准是**反向**的：hook 阻塞一小段时间
-等浮窗的否决，**沉默即批准**。实现在 `protocol.js:333-517` 与 `internal/ui/approve_windows.go`。
+等浮窗的否决，**沉默即批准**。实现在 `protocol.js:333-517` 与 `internal/ui/approve.go`。
 
 | 项 | 值 | 出处 |
 | --- | --- | --- |
 | 目录 | `%LOCALAPPDATA%\AI-Terminal-Pet\approvals\` | `protocol.js:406-409` |
 | 请求文件名 | `pending-<sanitizeStem(source)>-<sanitizeStem(sessionId)>-<pid>-<epochms>.json` | `protocol.js:428-453` |
 | 请求体 | `{"source","sessionId","pid","tool","createdAt"}` | `protocol.js:438-444` |
-| 否决文件名 | **同名文件 + `.deny`** | `protocol.js:459`；`approve_windows.go:257` |
-| 否决体 | `{"decision":"deny","at":"<RFC3339>"}` | `approve_windows.go:240` |
+| 否决文件名 | **同名文件 + `.deny`** | `protocol.js:459`；`approve.go` `writeApprovalDeny` |
+| 否决体 | `{"decision":"deny","at":"<RFC3339>"}` | `approve.go` |
 | 轮询间隔 | 100 ms（`APPROVAL_POLL_MS`） | `protocol.js:355` |
 | 默认超时 | 5 s（`DEFAULT_APPROVE_TIMEOUT_SEC`），配置范围 1–60 s | `protocol.js:357,394-399` |
 | 文件权限 | hook 侧 `0o600`，先写 `.tmp` 再 `rename` | `protocol.js:446-448` |
@@ -252,7 +252,7 @@ keepalive 的意义：reporter 只在**状态变化**时写快照，一个跑了
 任何未预期错误 → `waitForApprovalDecision` 返回 `"deny"` 且**永不抛**
 （`protocol.js:499-517`）。第三方实现照此办理：宁可多问一次，也不要静默放行。
 
-浮窗侧的 `approvalTracker`（`approve_windows.go:124-144`）只给 `waiting_permission` 的会话计时，
+浮窗侧的 `approvalTracker`（`approve.go approvalTracker.update`）只给 `waiting_permission` 的会话计时，
 `updatedAt` 变化即重启倒计时（新的一轮权限请求），会话离开该状态就立刻丢计时器（不会"幽灵批准"）。
 
 ## 8. 最小 reporter 实现（Node.js，约 20 行）

@@ -1,302 +1,42 @@
 package app
 
+// The platform-neutral half of the overlay: the scanner loop, the config watcher,
+// the two savers, the config-to-UI mapping and the --json side.
+//
+// RunWith (run.go) is the only place that knows the whole lifecycle; everything here
+// is a piece of it with no OS in it, which is why internal/app can now be compiled
+// for two more platforms. Splitting them is handover §55.6 step 7.
+
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
 
-	"ai-terminal-pet/internal/autostart"
 	"ai-terminal-pet/internal/config"
-	"ai-terminal-pet/internal/pipeserver"
-	"ai-terminal-pet/internal/platform"
+	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/session"
 	"ai-terminal-pet/internal/store"
 	"ai-terminal-pet/internal/ui"
 )
 
-// Version is reported by `ai-terminal-pet --version`.
-//
-// 1.0.7 rather than 1.0.6: the settings window became readable and usable. The
-// type ramp now lands on four distinct sizes instead of two (GDI snaps a
-// requested height to its own step, so 11/12/13 px all drew the same 8 px em),
-// hints wrap to two lines instead of losing text to an ellipsis, the window
-// reads its own DPI and follows WM_DPICHANGED, and the Look tab - which was
-// drawn, hovered and highlighted but wired to nothing - finally switches.
-//
-// 1.0.8 fixes the two defects that report described as "closed things still
-// show" and "the settings window flashes and goes away". An archived
-// OpenCode conversation now ends its row (the host emits `session.archived`,
-// not `session.deleted`), and a visible settings window keeps the process
-// alive instead of letting the session-less idle timer quit underneath it.
-//
-// 1.0.9 stops the hang watchdog from reporting standby as a stall. hang.log
-// held six "6 s stalls"; three of them landed on the same second as the
-// system's own "exiting standby" event, and the clock the watchdog used
-// (time.Now) counts the hours the machine spends asleep - 394 minutes on the
-// machine that reported them. QueryUnbiasedInterruptTime excludes that time,
-// so a resume can no longer look like a freeze. See internal/ui/hang.go.
-const Version = "1.0.9"
+// scanInterval is deliberately slow. Presence caches the OS view for 10s, reporters
+// push state changes immediately over the pipe, and the panel already skips
+// identical frames. Five seconds is enough to notice a terminal that started
+// without a reporter event, without waking the process twice a second forever.
+const scanInterval = 5 * time.Second
 
-func Run() error {
-	return RunWith(false)
-}
+// scanIntervalForTest is the same value the scanner goroutine uses, exposed so a
+// test can assert the cadence instead of waiting five seconds to observe it.
+func scanIntervalForTest() time.Duration { return scanInterval }
 
-// RunWith starts the overlay, optionally opening the settings window once the
-// panel is up. `--settings` needs this: when nothing is running yet there is no
-// window to post to, and silently starting a panel without the settings window
-// the user asked for would make the flag a lie.
-func RunWith(openSettings bool) error {
-	// Single-instance gate doubles as pipe-preemption mitigation: only the
-	// mutex holder proceeds to pipeserver.New/ListenPipe (see PipePathForUser).
-	// A second instance does not just exit silently - it pokes the live
-	// overlay so a user double-clicking the executable sees it appear
-	// instead of nothing happening.
-	instance, err := platform.AcquireInstance(`Local\AI-Terminal-Pet-v1-SingleInstance`)
-	if errors.Is(err, platform.ErrAlreadyRunning) {
-		if openSettings {
-			ui.Control(ui.ControlSettings)
-		} else {
-			ui.Control(ui.ControlActivate)
-		}
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	defer instance.Close()
-	localAppData := os.Getenv("LOCALAPPDATA")
-	if localAppData == "" {
-		return errors.New("LOCALAPPDATA is not set")
-	}
-	platform.HideConsole()
-	directory := filepath.Join(localAppData, "AI-Terminal-Pet")
-	// Reclaim atomic-write temporaries orphaned by a hard kill. Two minutes is
-	// already orders of magnitude longer than the write it guards, and the
-	// overlay is single-instance, so nothing else can hold one in flight.
-	// scripts/install.ps1 force-stops the overlay before every upgrade, so a longer
-	// window would leave a visible orphan behind after each reinstall.
-	config.SweepTemporaryFiles(directory, 2*time.Minute)
-	runtimeDirectory := filepath.Join(directory, "runtime")
-	// One cached OS view drives snapshot retention, liveness and cleanup for
-	// the whole process. It replaces the old model where "no reporter push for
-	// 15/30 seconds" was taken to mean the session had ended.
-	presence := platform.NewPresence(platform.DefaultPresenceTTL)
-	scanner := store.SnapshotScanner{
-		Directory: runtimeDirectory,
-		TTL:       store.DefaultSnapshotTTL,
-		Now:       time.Now,
-		Alive:     presence.ProcessAlive,
-		KeepAlive: presence.SessionAlive,
-	}
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	configPath := filepath.Join(directory, config.FileName)
-	statePath := filepath.Join(directory, config.StateFileName)
-	settings := config.Load(configPath)
-	placement := config.LoadState(statePath)
-	// Saves are coalesced onto a background goroutine: a placement write
-	// happens right after a drag, and on machines with AV write hooks an
-	// inline write could stall the UI thread for hundreds of milliseconds.
-	saver := newPlacementSaver(statePath)
-	defer saver.flush()
-	// config.json gets the same treatment. The settings window writes on every
-	// click and once per slider drag, and an inline write there would put a
-	// file write on the UI thread for a window that is already repainting.
-	settingsSaver := newConfigSaver(configPath)
-	defer settingsSaver.flush()
-
-	autostartManager := autostart.New()
-	executable, executableErr := os.Executable()
-	autostartEnabled := false
-	if executableErr == nil {
-		// Repair a stale path first. The install path is the only thing in
-		// the Run value, so a moved or reinstalled binary would fail silently
-		// at logon - the worst possible way to fail. Sync never enables a
-		// disabled entry, so this cannot turn autostart on by itself.
-		if _, err := autostartManager.Sync(executable); err != nil {
-			// Autostart is a convenience, not a prerequisite: a registry that
-			// refuses to cooperate must not stop the overlay from running.
-			_ = err
-		}
-		if status, err := autostartManager.Status(); err == nil {
-			autostartEnabled = status.Enabled
-		}
-	}
-
-	values := store.New()
-	window := ui.New(values, ui.Options{
-		Opacity: uint8(settings.Opacity),
-		Settings: ui.Settings{
-			Notifications:         settings.Notifications,
-			Sound:                 settings.Sound,
-			SoundVolume:           settings.SoundVolume,
-			SoundScheme:           settings.SoundScheme,
-			SoundOnWaiting:        settings.SoundOnWaiting,
-			SoundOnError:          settings.SoundOnError,
-			NotifyOnFinish:        settings.NotifyOnFinish,
-			DonePolicy:            settings.DonePolicy,
-			ForegroundAware:       settings.ForegroundAware,
-			IdleSeconds:           settings.IdleMinutes * 60,
-			QuietCurrent:          settings.QuietCurrent,
-			MutedSessions:         append([]string(nil), settings.MutedSessions...),
-			QuietSubagents:        settings.QuietSubagents,
-			AlwaysOnTop:           settings.AlwaysOnTop,
-			EdgeRetract:           settings.EdgeRetract,
-			Language:              settings.Language,
-			AutoApprove:           settings.AutoApprove,
-			AutoApproveTimeoutSec: settings.AutoApproveTimeoutSec,
-			Opacity:               settings.Opacity,
-			Theme:                 settings.Theme,
-			PerSourceColor:        settings.PerSourceColor,
-			HiddenAtLaunch:        settings.HiddenAtLaunch,
-			SettingsTextSize:      settings.SettingsTextSize,
-			SettingsKeyboard:      settings.SettingsKeyboard,
-			SettingsTooltips:      settings.SettingsTooltips,
-		},
-		AutoStart:             autostartEnabled,
-		AutoApproveTimeoutSec: settings.AutoApproveTimeoutSec,
-		OpenSettings:          openSettings,
-		// The attendance sampler reuses this exact cache: one Toolhelp
-		// snapshot and one EnumWindows pass serve both liveness and "is the
-		// user looking at that session", instead of enumerating twice.
-		Presence: presence,
-		Initial: ui.Placement{
-			Placed:   placement.Placed,
-			X:        placement.X,
-			Y:        placement.Y,
-			Zoom:     placement.Zoom,
-			Expanded: placement.Expanded,
-		},
-		OnPlacementChanged: func(value ui.Placement) {
-			saver.save(config.State{
-				Placed:   value.Placed,
-				X:        value.X,
-				Y:        value.Y,
-				Zoom:     value.Zoom,
-				Expanded: value.Expanded,
-			})
-		},
-		OnSettingsChanged: func(value ui.Settings) {
-			// Staged, not written: the read, the merge and the write all happen
-			// on the saver's goroutine so a click can never block the pump.
-			settingsSaver.save(value)
-		},
-		OnAutoStartChanged: func(enabled bool) bool {
-			if executableErr != nil {
-				return false
-			}
-			if enabled {
-				return autostartManager.Enable(executable) == nil
-			}
-			return autostartManager.Disable() == nil
-		},
-	})
-	// Snapshot files are the durable record of which conversations exist.
-	// seenSnapshots remembers every identity that ever had one, so a file
-	// disappearing is an explicit "this session ended" signal - reporters
-	// remove their snapshot on close, and writing a `closed` payload has the
-	// same effect. Without this, a pipe session whose file was deleted stayed
-	// in memory forever, propped up by a long-lived parent pid.
-	seenSnapshots := make(map[string]bool)
-	apply := func() bool {
-		now := time.Now()
-		changed := false
-		items, present := scanner.ScanWithKeys()
-		for _, value := range items {
-			changed = values.UpsertSnapshot(value, now) || changed
-			seenSnapshots[store.Key(value)] = true
-		}
-		alive := snapshotAwareAlive(present, seenSnapshots, presence.SessionAlive)
-		// Reconcile, not Cleanup: a live terminal keeps its session no matter
-		// how long the reporter has been quiet. Reconcile only bumps the
-		// revision when a session is really added or removed, so a quiet
-		// desktop schedules no repaints at all.
-		changed = values.Reconcile(now, alive, store.DefaultAbsenceGrace) || changed
-		return changed
-	}
-	apply()
-	server, err := pipeserver.New(pipeserver.PipePathForUser(), func(value session.Session) {
-		changed := values.UpsertPipe(value, time.Now())
-		if changed {
-			window.Refresh()
-			if value.State != session.StateClosed {
-				window.Activate()
-			}
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("pipe server: %w", err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	serverDone := make(chan struct{})
-	serverErr := make(chan error, 1)
-	go func() {
-		defer close(serverDone)
-		if serveErr := server.Serve(ctx); serveErr != nil {
-			select {
-			case serverErr <- serveErr:
-			default:
-			}
-			window.Close()
-		}
-	}()
-	defer func() {
-		cancel()
-		server.Close()
-		<-serverDone
-	}()
-	go scan(ctx, scanner, apply, window.Refresh)
-	// Hot-reload the human-editable config without restarting the overlay.
-	// A single Stat every 30s is cheaper than any Windows file watcher and
-	// needs no extra handle or thread.
-	go watchConfig(ctx, configPath, func() {
-		current := config.Load(configPath)
-		// A settings-window change lands on disk and bumps mtime; reloading it
-		// straight back would echo the write. Only a change this process did
-		// not make is worth applying.
-		if settingsSaver.echo(current) {
-			return
-		}
-		window.QueueSettings(ui.Settings{
-			Notifications:         current.Notifications,
-			Sound:                 current.Sound,
-			SoundVolume:           current.SoundVolume,
-			SoundScheme:           current.SoundScheme,
-			SoundOnWaiting:        current.SoundOnWaiting,
-			SoundOnError:          current.SoundOnError,
-			NotifyOnFinish:        current.NotifyOnFinish,
-			AlwaysOnTop:           current.AlwaysOnTop,
-			EdgeRetract:           current.EdgeRetract,
-			Language:              current.Language,
-			AutoApprove:           current.AutoApprove,
-			AutoApproveTimeoutSec: current.AutoApproveTimeoutSec,
-			Opacity:               current.Opacity,
-			Theme:                 current.Theme,
-			PerSourceColor:        current.PerSourceColor,
-			HiddenAtLaunch:        current.HiddenAtLaunch,
-			SettingsTextSize:      current.SettingsTextSize,
-			SettingsKeyboard:      current.SettingsKeyboard,
-			SettingsTooltips:      current.SettingsTooltips,
-		})
-	})
-	if err := window.Run(); err != nil {
-		return fmt.Errorf("window: %w", err)
-	}
-	select {
-	case err := <-serverErr:
-		return fmt.Errorf("pipe server: %w", err)
-	default:
-		return nil
-	}
-}
+// configWatchInterval is intentionally slow. Hand edits to config.json are rare and
+// a 30s delay is imperceptible, while a filesystem watcher would add a handle and a
+// thread to a process whose whole job is to stay lightweight.
+const configWatchInterval = 30 * time.Second
 
 // snapshotAwareAlive combines the durable disk record with OS liveness.
 //
@@ -327,13 +67,6 @@ func snapshotAwareAlive(present, seen map[string]bool, fallback func(session.Ses
 	}
 }
 
-// scanInterval is deliberately slow. Presence caches the OS view for 10s,
-// reporters push state changes immediately over the pipe, and the panel
-// already skips identical frames. Five seconds is enough to notice a terminal
-// that started without a reporter event, without waking the process twice a
-// second forever.
-const scanInterval = 5 * time.Second
-
 func scan(ctx context.Context, scanner store.SnapshotScanner, apply func() bool, refresh func()) {
 	ticker := time.NewTicker(scanInterval)
 	defer ticker.Stop()
@@ -348,11 +81,6 @@ func scan(ctx context.Context, scanner store.SnapshotScanner, apply func() bool,
 		}
 	}
 }
-
-// configWatchInterval is intentionally slow. Hand edits to config.json are
-// rare and a 30s delay is imperceptible, while a filesystem watcher would add
-// a handle and a thread to a process whose whole job is to stay lightweight.
-const configWatchInterval = 30 * time.Second
 
 func watchConfig(ctx context.Context, path string, onChange func()) {
 	watchConfigWithInterval(ctx, path, onChange, configWatchInterval)
@@ -621,13 +349,13 @@ type AlertReportSession struct {
 // timestamp is still reported while its host terminal is observable, so a
 // quiet session does not vanish from a script's view either.
 func Snapshot() (Report, error) {
-	localAppData := os.Getenv("LOCALAPPDATA")
-	if localAppData == "" {
-		return Report{}, errors.New("LOCALAPPDATA is not set")
+	directory := home.Directory()
+	if directory == "" {
+		return Report{}, ErrNoDataDirectory
 	}
-	presence := platform.NewPresence(platform.DefaultPresenceTTL)
+	presence := newPresence()
 	scanner := store.SnapshotScanner{
-		Directory: filepath.Join(localAppData, "AI-Terminal-Pet", "runtime"),
+		Directory: filepath.Join(directory, "runtime"),
 		TTL:       store.DefaultSnapshotTTL,
 		Now:       time.Now,
 		Alive:     presence.ProcessAlive,
@@ -649,7 +377,7 @@ func Snapshot() (Report, error) {
 	// NOT in runtime/, because every *.json in runtime/ is a reporter snapshot
 	// and the store scanner deletes the ones it cannot parse (see
 	// internal/store/runtime_contract_test.go).
-	alerts := readAlertReport(filepath.Join(localAppData, "AI-Terminal-Pet"))
+	alerts := readAlertReport(directory)
 	return Report{
 		SchemaVersion: session.SchemaVersion,
 		State:         session.Aggregate(items),

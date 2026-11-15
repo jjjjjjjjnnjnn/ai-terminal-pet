@@ -42,14 +42,14 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 # source instead of taking a literal here means a future version bump moves the
 # filename in the same commit, with no second place to forget.
 if (-not $Version) {
-  $appFile = Join-Path $RepoRoot 'internal\app\app_windows.go'
+  $appFile = Join-Path $RepoRoot 'internal\app\version.go'
   if (-not (Test-Path -LiteralPath $appFile -PathType Leaf)) {
-    Write-Output '[fail] package: internal\app\app_windows.go is missing, so the overlay version cannot be read'
+    Write-Output '[fail] package: internal\app\version.go is missing, so the overlay version cannot be read'
     exit 1
   }
   $match = Select-String -LiteralPath $appFile -Pattern 'const\s+Version\s*=\s*"([^"]+)"' | Select-Object -First 1
   if (-not $match) {
-    Write-Output '[fail] package: no `const Version = "..."` line in internal\app\app_windows.go'
+    Write-Output '[fail] package: no `const Version = "..."` line in internal\app\version.go'
     exit 1
   }
   $Version = $match.Matches[0].Groups[1].Value

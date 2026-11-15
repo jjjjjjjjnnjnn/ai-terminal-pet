@@ -336,7 +336,7 @@ Terminal hooks run inside your development environment, so their boundaries are 
 
 ### Known limits
 
-- **Windows only**: The overlay relies directly on Win32 layered windows and Windows named pipes; macOS and Linux are not supported. A port is being inventoried, not announced: the exact size of the work is in [docs/HANDOVER.md](docs/HANDOVER.md) §55, and the seven-step order is in [docs/ROADMAP.md](docs/ROADMAP.md) §2 E3.
+- **The floating panel is Windows-only for now; the reporting path is not**: the overlay's window is Win32 (layered window + GDI). The cross-platform work is in progress and the measured state is in [docs/PLATFORMS.md](docs/PLATFORMS.md): `pet-hook`, `pet-statusline`, `--json`, `--connect`, `--autostart` and the socket transport already build and pass their tests on Linux, and compile for `darwin/arm64`; what does not exist off Windows is the panel itself, and a build without it says so (`ErrNoWindowLayer`) instead of starting a window nobody can see. The inventory is [docs/HANDOVER.md](docs/HANDOVER.md) §55 and the seven-step order is [docs/ROADMAP.md](docs/ROADMAP.md) §2 E3.
 
 - **Process creation overhead**: Antivirus scanning hooks can make each Node.js process launch take roughly 1s; using the native `pet-hook.exe` / `pet-statusline.exe` binaries or adding an AV exclusion for the install folder reduces this latency. The delay comes from process scanning rather than application code.
 
@@ -744,7 +744,7 @@ echo '{"state":"error","reason":"build failed"}' | node reporters/generic.js --s
 
 ### 已知限制
 
-- **仅限 Windows**：仅基于 Win32 分层窗口与 Windows 命名管道构建，不支持 macOS 或 Linux。跨平台**只在盘点阶段**，没有承诺：工作量与七步顺序见 [docs/HANDOVER.md](docs/HANDOVER.md) §55 与 [docs/ROADMAP.md](docs/ROADMAP.md) §2 E3。
+- **浮窗本体目前只在 Windows 上，但上报链路已经不是**：面板是 Win32 分层窗口 + GDI。跨平台改造正在进行，实测状态见 [docs/PLATFORMS.md](docs/PLATFORMS.md)：`pet-hook`、`pet-statusline`、`--json`、`--connect`、`--autostart` 与 socket 传输层在 Linux 上已能构建并通过各自的测试，也能为 `darwin/arm64` 交叉编译；Windows 之外**还没有的只有面板本身**，而一个没有面板的构建会明确报错（`ErrNoWindowLayer`），不会启动一个谁也看不见的窗口。盘点见 [docs/HANDOVER.md](docs/HANDOVER.md) §55，七步顺序见 [docs/ROADMAP.md](docs/ROADMAP.md) §2 E3。
 - **杀毒软件增加进程启动开销**：在部分开启杀毒软件钩子的机器上，频繁启动 Node 进程会导致可感知的延迟；建议改用原生 `pet-hook.exe` / `pet-statusline.exe`，并为安装目录配置杀毒排除项。
 - **低完整性工作目录**：若整棵目录树带 Low 强制完整性标签，其中的可执行文件继承该标签，而 Low 完整性进程打不开浮窗的命名管道（浮窗跑在 Medium）。在这种目录里直接用 `bin\` 下的二进制测试会静默投递不到，请先复制到安装目录或 `%TEMP%` 再跑；安装后的副本不受影响。
 - **还没有代码签名**：不使用 DeepSeek Harness 的 Windows 用户现在有**两个**成品包可下——自解压的 `pet-setup.exe` 与便携 zip，都由 `scripts/package.ps1` 打出、随 GitHub Release 发布——但既没有 `.msi` 也没有代码签名。首次运行会撞 SmartScreen 的「未知发布者」提示；在签名到位之前，每个包里那份逐文件 `SHA256SUMS.txt` 才是诚实的来源证明。签名过的单文件安装包在路线图上。

@@ -33,25 +33,7 @@ const (
 	niifNoSound = 0x00000010
 	// niifInfo is NIIF_INFO; lxn/win only exports the warning/error flags.
 	niifInfo = 0x00000001
-
-	soundSchemeChime = "chime"
-	soundSchemeBell  = "bell"
-	soundSchemeSoft  = "soft"
-	soundSchemePulse = "pulse"
-	defaultScheme    = soundSchemeChime
 )
-
-// SoundSchemes is the user-visible order shown by the settings window.
-var SoundSchemes = []string{soundSchemeChime, soundSchemeBell, soundSchemeSoft, soundSchemePulse}
-
-func validSoundScheme(value string) string {
-	for _, name := range SoundSchemes {
-		if name == value {
-			return value
-		}
-	}
-	return defaultScheme
-}
 
 const (
 	waveSine = iota
