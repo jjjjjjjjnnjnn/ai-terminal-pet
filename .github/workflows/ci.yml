@@ -401,8 +401,10 @@ jobs:
 
       - name: Headless Linux CLI, install, and hook smoke test
         run: |
+          export GOPATH="$(go env GOPATH)"
+          export GOMODCACHE="$(go env GOMODCACHE)"
           sandbox="$(mktemp -d)"
-          trap 'rm -rf "$sandbox"' EXIT
+          trap 'chmod -R u+w "$sandbox" 2>/dev/null || true; rm -rf "$sandbox"' EXIT
           export HOME="$sandbox"
           export TMPDIR="$sandbox/tmp"
           export XDG_DATA_HOME="$sandbox/data"
@@ -418,6 +420,9 @@ jobs:
           "$XDG_DATA_HOME/ai-terminal-pet/AI-Terminal-Pet" --quit
           sh ./scripts/install.sh --uninstall
           node scripts/package-unix.mjs --target=linux/amd64,linux/arm64 --output="$sandbox/dist"
+          mkdir -p "$sandbox/tarcheck"
+          tar -xzf "$sandbox/dist"/ai-terminal-pet-*-linux-amd64.tar.gz -C "$sandbox/tarcheck" --strip-components=1
+          (cd "$sandbox/tarcheck" && sha256sum -c SHA256SUMS.txt)
 
   # Native macOS (darwin/arm64) build and headless verification with CGO_ENABLED=0.
   # Live WindowServer probes stay opt-in (PET_COCOA_PROBE=1), while Objective-C
@@ -464,8 +469,10 @@ jobs:
 
       - name: Headless macOS CLI, install, and hook smoke test
         run: |
+          export GOPATH="$(go env GOPATH)"
+          export GOMODCACHE="$(go env GOMODCACHE)"
           sandbox="$(mktemp -d)"
-          trap 'rm -rf "$sandbox"' EXIT
+          trap 'chmod -R u+w "$sandbox" 2>/dev/null || true; rm -rf "$sandbox"' EXIT
           export HOME="$sandbox"
           export TMPDIR="$sandbox/tmp"
           export XDG_DATA_HOME="$sandbox/data"
