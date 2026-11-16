@@ -33,6 +33,31 @@
 已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 
+## [1.2.26] — 2026-11-16（只改文案：包的内页开头重写，npm 页与仓库同源）
+
+按本仓库的规矩，**改一句随包发布的 README 也要新版本号**（资产不可变，1.2.1 与 1.2.4 就是这么来的）。
+这一版除了下面这段文案之外没有任何改动：`lib/`、`vendor/`、`protocol.js`、清单字段与协议全部与 1.2.25 相同。
+
+### 改了什么
+
+- `README.md` / `README.zh.md` 的开头从"一个把 Harness 状态送到浮窗的 Cordis bundle"改成先给结论：
+  **你的 agent 在等你，而你在另一个标签页里** —— 然后一句话说清它是什么、装完能看到什么、不会自己接别的终端。
+- 顺手修掉两处已经不准的话：开头还写着"置顶的 Win32 小窗"（早已三平台）；
+  "运行期不联网（除非维护者在 `release-pins.json` 里钉了资产）"（pin 现在就在包里，Linux/macOS 首次使用会下载一次）。
+  现在明确写：Windows 内置、离线；Linux/macOS 首次从钉住的归档下载一次并校验摘要。
+
+### 实测
+
+- `node packages/dsh-ai-terminal-pet/verify.mjs` 全过（118 条）；`tools/check_versions.mjs` 20 条一致；
+  `tools/check_docs_links.py` 12 份全解。
+- 浮窗本体零改动（仍是 **1.0.14**），`vendor/AI-Terminal-Pet.exe` 字节未变（`DB2DD2AB…`）。
+
+### 1.2.26 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `dsh-plugin-v1.2.26` | `dsh-ai-terminal-pet-1.2.26.tgz` | 2,072,884 B（20 文件） | `030545BBAADEB58158462F05F71FB8D06E3BD9B5D508914A741A3459259EFCDA` |
+
 ## [1.2.25] — 2026-11-16（macOS 的提示音第一次被执行就崩了：AppKit 会话之前不许碰 NSSound）
 
 这一版只有一个原因，而它值得单独记：**1.2.24 的 macOS 提示音路径，第一次被执行就 SIGSEGV**。

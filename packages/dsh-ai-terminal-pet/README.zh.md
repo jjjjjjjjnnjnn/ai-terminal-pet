@@ -2,18 +2,18 @@
 
 [English](./README.md) · **中文**
 
-一个 DeepSeek Harness（DSH）的 Cordis bundle：把 Harness 的会话状态送到
-[AI Terminal Pet](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet) 桌面浮窗上——
-一个常驻置顶的小窗，一眼看出哪些会话在跑、哪一个在等你确认、哪个出错、哪个已经完成。
+**你的 agent 在等你，而你在另一个标签页里。** 这是
+[AI Terminal Pet](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet) 的 DeepSeek Harness（DSH）bundle：
+一条 56 px 的置顶窄条，告诉你哪个 Harness 会话在跑、哪一个在等你确认、哪个出错、哪个已完成 ——
+再点一下，直接回到那个终端。
 
-包里带着**预编译好的浮窗**和官方的上报协议模块，所以装上这一个包，屏幕上就有一块跟着
-**这个 Harness** 的会话走的面板。它**不会**自己接上别的终端：OpenCode、Claude Code 与 Antigravity
-的会话，要先给那个终端各自装好上报端才会出现。每个终端对应一行钩子，写在仓库 README 的
+装上它，**这个 Harness** 的会话就会出现。它**不会**自己接上别的终端：OpenCode、Claude Code 与
+Antigravity 的行，要先给那个终端各自装好上报端才会出现 —— 每个终端一行钩子，写在仓库 README 的
 [Connect your terminal](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet#connect-your-terminal)
-一节里；面板、管道与协议是共用的，所以某个终端一旦开始上报，它的会话就会出现在 Harness 会话旁边。
+一节里。面板、端点与协议是共用的，所以某个终端一旦开始上报，它的会话就会出现在 Harness 旁边。
 
-没有任何 npm 依赖、没有安装期脚本、运行期不联网（除非维护者在 `lib/release-pins.json` 里显式钉了一个
-Release 资产，见下文）。
+Windows、Linux（X11）与 macOS。Windows 上浮窗随包内置、离线安装；Linux / macOS 上则首次使用从钉住的
+发布归档下载一次（按 `lib/release-pins.json` 校验摘要，以 `0755` 安装）。没有任何 npm 依赖、没有安装期脚本。
 
 ## 它做了什么
 
@@ -75,10 +75,10 @@ capabilities 是**自我声明**、从不校验——DSH 并不沙箱化插件�
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # Release tarball：与 npm 上同一份字节，直接来自 GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.25/dsh-ai-terminal-pet-1.2.25.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.26/dsh-ai-terminal-pet-1.2.26.tgz
 
 # git 源，钉住 Release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.25&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.26&path:/packages/dsh-ai-terminal-pet"
 ```
 
 这三种只差运输方式。npm 那条最短，也是市场按包名安装时走的路径；tarball 那条给「钉住 Release 资产

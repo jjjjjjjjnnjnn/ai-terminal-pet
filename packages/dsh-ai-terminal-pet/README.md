@@ -2,22 +2,23 @@
 
 **English** · [中文](./README.zh.md)
 
-A DeepSeek Harness (DSH) Cordis bundle that mirrors Harness session state onto
-the [AI Terminal Pet](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet) desktop
-overlay: a small always-on-top Win32 pet that shows which sessions are working,
-which one is waiting for your approval, which failed, and which finished.
+**Your agents are waiting. You are in another tab.** This is the DeepSeek Harness
+(DSH) bundle for [AI Terminal Pet](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet):
+one 56 px always-on-top strip that shows which Harness session is working, which
+one is waiting for your approval, which failed, and which finished - and takes
+you back to the right terminal in one click.
 
-The package ships the overlay binary and the official reporter protocol module
-inside the tarball, so a single market install is enough to get a pet on screen
-that follows **this Harness's** sessions. It does not attach to any other
-terminal by itself: sessions from OpenCode, Claude Code and Antigravity appear
-only after that terminal's own reporter is installed into it. The repository
-README section [Connect your terminal](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet#connect-your-terminal)
-has one hook per terminal; the panel, the pipe and the protocol are shared, so
-once a terminal reports it shows up next to the Harness sessions.
+Install it and **this Harness's** sessions appear. It does not attach to any other
+terminal by itself: OpenCode, Claude Code and Antigravity rows appear only after
+that terminal's own reporter is installed - one hook each, in the repository
+README's [Connect your terminal](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet#connect-your-terminal)
+section. The panel, the endpoint and the protocol are shared, so a terminal that
+reports shows up next to the Harness sessions.
 
-No npm dependencies, no install scripts, no network calls at runtime (unless the
-maintainer pins a release in lib/release-pins.json, see below).
+Windows, Linux (X11) and macOS. On Windows the overlay ships inside this package
+and installs offline; on Linux and macOS it is fetched once from the pinned
+release archive (verified against `lib/release-pins.json`, installed `0755`).
+No npm dependencies, no install scripts.
 
 ## What it does
 
@@ -95,10 +96,10 @@ tarball, or by pinning the release tag. All three are verified end to end:
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # release tarball: same bytes as the npm release, straight from the GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.25/dsh-ai-terminal-pet-1.2.25.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.26/dsh-ai-terminal-pet-1.2.26.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.25&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.26&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Those three differ only in transport. The npm path is the shortest and the one a

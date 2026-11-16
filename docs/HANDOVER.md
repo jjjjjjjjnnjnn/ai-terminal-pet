@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.25** 已发版；**§68 第 68 轮（公开文案）：README 重写、4 张坏图与 3 处不实描述修掉、链接门禁开始查图片；§67 DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗）；§66 POSIX 平权：Linux 提示音与通知面、跳转失败不再静默、`--doctor` 13 项**）
+## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.26** 已发版；**§68 第 68 轮（公开文案）：README 重写、4 张坏图与 3 处不实描述修掉、链接门禁开始查图片；§67 DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗）；§66 POSIX 平权：Linux 提示音与通知面、跳转失败不再静默、`--doctor` 13 项**）
 
 > 接手请先读本节与 **§68「公开文案重做」**
 > （README 的新结构、被抓到的三处不实描述、图片门禁与它的自测、以及"硬件实测永久跳过"的对外写法），
@@ -58,9 +58,9 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.14`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.25`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.14` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.25`。
-  **工作区与本机安装目录已经与 `1.0.14` / `1.2.25` 同步**：`bin/`、
+- **版本**：浮窗 **`1.0.14`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.26`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.14` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.26`。
+  **工作区与本机安装目录已经与 `1.0.14` / `1.2.26` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `DB2DD2AB…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
