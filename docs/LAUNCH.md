@@ -89,8 +89,8 @@ imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 
 
 - [x] **六个跨平台资产**（`pet-v1.0.15`）：`pet-setup.exe` / `ai-terminal-pet-1.0.15-win-x64.zip` /
       `linux-{amd64,arm64}.tar.gz` / `darwin-{arm64,amd64}.tar.gz`；字节与 sha256 见
-      [CHANGELOG](../CHANGELOG.md) 的「1.0.15 / 1.2.23 发布包实测清单」，全部从公开 URL 下载回来逐字节核对过
-- [x] 独立 tag `pet-v1.0.15` + Release；`scripts\install.cmd -VerifyOnly` **11/11**，`--doctor` 10 ok / 1 warn / 0 fail
+      [CHANGELOG](../CHANGELOG.md) 的「1.0.15 / 1.2.27 发布包实测清单」，全部从公开 URL 下载回来逐字节核对过
+- [x] 独立 tag `pet-v1.0.15` + Release；`scripts\install.cmd -VerifyOnly` **12/12**，`--doctor` 12 ok / 1 warn / 0 fail
 - [x] 插件包 `dsh-ai-terminal-pet` **1.2.27**（npm `latest`、`dsh-plugin-v1.2.27` Release、上游 `+1 −1` 的跟进 PR）
 - [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 342,606 B），三段真实动作
       —— 等待呼吸 → 悬停展开 → 点击等待行。循环时长 5.4 秒而不是 15 秒：GIF 是循环播放的，
@@ -201,7 +201,7 @@ long it has been asking.
 
 3/5 Auto-approve is off by default and opt-in per terminal. Before the 5-second countdown starts a denylist is checked: rm -rf, rd /s, format, git push --force. Those always go to manual review; silence only approves an ordinary tool prompt you chose to delegate.
 
-4/5 Three native exes, no runtime at install: the 4.49 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
+4/5 Three native exes, no runtime at install: the 4.50 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
 
 5/5 Windows / Linux (X11) / macOS (AppKit), one CGO-free Go codebase. MIT, no account, no network, no telemetry. 463 Go tests plus a 172-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
@@ -224,9 +224,9 @@ long it has been asking.
 
 3/5 自动同意默认关闭、按终端单独开启。倒计时开始前先过黑名单：rm -rf、rd /s、format、git push --force 一律走人工确认；沉默只放行你主动委托的普通工具调用。
 
-4/5 三个原生 exe，装完不需要任何运行时：4.49 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
+4/5 三个原生 exe，装完不需要任何运行时：4.50 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
 
-5/5 支持 Windows / Linux (X11) / macOS (AppKit)，同一份零 cgo 的 Go 代码。MIT，无账号、不联网、无遥测。425 个 Go 单测 + 172 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 支持 Windows / Linux (X11) / macOS (AppKit)，同一份零 cgo 的 Go 代码。MIT，无账号、不联网、无遥测。465 个 Go 单测 + 183 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 181。
