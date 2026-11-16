@@ -195,7 +195,7 @@ It reads your local host configs **read-only** (never modifies files on your beh
 | **Antigravity CLI** | Statusline + hooks in `~/.gemini/antigravity/settings.json` (`--connect=antigravity`) | Invokes `pet-statusline` (with L1 short-circuit) + `pet-hook --mode=antigravity` |
 | **Any custom CLI / script** | Shell wrapper (`reporters/generic.js`) or JSON-lines IPC | Send a single JSON line per state transition — see [docs/PROTOCOL.md](docs/PROTOCOL.md) |
 
-Then run diagnostics (`11 checks`, zero leaks of host tokens/secrets):
+Then run diagnostics (`13 checks`, zero leaks of host tokens/secrets):
 
 ```sh
 ai-terminal-pet --doctor
@@ -428,7 +428,7 @@ sh ./scripts/install.sh
 ai-terminal-pet --connect
 ```
 
-随后运行 11 项系统体检（安装文件、版本、管道/socket、宿主接入状态、自启动与提醒判定，任何 fail 返回码为 1）：
+随后运行 13 项系统体检（安装文件、版本、管道/socket、宿主接入状态、自启动与提醒判定、声音与通知表面，任何 fail 返回码为 1）：
 
 ```sh
 ai-terminal-pet --doctor
@@ -440,7 +440,7 @@ ai-terminal-pet --doctor
   - `--show` / `--toggle` / `--reset` / `--settings` / `--quit`
   - `--autostart[=on|off]`：查询或开关开机自启（Windows 注册表 / macOS `LaunchAgent` / Linux XDG `.desktop`）
   - `--connect[=opencode|claude|antigravity]`：只读打印对应宿主接入配置
-  - `--doctor`：运行 11 项健康诊断
+  - `--doctor`：运行 13 项健康诊断
   - `--json [--pretty]`：输出实时会话与提醒判定状态 JSON
   - `--version`：打印版本信息（v1.0.13）
   - `--help`：打印帮助说明

@@ -37,6 +37,8 @@ func newDoctorFixture(t *testing.T) *doctorFixture {
 			return nodeResult{Path: "C:/node/node.exe", Version: "v20.11.0"}
 		},
 		autostartStatus: func() (autostart.Status, error) { return autostart.Status{}, nil },
+		soundSurface:    func() string { return "winmm PlaySoundW (built in)" },
+		notifySurface:   func() string { return "tray balloon (Shell_NotifyIconW, built in)" },
 	}
 	return fixture
 }
@@ -447,5 +449,58 @@ func TestDoctorPipeProbeFailureIsContained(t *testing.T) {
 	panicErr := dialOnce(func(string, time.Duration) error { panic("boom") }, "route pipe")
 	if panicErr == nil || !strings.Contains(panicErr.Error(), "panicked") {
 		t.Fatalf("panicking probe = %v", panicErr)
+	}
+}
+
+// --doctor must answer "will the sound be heard / the notification be seen" with
+// the measured surface on a machine that has one.
+func TestDoctorNamesTheSoundAndNotificationSurfaces(t *testing.T) {
+	fixture := newDoctorFixture(t)
+	fixture.install(t)
+	fixture.runtime(t)
+	fixture.env.soundSurface = func() string { return "external player /usr/bin/paplay" }
+	fixture.env.notifySurface = func() string { return "notify-send /usr/bin/notify-send" }
+	report := runDoctor(fixture.env)
+	for _, name := range []string{"audio", "notifications"} {
+		check := checkNamed(t, report, name)
+		if check.Status != doctorOK {
+			t.Fatalf("%s = %q, want ok: %s", name, check.Status, check.Detail)
+		}
+	}
+	if detail := checkNamed(t, report, "audio").Detail; !strings.Contains(detail, "paplay") {
+		t.Fatalf("audio does not name the player: %s", detail)
+	}
+}
+
+// A machine with neither is a warning, not a failure: the panel still works and
+// the setting is still stored, so the exit code must stay 0.
+func TestDoctorWarnsWhenNothingCanPlayOrShow(t *testing.T) {
+	fixture := newDoctorFixture(t)
+	fixture.install(t)
+	fixture.runtime(t)
+	fixture.env.soundSurface = func() string { return "none (no pw-play, paplay or aplay in PATH)" }
+	fixture.env.notifySurface = func() string { return "none (notify-send not found)" }
+	report := runDoctor(fixture.env)
+	for _, name := range []string{"audio", "notifications"} {
+		if got := checkNamed(t, report, name).Status; got != doctorWarn {
+			t.Fatalf("%s = %q, want warn", name, got)
+		}
+	}
+	if got := report.ExitCode(); got != 0 {
+		t.Fatalf("exit code = %d, warnings must not fail the run", got)
+	}
+}
+
+// A probe that answers nothing at all is a warning too, never a panic and never
+// a silent ok.
+func TestDoctorSurfaceProbeWithoutAnAnswerWarns(t *testing.T) {
+	fixture := newDoctorFixture(t)
+	fixture.env.soundSurface = nil
+	fixture.env.notifySurface = func() string { return "  " }
+	if got := checkAudio(fixture.env).Status; got != doctorWarn {
+		t.Fatalf("a nil probe = %q", got)
+	}
+	if got := checkNotifications(fixture.env).Status; got != doctorWarn {
+		t.Fatalf("an empty answer = %q", got)
 	}
 }

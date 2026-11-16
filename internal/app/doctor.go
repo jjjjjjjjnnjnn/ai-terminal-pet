@@ -20,6 +20,7 @@ import (
 	"ai-terminal-pet/internal/connect"
 	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/pipeserver"
+	"ai-terminal-pet/internal/ui"
 )
 
 const (
@@ -101,6 +102,12 @@ type doctorEnv struct {
 	dial            func(path string, timeout time.Duration) error
 	node            func(timeout time.Duration) nodeResult
 	autostartStatus func() (autostart.Status, error)
+	// soundSurface and notifySurface name what the `sound` and `notifications`
+	// settings actually reach on this machine. They are injected for the same
+	// reason the pipe and node probes are: a test must be able to describe a
+	// machine that has neither, on a machine that has both.
+	soundSurface  func() string
+	notifySurface func() string
 }
 
 func defaultDoctorEnv() doctorEnv {
@@ -120,6 +127,8 @@ func defaultDoctorEnv() doctorEnv {
 		dial:            probePipe,
 		node:            probeNode,
 		autostartStatus: func() (autostart.Status, error) { return autostart.New().Status() },
+		soundSurface:    ui.SoundSurface,
+		notifySurface:   ui.NotificationSurface,
 	}
 }
 
@@ -210,6 +219,8 @@ func runDoctor(env doctorEnv) DoctorReport {
 		runCheck("reporters", func() DoctorCheck { return checkReporters(env) }),
 		runCheck("autostart", func() DoctorCheck { return checkAutoStart(env) }),
 		runCheck("alerts", func() DoctorCheck { return checkAlerts(env) }),
+		runCheck("audio", func() DoctorCheck { return checkAudio(env) }),
+		runCheck("notifications", func() DoctorCheck { return checkNotifications(env) }),
 	}
 	return DoctorReport{Checks: checks}
 }
@@ -259,6 +270,34 @@ func checkAlerts(env doctorEnv) DoctorCheck {
 		detail += ", decisions=" + strings.Join(decisions, "; ")
 	}
 	return DoctorCheck{Status: doctorOK, Detail: detail}
+}
+
+// checkAudio answers "will `sound` be audible here", and checkNotifications the
+// same question for the alert surface. Both are warnings when the answer is
+// "nothing": the install is healthy and the panel works, but a setting the user
+// can see doing nothing is exactly the shape of gap --doctor exists to name.
+func checkAudio(env doctorEnv) DoctorCheck {
+	return surfaceCheck("sound", env.soundSurface)
+}
+
+func checkNotifications(env doctorEnv) DoctorCheck {
+	return surfaceCheck("notification", env.notifySurface)
+}
+
+// surfaceCheck is the one shape both questions have: a name, or a leading
+// "none" that already carries the reason and the way out.
+func surfaceCheck(name string, probe func() string) DoctorCheck {
+	if probe == nil {
+		return DoctorCheck{Status: doctorWarn, Detail: name + " surface probe is unavailable"}
+	}
+	surface := strings.TrimSpace(probe())
+	switch {
+	case surface == "":
+		return DoctorCheck{Status: doctorWarn, Detail: "the platform did not name a " + name + " surface"}
+	case strings.HasPrefix(surface, "none"):
+		return DoctorCheck{Status: doctorWarn, Detail: surface}
+	}
+	return DoctorCheck{Status: doctorOK, Detail: surface}
 }
 
 func emptyAsNone(value string) string {
