@@ -999,6 +999,9 @@ func (a *App) alertOnTransitions() {
 		a.lastAlertRecord = receipt
 		writeAlertRecord(receipt)
 	}
+	if plan.Balloon != nil {
+		a.notify(composeAlert(*plan.Balloon, a.lang))
+	}
 	if plan.Tone != "" {
 		beep(toneKind(plan.Tone))
 	}

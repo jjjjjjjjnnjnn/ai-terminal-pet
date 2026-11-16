@@ -1190,8 +1190,7 @@ func (a *App) jumpTo(row int) bool {
 // doing would be worse than a small notification.
 func (a *App) focusFailure() {
 	beep(beepExclamation)
-	a.balloonText(i18n.T(a.lang, i18n.KeyBalloonJumpTitle),
-		i18n.T(a.lang, i18n.KeyBalloonJumpBody), win.NIIF_WARNING)
+	a.notify(composeJumpFailure(a.lang))
 }
 
 // expandedRowCopyTarget resolves a tap on a drawn session row to the path that
@@ -1734,12 +1733,7 @@ func (a *App) alertOnTransitions() {
 	a.persistReceipt(receipt)
 
 	if plan.Balloon != nil {
-		if plan.Balloon.State == session.StateIdle || plan.Balloon.State == session.StateClosed {
-			a.balloonText(i18n.T(a.lang, i18n.KeyBalloonDoneTitle),
-				doneBalloonBody(*plan.Balloon, a.lang), niifInfo)
-		} else {
-			a.balloon(*plan.Balloon)
-		}
+		a.notify(composeAlert(*plan.Balloon, a.lang))
 	}
 	if plan.Tone != "" {
 		beep(toneKind(plan.Tone))
@@ -1805,23 +1799,10 @@ func (a *App) attentionSettings() AttentionSettings {
 // are both waiting_permission. This comment stays so the next reader looking
 // for them in this file finds out where they went instead of concluding they
 // were deleted without a replacement.
-
-// balloon shows the tray balloon tip. It is a no-op when the tray icon is not
-// registered, which happens briefly during startup and after an Explorer
-// restart.
-func (a *App) balloon(target session.Session) {
-	title := i18n.T(a.lang, i18n.KeyBalloonWaitTitle)
-	flags := uint32(win.NIIF_WARNING)
-	if target.State == session.StateError {
-		title = i18n.T(a.lang, i18n.KeyBalloonErrTitle)
-		flags = win.NIIF_ERROR
-	}
-	body := projectLabel(target, a.lang)
-	if reason := reasonLabel(target, a.lang); reason != "" {
-		body += " · " + reason
-	}
-	a.balloonText(title, body, flags)
-}
+//
+// balloon() was the other half of that move: the copy it composed now lives in
+// notify.go (composeAlert) and reaches the tray through notify_windows.go, so
+// Linux and macOS can say the same sentence through their own surface.
 
 // balloonText shows a tray balloon with arbitrary copy. Alert balloons and
 // "could not find that terminal" feedback share the same construction.
