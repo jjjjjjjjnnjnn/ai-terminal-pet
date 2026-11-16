@@ -66,8 +66,11 @@
   `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`，本轮未改）、
   `bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`，本轮未改）。
 - **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.22**；`dsh-plugin-v1.2.22` 的 Release 资产是这一版新打的 tag
-    （`.tgz` 的字节数与 sha256 见 CHANGELOG 的发布清单）；钉 tag 的 git 源；仓库根的清单 shim；
+  - 插件线：npm `latest` = **1.2.22**；`dsh-plugin-v1.2.22` 的 Release 资产 `dsh-ai-terminal-pet-1.2.22.tgz`
+    **2,067,790 B / sha256 `879AD246…` / 19 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.13`）；
+    上游条目跟进 PR [#15814](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15814)
+    （分支 `bump-tarball-1.2.22`，单文件 `+1 −1`，`MERGEABLE`）已开、`--check` = OK（in flight）。
+    **上一轮的 #15674（1.2.21）已于本轮期间被合并**——这解释了 `--check` 为什么现在报的是 1.2.21 而不是 1.2.19；钉 tag 的 git 源；仓库根的清单 shim；
     自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
   索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
   提供的**替代**路径，而不是权宜之计。
