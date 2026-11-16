@@ -69,8 +69,9 @@
   （`node --test tools/check_versions.test.mjs` 26/26）、`tools/catalog-status.test.mjs` **12/12**、
   `tools/upstream-entry.test.mjs` 26/26；`tests/fresh-machine.mjs --no-overlay` **172/172**（23.0 s）；
   `tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  **交付前的装机实测**见 §64.5：240 次 + 300 次上报 `failures: 0`、句柄与线程平、`runtime/` 回基线、
-  设置窗口原样放 40 秒不消失、`--doctor` 全程 10 ok / 1 warn / 0 fail。
+  **交付前的装机实测**见 §64.5（1.0.13 那一轮：240 次 + 300 次上报 `failures: 0`、句柄与线程平、`runtime/` 回基线、
+  设置窗口原样放 40 秒不消失）；1.0.14 的装机实测见 §66.6：`-VerifyOnly` 11/11、
+  `--doctor` **12 ok / 1 warn / 0 fail**、`--version` 报 `ai-terminal-pet 1.0.14`。
 - **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.14 实测）：非测试 **143 文件 / 27,185 行**、
   测试 **93 文件 / 13,444 行**、**461 个 `func Test`**。
   `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `DB2DD2AB…`）、
@@ -79,7 +80,7 @@
 - **分发（两条线）**：
   - 插件线：npm `latest` = **1.2.23**；`dsh-plugin-v1.2.23` 的 Release 资产 `dsh-ai-terminal-pet-1.2.23.tgz`
     **2,069,513 B / sha256 `4C552C73…` / 19 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`）；
-    上游条目跟进 PR 见 §66.9（分支 `bump-tarball-1.2.23`）。
+    上游条目跟进 PR 见 §66.6（分支 `bump-tarball-1.2.23`）。
     **#15674（1.2.21）已在该轮期间被合并**，所以 `--check` 现在报的是 1.2.21 而不是 1.2.19。
     **这一条到此为止**：按用户 2026-11-16 的决定，上游那两项（重建 + 下载窗口）已有多位开发者反馈，
     我们**不再发 PR、不催合并、不重发版**（理由与分解见 §64.2 / §64.3、[docs/UPSTREAM.md](UPSTREAM.md) §4.1）。
@@ -4773,7 +4774,25 @@ node tools/catalog-status.mjs                # 目录那行现在是 current 还
 3. **macOS 的任何实际显示**：没有苹果硬件，CI 只跑编译与单测；`docs/PLATFORMS.md`、README 矩阵与
    `--doctor` 的通知行都写着 "best-effort, live display unverified"。
 
-### 66.6 下一轮从这里开始
+### 66.6 发版记录（2026-11-16，全部当场跑出来）
+
+- **tag**：`pet-v1.0.14`、`dsh-plugin-v1.2.23`；两个 Release 都建好，资产从**公开 URL 下载回来**逐字节核对
+  （7/7 的字节数与 sha256 与本地一致，完整表在 CHANGELOG「1.0.14 / 1.2.23 发布包实测清单」）。
+- **npm**：`dsh-ai-terminal-pet@1.2.23` 已 publish，`npm view ... version` = **1.2.23**。
+- **本机安装**：`scripts\install.cmd` → 11 个文件、`-VerifyOnly` **11/11 一致**、
+  `AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`、`--doctor` = **12 ok / 1 warn / 0 fail**
+  （唯一 warn 仍是 Antigravity 只接 statusline）。
+- **上游条目**：PR [#16010](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16010)
+  （分支 `bump-tarball-1.2.23`，单文件 `+1 −1`，`MERGEABLE`，OPEN）；
+  `node tools/upstream-entry.mjs --check` = **OK（in flight）**。
+- **一条顺序上的实话**：release 提交（`ef4c9e4`）推上去时 CI 立刻跑，而那时 1.2.23 的上游 PR 还不存在
+  （资产要先有、PR 才能开），于是 `Upstream catalogue entry` 这一步报
+  `STALE and NOTHING PENDING` 红了；PR #16010 开好之后**重跑同一提交的那条 job 即绿**。
+  这不是掩盖红灯，而是这条门禁的固有顺序——它判断的是「现在有没有人在推」，而 PR 只能在我们之后。
+  本次已把这条写进 [docs/UPSTREAM.md](UPSTREAM.md) §2，下一轮不必再想一遍。
+- `be45a1a`（把市场索引钉到 `ef4c9e4`）在 CI 上全绿（Run `43907267179`）。
+
+### 66.7 下一轮从这里开始
 
 1. **真实 Linux 桌面上的 5 分钟验收**（这是本轮唯一的缺口）：在一台有 PipeWire / PulseAudio 与通知守护进程的
    桌面上跑 `--doctor`（应看到 `audio: external player …`、`notifications: notify-send …`），触发一次等待提醒，
