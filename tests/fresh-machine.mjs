@@ -199,34 +199,46 @@ function runCmd(scriptArgs, cwd, timeout = 300000) {
 
 /**
  * readInstallEntry asks the registry what Settings > Apps would show for an
- * install in `installDir`, or null when there is no row.
+ * install in `installDir`.
  *
- * The row matters twice: before uninstall it is the only thing a package
- * manager can drive (winget reads exactly these values), and after uninstall its
- * absence is the difference between "the folder is gone" and "Windows no longer
- * lists this product". The lookup filters on InstallLocation, so a real install
- * of this project on the developer's machine can never satisfy it.
+ * It answers `{ entry, seen }`: `entry` is the matching row (or null), and `seen`
+ * is every AI-Terminal-Pet* row with its InstallLocation. The second half is
+ * not decoration - when a runner reports "no row" this is the difference between
+ * "the installer did not write it" and "the lookup looked in the wrong shape",
+ * and that question cost one CI round on 2026-11-16.
+ *
+ * The lookup filters on InstallLocation, so a real install of this project on the
+ * developer's machine can never satisfy it.
  */
 function readInstallEntry(installDir) {
   const quoted = String(installDir).replace(/'/g, "''")
   const script = [
     "$root = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'",
-    'if (-not (Test-Path $root)) { "none"; exit 0 }',
-    "$key = Get-ChildItem $root | Where-Object { $_.PSChildName -like 'AI-Terminal-Pet*' } | " +
-      "Where-Object { (Get-ItemProperty $_.PSPath).InstallLocation -eq '" + quoted + "' } | Select-Object -First 1",
-    'if (-not $key) { "none"; exit 0 }',
-    '$p = Get-ItemProperty $key.PSPath',
-    'ConvertTo-Json @{ key = $key.PSChildName; display = $p.DisplayName; version = $p.DisplayVersion; ' +
-      'location = $p.InstallLocation; uninstall = $p.UninstallString; quiet = $p.QuietUninstallString; ' +
-      'noModify = $p.NoModify; size = $p.EstimatedSize } -Compress',
+    'if (-not (Test-Path $root)) { "MISSING-ROOT"; exit 0 }',
+    "$rows = @(Get-ChildItem $root | Where-Object { $_.PSChildName -like 'AI-Terminal-Pet*' } | ForEach-Object {",
+    '  $p = Get-ItemProperty $_.PSPath',
+    '  [pscustomobject]@{ key = $_.PSChildName; location = [string]$p.InstallLocation; display = [string]$p.DisplayName;',
+    '    version = [string]$p.DisplayVersion; install = [string]$p.UninstallString; quiet = [string]$p.QuietUninstallString;',
+    '    noModify = $p.NoModify; size = $p.EstimatedSize }',
+    '})',
+    "$match = $rows | Where-Object { $_.location -eq '" + quoted + "' } | Select-Object -First 1",
+    'ConvertTo-Json @{ entry = $match; seen = $rows } -Compress -Depth 4',
   ].join('\n')
   const result = runPowerShell(['-Command', script], 60000)
   const text = String(result.stdout || '').trim()
-  if (!text || text === 'none') return null
+  if (!text || text === 'MISSING-ROOT') {
+    return { entry: null, seen: text || '(no output)', status: result.status }
+  }
   try {
-    return JSON.parse(text)
+    const parsed = JSON.parse(text)
+    // PowerShell renders a missing match inside a hashtable as {} rather than
+    // null, so "no row" arrives as an empty object. Treating that as a row is
+    // how a gate silently stops checking anything.
+    const row = parsed.entry
+    const entry = row && typeof row === 'object' && Object.keys(row).length > 0 ? row : null
+    return { entry, seen: parsed.seen || [] }
   } catch {
-    return { raw: text, status: result.status }
+    return { entry: null, seen: text }
   }
 }
 
@@ -1080,8 +1092,13 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
   equal('installed installer copy is the one that ran', sha256(installedScript), sha256(installScript))
   const versionRun = runExe(overlayExe, ['--version'], sandbox.env)
   const overlayVersion = /(\d+\.\d+\.\d+)/.exec(String(versionRun.stdout || ''))?.[1]
-  const entry = readInstallEntry(sandbox.petDir)
-  check('Apps & Features lists this install', entry !== null && entry.display === 'AI Terminal Pet', JSON.stringify(entry))
+  const listed = readInstallEntry(sandbox.petDir)
+  const entry = listed.entry
+  check(
+    'Apps & Features lists this install',
+    entry !== null && entry.display === 'AI Terminal Pet',
+    JSON.stringify(listed) + '\ninstall stdout: ' + String(install.stdout || ''),
+  )
   equal('the Apps & Features row names the overlay version', entry?.version, overlayVersion)
   equal('the Apps & Features row names the install directory', entry?.location, sandbox.petDir)
   check(
@@ -1360,23 +1377,27 @@ function scenarioUninstall(sandbox, overlayExe) {
   // string is the product's uninstall path, and it must work when nothing but
   // the install directory exists (the zip is gone by then). Since 1.0.15 the
   // row is also what a package manager drives, so this is the whole contract.
-  const entry = readInstallEntry(sandbox.petDir)
-  check('the install is listed before uninstalling', entry !== null, JSON.stringify(entry))
+  const listed = readInstallEntry(sandbox.petDir)
+  const entry = listed.entry
+  check('the install is listed before uninstalling', entry !== null, JSON.stringify(listed))
   const command = String(entry?.quiet || '')
-  check('the row records a quiet uninstall command', command.length > 0, command)
-  const uninstall = spawnSync(command, {
-    encoding: 'utf8',
-    timeout: 300000,
-    shell: true,
-    cwd: sandbox.root,
-  })
+  check('the row records a quiet uninstall command', command.length > 0, JSON.stringify(listed))
+  const uninstall = command
+    ? spawnSync(command, {
+        encoding: 'utf8',
+        timeout: 300000,
+        shell: true,
+        cwd: sandbox.root,
+      })
+    : { status: -1, stdout: '', stderr: 'no recorded uninstall command to run' }
   check(
     'uninstall succeeds',
     uninstall.status === 0,
     String(uninstall.stdout || '') + String(uninstall.stderr || ''),
   )
   check('the install directory is gone', !existsSync(sandbox.petDir), 'still present')
-  check('the Apps & Features row is gone', readInstallEntry(sandbox.petDir) === null, 'row still present')
+  const after = readInstallEntry(sandbox.petDir)
+  check('the Apps & Features row is gone', after.entry === null, JSON.stringify(after))
   check('uninstall reports completion', /uninstall: done/.test(uninstall.stdout || ''), uninstall.stdout)
   const doctor = runDoctor(overlayExe, sandbox.env)
   check('doctor fails again on the cleaned machine', doctor.status === 1, describeRun(doctor))
