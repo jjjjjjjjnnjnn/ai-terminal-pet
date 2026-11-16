@@ -268,8 +268,8 @@ files alone does not wire it. The connect table in the README has one line per t
 | star / fork | `gh repo view` | **1 / 0** |
 | npm | `npm view dsh-ai-terminal-pet version` | **1.2.22**（`dist-tags.latest`，2026-11-16 发版同步） |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后已数日未动） |
-| **npm 30 天下载** | `api.npmjs.org/downloads/point/last-week`／`range` | 近 7 天 **3,455**（2026-11-09 → 11-15）；30 天窗口 2026-10-16 → 11-15 也是 **3,455**，因为 11-11 之前该包还不存在 |
-| **目录那行是否当前** | `node tools/catalog-status.mjs` | **upstream**：站点 `version` 停在 1.2.16、安装命令仍是 `dsh-plugin-v1.2.16`（对方整站自 2026-11-14T05:27Z 冻结，issue #15569 / PR #15579），30 天下载数少最后一天（issue #15864）——**这两条都不是我们重发版能改的**，判断方式见 [docs/UPSTREAM.md](UPSTREAM.md) §4.1 |
+| **npm 下载量（唯一可信的那个数）** | `npm i dsh-ai-terminal-pet` 的 npm 页面 Weekly Downloads，或 `api.npmjs.org/downloads/point/last-week` | **3,455**（2026-11-09 → 11-15）。`point/last-month`（2026-10-17 → 11-15）**也是 3,455**：首个版本 2026-11-11T12:10:46Z 才发布，之前 30 天每天都是 0，所以两个窗口真实值相同 |
+| **目录那行（只作参考，不当数据源）** | `node tools/catalog-status.mjs` | 站点写 `downloads: 1,179 (30d)`、`version: 1.2.16`、安装命令 `dsh-plugin-v1.2.16`。**这三个都落后于现实，且都不归我们修**：1,179 = 11-11 的 624 + 11-12 的 555，缺掉的 2,276 分两段（最后一天 1,197 见 issue #15864、窗口没前进 1,079 见 #15569/PR #15579）。分解表在 [docs/UPSTREAM.md](UPSTREAM.md) §4.1。**对外引用下载量一律用 npm 的 3,455，不要抄站点那个 1,179** |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条（本仓库；上游报的两条是该仓库的 issue，不是这里的） |
 
@@ -279,3 +279,6 @@ files alone does not wire it. The connect table in the README has one line per t
 **判断「目录里那行是不是当前版本」，跑 `node tools/catalog-status.mjs`，不要开浏览器**：
 它把"该我们动"与"对方的原因"分开写清楚（`docs/UPSTREAM.md` §4.1），
 而 PR 页面上的 `merged` 既不等于 `published`，也不等于 `rebuilt`。
+
+**判断"有人真的在用"，看 npm 的下载量，不看目录卡上的数字**：后者今天是两段 bug 叠出来的
+（1,179 对 3,455），前者任何时候都能自己复算。

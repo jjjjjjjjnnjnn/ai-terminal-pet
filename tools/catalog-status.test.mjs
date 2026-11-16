@@ -65,6 +65,44 @@ test('the download shortfall is the final day of the window, exactly', () => {
   })
 })
 
+// Twelve entries, eleven of them other people's packages, measured 2026-11-16 against
+// npm for the exact window the site published (2026-10-15..2026-11-13). Every one
+// matches "published == window minus its final day", which is what makes this an
+// upstream bug rather than a row of ours being wrong. If a future probe fixes the
+// window, these numbers start failing and this test is the place that says so.
+const MEASURED = [
+  ['dsh-ai-terminal-pet', 1179, 2376, 1179, 1197],
+  ['dsh-tavily-mcp', 1320, 1364, 1320, 44],
+  ['dsh-fish-dream', 483, 516, 483, 33],
+  ['kunpet-dsh', 592, 610, 592, 18],
+  ['dsh-happy', 1392, 1428, 1392, 36],
+  ['dsh-om-messiah', 1663, 1694, 1663, 31],
+  ['dsh-plugin-yushe', 6010, 6278, 6010, 268],
+  ['dsh-cosplay', 4822, 4949, 4822, 127],
+  ['dsh-pet-plugin', 11429, 11700, 11429, 271],
+  ['dsh-dice-game', 1136, 1175, 1136, 39],
+  ['toto-the-cat', 728, 751, 728, 23],
+  ['dsh-meme', 80094, 81991, 80094, 1897],
+]
+
+test('the missing-final-day signature reproduces on every measured entry', () => {
+  for (const [npm, site, now, withoutLastDay, lastDay] of MEASURED) {
+    // downloadShortfall only needs the numbers, so the arithmetic is the same
+    // whether the window came from npm or from a fixture.
+    const days = [
+      { day: 'day-1', downloads: 0 },
+      { day: 'day-2', downloads: withoutLastDay },
+      { day: 'day-last', downloads: lastDay },
+    ]
+    const result = downloadShortfall(site, days)
+    assert.equal(result.withoutLastDay, withoutLastDay, npm)
+    assert.equal(result.now, now, npm)
+    assert.equal(result.lastDay, lastDay, npm)
+    assert.equal(result.lagging, true, npm)
+    assert.equal(result.site + result.lastDay, result.now, npm)
+  }
+})
+
 test('a genuine zero day is not called lagging', () => {
   // npm legitimately reports 0 for days with no installs. The published total
   // then equals the full window and there is nothing short.

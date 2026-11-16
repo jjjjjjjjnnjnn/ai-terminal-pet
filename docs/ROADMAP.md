@@ -890,12 +890,16 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
   `.github/workflows/ci.yml` 的注释里：`G115` 按**规则族**排除（Win32 消息与 `uintptr` 之间的整数转换，
   全部命中都是这一种形态），`G703` 只按**路径**在那四个有命中的文件上排除（由用户自己的
   `%LOCALAPPDATA%` 拼出的路径）——别的文件里出现路径污点仍然会让 `scan` 变红。**不是「全量安全扫描」**，别把这两条说成后者。
-- **上游条目仍停在旧版本**：`awesome-dsh-plugin` 的 `tarball` 由维护者手工合并，我们每一版都开一条 `+1 −1` 的 PR。
-  **2026-11-16 查清了另一层**：合并之后还有一道「重建」，而对方整站自 2026-11-14T05:27Z 冻结——两次夜间
-  `Build` 都死在 `MarketIndexError: ... duplicates dsh-dot-mcp`（对方 issue #15569 / 修复 PR #15579），
-  所以站点那行的 `version` 停在 1.2.16、30 天下载数还少窗口最后一天（全站如此，对方 issue #15864）。
-  **这两条都不是重发版能改的**；判断「该我们动 / 该我们等」用 `node tools/catalog-status.mjs`
-  （判定表与今天的实测输出见 [docs/UPSTREAM.md](UPSTREAM.md) §4.1）。
+- **上游条目仍停在旧版本（决策：不跟进）**：`awesome-dsh-plugin` 的 `tarball` 由维护者手工合并，我们每一版都开一条 `+1 −1` 的 PR。
+  合并之后还有一道「重建」，而对方整站自 2026-11-14T05:27Z 冻结（两次夜间 `Build` 死在
+  `MarketIndexError: ... duplicates dsh-dot-mcp`，对方 issue #15569 / PR #15579）。
+  已知的第二层是**下载量**：站点卡上的 `downloads (30d)` 比真实值少 **2,276**，分两段——
+  窗口自己的最后一天 1,197（03:1x UTC 探针撞上 npm 聚合延迟，**全站 12/12 条目同一签名**，对方 issue #15864）
+  加窗口没前进的 1,079（冻结，318 + 761）。真实 30 天值是 **3,455**（npm 页面 Weekly Downloads
+  与 `point/last-month` 一致；`1.2.4` 是 2026-11-11T12:10:46Z 才发的，所以两个窗口相同）。
+  **这两条已有多位开发者反馈，我们不再发 PR、不催合并、不重发版**；要做的只是**记录改准**：
+  凡引用下载量用 npm 的数并写明窗口（[docs/UPSTREAM.md](UPSTREAM.md) §4.1、[docs/LAUNCH.md](LAUNCH.md) §8），
+  判断「该我们动/该我们等」用 `node tools/catalog-status.mjs`。
 - **超长行（> 1 MiB）的上报被直接断开连接，不回 `ERR`**（2026-11-16 实测：写入 1,100,000 B 的那次，客户端拿到的是
   `连接被中断`、零字节回复）。这是 `readPayload` 读到超限就返回、`read` 立刻 `Close` 的必然结果；[docs/PROTOCOL.md](PROTOCOL.md)
   §3.4 里"`ERR` 表示载荷校验失败"指的是**解析失败**，不是超长。上报端本来就该在发送前截断（`protocol.js` 的 `normalizePayload` 会做），
