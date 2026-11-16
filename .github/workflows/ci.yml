@@ -423,6 +423,12 @@ jobs:
           go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-statusline ./cmd/pet-statusline
           go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-hook ./cmd/pet-hook
 
+      # The plugin's Linux path (XDG data directory, pinned archive, 0755 binary)
+      # can only be exercised on a real Linux host; the Windows job pins the
+      # platform seam to win32, so this is the job that proves the other half.
+      - name: Verify the DSH plugin package (Linux)
+        run: node packages/dsh-ai-terminal-pet/verify.mjs
+
       - name: Headless Linux CLI, install, and hook smoke test
         run: |
           export GOPATH="$(go env GOPATH)"
@@ -474,9 +480,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
       - name: Show toolchain versions
         run: |
           go version
+          node --version
           uname -a
 
       - name: go vet
@@ -490,6 +502,11 @@ jobs:
           go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/AI-Terminal-Pet ./cmd/ai-terminal-pet
           go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-statusline ./cmd/pet-statusline
           go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-hook ./cmd/pet-hook
+
+      # The plugin's macOS path (Application Support, pinned archive, 0755), on
+      # the only macOS this project has: a CI runner.
+      - name: Verify the DSH plugin package (macOS)
+        run: node packages/dsh-ai-terminal-pet/verify.mjs
 
       - name: Headless macOS CLI, install, and hook smoke test
         run: |

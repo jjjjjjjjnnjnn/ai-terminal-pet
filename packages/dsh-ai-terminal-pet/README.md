@@ -76,8 +76,10 @@ The package describes itself to storefronts through `dsh.catalog`: a category, a
 one-line summary in both languages, and the capabilities it uses. Capabilities
 are self-declared and never checked — DSH does not sandbox plugins — so read them
 as a description, not a permission grant.
-The bundle is Windows only and declares `dsh.bundle.platforms: ["win32"]`, so
-other platforms show it as unsupported instead of installing it.
+The bundle loads on Windows, Linux and macOS and declares
+`dsh.bundle.platforms: ["win32", "linux", "darwin"]`. The window layer differs
+per platform (Win32 layered DIB, pure-Go X11, pure-Go AppKit); the reporting path
+is the same everywhere.
 
 It also declares `dsh.marketplace` (`profiles: ["desktop", "headless", "web"]`,
 `requiresBuildApproval: false`, `manualSteps: false`). DSH itself never reads
@@ -93,10 +95,10 @@ tarball, or by pinning the release tag. All three are verified end to end:
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # release tarball: same bytes as the npm release, straight from the GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.23/dsh-ai-terminal-pet-1.2.23.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.24/dsh-ai-terminal-pet-1.2.24.tgz
 
 # git source, pinned to the release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.23&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.24&path:/packages/dsh-ai-terminal-pet"
 ```
 
 Those three differ only in transport. The npm path is the shortest and the one a
@@ -135,40 +137,64 @@ If the app reports restart-required after enabling the bundle, restart Harness.
 
 ## What it writes on disk
 
-First use in a Harness process copies two files, and only when they are missing:
+First use in a Harness process installs two files, and only when they are missing:
 
 | File | Origin | Purpose |
 | --- | --- | --- |
-| %LOCALAPPDATA%\AI-Terminal-Pet\protocol.js | vendor/protocol.js | pipe name, state set, redaction, snapshot |
-| %LOCALAPPDATA%\AI-Terminal-Pet\AI-Terminal-Pet.exe | vendor/AI-Terminal-Pet.exe | the Win32 overlay |
+| `<data directory>/protocol.js` | vendor/protocol.js | endpoint name, state set, redaction, snapshot |
+| `<data directory>/AI-Terminal-Pet.exe` (Windows) | vendor/AI-Terminal-Pet.exe | the Win32 overlay, offline |
+| `<data directory>/AI-Terminal-Pet` (Linux, macOS) | the pinned release archive | the same overlay, fetched once |
+
+The data directory is `%LOCALAPPDATA%\AI-Terminal-Pet` on Windows,
+`~/Library/Application Support/AI-Terminal-Pet` on macOS, and
+`$XDG_DATA_HOME/ai-terminal-pet` (or `~/.local/share/ai-terminal-pet`) on Linux -
+the same rule `reporters/protocol.js` and the Go side already use, and a test
+pins the two JavaScript answers together on every OS.
 
 Nothing is ever overwritten: an existing file, including one placed by the
 standalone installer, wins. Set DSH_PET_NO_BOOTSTRAP=1 to skip this step
-entirely (for example when the overlay is managed by `scripts/install.ps1` already).
+entirely (for example when the overlay is managed by the installer already).
 
 Reports also write the overlay's normal runtime snapshot under the same
 directory, exactly like every other reporter.
 
-### Optional download fallback
+### How Linux and macOS get the binary
 
-lib/release-pins.json is absent from the published package by default. When the
-maintainer fills it in with pinned release asset URLs, sizes and SHA-256
-digests, a machine that has no vendored binary downloads the two assets over
-HTTPS with a 30 s timeout, verifies size and digest with node:crypto, and only
-then installs them. Any failure is silent apart from one warning; the plugin
-keeps working without an overlay.
+One tarball serves every platform, and carrying four more ~2 MB binaries would
+make every Windows install pay for platforms it cannot run. So the package ships
+the Windows overlay in `vendor/` (fully offline) and **no** POSIX binary;
+`lib/release-pins.json` pins the four release archives by URL, byte count and
+SHA-256, and the first use on Linux or macOS downloads the matching one over
+HTTPS with a 30 s timeout, verifies the digest with `node:crypto`, extracts one
+member and installs it `0755`. Any failure leaves one warning and no file: the
+plugin keeps reporting, the panel simply is not installed, and
+`scripts/install.sh` from the release archive remains the manual route.
+
+Windows never reads that file. Its binary ships in `vendor/`, so a Windows
+install works with no network at all.
 
 ## The overlay itself is still standalone
 
-This bundle is a Windows convenience. The standalone overlay itself is a zero-cgo Go application that runs across Windows (Win32), Linux (pure-Go X11 ARGB), and macOS (pure-Go AppKit via purego), installing with `scripts/install.ps1` on Windows or `scripts/install.sh` on macOS/Linux, and every other reporter (Claude Code, OpenCode, Antigravity, generic) talks to the same per-user endpoint (a Windows named pipe, or a Unix domain socket elsewhere).
+This bundle is a convenience wrapper: it reports Harness sessions and installs
+the overlay for you. The overlay is the same zero-cgo Go application on all three
+platforms - Win32 layered window on Windows, pure-Go X11 on Linux, pure-Go AppKit
+via purego on macOS - installable on its own with `scripts/install.ps1` (Windows)
+or `scripts/install.sh` (macOS, Linux), and every other reporter (Claude Code,
+OpenCode, Antigravity, generic) talks to the same per-user endpoint: a named pipe
+on Windows, a Unix domain socket elsewhere.
 Those reporters are separate installs, not part of this package: a terminal that
 has none of them hooked reports nothing, in this install or in any other. A
 machine that only wants the overlay does not need this package; a machine that
-only wants the plugin gets one installed automatically.
+only wants the plugin gets the overlay installed for it.
 
 ## Requirements and limits
 
-- Windows only (named pipes plus a Win32 layered window).
+- Windows, Linux (X11) or macOS. The panel is verified live on Windows and on
+  WSLg X11; the macOS panel is built and unit-tested on `macos-latest` but has
+  never been driven on Apple hardware, and macOS notifications go through
+  `osascript` as a best-effort surface.
+- The POSIX overlay arrives by one pinned HTTPS download on first use, so a
+  machine with no network on first run needs `scripts/install.sh` instead.
 - DeepSeek Harness 0.2.x. `engines.dsh` is `>=0.2.0-0 <0.3.0-0`, and since DSH
   0.2.1-alpha.3 the host reads that range alone: a bundle whose range the running
   DSH does not satisfy is refused and the profile rolled back, so the range is the

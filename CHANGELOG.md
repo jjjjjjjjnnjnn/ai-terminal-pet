@@ -33,6 +33,57 @@
 已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 
+## [1.2.24] — 2026-11-16（DSH 插件三平台：Linux/macOS 首次使用按 pin 取浮窗；插件不再手写 Windows 路径）
+
+### 为什么这一轮值得单独发版
+浮窗从 1.0.10 起就是三平台，但**唯一的零配置入口仍只对 Windows 生效**：插件的
+`dsh.bundle.platforms` 写着 `["win32"]`，`EXE_NAME` 硬编码成 `AI-Terminal-Pet.exe`，
+数据目录自己从 `LOCALAPPDATA` 拼。于是 `reporters/protocol.js`（三平台，第 60 轮就改好了）
+与 Go 侧的 `internal/home` 都在管同一件契约，而插件是**第三份手写实现**。
+还有一个会直接炸的细节：`copyVerified(vendorExe, targetExe)` **没有传 mode**，POSIX 上复制出
+0644，`protocol.js` 的 `launchApplication()` 立刻 EACCES。
+
+### 改了什么
+- **平台清单**：两份 `package.json` 都改成 `["win32", "linux", "darwin"]`；`dsh.catalog.summary`
+  与 `docs/market-index.json` 的描述里"Windows panel"改成三平台。
+- **数据目录**：插件按平台算——Windows `%LOCALAPPDATA%\AI-Terminal-Pet`、macOS
+  `~/Library/Application Support/AI-Terminal-Pet`、Linux `$XDG_DATA_HOME/ai-terminal-pet`
+  （相对路径按 XDG 规范忽略）。`verify.mjs` 新增一条**跨文件断言**：插件算出来的目录必须是
+  `protocol.js` 写快照的那个目录的父目录，在每个 OS 上各跑一次。
+- **Windows 保持完全离线**：vendored 二进制照旧从 `vendor/` 拷贝，插件在 Windows 上**从不读**
+  `lib/release-pins.json`。
+- **Linux / macOS 首启下载**：一个 tarball 服务所有平台，再塞四个 ~2 MB 二进制会让每个 Windows
+  安装都为跑不了的平台买单（实测：linux-amd64 5,009,568 B / gzip-9 2.06 MB，linux-arm64 1.86 MB，
+  darwin-arm64 1.96 MB）。所以 `lib/release-pins.json`（schema 2）按 `linux-amd64` /
+  `linux-arm64` / `darwin-arm64` / `darwin-amd64` 钉住发布归档的 URL、字节数与 SHA-256；
+  首次使用下载对应那份、核对摘要、用自带的**最小 USTAR 读取器**取出
+  `ai-terminal-pet-1.0.14-<平台>/bin/AI-Terminal-Pet`，以 `0755` 原子写入，且**绝不覆盖**已有文件。
+  任何失败只留一条 warning、不落文件——插件继续上报，用发布归档里的 `scripts/install.sh`
+  手工安装仍然可行。
+- **CI 真的跑到了**：`ubuntu-latest` 与 `macos-latest` 两个 job 新增 `node packages/dsh-ai-terminal-pet/verify.mjs`
+  （macOS job 同时补了 `setup-node`），Windows job 用测试缝 `DSH_PET_PLATFORM=win32` 钉住它自己那一半。
+  也就是说插件的 Linux 分支不是"读起来对"，是在真 Linux 上跑过 `0755`、XDG 路径与解包断言的。
+
+### 实测
+- `node packages/dsh-ai-terminal-pet/verify.mjs`：Windows 上 **118 条 ok / 0 fail**（新增约 12 条，
+  含"解出的字节就是归档成员""摘要不符一个字节都不写""没有 pin 的平台会明说"）。
+- 包体积**没有变**：仍然不含任何 POSIX 二进制；代价是 Linux/macOS 首次运行要下载 4.9–5.5 MB 的归档一次。
+- 浮窗本体**零改动**，版本仍是 **1.0.14**：这一版只发插件线 `dsh-plugin-v1.2.24`。
+
+### 1.2.24 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `dsh-plugin-v1.2.24` | `dsh-ai-terminal-pet-1.2.24.tgz` | 2,072,902 B（20 文件） | `02AEEC8E2951B77F67B1233111D464646E003A42ADB6B2B5793D38EA5B21D7C4` |
+
+浮窗的六个平台资产**没有重发**：`pet-v1.0.14` 那六个（表见上一节）仍然是当前版本，插件与
+`lib/release-pins.json` 都指向它们。
+
+### 未验证项（照旧写清楚）
+- **macOS 面板的真实显示**：没有苹果硬件。CI 只到"构建 + 单测 + 插件逻辑在 macos-latest 上跑通"。
+- **Linux 桌面上的真实安装**：CI runner 上没有面板可看；`0755`、XDG 路径与解包是断言的，
+  "双击/命令装完后窗口真的出现"要在有桌面的 Linux 上确认。
+
 ## [1.0.14] & [1.2.23] — 2026-11-16（POSIX 平权：Linux 有提示音与提醒面，跳转失败不再一声不响）
 
 ### 新：Linux 的提示音（`internal/ui/sound_linux.go`）

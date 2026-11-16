@@ -21,10 +21,12 @@
  */
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { gzipSync } from 'node:zlib'
 
 const require = createRequire(import.meta.url)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
@@ -185,9 +187,14 @@ async function caseBootstrap() {
   writeFileSync(path.join(fakeRoot, 'vendor', 'protocol.js'), VENDOR_PROTOCOL, 'utf8')
   writeFileSync(path.join(fakeRoot, 'vendor', 'AI-Terminal-Pet.exe'), VENDOR_EXE, 'utf8')
 
+  // This case is about the Windows path (a vendored binary, offline), so it
+  // pins the platform instead of following the machine running it: the same
+  // assertions then hold on the Linux and macOS CI jobs.
   process.env.LOCALAPPDATA = local
   process.env.DSH_PET_TEST = '1'
   process.env.DSH_PET_PACKAGE_ROOT = fakeRoot
+  process.env.DSH_PET_PLATFORM = 'win32'
+  process.env.DSH_PET_ARCH = 'x64'
 
   check(!existsSync(petDir), 'bootstrap starts from a machine with no AI-Terminal-Pet directory')
 
@@ -225,6 +232,221 @@ async function caseBootstrap() {
   check(outcomeOptOut.skipped === 'disabled', 'DSH_PET_NO_BOOTSTRAP=1 disables the bootstrap')
   check(!existsSync(path.join(localOptOut, 'AI-Terminal-Pet')), 'the opt-out writes nothing to disk')
   delete process.env.DSH_PET_NO_BOOTSTRAP
+  delete process.env.DSH_PET_PLATFORM
+  delete process.env.DSH_PET_ARCH
+}
+
+/**
+ * Case 2b: the data directory, the binary name and the platform key, on all
+ * three platforms, plus the cross-file consistency that matters - the plugin's
+ * answer must equal protocol.js's own data directory on whichever OS runs this.
+ */
+async function casePlatformDirectories() {
+  const home = path.join(root, 'home-platforms')
+  const xdg = path.join(root, 'xdg-platforms')
+  mkdirSync(home, { recursive: true })
+  mkdirSync(xdg, { recursive: true })
+  const previous = {
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
+    XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+    DSH_PET_PLATFORM: process.env.DSH_PET_PLATFORM,
+    DSH_PET_ARCH: process.env.DSH_PET_ARCH,
+  }
+  process.env.DSH_PET_TEST = '1'
+  process.env.HOME = home
+  process.env.USERPROFILE = home
+  delete process.env.XDG_DATA_HOME
+
+  const fakeRoot = path.join(root, 'pkg-platforms')
+  mkdirSync(path.join(fakeRoot, 'lib'), { recursive: true })
+  writeFileSync(path.join(fakeRoot, 'lib', 'index.js'), readFileSync(source, 'utf8'), 'utf8')
+  process.env.DSH_PET_PACKAGE_ROOT = fakeRoot
+  const plugin = await load(path.join(fakeRoot, 'lib', 'index.js'))
+
+  process.env.DSH_PET_PLATFORM = 'darwin'
+  check(
+    plugin.__testing.petDirectory() === path.join(home, 'Library', 'Application Support', 'AI-Terminal-Pet'),
+    'macOS data directory is ~/Library/Application Support/AI-Terminal-Pet',
+  )
+  check(plugin.__testing.overlayBinaryName() === 'AI-Terminal-Pet', 'macOS binary has no .exe suffix')
+  process.env.DSH_PET_ARCH = 'arm64'
+  check(plugin.__testing.platformKey() === 'darwin-arm64', 'arm64 maps to darwin-arm64')
+
+  process.env.DSH_PET_PLATFORM = 'linux'
+  check(
+    plugin.__testing.petDirectory() === path.join(home, '.local', 'share', 'ai-terminal-pet'),
+    'Linux without XDG_DATA_HOME falls back to ~/.local/share/ai-terminal-pet',
+  )
+  process.env.XDG_DATA_HOME = xdg
+  check(
+    plugin.__testing.petDirectory() === path.join(xdg, 'ai-terminal-pet'),
+    'Linux honours an absolute XDG_DATA_HOME',
+  )
+  process.env.XDG_DATA_HOME = 'relative/ignored'
+  check(
+    plugin.__testing.petDirectory() === path.join(home, '.local', 'share', 'ai-terminal-pet'),
+    'a relative XDG_DATA_HOME is ignored, as the spec says',
+  )
+  delete process.env.XDG_DATA_HOME
+  process.env.DSH_PET_ARCH = 'x64'
+  check(plugin.__testing.platformKey() === 'linux-amd64', 'x64 maps to linux-amd64')
+
+  process.env.DSH_PET_PLATFORM = 'win32'
+  check(
+    plugin.__testing.petDirectory() === path.join(process.env.LOCALAPPDATA, 'AI-Terminal-Pet'),
+    'Windows data directory is %LOCALAPPDATA%\\AI-Terminal-Pet',
+  )
+  check(plugin.__testing.overlayBinaryName() === 'AI-Terminal-Pet.exe', 'Windows binary keeps the .exe suffix')
+
+  // Cross-file consistency: only meaningful on the platform actually running,
+  // because protocol.js reads process.platform rather than the test seam.
+  delete process.env.DSH_PET_PLATFORM
+  const real = await load(path.join(fakeRoot, 'lib', 'index.js'))
+  const requireFromSource = createRequire(source)
+  const realProtocol = requireFromSource(path.join(packageDir, 'vendor', 'protocol.js'))
+  const snapshot = realProtocol.snapshotPath({ source: 'deepseek-harness', sessionId: 'ses_probe' })
+  check(
+    typeof snapshot === 'string' && snapshot.startsWith(real.__testing.petDirectory() + path.sep),
+    'the plugin data directory is the parent protocol.js writes under (' + process.platform + ')',
+  )
+
+  for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+  delete process.env.DSH_PET_ARCH
+}
+
+/** A minimal USTAR writer, so the pinned-install case needs no fixture file. */
+function tarHeader(name, size) {
+  const header = Buffer.alloc(512)
+  header.write(name, 0, 100, 'utf8')
+  header.write('0000644\0', 100, 8, 'ascii')
+  header.write('0000000\0', 108, 8, 'ascii')
+  header.write('0000000\0', 116, 8, 'ascii')
+  header.write(size.toString(8).padStart(11, '0') + '\0', 124, 12, 'ascii')
+  header.write('00000000000\0', 136, 12, 'ascii')
+  header.write('        ', 148, 8, 'ascii')
+  header.write('0', 156, 1, 'ascii')
+  header.write('ustar\0', 257, 6, 'ascii')
+  header.write('00', 263, 2, 'ascii')
+  let sum = 0
+  for (const byte of header) sum += byte
+  header.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii')
+  return header
+}
+
+function makeTarGz(members) {
+  const chunks = []
+  for (const member of members) {
+    const data = Buffer.from(member.data)
+    chunks.push(tarHeader(member.name, data.length), data, Buffer.alloc((512 - (data.length % 512)) % 512))
+  }
+  chunks.push(Buffer.alloc(1024))
+  return gzipSync(Buffer.concat(chunks))
+}
+
+/**
+ * Case 2c: the pinned install. Linux and macOS ship no binary, so the plugin
+ * fetches the pinned release archive and extracts one member. A local HTTP
+ * server serves the archive, so nothing here touches the network.
+ */
+async function casePinnedInstall() {
+  const payload = Buffer.from('#!/bin/sh\n# fake overlay for the pinned-install case\n')
+  const archive = makeTarGz([
+    { name: 'ai-terminal-pet-9.9.9-linux-amd64/README.install.txt', data: 'read me\n' },
+    { name: 'ai-terminal-pet-9.9.9-linux-amd64/bin/AI-Terminal-Pet', data: payload },
+  ])
+  const server = createServer((request, response) => {
+    if (request.url !== '/overlay.tar.gz') {
+      response.writeHead(404).end()
+      return
+    }
+    response.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': archive.length })
+    response.end(archive)
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const port = server.address().port
+  const url = 'http://127.0.0.1:' + String(port) + '/overlay.tar.gz'
+
+  const home = path.join(root, 'home-pinned')
+  mkdirSync(home, { recursive: true })
+  const fakeRoot = path.join(root, 'pkg-pinned')
+  mkdirSync(path.join(fakeRoot, 'lib'), { recursive: true })
+  mkdirSync(path.join(fakeRoot, 'vendor'), { recursive: true })
+  writeFileSync(path.join(fakeRoot, 'lib', 'index.js'), readFileSync(source, 'utf8'), 'utf8')
+  writeFileSync(path.join(fakeRoot, 'vendor', 'protocol.js'), VENDOR_PROTOCOL, 'utf8')
+
+  const pin = {
+    url,
+    sha256: createHash('sha256').update(archive).digest('hex'),
+    bytes: archive.length,
+    member: 'ai-terminal-pet-9.9.9-linux-amd64/bin/AI-Terminal-Pet',
+  }
+  writeFileSync(
+    path.join(fakeRoot, 'lib', 'release-pins.json'),
+    JSON.stringify({ schemaVersion: 2, overlayVersion: '9.9.9', platforms: { 'linux-amd64': pin } }),
+    'utf8',
+  )
+
+  const previous = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, XDG_DATA_HOME: process.env.XDG_DATA_HOME }
+  process.env.HOME = home
+  process.env.USERPROFILE = home
+  delete process.env.XDG_DATA_HOME
+  process.env.DSH_PET_TEST = '1'
+  process.env.DSH_PET_PACKAGE_ROOT = fakeRoot
+  process.env.DSH_PET_PLATFORM = 'linux'
+  process.env.DSH_PET_ARCH = 'x64'
+  delete process.env.DSH_PET_NO_BOOTSTRAP
+
+  try {
+    const target = path.join(home, '.local', 'share', 'ai-terminal-pet', 'AI-Terminal-Pet')
+    const first = await load(path.join(fakeRoot, 'lib', 'index.js'))
+    const outcome = await first.__testing.bootstrap({ logger: { warn: () => {} } })
+    check(outcome.downloaded === true && outcome.copiedExe === true, 'Linux installs the overlay from the pinned archive')
+    check(existsSync(target), 'the extracted overlay lands in the XDG data directory')
+    check(existsSync(target) && readFileSync(target).equals(payload), 'the extracted bytes are the archive member')
+    if (process.platform !== 'win32') {
+      check((statSync(target).mode & 0o777) === 0o755, 'the installed overlay is executable (0755)')
+    }
+
+    // A wrong digest must install nothing at all.
+    const badHome = path.join(root, 'home-pinned-bad')
+    mkdirSync(badHome, { recursive: true })
+    process.env.HOME = badHome
+    process.env.USERPROFILE = badHome
+    writeFileSync(
+      path.join(fakeRoot, 'lib', 'release-pins.json'),
+      JSON.stringify({
+        schemaVersion: 2,
+        overlayVersion: '9.9.9',
+        platforms: { 'linux-amd64': { ...pin, sha256: 'f'.repeat(64) } },
+      }),
+      'utf8',
+    )
+    const bad = await load(path.join(fakeRoot, 'lib', 'index.js'))
+    const badOutcome = await bad.__testing.bootstrap({ logger: { warn: () => {} } })
+    check(badOutcome.skipped === 'download-failed', 'a digest mismatch is reported, not installed')
+    check(
+      !existsSync(path.join(badHome, '.local', 'share', 'ai-terminal-pet', 'AI-Terminal-Pet')),
+      'a digest mismatch writes no binary',
+    )
+
+    // A platform with no pin says so (and still copies protocol.js).
+    process.env.DSH_PET_ARCH = 'riscv64'
+    const missing = await load(path.join(fakeRoot, 'lib', 'index.js'))
+    const missingOutcome = await missing.__testing.bootstrap({ logger: { warn: () => {} } })
+    check(missingOutcome.skipped === 'no-pinned-overlay', 'an unpinned platform is reported as such')
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    delete process.env.DSH_PET_PLATFORM
+    delete process.env.DSH_PET_ARCH
+  }
 }
 
 /** Case 3: a hostile protocol module leaves the plugin silent. */
@@ -298,7 +520,10 @@ async function caseManifest() {
     `README.zh.md reads as Chinese under a CJK sniff (${cjkCount} CJK characters)`
   )
   check(manifest.dsh?.bundle?.patch === './cordis.patch.yml', 'dsh.bundle.patch is declared')
-  check(JSON.stringify(manifest.dsh?.bundle?.platforms) === '["win32"]', 'the bundle is Windows only')
+  check(
+    JSON.stringify(manifest.dsh?.bundle?.platforms) === '["win32","linux","darwin"]',
+    'the bundle loads on Windows, Linux and macOS',
+  )
   // Third-party registries (YELEBAI/dsh-plugin-marketplace, and any other that
   // reads the same convention) filter a plugin out unless install.profiles
   // contains the profile the client is running. Without this declaration the
@@ -370,7 +595,10 @@ async function caseRootManifest() {
   check(rootManifest.version === manifest.version, 'the root shim tracks the package version')
   check(rootManifest.private === true, 'the root shim is private so it never claims the npm name')
   check(rootManifest.dsh?.bundle?.patch === './packages/dsh-ai-terminal-pet/cordis.patch.yml', 'the root shim points dsh.bundle.patch at this package')
-  check(JSON.stringify(rootManifest.dsh?.bundle?.platforms) === '["win32"]', 'the root shim keeps the Windows platform gate')
+  check(
+    JSON.stringify(rootManifest.dsh?.bundle?.platforms) === '["win32","linux","darwin"]',
+    'the root shim agrees about the platform list',
+  )
   check(JSON.stringify(rootManifest.dsh?.marketplace) === JSON.stringify(manifest.dsh?.marketplace), 'the root shim copies the marketplace declaration verbatim')
   const patched = path.join(packageDir, '..', '..', rootManifest.dsh?.bundle?.patch ?? '')
   check(rootManifest.dsh?.bundle?.patch !== undefined && existsSync(patched), 'the patch file the root shim names exists')
@@ -493,6 +721,8 @@ async function caseVendoredProtocolLoads() {
 try {
   await caseMapping()
   await caseBootstrap()
+  await casePlatformDirectories()
+  await casePinnedInstall()
   await caseThrowingProtocol()
   await caseManifest()
   await caseRootManifest()

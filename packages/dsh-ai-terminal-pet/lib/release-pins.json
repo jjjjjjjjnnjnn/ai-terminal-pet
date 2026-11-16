@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "overlayVersion": "1.0.14",
+  "note": "Linux and macOS fetch the pinned release archive once, on first use; Windows ships its overlay in vendor/ and never reads this file. Update the four entries whenever the overlay version moves.",
+  "platforms": {
+    "linux-amd64": {
+      "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/pet-v1.0.14/ai-terminal-pet-1.0.14-linux-amd64.tar.gz",
+      "sha256": "f45ac34bc4977cf1250c044f7c5f70b996116f451eaec42f522ce8bc32e6eee1",
+      "bytes": 5418730,
+      "member": "ai-terminal-pet-1.0.14-linux-amd64/bin/AI-Terminal-Pet"
+    },
+    "linux-arm64": {
+      "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/pet-v1.0.14/ai-terminal-pet-1.0.14-linux-arm64.tar.gz",
+      "sha256": "298b3956e962e592e77fb6bd49f6b23073b0dfb821175b3d9a21df8b5519896f",
+      "bytes": 4928818,
+      "member": "ai-terminal-pet-1.0.14-linux-arm64/bin/AI-Terminal-Pet"
+    },
+    "darwin-arm64": {
+      "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/pet-v1.0.14/ai-terminal-pet-1.0.14-darwin-arm64.tar.gz",
+      "sha256": "b5b62b794a43e6c13c3d3950063fdecf44ec59b46bfa74ee733f68235b30256b",
+      "bytes": 5123672,
+      "member": "ai-terminal-pet-1.0.14-darwin-arm64/bin/AI-Terminal-Pet"
+    },
+    "darwin-amd64": {
+      "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/pet-v1.0.14/ai-terminal-pet-1.0.14-darwin-amd64.tar.gz",
+      "sha256": "7e8e40b3cc26578c0d73ad48c2dfb55f945dc00cda088b913c5ba4748ad20342",
+      "bytes": 5515821,
+      "member": "ai-terminal-pet-1.0.14-darwin-amd64/bin/AI-Terminal-Pet"
+    }
+  }
+}

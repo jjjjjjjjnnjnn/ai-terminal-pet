@@ -92,24 +92,24 @@ Choose **either** the zero-config DeepSeek Harness plugin (Windows), a prebuilt 
 
 ### Option A — DeepSeek Harness Plugin (`dsh-ai-terminal-pet`)
 
-> The package is now **1.2.23** (`dsh.bundle.platforms: ["win32"]`). On Windows it connects DeepSeek Harness sessions immediately and auto-bootstraps the bundled Win32 overlay + `protocol.js` on first run.
+> The package is now **1.2.24** (`dsh.bundle.platforms: ["win32", "linux", "darwin"]`). It connects DeepSeek Harness sessions immediately on all three platforms: on Windows it installs the bundled overlay + `protocol.js` offline on first run, on Linux and macOS it fetches the pinned release archive once (SHA-256 verified) and installs the same overlay.
 >
 > **Important scope note**: Installing the plugin out-of-the-box shows **DeepSeek Harness** sessions. To also aggregate OpenCode, Claude Code, or Antigravity into the same strip, wire those reporters once using `--connect` below.
 
 <details>
 <summary>Install via DSH CLI / npm / tarball / pinned git</summary>
 
-Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.23):
+Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.24):
 
 ```sh
 # 1. From npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # 2. Direct release tarball
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.23/dsh-ai-terminal-pet-1.2.23.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.24/dsh-ai-terminal-pet-1.2.24.tgz
 
 # 3. Pinned git release tag (no npm required)
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.23&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.24&path:/packages/dsh-ai-terminal-pet"
 ```
 
 See [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) for full details and uninstall instructions.
@@ -344,24 +344,24 @@ Key maintainer references:
 
 #### 方式 A — DeepSeek Harness 插件安装（`dsh-ai-terminal-pet`，Windows）
 
-> 当前版本是 **1.2.23**（包声明 `dsh.bundle.platforms: ["win32"]`）。在 Windows 的 DeepSeek Harness 0.2.x 中安装即用，插件首次加载会自动把 Win32 浮窗本体与 `protocol.js` 落盘到本机。
+> 当前版本是 **1.2.24**（包声明 `dsh.bundle.platforms: ["win32", "linux", "darwin"]`）。三个平台的 DeepSeek Harness 0.2.x 都是安装即用：Windows 上首次加载会把内置的浮窗本体与 `protocol.js` 离线落盘，Linux / macOS 上会先下载一次钉住的发布归档（校验 SHA-256）再装同一份浮窗。
 >
 > **边界说明**：装完包即可在面板看到 **DeepSeek Harness** 的会话；如果需要把 OpenCode、Claude Code 或 Antigravity 也汇入同一块浮窗，请再运行一次下面的 `--connect`。
 
 <details>
 <summary>通过 DSH CLI 安装（npm / tarball / git tag）</summary>
 
-已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.23）：
+已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.24）：
 
 ```sh
 # 1. 通过 npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # 2. 通过 Release tarball 直链
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.23/dsh-ai-terminal-pet-1.2.23.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.24/dsh-ai-terminal-pet-1.2.24.tgz
 
 # 3. 钉死 Release tag 的 git 源（无 npm 网络兜底）
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.23&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.24&path:/packages/dsh-ai-terminal-pet"
 ```
 
 更多说明与卸载方式见 [packages/dsh-ai-terminal-pet/README.zh.md](packages/dsh-ai-terminal-pet/README.zh.md)。

@@ -59,8 +59,9 @@ Release 资产，见下文）。
 
 包通过 `dsh.catalog` 向商店自述：一个 category、两种语言各一行摘要，以及它用到的 capabilities。
 capabilities 是**自我声明**、从不校验——DSH 并不沙箱化插件——所以请把它当描述读，而不是权限清单。
-这个 bundle 只在 Windows 上可用，声明了 `dsh.bundle.platforms: ["win32"]`，因此其它平台显示为
-不支持，而不是装上去再坏。
+这个 bundle 在 Windows、Linux 与 macOS 上都可加载，声明了
+`dsh.bundle.platforms: ["win32", "linux", "darwin"]`。窗口层按平台不同（Win32 分层 DIB、
+纯 Go X11、纯 Go AppKit），上报路径三端一致。
 
 它还声明了 `dsh.marketplace`（`profiles: ["desktop", "headless", "web"]`、
 `requiresBuildApproval: false`、`manualSteps: false`）。DSH 自己从不读这个字段——bundle 走
@@ -74,10 +75,10 @@ capabilities 是**自我声明**、从不校验——DSH 并不沙箱化插件�
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # Release tarball：与 npm 上同一份字节，直接来自 GitHub Release
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.23/dsh-ai-terminal-pet-1.2.23.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.24/dsh-ai-terminal-pet-1.2.24.tgz
 
 # git 源，钉住 Release tag
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.23&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.24&path:/packages/dsh-ai-terminal-pet"
 ```
 
 这三种只差运输方式。npm 那条最短，也是市场按包名安装时走的路径；tarball 那条给「钉住 Release 资产
@@ -105,33 +106,51 @@ dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-term
 
 ## 它在磁盘上写什么
 
-在 Harness 进程里第一次使用时，**只在文件缺失时**拷两个文件：
+在 Harness 进程里第一次使用时，**只在文件缺失时**装上两个文件：
 
 | 文件 | 来源 | 用途 |
 | --- | --- | --- |
-| %LOCALAPPDATA%\AI-Terminal-Pet\protocol.js | vendor/protocol.js | 管道名、状态集合、脱敏、快照 |
-| %LOCALAPPDATA%\AI-Terminal-Pet\AI-Terminal-Pet.exe | vendor/AI-Terminal-Pet.exe | Win32 浮窗本体 |
+| `<数据目录>/protocol.js` | vendor/protocol.js | 端点名、状态集合、脱敏、快照 |
+| `<数据目录>/AI-Terminal-Pet.exe`（Windows） | vendor/AI-Terminal-Pet.exe | Win32 浮窗本体，完全离线 |
+| `<数据目录>/AI-Terminal-Pet`（Linux、macOS） | 钉住的 Release 归档 | 同一份浮窗，首次使用时取一次 |
+
+数据目录：Windows 是 `%LOCALAPPDATA%\AI-Terminal-Pet`，macOS 是
+`~/Library/Application Support/AI-Terminal-Pet`，Linux 是
+`$XDG_DATA_HOME/ai-terminal-pet`（或 `~/.local/share/ai-terminal-pet`）—— 和
+`reporters/protocol.js` 与 Go 侧已有的规则同一条，测试会在每个 OS 上把两边钉在一起。
 
 **绝不覆盖**：已存在的文件（包括独立安装脚本放进去的那份）优先。设 `DSH_PET_NO_BOOTSTRAP=1`
-可以整段跳过这一步（例如浮窗已经由 `scripts/install.ps1` 管着）。
+可以整段跳过这一步（例如浮窗已经由安装脚本管着）。
 
 上报同样会在那个目录下写浮窗正常的运行期快照，和其它任何上报端一样。
 
-### 可选的下载兜底
+### Linux 与 macOS 怎么拿到二进制
 
-`lib/release-pins.json` 默认**不在**发布包里。维护者把钉住的 Release 资产 URL、大小与 SHA-256
-填进去之后，没有 vendored 二进制的机器会经 HTTPS（30 秒超时）下载这两个资产，用 `node:crypto`
-核对大小与摘要，**核对通过才安装**。任何失败都只留一条 warning，插件在没有浮窗的情况下继续工作。
+一个 tarball 服务所有平台，再塞四个 ~2 MB 的二进制会让每个 Windows 安装都为跑不了的平台买单。
+所以包里内置 Windows 浮窗（`vendor/`，完全离线），**不**内置任何 POSIX 二进制；
+`lib/release-pins.json` 用 URL、字节数与 SHA-256 钉住四个发布归档，Linux / macOS 首次使用经
+HTTPS（30 秒超时）下载对应那份，用 `node:crypto` 核对摘要，取出其中一个成员并以 `0755` 装好。
+任何失败只留一条 warning、不落任何文件：插件继续上报，只是浮窗没装上，用发布归档里的
+`scripts/install.sh` 手工安装仍然是可行路径。
+
+Windows 从不读这个文件：它的二进制在 `vendor/` 里，所以 Windows 安装全程不需要网络。
 
 ## 浮窗本身仍然是独立的
 
-这个 bundle 是 Windows 端的便利装法。独立的浮窗本体是一个零 cgo Go 程序，支持 Windows（Win32）、Linux（纯 Go X11 ARGB）与 macOS（纯 Go `purego` AppKit），在 Windows 上通过 `scripts/install.ps1` 安装、在 macOS/Linux 上通过 `scripts/install.sh` 安装；其它每一个上报端（Claude Code、OpenCode、Antigravity、generic）都走同一套按用户隔离的本地端点（Windows 命名管道 / POSIX Unix domain socket）。
+这个 bundle 是便利装法：它上报 Harness 的会话，并顺手把浮窗装好。浮窗本体是一个零 cgo Go 程序，
+三平台同一份实现——Windows 是 Win32 分层窗口、Linux 是纯 Go X11、macOS 是纯 Go `purego` AppKit——
+既可以用 `scripts/install.ps1`（Windows）或 `scripts/install.sh`（macOS / Linux）单独安装，
+也可以用其它每一个上报端（Claude Code、OpenCode、Antigravity、generic）接同一套按用户隔离的本地端点
+（Windows 命名管道 / POSIX Unix domain socket）。
 那些上报端是**另外安装**的，不属于这个包：一个终端没挂任何上报端，它在哪种装法里都不会上报。
 只想要浮窗的机器不需要这个包；只想要插件的机器则会自动得到一份浮窗。
 
 ## 要求与限制
 
-- 仅 Windows（命名管道 + Win32 分层窗口）。
+- Windows、Linux（X11）或 macOS。浮窗在 Windows 与 WSLg X11 上有实测；macOS 面板只在
+  `macos-latest` 上构建与单测，从未在苹果硬件上真的开过窗，macOS 的通知走 `osascript`，是尽力而为的提示面。
+- POSIX 的浮窗二进制靠首次使用时一次钉住的 HTTPS 下载；首次运行就没网的话，请用
+  `scripts/install.sh` 手工安装。
 - DeepSeek Harness 0.2.x。`engines.dsh` 是 `>=0.2.0-0 <0.3.0-0`；从 DSH 0.2.1-alpha.3 起宿主**只看
   这一个区间**，区间不满足就拒绝安装并把 profile 回滚，所以这个区间就是全部的兼容性声明。
   那两个 `-0` 边界是有意写的——DSH 用 semver 的 `includePrerelease` 求值，在那种语义下

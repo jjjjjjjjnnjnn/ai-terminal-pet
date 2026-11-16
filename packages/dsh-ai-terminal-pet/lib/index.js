@@ -2,12 +2,19 @@
  * dsh-ai-terminal-pet - a DeepSeek Harness Cordis bundle that reports session
  * state to the AI Terminal Pet desktop overlay.
  *
- * The plugin is a field adapter only. It never computes the pipe name, the
- * state set, the snapshot path or the redaction rules: those come from the
- * official protocol module, resolved at first use from
- *   %LOCALAPPDATA%\AI-Terminal-Pet\protocol.js   (placed there by install.ps1)
+ * The plugin is a field adapter only. It never computes the state set, the
+ * snapshot path or the redaction rules: those come from the official protocol
+ * module, resolved at first use from
+ *   <data directory>/protocol.js   (placed there by the installer, or by this
+ *                                   plugin's own bootstrap from vendor/)
  * and, when that file is missing, from the copy shipped in this package
  * (vendor/protocol.js).
+ *
+ * The data directory itself is the one path rule it cannot borrow from that
+ * module - protocol.js lives inside the directory it would have to compute - so
+ * this file carries its own reading of the same contract (Windows
+ * %LOCALAPPDATA%\AI-Terminal-Pet, macOS Application Support, XDG on Linux) and
+ * verify.mjs pins it to protocol.js's answer on every OS in CI.
  *
  * Everything is fire-and-forget. Nothing here may throw into the Harness host
  * process, nothing calls process.exit, and nothing waits on the overlay.
@@ -18,7 +25,6 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -28,6 +34,7 @@ import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gunzipSync } from 'node:zlib'
 
 const require = createRequire(import.meta.url)
 
@@ -39,9 +46,12 @@ const TERMINAL = 'deepseek-harness'
 const TITLE = 'DeepSeek Harness'
 const KEEP_ALIVE_MS = 60_000
 
-const EXE_NAME = 'AI-Terminal-Pet.exe'
 const PROTOCOL_NAME = 'protocol.js'
 const PET_DIRECTORY = 'AI-Terminal-Pet'
+// Linux follows XDG, where the convention is lower-case; internal/home makes the
+// same split on the Go side ("a stray capitalised directory in ~/.local/share is
+// not what any other Linux application does").
+const PET_DIRECTORY_XDG = 'ai-terminal-pet'
 const VENDOR_DIRECTORY = 'vendor'
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
@@ -64,6 +74,32 @@ function packageDirectory() {
 
 const packageRoot = packageDirectory()
 
+/**
+ * Which platform and architecture this process is, with a test-only seam.
+ *
+ * verify.mjs has to exercise the Linux and macOS bootstrap from whichever
+ * machine runs it, and the three CI jobs that run it are themselves three
+ * different machines. The seam makes both possible; a shipped install never
+ * sets either variable.
+ */
+function hostPlatform() {
+  try {
+    if (process.env.DSH_PET_TEST === '1' && process.env.DSH_PET_PLATFORM) return process.env.DSH_PET_PLATFORM
+  } catch {
+    // A broken environment falls back to the real platform.
+  }
+  return process.platform
+}
+
+function hostArch() {
+  try {
+    if (process.env.DSH_PET_TEST === '1' && process.env.DSH_PET_ARCH) return process.env.DSH_PET_ARCH
+  } catch {
+    // Fall through.
+  }
+  return process.arch
+}
+
 function localAppData() {
   try {
     const value = process.env.LOCALAPPDATA
@@ -80,10 +116,50 @@ function localAppData() {
   return ''
 }
 
-/** LOCALAPPDATA/AI-Terminal-Pet, or an empty string when unknowable. */
+function homeDirectory() {
+  try {
+    const home = os.homedir()
+    if (typeof home === 'string' && home.length > 0) return home
+  } catch {
+    // Fall through.
+  }
+  return ''
+}
+
+/**
+ * This project's data directory, on all three platforms.
+ *
+ * The contract is owned by reporters/protocol.js (dataDirectory) and mirrored by
+ * internal/home in Go. This is the plugin's reading of it - it needs the answer
+ * before it can load protocol.js, which is what lives at that path - and
+ * verify.mjs pins the two JavaScript answers together on every OS.
+ */
 function petDirectory() {
-  const base = localAppData()
-  return base ? path.join(base, PET_DIRECTORY) : ''
+  const platform = hostPlatform()
+  if (platform === 'win32') {
+    const base = localAppData()
+    return base ? path.join(base, PET_DIRECTORY) : ''
+  }
+  if (platform === 'darwin') {
+    const home = homeDirectory()
+    return home ? path.join(home, 'Library', 'Application Support', PET_DIRECTORY) : ''
+  }
+  const xdg = process.env.XDG_DATA_HOME
+  if (typeof xdg === 'string' && path.isAbsolute(xdg)) return path.join(xdg, PET_DIRECTORY_XDG)
+  const home = homeDirectory()
+  return home ? path.join(home, '.local', 'share', PET_DIRECTORY_XDG) : ''
+}
+
+/** The overlay binary's file name. The Go side strips .exe on POSIX too. */
+function overlayBinaryName() {
+  return hostPlatform() === 'win32' ? 'AI-Terminal-Pet.exe' : 'AI-Terminal-Pet'
+}
+
+/** os/arch as the release assets spell it: linux-amd64, darwin-arm64, ... */
+function platformKey() {
+  const arch = hostArch()
+  const goarch = { x64: 'amd64', arm64: 'arm64', ia32: '386', arm: 'arm' }[arch] || arch
+  return hostPlatform() + '-' + goarch
 }
 
 let protocol = null
@@ -329,62 +405,42 @@ function warnOnce(ctx, message) {
   }
 }
 
-/** A pinned release asset { url, sha256, bytes } or null. */
-function pinnedAsset(parsed, flat, group) {
-  const block = parsed && typeof parsed[group] === 'object' && parsed[group] !== null ? parsed[group] : {}
-  const url = typeof parsed[flat.url] === 'string' && parsed[flat.url] ? parsed[flat.url]
-    : typeof block.url === 'string' && block.url ? block.url : ''
-  const sha256 = typeof parsed[flat.sha256] === 'string' && parsed[flat.sha256] ? parsed[flat.sha256]
-    : typeof block.sha256 === 'string' && block.sha256 ? block.sha256 : ''
-  const rawBytes = parsed[flat.bytes] === undefined ? block.bytes : parsed[flat.bytes]
-  const bytes = Number.isSafeInteger(Number(rawBytes)) && Number(rawBytes) > 0 ? Number(rawBytes) : 0
-  if (!url || !sha256) return null
-  return { url, sha256: sha256.toLowerCase(), bytes }
+/** A pinned release archive { url, sha256, bytes, member } or null. */
+function pinnedAsset(entry) {
+  if (!entry || typeof entry !== 'object') return null
+  const url = typeof entry.url === 'string' ? entry.url : ''
+  const sha256 = typeof entry.sha256 === 'string' ? entry.sha256.toLowerCase() : ''
+  const member = typeof entry.member === 'string' ? entry.member : ''
+  const bytes = Number.isSafeInteger(Number(entry.bytes)) && Number(entry.bytes) > 0 ? Number(entry.bytes) : 0
+  if (!url || !/^[0-9a-f]{64}$/.test(sha256) || !member) return null
+  return { url, sha256, bytes, member }
 }
 
-/** lib/release-pins.json, or null when the lead has not filled it in yet. */
+/**
+ * lib/release-pins.json's `platforms`, or null when it is absent.
+ *
+ * Schema 2, keyed by `platformKey()`. Windows never reads it: its overlay ships
+ * in vendor/ and installs offline. Linux and macOS have no bundled binary - one
+ * tarball serves every platform, and four ~2 MB binaries inside it would make
+ * every Windows install pay for three platforms it cannot run - so they fetch the
+ * pinned archive once, on first use, and verify it against this file.
+ */
 function releasePins() {
   try {
     const file = path.join(moduleDirectory, 'release-pins.json')
     if (!existsSync(file)) return null
     const parsed = JSON.parse(readFileSync(file, 'utf8'))
     if (!parsed || typeof parsed !== 'object') return null
-    const exe = pinnedAsset(parsed, { url: 'exeUrl', sha256: 'exeSha256', bytes: 'exeBytes' }, 'exe')
-    const protocolPin = pinnedAsset(parsed, { url: 'protocolUrl', sha256: 'protocolSha256', bytes: 'protocolBytes' }, 'protocol')
-    if (!exe || !protocolPin) return null
-    return { exe, protocol: protocolPin }
+    if (!parsed.platforms || typeof parsed.platforms !== 'object') return null
+    return parsed.platforms
   } catch {
     return null
   }
 }
 
-function temporaryDirectory() {
-  const bases = []
-  try {
-    const temp = os.tmpdir()
-    if (typeof temp === 'string' && path.isAbsolute(temp)) bases.push(temp)
-  } catch {
-    // tmpdir is broken in some sandboxes; try the next base.
-  }
-  try {
-    const local = localAppData()
-    if (local) bases.push(path.join(local, 'Temp'))
-  } catch {
-    // Ignore.
-  }
-  for (const base of bases) {
-    try {
-      mkdirSync(base, { recursive: true })
-      return mkdtempSync(path.join(base, 'dsh-ai-terminal-pet-'))
-    } catch {
-      // Try the next base.
-    }
-  }
-  return ''
-}
-
-async function fetchAsset(url, destination, pin) {
-  if (typeof fetch !== 'function') return false
+/** The pinned archive's bytes, or null when the fetch, size or digest fails. */
+async function fetchPinnedBytes(pin) {
+  if (typeof fetch !== 'function') return null
   const options = { redirect: 'follow', headers: { 'user-agent': 'dsh-ai-terminal-pet' } }
   try {
     if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
@@ -394,91 +450,156 @@ async function fetchAsset(url, destination, pin) {
     // Without timeout support the request still settles on its own.
   }
   try {
-    const response = await fetch(url, options)
-    if (!response || !response.ok) return false
-    const buffer = await response.arrayBuffer()
-    const bytes = new Uint8Array(buffer)
-    if (pin.bytes && bytes.byteLength !== pin.bytes) return false
-    const digest = createHash('sha256').update(bytes).digest('hex')
-    if (digest !== pin.sha256) return false
+    const response = await fetch(pin.url, options)
+    if (!response || !response.ok) return null
+    // A hostile redirect must not be able to make the host allocate without
+    // bound: the pin's size is the ceiling, and it is small.
+    const declared = Number(response.headers?.get?.('content-length'))
+    if (pin.bytes && Number.isFinite(declared) && declared > pin.bytes) return null
+    const bytes = Buffer.from(await response.arrayBuffer())
+    if (pin.bytes && bytes.length !== pin.bytes) return null
+    if (createHash('sha256').update(bytes).digest('hex') !== pin.sha256) return null
+    return bytes
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Reads one file out of a gzipped USTAR archive - the shape
+ * scripts/package-unix.mjs writes, and the shape the release ships.
+ *
+ * It is not a general tar reader: no pax, no GNU long names, no symlinks. It
+ * walks the header sequence, compares the full name (ustar prefix included) and
+ * returns that member's bytes. A member it cannot parse ends the walk with null
+ * rather than guessing.
+ */
+function readTarMember(archive, member) {
+  let raw
+  try {
+    raw = gunzipSync(archive)
+  } catch {
+    return null
+  }
+  let offset = 0
+  while (offset + 512 <= raw.length) {
+    const header = raw.subarray(offset, offset + 512)
+    if (header.every((byte) => byte === 0)) return null
+    const name = header.subarray(0, 100).toString('utf8').replace(/\0.*$/, '')
+    const magic = header.subarray(257, 262).toString('ascii')
+    const prefix = magic.startsWith('ustar') ? header.subarray(345, 345 + 155).toString('utf8').replace(/\0.*$/, '') : ''
+    const sizeText = header.subarray(124, 136).toString('ascii').replace(/\0.*$/, '').trim()
+    const size = parseInt(sizeText || '0', 8)
+    const type = header[156] === 0 ? '0' : String.fromCharCode(header[156])
+    const full = prefix ? prefix + '/' + name : name
+    if (!Number.isFinite(size) || size < 0) return null
+    const dataStart = offset + 512
+    const dataEnd = dataStart + size
+    if (dataEnd > raw.length) return null
+    if (type === '0' && full === member) return raw.subarray(dataStart, dataEnd)
+    offset = dataStart + Math.ceil(size / 512) * 512
+  }
+  return null
+}
+
+/**
+ * Writes an executable atomically. The temporary name ends in .tmp so a crash
+ * leaves something verify.mjs can find, and renameSync never clobbers a file a
+ * user (or a newer install) put there first.
+ */
+function writeExecutable(destination, bytes) {
+  const temp = destination + '.' + String(process.pid) + '.' + String(Date.now()) + '.tmp'
+  try {
     mkdirSync(path.dirname(destination), { recursive: true })
-    writeFileSync(destination, bytes)
+    writeFileSync(temp, bytes, { mode: 0o755 })
+    try {
+      chmodSync(temp, 0o755)
+    } catch {
+      // Windows maps this to the read-only bit; a refusal is fine.
+    }
+    if (existsSync(destination)) {
+      rmSync(temp, { force: true })
+      return false
+    }
+    renameSync(temp, destination)
     return true
   } catch {
+    try {
+      rmSync(temp, { force: true })
+    } catch {
+      // Best effort.
+    }
     return false
   }
 }
 
 /**
- * Optional, OFF unless lib/release-pins.json exists. Downloads the two pinned
- * release assets, verifies size and SHA-256, then installs them. Every failure
- * is silent except one ctx.logger.warn per process.
+ * Installs the overlay for this platform from the pinned release archive.
+ *
+ * One { ctx.logger.warn } per process when it cannot: the user can still install
+ * the overlay from the release archive (scripts/install.sh), and a plugin that
+ * shouts on every load is worse than one that says it once.
  */
-async function downloadFallback(ctx, dir, outcome) {
-  const pins = releasePins()
-  if (!pins) {
-    outcome.skipped = 'no-pinned-release'
+async function installFromPin(ctx, dir, outcome) {
+  const platforms = releasePins()
+  const key = platformKey()
+  const pin = platforms ? pinnedAsset(platforms[key]) : null
+  if (!pin) {
+    outcome.skipped = 'no-pinned-overlay'
+    warnOnce(ctx, 'ai-terminal-pet: no pinned overlay for ' + key + ' - install it from the release archive (scripts/install.sh) and the panel will appear.')
     return outcome
   }
-  const work = temporaryDirectory()
-  if (!work) {
-    outcome.skipped = 'no-temp-directory'
+  const archive = await fetchPinnedBytes(pin)
+  if (!archive) {
+    outcome.skipped = 'download-failed'
+    warnOnce(ctx, 'ai-terminal-pet: the pinned overlay download failed; the panel stays uninstalled (reports still go to the pipe when it runs).')
     return outcome
   }
-  try {
-    const exeTemp = path.join(work, EXE_NAME)
-    const protocolTemp = path.join(work, PROTOCOL_NAME)
-    const exeOk = await fetchAsset(pins.exe.url, exeTemp, pins.exe)
-    const protocolOk = exeOk && await fetchAsset(pins.protocol.url, protocolTemp, pins.protocol)
-    if (!exeOk || !protocolOk) {
-      warnOnce(ctx, 'ai-terminal-pet: the pinned release download failed; the overlay stays uninstalled.')
-      outcome.skipped = 'download-failed'
-      return outcome
-    }
-    outcome.copiedProtocol = copyVerified(protocolTemp, path.join(dir, PROTOCOL_NAME), 0o600)
-    outcome.copiedExe = copyVerified(exeTemp, path.join(dir, EXE_NAME))
-    outcome.downloaded = true
+  const binary = readTarMember(archive, pin.member)
+  if (!binary) {
+    outcome.skipped = 'archive-member-missing'
+    warnOnce(ctx, 'ai-terminal-pet: the pinned archive does not contain ' + pin.member + '; nothing was installed.')
     return outcome
-  } catch {
-    return outcome
-  } finally {
-    try {
-      rmSync(work, { recursive: true, force: true })
-    } catch {
-      // Best effort.
-    }
   }
+  outcome.copiedExe = writeExecutable(path.join(dir, overlayBinaryName()), binary)
+  outcome.downloaded = true
+  return outcome
 }
 
 /**
- * One-click install of the overlay binary that this package ships.
- * Runs once per process, fire-and-forget, and never overwrites a file.
+ * One-click install of the overlay binary for this platform.
+ *
+ * Runs once per process, fire-and-forget, and never overwrites a file. Windows
+ * copies the vendored binary (offline); Linux and macOS fetch the pinned release
+ * archive, because the package deliberately ships no binary for them.
  */
 async function runBootstrap(ctx) {
   const outcome = { skipped: '', copiedProtocol: false, copiedExe: false, downloaded: false }
   try {
     const dir = petDirectory()
     if (!dir) {
-      outcome.skipped = 'no-localappdata'
+      outcome.skipped = 'no-data-directory'
       return outcome
     }
-    const targetExe = path.join(dir, EXE_NAME)
+    const targetExe = path.join(dir, overlayBinaryName())
     if (existsSync(targetExe)) {
       outcome.skipped = 'installed'
       return outcome
     }
-    const vendorExe = path.join(packageRoot, VENDOR_DIRECTORY, EXE_NAME)
+    mkdirSync(dir, { recursive: true })
+    // protocol.js ships with the package on every platform, and the reporters
+    // read the installed copy first, so it is always the one that lands.
+    outcome.copiedProtocol = copyVerified(
+      path.join(packageRoot, VENDOR_DIRECTORY, PROTOCOL_NAME),
+      path.join(dir, PROTOCOL_NAME),
+      0o600,
+    )
+    const vendorExe = path.join(packageRoot, VENDOR_DIRECTORY, overlayBinaryName())
     if (existsSync(vendorExe)) {
-      mkdirSync(dir, { recursive: true })
-      outcome.copiedProtocol = copyVerified(
-        path.join(packageRoot, VENDOR_DIRECTORY, PROTOCOL_NAME),
-        path.join(dir, PROTOCOL_NAME),
-        0o600,
-      )
-      outcome.copiedExe = copyVerified(vendorExe, targetExe)
+      outcome.copiedExe = copyVerified(vendorExe, targetExe, 0o755)
       return outcome
     }
-    return await downloadFallback(ctx, dir, outcome)
+    return await installFromPin(ctx, dir, outcome)
   } catch {
     return outcome
   }
@@ -647,4 +768,12 @@ export function apply(ctx, config) {
 }
 
 /** Test-only seam used by verify.mjs; not part of the plugin surface. */
-export const __testing = { bootstrap, officialProtocol, packageRoot, petDirectory }
+export const __testing = {
+  bootstrap,
+  officialProtocol,
+  packageRoot,
+  petDirectory,
+  overlayBinaryName,
+  platformKey,
+  readTarMember,
+}

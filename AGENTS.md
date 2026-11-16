@@ -6,8 +6,8 @@
 > **Language**: Go 1.23+ / Win32 API (the window) / Node.js (Reporters, zero npm dependencies)
 > **License**: MIT
 >
-> **The reporting path is cross-platform; the window is Windows-only so far.** What works where, and how
-> each claim was measured, is [docs/PLATFORMS.md](docs/PLATFORMS.md) — read it before assuming a package
+> **The reporting path and the window layer are cross-platform; the depth of the verification is not.**
+> What works where, and how each claim was measured, is [docs/PLATFORMS.md](docs/PLATFORMS.md) — read it before assuming a package
 > builds everywhere, and before promising anything to a macOS or Linux user.
 
 ---

@@ -6,10 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.23** 已发版；**§66 第 66 轮（POSIX 平权）：Linux 有了提示音与通知面、macOS 有了 osascript 提醒面、跳转失败在 POSIX 上不再一声不响、`--doctor` 从 11 项变 13 项；§65 是上一轮交接的快照；§64 查清了上游那行为什么是旧的**）
+## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.24** 已发版；**§67 第 67 轮：DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗），插件不再手写 Windows 路径；§66 POSIX 平权：Linux 有了提示音与通知面、跳转失败不再一声不响、`--doctor` 13 项；§64 查清了上游那行为什么是旧的**）
 
-> 接手请先读本节与 **§66「POSIX 平权落地」**
-> （三条用户可感知的变化、六个提交的顺序、为什么这样分文件、本机实测到了哪一步、以及三条**证不到**的事），
+> 接手请先读本节与 **§67「DSH 插件三平台」**
+> （四个改动面、三个"看起来对其实错"的地方、尺寸方案为什么是"首启按 pin 下载"、以及两条未验证项），
+> 再读 **§66「POSIX 平权落地」**
+> （Linux 提示音与通知面、macOS 的 osascript、跳转失败反馈、`--doctor` 从 11 项变 13 项、三条证不到的事），
 > 再读 **§65「交接：下个会话从这里开始」**
 > （上一轮收尾时的机器状态与四条上手命令；那一节的 §65.4 四项候选，第 1 项已在本轮做完），
 > 再读 **§64「上游目录里我们那行为什么是旧的（两个不同的原因），以及交接前的又一轮装机实测」**
@@ -54,9 +56,9 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.14`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.23`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.14` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.23`。
-  **工作区与本机安装目录已经与 `1.0.14` / `1.2.23` 同步**：`bin/`、
+- **版本**：浮窗 **`1.0.14`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.24`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.14` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.24`。
+  **工作区与本机安装目录已经与 `1.0.14` / `1.2.24` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `DB2DD2AB…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
@@ -4825,6 +4827,65 @@ node tools/catalog-status.mjs                # 目录那行现在是 current 还
 - **交接后第一件要查的事**：`node tools/catalog-status.mjs`。如果对方那次重建成功，我们的行会从
   `version 1.2.16 / tarball 1.2.21` 变成 `version 1.2.23 / tarball 1.2.21`（等 #16010），
   下载窗口也会前进——那时**不需要发新版**，也不需要再开 PR。
+
+## 67. 交接：DSH 插件三平台 —— Linux / macOS 首次使用按 pin 取浮窗，插件不再手写 Windows 路径（2026-11-16，第 67 轮；插件 **1.2.24**，浮窗仍 **1.0.14**）
+
+第 66 轮把浮窗做到了三平台，这一轮把**唯一的零配置入口**追上：DSH 插件在此之前只对 Windows 生效。
+它同时是仓库里最后一份手写 Windows 路径——`EXE_NAME`、`LOCALAPPDATA`、`platforms: ["win32"]`——
+而 `reporters/protocol.js` 与 `internal/home` 早就在管同一件契约。
+
+### 67.1 四个改动面
+
+| 面 | 之前 | 现在 |
+|---|---|---|
+| 平台清单 | `["win32"]`（两份清单） | `["win32","linux","darwin"]`；`dsh.catalog.summary` 与市场索引描述同步 |
+| 数据目录 | 插件自己从 `LOCALAPPDATA` 拼 | Windows `%LOCALAPPDATA%\AI-Terminal-Pet`、macOS `Application Support`、Linux XDG；**`verify.mjs` 钉住它与 `protocol.js` 快照目录一致** |
+| 浮窗二进制 | 只从 `vendor/AI-Terminal-Pet.exe` 拷 | Windows 照旧（离线、不读 pin）；Linux/macOS 用 `lib/release-pins.json`（schema 2）钉住的发布归档，首启下载 + SHA-256 + 解出成员 + `0755` |
+| CI | 只有 Windows job 跑 `verify.mjs` | `ubuntu-latest` 与 `macos-latest` 也跑（macOS job 补了 `setup-node`）；Windows job 用 `DSH_PET_PLATFORM=win32` 钉住自己的那一半 |
+
+### 67.2 三个"看起来对其实错"的地方
+
+1. **`copyVerified` 的 mode 参数不是装饰**：exe 那一行原来没传 mode。Windows 上 chmod 只映射只读位，
+   所以看不出问题；POSIX 上会落地 0644，`protocol.js` 的 `launchApplication()` 立刻 EACCES。
+   现在以 `0755` 写入并在**非 Windows** 的 job 上断言 `mode & 0o777 === 0o755`。
+2. **一个 tarball 服务所有平台，所以"内置四个二进制"不是免费的**：实测 POSIX 二进制比 Windows 的还大
+   （linux-amd64 5,009,568 B / gzip-9 2.06 MB；linux-arm64 1.86 MB；darwin-arm64 1.96 MB），
+   内置四个会把 tgz 从 2.07 MB 推到 ~9.9 MB，让每个 Windows 安装为跑不了的平台买单。
+   所以选"首启按 pin 下载"：tgz 不变，代价是 Linux/macOS 首次运行要下 4.9–5.5 MB 一次。
+3. **测试缝是必需的，不是作弊**：`verify.mjs` 要在同一台机器上验三个平台的路径，而三个 CI job 又各在
+   自己的 OS 上跑。`DSH_PET_TEST=1` 下的 `DSH_PET_PLATFORM` / `DSH_PET_ARCH` 让两件事同时成立；
+   发行版从不设置它们，而且**真实平台那一半仍然在真 Linux / 真 macOS 上跑**（没有缝）。
+
+### 67.3 实测
+
+- `node packages/dsh-ai-terminal-pet/verify.mjs`（Windows）：**118 条 ok / 0 fail**，新增约 12 条——
+  三平台数据目录、`platformKey()` 的 x64→amd64 映射、从本地 HTTP 服务器取一个真 tar.gz 后解出的字节
+  与成员一致、摘要不符时**一个字节都不写**、没有 pin 的平台明确报 `no-pinned-overlay`。
+- 包**不含任何 POSIX 二进制**：tgz 体积与 1.2.23 同量级（2,069,513 B），`vendor/` 只有 Windows 那份。
+- 浮窗本体零改动 → 浮窗版本仍是 **1.0.14**，只发插件线 `dsh-plugin-v1.2.24`（资产不可变，
+  没必要重发同一份 overlay）。
+- 新增的 CI 步骤跑在 `ubuntu-latest` / `macos-latest` 上；`0755` 断言只在非 Windows 生效，所以它
+  真正被执行是在那两条 job 里。
+
+### 67.4 未验证项
+
+1. **macOS 面板的真实显示**：没有苹果硬件。这一轮能证明的是"插件在 macOS 上选对目录、装对文件、
+   跑通逻辑"，不是"窗口在 Mac 上出现过"。
+2. **Linux 桌面上的真实安装**：CI runner 没有面板可看；XDG 路径、`0755` 与解包都是断言过的，
+   "装完窗口真的出现"仍要在有桌面的 Linux 上确认一次（方法与 §66.7 第 1 项相同，且按用户决定
+   **不排期**）。
+3. **macOS 首次下载的代理/证书环境**：`fetch` 走系统信任链，没有额外配置；企业代理下若失败，
+   插件按设计只 warn 一次并保持不上报浮窗——这条没有在真实企业网络里验过。
+
+### 67.5 下一轮从这里开始
+
+1. **上游目录那行**（§66.8 的后续）：对方 2026-11-16 16:39Z 之后的那次重建一旦跑完，
+   `version` 会自己变成 1.2.24；`tarball` 仍要等 PR 合并 + 再一次重建。查法仍是
+   `node tools/catalog-status.mjs`。
+2. **插件在 Linux 上的手工安装体验**：`scripts/install.sh` 与插件的首启下载现在都能装浮窗，
+   两条路会写同一个目录——值得在文档里明确"先装的赢"，避免用户以为要装两次。
+3. 视觉不变量门禁（本轮盘点过的候选 B）：preview PNG 已被确认**同机逐字节可复现**，
+   跨机器只能做颜色/几何探针，不能比整图。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 
