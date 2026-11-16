@@ -123,28 +123,26 @@ failure mode is always the same: one asks for permission, I am focused in anothe
 and twelve minutes later I notice the build sat idle.
 
 So I built ai-terminal-pet: a 56 by 156 pixel strip at the screen edge showing the
-highest-priority state across every session - which project waits, what for, how long.
+highest-priority state across every session: which project waits, what for, how long.
 
 Two choices worth explaining:
 
 State is pushed as one JSON line per event over a per-user Windows named pipe. Session
 lifecycle is not pushed at all: it is verified against the OS process table and window
-titles. A reporter going silent does not end a session, and one idle for an hour is not
-dead. Dropping it takes two minutes of unobservability. Clicking a row activates that
-terminal window, or the right tab in Windows Terminal.
+titles. A reporter going silent does not end a session; one idle for an hour is not dead.
+Dropping it takes two minutes of unobservability. Clicking a row activates that terminal
+window, or the right tab in Windows Terminal.
 
 Permission prompts get an optional 5 second veto window: a draining bar, tap to deny,
-silence to allow. Off by default. Destructive commands - rm -rf, rd /s, git push --force,
-format - are checked before the countdown and always go to manual review.
+silence to allow. Off by default. Destructive commands (rm -rf, rd /s, git push --force,
+format) are checked before the countdown and always go to manual review.
 
-Runs on Windows, Linux (X11) and macOS (AppKit) from one CGO-free Go codebase; the DSH
-bundle itself is Windows-only for now. Out of the box only DeepSeek Harness sessions appear;
-the other three terminals need their reporter wired once (one line each, README table). Not
-code-signed, so first run shows SmartScreen.
-
-Three native executables, nothing to install first: a 4.49 MiB overlay, a statusline shim,
-a hook binary. No account, no network, no telemetry, MIT. 425 Go tests plus a 172-check
-suite that installs into a throwaway sandbox.
+Windows, Linux (X11) and macOS (AppKit), one CGO-free Go codebase. Out of the box only
+DeepSeek Harness sessions appear, and that bundle is Windows-only; the other three
+terminals need their reporter wired once (one line, README table). Not code-signed, so
+first run shows SmartScreen. Three native executables: a 4.49 MiB overlay, a statusline
+shim, a hook. MIT, no account, no network, no telemetry. 425 Go tests plus a 172-check
+fresh-machine suite.
 
 https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
@@ -178,7 +176,7 @@ entry.
 5/5 Windows / Linux (X11) / macOS (AppKit), one CGO-free Go codebase. MIT, no account, no network, no telemetry. 425 Go tests plus a 172-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
-字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 213。
+字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 265。
 **第 1 条挂 `docs/assets/demo.gif`**，第 2 条挂 `docs/assets/overlay-expanded.png`，
 第 4 条挂 `docs/assets/smartscreen-unsigned.png`（未签名这件事先说在前面，
 而不是等人来问），第 5 条挂 `docs/assets/desktop-scene.png`。GIF 在 X 上要 ≤5 MB / ≤15 MB（移动端另算），
@@ -201,7 +199,7 @@ entry.
 5/5 支持 Windows / Linux (X11) / macOS (AppKit)，同一份零 cgo 的 Go 代码。MIT，无账号、不联网、无遥测。425 个 Go 单测 + 172 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
-字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 132。
+字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 181。
 中文帖比英文帖短得多，这是**故意的**：中文读者更愿意点进去看长图，而不是在时间线上读长句。
 
 ## 6. DSH 市场条目描述

@@ -58,7 +58,7 @@ Two things about that list are worth knowing before you trust a red run:
   session, not per sandbox. If a host CLI with this project's reporter is running in the same session, its next
   hook event relaunches the real overlay, the sandbox copy loses the mutex and exits cleanly without creating
   its pipe, and S4 looks like a product failure. Kill every `AI-Terminal-Pet.exe` first if you want the 182-check
-  form; CI deliberately runs the 162-check form (`docs/HANDOVER.md` §35.8 has the measurement).
+  form; CI deliberately runs the 172-check form (`docs/HANDOVER.md` §35.8 has the measurement).
 
 `tests/fresh-machine.mjs` is the gate that answers "does this work on a machine that has never seen it" — it packs the plugin, extracts it into a DSH-style `node_modules`, installs through the installer and drives all three binaries inside a sandbox with its own `LOCALAPPDATA`, `USERPROFILE` and named pipe. Drop `--no-overlay` to also boot the overlay inside that sandbox.
 
