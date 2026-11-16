@@ -33,6 +33,64 @@
 已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 
+## [1.0.14] & [1.2.23] — 2026-11-16（POSIX 平权：Linux 有提示音与提醒面，跳转失败不再一声不响）
+
+### 新：Linux 的提示音（`internal/ui/sound_linux.go`）
+- **背景**：`sound` / `soundVolume` / `soundScheme` 一直被解码、被提醒策略判定，然后在 Linux 上被丢掉 ——
+  `sound.go` 合成了 WAV，`app_linux.go` 从不调 `beep`。方向在第 61 轮就定过：不引入 cgo、不链 libasound/libpulse，
+  改为**探测系统播放器**。
+- **做法**：按 `pw-play -` → `paplay`（无文件名即读 stdin）→ `aplay -q -` 的顺序探测一次并缓存，把同一段合成 WAV
+  写进它的 stdin；`Start` 后由 goroutine `Wait` 回收，新提示音先杀掉上一个 —— 与 Windows 的 `PlaySoundW`、
+  macOS 停掉上一个 `NSSound` 是同一个"一次只响一个"。找不到播放器就是静音，不报错。
+- **顺带补上**：`app_linux.go` 现在和 darwin 一样在启动与热重载里调 `setSoundVolume` / `setSoundScheme`，
+  并在 `PlanAlerts` 之后播 `plan.Tone`。
+
+### 新：Linux 与 macOS 的提醒面（`notify.go` + 两个平台文件）
+- **文案只有一份**：Windows 原先写在 `app_windows.go` 里的气泡文案（完成 / 等待 / 出错 + `项目 · 原因`）
+  抽成 untagged 的 `composeAlert` / `composeJumpFailure`，三个平台共用；Windows 行为零变化。
+- **Linux**：`notify-send --app-name=… --urgency=<low|normal|critical> --icon=…`，`critical` 只给 error
+  （部分桌面上它会常驻并自带声音）。没有 `notify-send` 就没有气泡，面板仍标记未读。
+- **macOS**：`osascript -e 'display notification … with title …'`，字符串转义有测试。
+  **这是本项目唯一无法真机验证的提醒面**（没有苹果硬件；`UNUserNotificationCenter` 又需要 bundle identifier），
+  因此 `--doctor` 与 `docs/PLATFORMS.md` 在同一句里写明"best-effort，未实测弹窗"。
+
+### 修：跳转失败在 Linux / macOS 上不再毫无反应
+- 两个平台的 `focusCh` 分支原本是 `if handle != 0 && ActivateTarget(handle) { … }`，失败时什么都不做 ——
+  点一个终端已经关掉的会话行，看起来和"点击没被接收"完全一样，而且未读标记已经被清掉。
+- 现在 `focusCh` 携带 `focusRequest{handle, row, identity, at}`：失败时在**那一行**上画一张 `未能切换` 的小条
+  （复用复制回执的机制，新增第三种状态与 `KeyJumpFailed`），同时响一声；距点击超过 2 秒才返回的结果直接丢弃。
+  复制失败在 POSIX 也补上了同样的提示音。
+
+### 改：`--doctor` 从 11 项变 13 项
+- 新增 `audio` 与 `notifications` 两行，回答"这台机器上 `sound` / `notifications` 到底能不能到得了你"：
+  Windows 是内置的 `PlaySoundW` / 托盘气泡（ok）；Linux 报出探测到的播放器与 `notify-send`（找不到则 warn）；
+  macOS 的通知行自带"未实测"标注。找不到表面是 **warn 不是 fail** —— 安装是健康的，面板照常工作。
+
+### 如实记录的未验证项
+- **Linux 是否真的出声、真的弹窗**：本机 WSL 里三个播放器和 `notify-send` 都没装、会话总线上也没有通知守护进程，
+  且没有免密 sudo。已验证的是我们这一侧：探测顺序、argv、WAV 字节确实进了播放器 stdin、失败时静默、`--doctor` 的结论。
+- **macOS 的任何实际显示**：没有苹果硬件，CI 只跑编译与单测。
+
+### 门禁与版本
+- `gofmt` / `go vet` / 13 个包全部单测（Windows）；`internal/ui` 另用 `GOOS=linux go test -c` 编出的测试二进制在
+  WSL 里跑全量（含 4 个新的 Linux 投递测试、3 个 POSIX 跳转失败测试）；`scripts/cross-build.sh` 三平台全绿。
+- 浮窗 **1.0.14**（`internal/app/version.go`）、插件包 **1.2.23**。
+- 二进制：`AI-Terminal-Pet.exe` **4,717,568 B**（sha256 `DB2DD2AB…`）、`pet-statusline.exe` **3,678,720 B**、
+  `pet-hook.exe` **3,705,344 B**；主程序比 1.0.13 长 **6,144 B**（新增的 `notify*.go` / `sound_linux.go` /
+  `focus_posix.go`，`os/exec` 本来就已经在二进制里）。
+
+### 1.0.14 / 1.2.23 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.14` | `pet-setup.exe` | 14,494,208 B | `C47646E2615078288B724D665ABCDE1A166EC701CD7F155E14521CF4930314BB` |
+| `pet-v1.0.14` | `ai-terminal-pet-1.0.14-win-x64.zip` | 5,126,495 B（17 文件） | `D487DE69E913ECCD5E89FA045B410A5243F9C34E5FFF90CD328F35C9CCD4E8A8` |
+| `pet-v1.0.14` | `ai-terminal-pet-1.0.14-linux-amd64.tar.gz` | 5,418,730 B | `F45AC34BC4977CF1250C044F7C5F70B996116F451EAEC42F522CE8BC32E6EEE1` |
+| `pet-v1.0.14` | `ai-terminal-pet-1.0.14-linux-arm64.tar.gz` | 4,928,818 B | `298B3956E962E592E77FB6BD49F6B23073B0DFB821175B3D9A21DF8B5519896F` |
+| `pet-v1.0.14` | `ai-terminal-pet-1.0.14-darwin-arm64.tar.gz` | 5,123,672 B | `B5B62B794A43E6C13C3D3950063FDECF44EC59B46BFA74EE733F68235B30256B` |
+| `pet-v1.0.14` | `ai-terminal-pet-1.0.14-darwin-amd64.tar.gz` | 5,515,821 B | `7E8E40B3CC26578C0D73AD48C2DFB55F945DC00CDA088B913C5BA4748AD20342` |
+| `dsh-plugin-v1.2.23` | `dsh-ai-terminal-pet-1.2.23.tgz` | 2,069,513 B（19 文件） | `4C552C73803ED2ED00540500E65386456B9397B7EDAB468D6C98DF5A372A2B15` |
+
 ## [1.0.13] & [1.2.22] — 2026-11-16（修 1.0.11 引入的回归：结束的 agy 会话被标签页标题留在面板上）
 
 ### 修：`title` 等于窗口标题时，它不再算"这个会话还存在"的证据

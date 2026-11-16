@@ -9,7 +9,7 @@
 // Usage:
 //   node scripts/package-unix.mjs
 //   node scripts/package-unix.mjs --target=linux/amd64,darwin/arm64
-//   node scripts/package-unix.mjs --output=dist --version=1.0.13
+//   node scripts/package-unix.mjs --output=dist --version=1.0.14
 
 import fs from "node:fs";
 import path from "node:path";

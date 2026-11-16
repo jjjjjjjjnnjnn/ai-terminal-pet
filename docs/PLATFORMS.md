@@ -13,7 +13,7 @@ Three platforms compile cleanly with `CGO_ENABLED=0` across all 16 Go packages a
 | **Settings UI** | Dedicated four-tab Win32 settings window (`AITerminalPetSettings`) | Edit `config.json` directly (CLI `--settings` prints guidance until native settings UI arrives) | Edit `config.json` directly (`internal/ui/settings_windows.go` is Win32-only so far) | Verified in Win32 preview suite & POSIX headless behavior |
 | **Tray / menu bar icon** | `Shell_NotifyIconW` tray icon + context menu | Desktop-neutral panel gestures (right-click/middle-click/dock); no XEmbed tray | `NSStatusBar` menu bar item (`Show/Hide`, `Reset Position`, `Quit`) | Win32 live tray + macOS `app_darwin.go` bindings |
 | **Process & window presence / focus jump** | Win32 process snapshot + `HWND` enumeration + `SetForegroundWindow` | `/proc` scan + X11 `_NET_CLIENT_LIST` + MIT-SCREEN-SAVER idle + WM activation | `sysctl` `kinfo_proc` + `CGWindowListCopyWindowInfo` + `NSWorkspace` / `NSRunningApplication.activateWithOptions:` | `internal/platform` tests across Win / Linux / macOS CI |
-| **Audio cues** | Synthesized WAV PCM via `winmm` `PlaySoundW` (`sound_windows.go`); fires on the alert plan **and** on the six jump/copy/settings confirmation points (`beep(beepExclamation)` / `beep(beepFinished)`) | **No playback path at all**: `sound.go` synthesises the WAV, nothing consumes it, and `internal/ui/app_linux.go` never calls `beep`. `soundVolume` / `soundScheme` are read by `internal/config` and then ignored | Synthesized WAV played async via AppKit `NSSound` (`sound_darwin.go`), but only from the **alert plan** (`app_darwin.go`, one call site): finished/error/waiting transition tones and the UI confirmation beeps do not exist here | `TestToneForTransition` on all 3 OSes (pure synthesis); `TestPlaySoundLive` Win32 live probe; coverage per platform measured in §"Config keys" below |
+| **Audio cues** | Synthesized WAV PCM via `winmm` `PlaySoundW` (`sound_windows.go`); fires on the alert plan **and** on the six jump/copy/settings confirmation points (`beep(beepExclamation)` / `beep(beepFinished)`) | Synthesized WAV handed to the first player found on `PATH` — `pw-play -`, `paplay` (stdin), `aplay -q -` (`sound_linux.go`); fires on the alert plan and on the copy/jump failure cues. **No player installed = silence**, reported by `--doctor` | Synthesized WAV played async via AppKit `NSSound` (`sound_darwin.go`) from the alert plan and the copy/jump failure cues; the settings-window audition points do not exist (there is no settings window) | `TestToneForTransition` on all 3 OSes (pure synthesis); `TestPlaySoundLive` Win32 live probe; Linux probe/argv/stdin tests (`sound_linux_test.go`); coverage per platform measured in §"Config keys" below |
 | **Clipboard copy** | Win32 `OpenClipboard` / `SetClipboardData` | X11 `CLIPBOARD` `SelectionRequest` owner | `NSPasteboard` general pasteboard (`clipboard_darwin.go`) | Win32 + Linux X11 + macOS unit bindings |
 | **Autostart** | `HKCU\...\Run` registry key (`--autostart=on/off`) | XDG `~/.config/autostart/ai-terminal-pet.desktop` | LaunchAgent `~/Library/LaunchAgents/io.github.jjjjjjjjnnjnn.ai-terminal-pet.plist` | `internal/autostart` unit tests on Windows + Ubuntu + macOS CI |
 | **Installer & release archives** | `pet-setup.exe`, `ai-terminal-pet-<ver>-win-x64.zip`, `scripts/install.cmd` (`install.ps1`) | `ai-terminal-pet-<ver>-linux-{amd64,arm64}.tar.gz`, `scripts/install.sh` | `ai-terminal-pet-<ver>-darwin-{arm64,amd64}.tar.gz`, `scripts/install.sh` | Packaged & sha256-verified on Windows + WSL2 Ubuntu + `ubuntu-latest` + `macos-latest` CI |
@@ -29,10 +29,10 @@ are the backlog for round 62 - it is a record, not a promise.
 
 | Key | Windows | Linux | macOS |
 |---|---|---|---|
-| `notifications` | balloon layer (`app_windows.go`) | plan only, then dropped: nothing renders a balloon on X11 | plan only, then dropped |
-| `sound` | gates the tone (`attention.go`) | gates a tone that nothing plays | gates a tone `NSSound` can play |
-| `soundVolume` / `soundScheme` | applied to the synthesizer | stored, never read (only `config.go` mentions them) | applied (`app_darwin.go`) |
-| `soundOnWaiting` / `soundOnError` | per-event gate | same gate, no playback; the checks are in `attention.go`, which is untagged, so the *decision* is identical everywhere and only the playback is missing | same gate, no playback |
+| `notifications` | balloon layer (`app_windows.go`) | freedesktop notification via `notify-send` (`notify_linux.go`); **no `notify-send` in PATH means no bubble** — the row still goes unread and `alerts.json` records `skipped=no-notification-surface` | `osascript -e 'display notification …'` (`notify_darwin.go`); implemented, **live display unverified** (no Apple hardware, and `UNUserNotificationCenter` needs a bundle identifier a bare binary does not have) |
+| `sound` | gates the tone (`attention.go`) | gates the tone, which the probed player plays | gates a tone `NSSound` plays |
+| `soundVolume` / `soundScheme` | applied to the synthesizer | applied to the synthesizer | applied (`app_darwin.go`) |
+| `soundOnWaiting` / `soundOnError` | per-event gate | same gate, and the tone is played | same gate, and the tone is played |
 | `notifyOnFinish` / `donePolicy` | decides the finish tone | plan only | plan only |
 | `quietCurrent` / `quietSubagents` | policy (`attention.go`) | same policy (it suppresses marks too, so it works) | same policy |
 | `foregroundAware` / `idleMinutes` | presence sampling | same | same |
@@ -41,9 +41,13 @@ are the backlog for round 62 - it is a record, not a promise.
 | `settingsTextSize` | scales the settings window | stored only (there is no settings window) | stored only |
 | `settingsKeyboard` / `settingsTooltips` | settings window | stored only | stored only |
 
-Two rows are the round-62 backlog, written down rather than only known locally:
+Two rows used to be the round-62 backlog, written down rather than only known locally:
 `notifications` (no balloon surface on Linux or macOS) and the whole `sound*`
-block on Linux.
+block on Linux. Both were delivered in round 66: Linux plays through a probed
+system player and shows alerts through `notify-send`, macOS shows alerts through
+`osascript` (best-effort, live display unverified), and `--doctor` now prints
+what each machine actually reaches (`audio` / `notifications` lines) instead of
+leaving the answer in this table.
 
 ## Data directories and IPC endpoints
 
@@ -59,5 +63,6 @@ Implemented identically in Go (`internal/home`, `internal/pipeserver`) and Node.
 2. **`scripts/cross-build.sh`** asserts that all packages in [scripts/portable-packages.txt](../scripts/portable-packages.txt) (every package in this repository — 16 packages) build cleanly with `CGO_ENABLED=0` for `windows/amd64`, `linux/amd64`, and `darwin/arm64`, while [scripts/windows-only-packages.txt](../scripts/windows-only-packages.txt) stays empty.
 3. **Host-windowed gaps still open cleanly**:
    - On Linux & macOS, edit `config.json` directly instead of opening a native settings dialog (`--settings` logs/prints guidance cleanly).
-   - Linux audio has no playback path at all (`internal/ui` never calls `beep` there; the synthesiser in `sound.go` builds a WAV nothing consumes). Nothing to install, nothing to break - and nothing to hear.
+   - Linux audio and notifications depend on what the machine has: the overlay probes `pw-play`/`paplay`/`aplay` and `notify-send`, stays silent/quiet when none exists, and `--doctor` says which one is missing. Nothing has to be installed for the panel itself to work.
+   - macOS notifications go through `osascript` and were never observed on real Apple hardware from this project; `--doctor` states that in the same line.
    - Live interactive WindowServer GUI on physical Apple hardware (and non-WSLg desktop environments such as GNOME/KDE/Wayland+XWayland) remains opt-in verified (`PET_COCOA_PROBE=1` on macOS, WSLg X11 live-tested on Linux).

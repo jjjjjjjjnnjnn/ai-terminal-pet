@@ -6,10 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-16；浮窗 **1.0.13**、插件包 **1.2.22** 已发版；**§65 第 65 轮（交接）：仓库干净、CI 全绿、本机装的就是发布那个版本、上游那条已按决定收尾；§64 查清了目录那行为什么是旧的；§63 修了 1.0.11 的回归**）
+## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.23** 已发版；**§66 第 66 轮（POSIX 平权）：Linux 有了提示音与通知面、macOS 有了 osascript 提醒面、跳转失败在 POSIX 上不再一声不响、`--doctor` 从 11 项变 13 项；§65 是上一轮交接的快照；§64 查清了上游那行为什么是旧的**）
 
-> 接手请先读本节与 **§65「交接：下个会话从这里开始」**
-> （这一刻的机器状态、四条上手命令、下一轮四项候选、以及"别做的事"），
+> 接手请先读本节与 **§66「POSIX 平权落地」**
+> （三条用户可感知的变化、六个提交的顺序、为什么这样分文件、本机实测到了哪一步、以及三条**证不到**的事），
+> 再读 **§65「交接：下个会话从这里开始」**
+> （上一轮收尾时的机器状态与四条上手命令；那一节的 §65.4 四项候选，第 1 项已在本轮做完），
 > 再读 **§64「上游目录里我们那行为什么是旧的（两个不同的原因），以及交接前的又一轮装机实测」**
 > （站点 `version` 停在 1.2.16 是对方整站冻结（#15569 / #15579），下载数少掉的 2,276 是两段叠加
 > （1,197 见 #15864 + 1,079 是冻结）；**已按决定不再跟进**，判断用 `node tools/catalog-status.mjs`），
@@ -52,32 +54,32 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.13`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.22`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.10` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.19`。
-  **工作区与本机安装目录已经与 `1.0.10` / `1.2.19` 同步**：`bin/`、
+- **版本**：浮窗 **`1.0.14`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.23`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.14` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.23`。
+  **工作区与本机安装目录已经与 `1.0.14` / `1.2.23` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
-  （`AI-Terminal-Pet.exe` **4,702,208 B**，sha256 `B69CA725…`）。
+  （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `DB2DD2AB…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**428 个** `func Test`）；
-  CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）最近一次 Run `43894252617` 全绿；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**461 个** `func Test`，
+  本轮 +33）；`internal/ui` 的 linux 测试二进制在 WSL 里 **122 PASS**；CI 四条 job
+  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.14 的提交上重跑；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 与 1.0.13 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
+  `vendor.mjs --check` 与 1.0.14 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
   （`node --test tools/check_versions.test.mjs` 26/26）、`tools/catalog-status.test.mjs` **12/12**、
-  `tools/upstream-entry.test.mjs` 26/26；`tests/fresh-machine.mjs --no-overlay` **172/172**；
-  `tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 零告警。
+  `tools/upstream-entry.test.mjs` 26/26；`tests/fresh-machine.mjs --no-overlay` **172/172**（23.0 s）；
+  `tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 在 CI 的 scan job 跑。
   **交付前的装机实测**见 §64.5：240 次 + 300 次上报 `failures: 0`、句柄与线程平、`runtime/` 回基线、
   设置窗口原样放 40 秒不消失、`--doctor` 全程 10 ok / 1 warn / 0 fail。
-- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.13 实测）：非测试 **136 文件 / 26,526 行**、
-  测试 **87 文件 / 12,673 行**、**428 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,711,424 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `161C6083…`）、
-  `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`）、`bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`）。
-  三个二进制合计 **12,095,488 B** = 11.53 MiB。
+- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.14 实测）：非测试 **143 文件 / 27,185 行**、
+  测试 **93 文件 / 13,444 行**、**461 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `DB2DD2AB…`）、
+  `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
+  三个二进制合计 **12,101,632 B** = 11.54 MiB。
 - **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.22**；`dsh-plugin-v1.2.22` 的 Release 资产 `dsh-ai-terminal-pet-1.2.22.tgz`
-    **2,067,790 B / sha256 `879AD246…` / 19 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.13`）；
-    上游条目跟进 PR [#15814](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15814)
-    （分支 `bump-tarball-1.2.22`，单文件 `+1 −1`，`MERGEABLE`）已开、`--check` = OK（in flight）。
+  - 插件线：npm `latest` = **1.2.23**；`dsh-plugin-v1.2.23` 的 Release 资产 `dsh-ai-terminal-pet-1.2.23.tgz`
+    **2,069,513 B / sha256 `4C552C73…` / 19 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`）；
+    上游条目跟进 PR 见 §66.9（分支 `bump-tarball-1.2.23`）。
     **#15674（1.2.21）已在该轮期间被合并**，所以 `--check` 现在报的是 1.2.21 而不是 1.2.19。
     **这一条到此为止**：按用户 2026-11-16 的决定，上游那两项（重建 + 下载窗口）已有多位开发者反馈，
     我们**不再发 PR、不催合并、不重发版**（理由与分解见 §64.2 / §64.3、[docs/UPSTREAM.md](UPSTREAM.md) §4.1）。
@@ -4710,6 +4712,75 @@ node tools/catalog-status.mjs                # 目录那行现在是 current 还
 **别做的事**：不要在仓库目录里直接跑 `bin\pet-hook.exe` 验证投递（该目录带 Low 完整性标签，
 从它启动的进程一律继承 Low IL，浮窗的管道 DACL 只给 OWNER RIGHTS + SYSTEM，**永远打不开**；
 复制到 `%TEMP%` 或安装目录就正常。详见 ROADMAP §2 E1 的实测记录）。
+
+## 66. 交接：POSIX 平权落地 —— Linux 的提示音与通知面、macOS 的 osascript、跳转失败不再静默（2026-11-16，第 66 轮；浮窗 **1.0.14** / 插件 **1.2.23**）
+
+§65.4 把下一项排在第一：`docs/PLATFORMS.md` config 表第 1、2 行那两条"设置被读进来然后丢掉"。
+这一轮把它做完了，并且顺手补了一个谁都看得见、但三份文档都没写过的洞：**Linux / macOS 上跳转失败是完全没有反馈的**。
+
+### 66.1 三条用户可感知的变化
+
+1. **Linux 有提示音了**。`sound` / `soundVolume` / `soundScheme` 过去在 Linux 上被判定、然后丢弃
+   （`sound.go` 合成了 WAV，`app_linux.go` 从不调 `beep`）。现在把同一段 WAV 交给探测到的系统播放器。
+2. **Linux 与 macOS 有提醒面了**。`notifications` 过去在这两个平台只影响判定记录，气泡没有任何表面。
+   现在 Linux 走 `notify-send`，macOS 走 `osascript`；两边都没有时，`alerts.json` 记
+   `skipped=no-notification-surface`，而不是记一条从没出现过的气泡。
+3. **跳转失败会说话了**（POSIX）。原来 `focusCh` 的失败分支什么都不做，点一个终端已关掉的会话行
+   看起来和"点击没被接收"一模一样，而且未读标记已经被清掉。现在在那一行上画一条 `未能切换` 并列响一声。
+
+### 66.2 五个提交（按落地顺序）
+
+| 提交 | 内容 | 关键文件 |
+|---|---|---|
+| `feat(sound)` | Linux 提示音：探测 `pw-play` → `paplay` → `aplay`，WAV 写 stdin，`Start` + goroutine `Wait`，新音先杀旧音 | `sound_linux.go`（新）、`app_linux.go`、`sound_windows.go` / `sound_darwin.go`（各加一个 `SoundSurface`） |
+| `feat(notify)` | 文案抽成一份（`composeAlert` / `composeJumpFailure`），Windows 走托盘（行为不变），Linux 走 `notify-send`，macOS 走 `osascript`；回执不再虚报气泡 | `notify.go`、`notify_{windows,linux,darwin}.go`、`app_windows.go`（`balloon` 拆掉）、`receipt.go` |
+| `fix(ui)` | 跳转失败：`focusCh` 携带 `focusRequest`，失败时 `未能切换` 小条 + 提示音，迟到 2 秒的结果丢弃；复制失败在 POSIX 也响 | `focus_posix.go`（新）、`copy_toast.go`、`drawing_compact.go`、`i18n.go`、两个 `app_*.go` |
+| `feat(doctor)` | `--doctor` 11 → 13 项：`audio` / `notifications`；缺表面是 warn 不是 fail | `internal/app/doctor.go`、`doctor_windows_test.go` |
+| `release` | 版本、CHANGELOG、PLATFORMS、README 矩阵、HANDOVER、市场索引 | 见 §66.6 |
+
+### 66.3 四个"看起来对、其实错"的地方（都记下来）
+
+1. **"把 `beep` 的调用补上就行"是错的**：Linux 上根本没有 `beep`。`sound_windows.go` 与
+   `sound_darwin.go` 都带 build tag，`app_linux.go` 里加一行会直接编译失败——必须先有播放路径。
+2. **"一次只响一个"要自己实现**：Windows 的 `PlaySoundW` 再给一个缓冲区就顶掉上一个，macOS 是显式
+   `stop` 上一个 `NSSound`。Linux 没有这层，所以要自己留着上一个 `*exec.Cmd` 并 `Kill`，否则两条提醒
+   叠在一起会变成噪声。
+3. **子进程必须 `Wait`**：只 `Start` 不 `Wait` 会留僵尸。播放是异步的，所以 `Wait` 放在 goroutine 里，
+   UI 线程只负责 `Start`（毫秒级）。
+4. **AppleScript 的转义是安全性问题，不是美观问题**：项目名会被原样塞进 `display notification "…"`，
+   一个双引号就能改掉整条脚本。`appleScriptLiteral` 转义 `"` 与 `\`、把换行折成空格，测试在三个平台都跑
+   （函数故意放在 untagged 的 `notify.go` 里）。
+
+### 66.4 本机验证做到哪一步（以及一个新学会的办法）
+
+- `gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 13 个包全过（Windows，**461 个 `func Test`**，
+  本轮 +33）；`scripts/cross-build.sh` 16 个包在 linux/amd64 与 darwin/arm64 上全绿。
+- **Linux 专属代码在这台机器上真的跑过了**：`GOOS=linux CGO_ENABLED=0 go test -c -o %TEMP%\petui.test ./internal/ui`
+  编出 linux 测试二进制，WSL 里直接执行 → **122 PASS**，包含 4 个投递测试（探针顺序、argv、WAV 进了 stdin、
+  没有播放器时静默）与 3 个 POSIX 跳转失败测试。WSL 里没有 Go，但**不需要 Go 也能跑交叉编译出来的静态测试二进制**
+  ——下一轮做 Linux 侧改动时直接用这条路，不要等 CI。
+- `node --test reporters/opencode-events.test.mjs` 10/10、两个 `verify.mjs` PASS、`tools/check_versions.mjs` 20 条一致。
+- `--doctor` 实测从 11 行变 13 行，新增两行：
+  `[ok] audio: winmm PlaySoundW (built in)` / `[ok] notifications: tray balloon (Shell_NotifyIconW, built in)`。
+
+### 66.5 三条证不到的事（不要在下一次交接里写成"已支持"）
+
+1. **Linux 是否真的出声**：WSL 里 `pw-play` / `paplay` / `aplay` / `pactl` 都没有、没有免密 sudo。
+   验证到的是"我们这一侧"（选谁、argv、WAV 字节确实进了它的 stdin），**音箱有没有响没验过**。
+   另外三个播放器"无参/`-` 即读 stdin"来自各自手册，本机无法实测。
+2. **Linux 是否真的弹窗**：WSL 的会话总线上只有 `org.freedesktop.DBus`，没有通知守护进程；
+   `notify-send` 也没装。验的是调用形状与失败静默。
+3. **macOS 的任何实际显示**：没有苹果硬件，CI 只跑编译与单测；`docs/PLATFORMS.md`、README 矩阵与
+   `--doctor` 的通知行都写着 "best-effort, live display unverified"。
+
+### 66.6 下一轮从这里开始
+
+1. **真实 Linux 桌面上的 5 分钟验收**（这是本轮唯一的缺口）：在一台有 PipeWire / PulseAudio 与通知守护进程的
+   桌面上跑 `--doctor`（应看到 `audio: external player …`、`notifications: notify-send …`），触发一次等待提醒，
+   确认"响 + 弹 + 面板未读"三件事。若某个播放器不认 stdin，那是本轮唯一可能翻车的假设。
+2. **macOS 真机验收**（有硬件时）：`osascript` 那条是否真的出现 banner；如果不行，退路是把这条写成已知项。
+3. §65.4 的其余三项仍然有效：macOS 设置窗口（**仍不做**，§57.7 的理由不变）、L5 对 `--json` 的长期收益（可选）、
+   README 平台表与 `docs/PLATFORMS.md` 的两表一致性（本轮已同步，改行为时记得还改两处）。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 
