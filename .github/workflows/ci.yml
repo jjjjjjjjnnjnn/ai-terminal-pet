@@ -292,6 +292,12 @@ jobs:
       - name: Upstream entry rules
         run: node --test tools/upstream-entry.test.mjs
 
+      # Informational, like the entry check above: it reads another repository's
+      # published index, and CI must not go red because that repository's
+      # nightly failed. A `--json` run of the same tool is in docs/UPSTREAM.md.
+      - name: Catalogue status (informational)
+        run: node tools/catalog-status.mjs || true
+
       # Every relative link and in-document anchor in the docs we wrote. GitHub
       # renders a broken one without a warning, and a launch post is the worst
       # possible time to discover that "see the connect table" points at a
@@ -316,6 +322,13 @@ jobs:
       # the changelog heading rules.
       - name: Version claim rules
         run: node --test tools/check_versions.test.mjs
+
+      # The catalogue-status verdicts decide what a stale upstream row MEANS
+      # (ours to fix / waiting on a merge / upstream's own bug), so they are
+      # pinned like every other rule. Offline by construction: the file is a
+      # pure-function test, and the live run needs the network.
+      - name: Catalogue status rules
+        run: node --test tools/catalog-status.test.mjs
 
       # The portable zip and the self-extracting setup exe are what a Windows
       # user who does not use the DeepSeek Harness actually downloads, so a

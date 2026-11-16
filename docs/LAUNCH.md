@@ -268,8 +268,14 @@ files alone does not wire it. The connect table in the README has one line per t
 | star / fork | `gh repo view` | **1 / 0** |
 | npm | `npm view dsh-ai-terminal-pet version` | **1.2.22**（`dist-tags.latest`，2026-11-16 发版同步） |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后已数日未动） |
+| **npm 30 天下载** | `api.npmjs.org/downloads/point/last-week`／`range` | 近 7 天 **3,455**（2026-11-09 → 11-15）；30 天窗口 2026-10-16 → 11-15 也是 **3,455**，因为 11-11 之前该包还不存在 |
+| **目录那行是否当前** | `node tools/catalog-status.mjs` | **upstream**：站点 `version` 停在 1.2.16、安装命令仍是 `dsh-plugin-v1.2.16`（对方整站自 2026-11-14T05:27Z 冻结，issue #15569 / PR #15579），30 天下载数少最后一天（issue #15864）——**这两条都不是我们重发版能改的**，判断方式见 [docs/UPSTREAM.md](UPSTREAM.md) §4.1 |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
-| issue 类型分布 | `gh issue list --json labels` | 0 条 |
+| issue 类型分布 | `gh issue list --json labels` | 0 条（本仓库；上游报的两条是该仓库的 issue，不是这里的） |
 
 **判断渠道是否真的起效，看下载数的增量，不看点赞数。** 发帖后 24 小时内的 Release 下载增量
 是唯一能说明「有人真的装了」的信号；star 与转推都可能只是路过。
+
+**判断「目录里那行是不是当前版本」，跑 `node tools/catalog-status.mjs`，不要开浏览器**：
+它把"该我们动"与"对方的原因"分开写清楚（`docs/UPSTREAM.md` §4.1），
+而 PR 页面上的 `merged` 既不等于 `published`，也不等于 `rebuilt`。
