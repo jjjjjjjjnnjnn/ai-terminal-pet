@@ -4,6 +4,7 @@ package ui
 
 import (
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/ebitengine/purego/objc"
@@ -12,12 +13,20 @@ import (
 var (
 	darwinSoundMu sync.Mutex
 	darwinSounds  = map[uint32]objc.ID{}
+
+	// darwinAudioReady is set by initCocoa once NSApplication exists. AppKit
+	// audio belongs to an application session: without one, NSSound's own
+	// machinery can fault (measured: SIGSEGV inside objc_msgSend when a headless
+	// `go test` called beep for the first time), and there is nothing to hear
+	// anyway. Everything else - the alert plan, the pill, the receipt - runs
+	// without AppKit, so tests can exercise them on a runner.
+	darwinAudioReady atomic.Bool
 )
 
 // beep synthesises an alert WAV and plays it asynchronously via Cocoa NSSound.
 func beep(kind uint32) {
 	volume := int(soundVolume.Load())
-	if volume <= 0 || !ensureCocoaLoaded() {
+	if volume <= 0 || !darwinAudioReady.Load() || !ensureCocoaLoaded() {
 		return
 	}
 	buffer := buildAlertWAV(kind, volume)

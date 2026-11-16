@@ -509,6 +509,12 @@ func (a *App) initCocoa() error {
 	a.nsApp = app
 	app.Send(objc.RegisterName("setActivationPolicy:"), nsApplicationActivationPolicyAccess)
 	app.Send(objc.RegisterName("finishLaunching"))
+	// Only now is there an AppKit session for NSSound to belong to. beep()
+	// refuses to touch AppKit before this point: a headless `go test` on macOS
+	// has no application, no run loop and no audio session, and the first time
+	// the tone path was ever executed (CI, 2026-11-16) it died with SIGSEGV
+	// inside objc_msgSend rather than doing anything useful.
+	darwinAudioReady.Store(true)
 
 	a.refreshDisplayCache()
 
