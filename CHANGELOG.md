@@ -93,9 +93,10 @@ Linux / macOS 的四个 tar.gz 同样按 1.0.15 重发（`install.sh` 与 POSIX 
 ### 没有做的事
 
 - **没有 Authenticode 签名**，也没有公证；因此 `pet-setup.exe` 仍会触发 SmartScreen，README 里照旧明说。
-- **没有提交 winget 清单**：清单里的 `InstallerSha256` 必须是这一版资产的真实摘要，所以只能在 Release 建好之后写。
-  清单放在 `packaging/winget/` 并随仓库走，提交到 `microsoft/winget-pkgs` 的 PR 另行记录在
-  [docs/UPSTREAM.md](docs/UPSTREAM.md)。
+- **winget 清单已提交但没上架**：清单在 `packaging/winget/`（`winget validate` 通过），
+  已开 PR [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)（3 文件 +60 −0，`MERGEABLE`）。
+  它现在卡在**两步都不由我们决定的事**上：Microsoft CLA 需要账号本人签署、PR 检查要维护者批准才激活。
+  因此 README 的安装段**没有**写 `winget install`——那会是一句没兑现的承诺。
 
 ## [1.2.26] — 2026-11-16（只改文案：包的内页开头重写，npm 页与仓库同源）
 

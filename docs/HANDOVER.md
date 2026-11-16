@@ -5077,7 +5077,8 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 - **资产**（详见 CHANGELOG 的「1.0.15 发布包实测清单」）：`pet-setup.exe` 14,504,960 B / `AF9E854F…`、
   `ai-terminal-pet-1.0.15-win-x64.zip` 5,129,002 B / `5292B2E7…`（17 文件）、
   `dsh-ai-terminal-pet-1.2.27.tgz` 2,072,885 B / `FA50130D…`（20 文件），另有四个 POSIX tar.gz。
-- **npm**：`latest` = 1.2.27。
+- **npm**：`latest` = 1.2.27；`npm pack dsh-ai-terminal-pet@1.2.27` 取回来的 tgz 与 Release 资产**逐字节相同**
+  （2,072,885 B / `FA50130D…`），integrity `sha512-2wxXHQts…` 与 `npm pack --dry-run` 当场输出的一致。
 - **上游条目**：PR [#16048](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16048)
   （分支 `bump-tarball-1.2.27`，单文件 `+1 −1`，`MERGEABLE`，OPEN）；`--check` 报 in flight（健康状态）。
   按 §67.4 的教训，**四个 job 在同一个提交（`c9733d2`）上全绿之后才打 tag**——1.0.15 的第一次 CI 是红的，
@@ -5086,11 +5087,16 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
   zip 200 / 5,129,002 B / `5292B2E7…`、linux-amd64 tar.gz 200 / 5,418,747 B / `8CD33190…`、
   tgz 200 / 2,072,885 B / `FA50130D…`）。
 
-### 70.6 winget：清单已就绪，提交状态单独记账
+### 70.6 winget：清单已提交，卡在两件不由我们决定的事上
 
 - 清单在 `packaging/winget/manifests/j/jjjjjjjjnnjnn/AI-Terminal-Pet/1.0.15/`（三份 YAML），
   目录结构就是 `microsoft/winget-pkgs` 的布局；`winget validate --manifest <目录>` 打印"清单验证成功"，
   `winget show --manifest <目录>` 能正确解析 URL 与 sha256。
+- **已开 PR**：[microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)
+  （3 文件 `+60 −0`，`MERGEABLE`）。现在的状态是：
+  - **Microsoft CLA 未签**（机器人 `msftbot/needsCLA`），这一步只能用账号本人去做；
+  - 检查在维护者批准前是 `skipping`，所以"pipeline 真的跑过静默安装/卸载"**还没有发生**。
+  两件事都不是发版动作，**不要**为了让流程看起来完整而在这里写"已上架"。
 - 能不能装/卸由我们的安装器决定：静默安装是 `pet-setup.exe --install`（默认就是这个），
   静默卸载是注册表那一行的 `QuietUninstallString`；`tests/fresh-machine.mjs` 的 S5/S8 就是按这条契约验的。
 - **真实风险写在前面**：`pet-setup.exe` 没有 Authenticode 签名，对方 pipeline 里那次静默安装可能被
