@@ -3,9 +3,13 @@
 <h1>ai-terminal-pet</h1>
 
 <p>
-  <strong>An always-on-top floating status strip that keeps every running AI coding agent visible — Windows, Linux (X11), and macOS (AppKit).</strong><br />
-  DeepSeek Harness · Claude Code · OpenCode · Antigravity
+  <strong>Your agents are waiting. You are in another tab.</strong><br />
+  One 56&nbsp;px always-on-top strip that says which AI coding agent is blocked on you,
+  what it is asking for, and how long it has been waiting — then puts you back in that
+  terminal in one click.
 </p>
+
+<p>DeepSeek Harness · Claude Code · OpenCode · Antigravity</p>
 
 <p>
   <a href="https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/actions/workflows/ci.yml"><img src="https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -21,13 +25,13 @@
 
 <br />
 
-<img src="docs/assets/demo.gif" width="520" alt="ai-terminal-pet hover-to-expand and click-to-jump demo" />
+<img src="docs/assets/demo.gif" width="520" alt="ai-terminal-pet: hover to expand, click a row's arrow to jump to its terminal" />
 
 <br />
 
-<img src="docs/assets/desktop-scene.png" width="760" alt="Two AI coding terminals side-by-side with the ai-terminal-pet overlay anchored to the right edge" />
+<img src="docs/assets/desktop-scene.png" width="760" alt="Two AI coding terminals side by side with the ai-terminal-pet strip anchored to the right edge" />
 
-<p><sub>Panel pixels rendered directly by the overlay's own rasterizer (`go test ./internal/ui -run TestRenderPreview`); terminal windows drawn in `docs/assets/make_launch_assets.py`.</sub></p>
+<p><sub>Panel pixels are rendered by the overlay's own rasterizer (<code>go test ./internal/ui -run TestRenderPreview</code>); the terminal windows around them are drawn in <code>docs/assets/make_launch_assets.py</code>. No mockup of a UI that does not exist.</sub></p>
 
 </div>
 
@@ -35,128 +39,123 @@
 
 <a id="english"></a>
 
-## Why this exists
+## The 15-minute problem
 
-When you run Claude Code, OpenCode, Antigravity, or DeepSeek Harness across multiple terminal tabs, two frustrating failure modes happen constantly:
+You have four agents running in four tabs. One of them hits a permission prompt, waits for an answer, and gets none — because you are reading a diff in another window, or on another monitor, or you only have one monitor and that tab is behind this one.
 
-1. One agent stops cleanly on a permission prompt or finish line while you are focused in another window — and sits untouched for fifteen minutes.
-2. When you finally hear a ping, every tab looks the same and you don't know **which project** is blocked or **for what**.
+Nothing crashed. Nothing is broken. You just paid fifteen minutes of an agent's life for nothing, and you will only notice when you switch back and see it still sitting there.
 
-**ai-terminal-pet** aggregates every local agent session into one native, zero-cgo floating widget (`56 × 156 px` idle pill that expands to `200 px` on hover or click):
+A bell does not fix this. Neither does a spinner in each terminal's own window: the information exists, but it is **inside** the thing you are not looking at.
 
-- **See every session in one strip**: highest-priority state badge (`ASK` / `PLAN` / `WORK` / `TOOL` / `ERR` / `DONE`), elapsed hold duration, project folder, and prompt reason across terminals.
-- **Jump straight back to the terminal or copy the workspace path**: click the row arrow to activate that terminal window/tab (`Windows Terminal`, `SetForegroundWindow` on Win32; EWMH `_NET_ACTIVE_WINDOW` on Linux X11; `NSRunningApplication` on macOS); click the row body to copy its workspace path to clipboard.
-- **Keyboard navigation & per-display layout memory**: use `Up` / `Down` / `Home` / `End`, `Enter` to focus, and `Esc` to collapse when expanded; `Ctrl`/`Cmd` + `+`/`-`/`0` (or scroll wheel) scales the panel; window coordinates remember each monitor arrangement independently.
-- **Zero-dependency native runtime**: compiled statically with `CGO_ENABLED=0` (`4.49 MiB` main binary on Win64, no runtime DLLs, no Electron, no libgtk, and zero npm dependencies for reporters).
+**ai-terminal-pet** puts that information where you cannot miss it: a 56&nbsp;px strip, always on top, docked to an edge of the screen. It knows every local agent session, what each one is asking for, and how long it has been asking.
 
----
+## What it does
 
-## Visual showcase
+- **One strip, every agent.** Windows, Linux (X11) and macOS; DeepSeek Harness, Claude Code, OpenCode and Antigravity in one list — sorted so the session that wants *you* is at the top, with its project folder, the reason it is blocked, and how long it has been blocked.
+- **One click back.** The arrow at the end of a row activates that terminal — the window *and* the right tab where the platform allows it. Clicking the row body copies its workspace path instead, with a pill that says "Copied" or "Copy failed" rather than staying silent.
+- **Quiet until it matters.** It rings only for real events: an agent that asked for something, an agent that failed, an agent that finished while you were away. A conversation that vanished is not a completion, an ordinary command is not an event, and a session you muted stays muted. The full rule table is in [docs/HANDOVER.md](docs/HANDOVER.md) §40–§43.
+
+## What it looks like
 
 <table>
   <tr>
-    <td width="50%" valign="top">
-      <strong>Dark compact &amp; expanded</strong><br />
-      <img src="docs/assets/hero.png" width="100%" alt="Hero preview of compact and expanded dark strip" />
+    <td width="46%" valign="top">
+      <strong>Compact</strong> — idle, 56&nbsp;px wide<br />
+      <img src="docs/assets/overlay-compact.png" width="100%" alt="Compact idle strip" />
     </td>
-    <td width="50%" valign="top">
-      <strong>All attention &amp; light states</strong><br />
-      <img src="docs/assets/panel-dark-expanded.png" width="48%" alt="Dark expanded view" />
-      <img src="docs/assets/panel-light-expanded.png" width="48%" alt="Light expanded view" />
-      <br />
-      <img src="docs/assets/panel-error.png" width="48%" alt="Error state" />
-      <img src="docs/assets/panel-autoapprove.png" width="48%" alt="Auto-approve 5s veto countdown" />
+    <td width="54%" valign="top">
+      <strong>Expanded</strong> — hover or click<br />
+      <img src="docs/assets/overlay-expanded.png" width="100%" alt="Expanded session rows" />
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <strong>English UI</strong> (same states, same layout)<br />
+      <img src="docs/assets/overlay-compact-en.png" width="100%" alt="Compact strip in English" />
+    </td>
+    <td valign="top">
+      <strong>Longest wait</strong>, then six sessions<br />
+      <img src="docs/assets/overlay-expanded-many.png" width="100%" alt="Expanded panel with six sessions" />
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <strong>Unread marks</strong> — what you have not looked at yet<br />
+      <img src="docs/assets/overlay-expanded-unread.png" width="100%" alt="Rows marked unread" />
+    </td>
+    <td valign="top">
+      <strong>Copy receipt</strong> — a claim about what happened, not a decoration<br />
+      <img src="docs/assets/overlay-copy.png" width="100%" alt="Copied pill over a session row" />
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <strong>Auto-approve veto</strong> — opt-in, 5&nbsp;s countdown<br />
+      <img src="docs/assets/overlay-auto-approve.png" width="100%" alt="Auto-approve countdown bar" />
+    </td>
+    <td valign="top">
+      <strong>Hero</strong> — compact and expanded side by side<br />
+      <img src="docs/assets/hero.png" width="100%" alt="Hero: compact and expanded panel" />
     </td>
   </tr>
 </table>
 
----
+| The row says | Meaning |
+|---|---|
+| **Waiting** | a permission prompt, a question, or a plan is waiting for your decision |
+| **Tool call** / **Working** / **Thinking** | the agent is busy — nothing for you to do yet |
+| **Error** | the turn failed; the reason is on the row |
+| **Idle** / **Closed** | finished, and waiting to be read |
 
-## Platform matrix
+## Install
 
-Every platform compiles all 16 Go packages cleanly with `CGO_ENABLED=0`. Details and exact measurement methods live in [docs/PLATFORMS.md](docs/PLATFORMS.md).
+The overlay is one statically linked binary per platform (`CGO_ENABLED=0`, no Electron, no WebView, no libgtk, no cgo). Reporters use the Node.js standard library only — zero npm dependencies.
 
-| Platform | Window &amp; Text Engine | IPC Endpoint | System Integration | Settings &amp; Audio |
-|---|---|---|---|---|
-| **Windows (x64)** | Native Win32 layered DIB + ClearType GDI | Named pipe `\\.\pipe\ai-terminal-pet-v1-<8hex>` | Win32 tray icon + context menu, `HKCU\...\Run` autostart, Windows Terminal tab activation | Full 4-tab native Win32 settings window + synthesized WAV via `winmm` |
-| **Linux (amd64 / arm64, X11)** | Pure-Go X11 ARGB utility window (`jezek/xgb`) + OpenType glyph rasterizer | Unix socket `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` | `/proc` + `_NET_CLIENT_LIST` + MIT-SCREEN-SAVER + XRandR + X11 `CLIPBOARD` + XDG `.desktop` autostart | Edit `config.json` directly; synthesized WAV through a probed system player (`pw-play` / `paplay` / `aplay`), alerts through `notify-send` — no cgo, and silent when neither is installed |
-| **macOS (arm64 / amd64)** | Pure-Go AppKit floating `NSWindow` (`ebitengine/purego`) + OpenType glyph rasterizer | Unix socket `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` | `NSStatusBar` menu bar item, `sysctl` + `CGWindowListCopyWindowInfo` + `NSRunningApplication`, `NSPasteboard`, `LaunchAgent` | Edit `config.json` directly; synthesized WAV via AppKit `NSSound`; alerts via `osascript` (best-effort — live display unverified without Apple hardware) |
+**Windows (x64)** — download `pet-setup.exe` from the [**latest release (`pet-v1.0.14`)**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.14) and run it. It verifies the SHA-256 of every embedded file before writing anything, then installs into `%LOCALAPPDATA%\AI-Terminal-Pet\`. Prefer a portable archive? Grab `ai-terminal-pet-1.0.14-win-x64.zip`, unzip, and run `.\install.cmd` (`-VerifyOnly`, `-AddToPath`, `-Uninstall` included).
 
-> **Honest verification note**: GitHub Actions runs full Go vet, unit tests, static builds, and headless CLI/install/hook smoke suites on all three real runners (`windows-latest`, `ubuntu-latest`, `macos-latest`). Live interactive X11 rendering was tested on WSLg; interactive Apple WindowServer rendering remains opt-in (`PET_COCOA_PROBE=1`) without Apple hardware. See [docs/PLATFORMS.md](docs/PLATFORMS.md).
-
----
-
-## Install (3 ways)
-
-Choose **either** the zero-config DeepSeek Harness plugin (Windows), a prebuilt standalone release archive (Windows / macOS / Linux), **or** building from source.
-
-### Option A — DeepSeek Harness Plugin (`dsh-ai-terminal-pet`)
-
-> The package is now **1.2.25** (`dsh.bundle.platforms: ["win32", "linux", "darwin"]`). It connects DeepSeek Harness sessions immediately on all three platforms: on Windows it installs the bundled overlay + `protocol.js` offline on first run, on Linux and macOS it fetches the pinned release archive once (SHA-256 verified) and installs the same overlay.
->
-> **Important scope note**: Installing the plugin out-of-the-box shows **DeepSeek Harness** sessions. To also aggregate OpenCode, Claude Code, or Antigravity into the same strip, wire those reporters once using `--connect` below.
-
-<details>
-<summary>Install via DSH CLI / npm / tarball / pinned git</summary>
-
-Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.25):
+**macOS (Apple Silicon `arm64` / Intel `amd64`)**:
 
 ```sh
-# 1. From npm
+tar -xzf ai-terminal-pet-1.0.14-darwin-arm64.tar.gz   # or darwin-amd64
+cd ai-terminal-pet-1.0.14-darwin-arm64
+xattr -dr com.apple.quarantine .                      # unsigned, not notarized yet
+sh ./install.sh
+```
+
+**Linux (`amd64` / `arm64`, X11)**:
+
+```sh
+tar -xzf ai-terminal-pet-1.0.14-linux-amd64.tar.gz    # or linux-arm64
+cd ai-terminal-pet-1.0.14-linux-amd64
+sh ./install.sh
+```
+
+Both POSIX installers land in the platform's data directory, symlink `~/.local/bin/ai-terminal-pet`, and support `--verify-only` / `--uninstall`.
+
+**DeepSeek Harness users** — the plugin is the zero-config path, on all three platforms now:
+
+> The package is now **1.2.25** (`dsh.bundle.platforms: ["win32", "linux", "darwin"]`). It connects DeepSeek Harness sessions immediately: on Windows it installs the bundled overlay + `protocol.js` offline on first run, on Linux and macOS it fetches the pinned release archive once (SHA-256 verified) and installs the same overlay.
+
+```sh
+# from npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
-# 2. Direct release tarball
+# or pinned to the release tarball
 dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.25/dsh-ai-terminal-pet-1.2.25.tgz
 
-# 3. Pinned git release tag (no npm required)
+# or pinned to a git tag, no npm needed
 dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.25&path:/packages/dsh-ai-terminal-pet"
 ```
 
-See [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) for full details and uninstall instructions.
+Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.25). Details and uninstall: [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md).
 
-</details>
+Installing the plugin shows **DeepSeek Harness** sessions out of the box. The other three terminals need their reporter wired once — one command, below.
 
-### Option B — Standalone Prebuilt Release (Windows · macOS · Linux)
-
-Download the archive for your OS from the [**latest GitHub Release (`pet-v1.0.14`)**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.14):
-
-- **Windows (x64)**:
-  - **Installer (`pet-setup.exe`)** — single executable; verifies SHA-256 checksums of all embedded files before writing anything, then installs into `%LOCALAPPDATA%\AI-Terminal-Pet\`. *(Not Authenticode-signed yet — see [Unsigned binary notice](#unsigned-binary-notice) below.)*
-  - **Portable ZIP (`ai-terminal-pet-1.0.14-win-x64.zip`)** — unzip and double-click `install.cmd` (or run `.\install.cmd` in PowerShell; use `-VerifyOnly` to verify SHA-256, `-AddToPath` to register `AI-Terminal-Pet.exe`, `-Uninstall` to remove).
-- **macOS (Apple Silicon `arm64` & Intel `amd64`)**:
-  ```sh
-  tar -xzf ai-terminal-pet-1.0.14-darwin-arm64.tar.gz   # or darwin-amd64
-  cd ai-terminal-pet-1.0.14-darwin-arm64
-  xattr -dr com.apple.quarantine .                      # unsigned binary Gatekeeper opt-in
-  sh ./install.sh
-  ```
-  Installs into `~/Library/Application Support/AI-Terminal-Pet` and symlinks `~/.local/bin/ai-terminal-pet`. Supports `sh ./install.sh --verify-only` and `--uninstall`.
-- **Linux (`amd64` & `arm64`, X11)**:
-  ```sh
-  tar -xzf ai-terminal-pet-1.0.14-linux-amd64.tar.gz    # or linux-arm64
-  cd ai-terminal-pet-1.0.14-linux-amd64
-  sh ./install.sh
-  ```
-  Installs into `$XDG_DATA_HOME/ai-terminal-pet` (default `~/.local/share/ai-terminal-pet`) and symlinks `~/.local/bin/ai-terminal-pet`. Supports `sh ./install.sh --verify-only` and `--uninstall`.
-
-#### Unsigned binary notice
-
-Windows (`pet-setup.exe`) is not Authenticode-signed and macOS builds are not notarized yet. Every release file can be checked bit-for-bit against `SHA256SUMS.txt` (`install.cmd -VerifyOnly` / `install.sh --verify-only`), and CI workflows + scanners are open in `.github/workflows/ci.yml`.
-<details>
-<summary>What Windows SmartScreen shows &amp; how to verify locally</summary>
-<img src="docs/assets/smartscreen-unsigned.png" width="520" alt="Mockup of Windows SmartScreen dialog for unsigned executables" />
-<p>Click <em>More info → Run anyway</em> after checking SHA-256, or build directly from source in Option C.</p>
-</details>
-
-### Option C — Build from Source (Go 1.23+, zero cgo)
-
-<details>
-<summary>Windows PowerShell &amp; macOS / Linux shell commands</summary>
+### Build from source
 
 ```powershell
-# Windows (PowerShell)
-git clone https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git
-cd ai-terminal-pet
+# Windows
+git clone https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git; cd ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
@@ -165,141 +164,155 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/
 
 ```sh
 # macOS / Linux
-git clone https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git
-cd ai-terminal-pet
+git clone https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git; cd ai-terminal-pet
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/AI-Terminal-Pet ./cmd/ai-terminal-pet
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-statusline ./cmd/pet-statusline
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-hook ./cmd/pet-hook
 sh ./scripts/install.sh
 ```
 
+#### Unsigned binary notice
+
+Windows (`pet-setup.exe`) is not Authenticode-signed and macOS builds are not notarized. Every release file can be checked bit-for-bit against `SHA256SUMS.txt` (`install.cmd -VerifyOnly` / `install.sh --verify-only`), and the CI workflows and scanners are in `.github/workflows/ci.yml`.
+
+<details>
+<summary>What Windows SmartScreen shows, and how to verify locally first</summary>
+<img src="docs/assets/smartscreen-unsigned.png" width="520" alt="Mockup of the Windows SmartScreen dialog for unsigned executables" />
+<p>Check the SHA-256, then choose <em>More info → Run anyway</em> — or build from source above.</p>
 </details>
 
----
-
-## Connect your AI coding terminals (`--connect`)
-
-Once installed, run:
+## Connect the terminals you already use
 
 ```sh
 ai-terminal-pet --connect
 ```
 
-It reads your local host configs **read-only** (never modifies files on your behalf) and prints ready-to-paste snippets with exact resolved binary/script paths for your OS:
+It reads your local host configs **read-only** (it never edits them for you) and prints ready-to-paste snippets with the resolved paths for your OS:
 
 | Host CLI | Mechanism | What runs on each event |
 |---|---|---|
-| **DeepSeek Harness** | Native Cordis plugin (`dsh-ai-terminal-pet` on Windows, or copy `integrations/deepseek-harness/ai-terminal-pet-bridge`) | Subscribes to `session/event` &amp; `approval/request` inside DSH |
-| **Claude Code** | Hooks in `~/.claude/settings.json` (`--connect=claude`) | Invokes native `pet-hook` (`--mode=claude`) — fallback: `node .../reporters/claude-hook.js` |
-| **OpenCode** | Plugin entry in `~/.config/opencode/opencode.json` (`--connect=opencode`) | Re-exports `reporters/opencode.js` (pure JS, handles `session.*`, `permission.asked`, `session.archived`) |
-| **Antigravity CLI** | Statusline + hooks in `~/.gemini/antigravity/settings.json` (`--connect=antigravity`) | Invokes `pet-statusline` (with L1 short-circuit) + `pet-hook --mode=antigravity` |
-| **Any custom CLI / script** | Shell wrapper (`reporters/generic.js`) or JSON-lines IPC | Send a single JSON line per state transition — see [docs/PROTOCOL.md](docs/PROTOCOL.md) |
+| **DeepSeek Harness** | Cordis plugin `dsh-ai-terminal-pet` (or the host-only bridge in `integrations/deepseek-harness/`) | subscribes to `session/event` and `approval/request` inside DSH |
+| **Claude Code** | hooks in `~/.claude/settings.json` (`--connect=claude`) | native `pet-hook --mode=claude`, falling back to `reporters/claude-hook.js` |
+| **OpenCode** | plugin entry in `~/.config/opencode/opencode.json` (`--connect=opencode`) | `reporters/opencode.js` (pure JS, OpenCode 2.x event names) |
+| **Antigravity CLI** | statusline + hooks in its settings (`--connect=antigravity`) | native `pet-statusline` (with the short-circuit) + `pet-hook --mode=antigravity` |
+| **Anything else** | a shell wrapper around `reporters/generic.js`, or JSON lines over the endpoint | one JSON line per state transition — see [docs/PROTOCOL.md](docs/PROTOCOL.md) |
 
-Then run diagnostics (`13 checks`, zero leaks of host tokens/secrets):
+Then check the machine:
 
 ```sh
 ai-terminal-pet --doctor
 ```
+
+13 checks — install files, version, endpoint, live instance, Node, host wiring, autostart, the alert decision record, and whether this machine can actually play the tone and show the notification. It exits `1` on any `[fail]` and prints what it measured.
 
 <details>
 <summary>Sample <code>--doctor</code> output</summary>
 <img src="docs/assets/doctor-green.png" width="700" alt="Sample clean output of ai-terminal-pet --doctor" />
 </details>
 
----
+## Alerts you will not mute
 
-## CLI reference
+The rule that decides whether to interrupt you is a pure function over the session list, so it can be tested without a window, a clock or a filesystem:
+
+- **One balloon, one tone, one row marked unread** per scan — two finished sessions do not stack two balloons.
+- **A conversation that disappeared is not a completion.** A dead reporter, a pruned duplicate or an aged-out snapshot is silent, and the receipt says why.
+- **Quiet in place.** If you are looking at the very session that just spoke, the balloon is suppressed; the unread mark is not.
+- **Per-session mute, and a "done" policy** (off / background only / always) so a completion you watched yourself does not ring.
+- **Every decision is written down** in `alerts.json` (`kind`, `decision`, `tone`, `presence`), which is what `--doctor` and `--json` read when you ask "why was I not told?".
+
+## Local by design
+
+- **No network, no account, no telemetry.** Nothing leaves the machine; the reporters and the overlay talk over a per-user endpoint — a named pipe on Windows, a Unix domain socket elsewhere — whose name is derived from `sha256(lowercased home directory)`. There is no HTTP client in the shipped binaries.
+- **Redaction before storage.** The wire layer drops 9 classes of secrets (bearer tokens, `sk-`/`pk-`/`rk-`/`ak-` keys, GitHub tokens, and more) and bounds every field; the panel never sees a raw prompt.
+- **Auto-approve is off by default.** Even when enabled, anything matching the destructive-command blocklist always goes to manual review, and safe commands enter a countdown you can veto with one click.
+
+## Platform matrix
+
+Every platform compiles all 16 Go packages cleanly with `CGO_ENABLED=0`. The overlay binary is **4.50 MiB** (4,717,568 bytes) on Win64. Details and measurement methods: [docs/PLATFORMS.md](docs/PLATFORMS.md).
+
+| Platform | Window &amp; text engine | Local endpoint | System integration | Settings &amp; audio |
+|---|---|---|---|---|
+| **Windows (x64)** | native Win32 layered DIB + ClearType GDI | named pipe `\\.\pipe\ai-terminal-pet-v1-<8hex>` | tray icon + menu, `HKCU\...\Run` autostart, Windows Terminal tab activation | full 4-tab native settings window + synthesized WAV via `winmm` |
+| **Linux (amd64 / arm64, X11)** | pure-Go X11 ARGB utility window (`jezek/xgb`) + OpenType rasterizer | Unix socket `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` | `/proc`, `_NET_CLIENT_LIST`, MIT-SCREEN-SAVER, XRandR, X11 `CLIPBOARD`, XDG autostart | edit `config.json`; the tone goes to a probed system player (`pw-play` / `paplay` / `aplay`), alerts through `notify-send` — silent when neither is installed |
+| **macOS (arm64 / amd64)** | pure-Go AppKit `NSWindow` (`ebitengine/purego`) + OpenType rasterizer | Unix socket `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` | `NSStatusBar` menu bar item, `sysctl` + `CGWindowListCopyWindowInfo` + `NSRunningApplication`, `NSPasteboard`, LaunchAgent | edit `config.json`; tone via AppKit `NSSound`; alerts via `osascript` (best-effort — see below) |
+
+## How this is verified — and what is not
+
+This is the part most projects leave out, and it is the part that decides whether you can trust a status strip: a strip that lies about state is worse than no strip.
+
+**Measured on every push, on real runners:** `go vet`, **463 `func Test`** across 15 packages, cross-builds for linux/amd64 and darwin/arm64, `go test -race` on Ubuntu, both plugin verifiers, **172 fresh-machine checks** (install → report → `--doctor` → uninstall in a sandbox), version-claim and documentation-link gates, `govulncheck` and `gosec`.
+
+**Not verified, and not planned** — this project has no Apple hardware and no spare Linux desktop, and the maintainer's decision is to skip those runs rather than claim them:
+
+- the macOS panel has never been driven on Apple hardware (CI builds it and runs its AppKit/geometry tests; the AppKit session is not a WindowServer session);
+- macOS notifications go through `osascript` and have never been seen on a Mac;
+- Linux audio and notifications are verified only down to the process boundary (the probe, the argv, the WAV bytes reaching the player's stdin, the digest-verified download) — not "a speaker made a noise" or "a banner appeared".
+
+Everything above is also written in [docs/PLATFORMS.md](docs/PLATFORMS.md), with the per-platform confidence level next to each capability.
+
+## CLI
 
 | Flag | Purpose |
 |---|---|
-| *(none)* | Start the overlay if not running, or toggle an existing instance |
-| `--show` / `--toggle` | Show or toggle the floating strip |
-| `--reset` | Reset panel coordinates, zoom scale, and expand state to default edge dock |
-| `--settings` | Open native 4-tab settings UI (Windows); prints `config.json` path &amp; guidance on macOS/Linux |
-| `--autostart[=on\|off]` | Query or toggle launch at login (`HKCU\...\Run` / macOS `LaunchAgent` / Linux XDG `.desktop`) |
-| `--connect[=HOST]` | Print copy-pasteable host setup snippets (`opencode`, `claude`, `antigravity`), read-only |
-| `--doctor` | Run all 11 diagnostics (`environment`, `install files`, `version`, `runtime`, `config`, `pipe`, `instance`, `node`, `reporters`, `autostart`, `alerts`); exits `1` on any `[fail]` |
-| `--json [--pretty]` | Output live merged session state + alert receipts as JSON |
-| `--quit` | Request graceful shutdown (flushes `config.json` and `state.json`) |
-| `--version` / `--help` | Print version / usage |
+| *(none)* | start the overlay if it is not running, or toggle a running one |
+| `--show` / `--toggle` | show, or toggle, the strip |
+| `--reset` | reset coordinates, zoom and expand state to the default edge dock |
+| `--settings` | open the native 4-tab settings window (Windows); prints the `config.json` path and guidance elsewhere |
+| `--autostart[=on\|off]` | query or toggle launch at login (HKCU Run / LaunchAgent / XDG `.desktop`) |
+| `--connect[=HOST]` | print copy-pasteable host snippets (`opencode`, `claude`, `antigravity`), read-only |
+| `--doctor` | run the 13 diagnostics; exit `1` on any failure |
+| `--json [--pretty]` | the merged live state plus the alert receipts, as JSON |
+| `--quit` | graceful shutdown (flushes `config.json` and `state.json`) |
+| `--version` / `--help` | version / usage |
 
----
+## Files on disk
 
-## Auto-approve safety design (opt-in only)
-
-Auto-approve is **off by default**. Even when enabled in `config.json` (or Windows Settings):
-
-1. Every pending permission command is checked against a strict destructive-action blocklist (`rm -rf`, `rd /s`, `format`, `mkfs`, `dd`, `git push --force`, `git reset --hard`, disk/system mutations, etc.) — blocked patterns **always** fall back to manual approval.
-2. Safe commands enter a configurable **countdown veto bar** (`5s` default). Clicking the bar or pressing deny immediately writes a `.deny` veto file to stop approval; silence lets the timeout elapse.
-
----
-
-## Architecture & files on disk
-
-```
-Host CLI (DeepSeek Harness / Claude Code / OpenCode / Antigravity / generic)
-       │  fire-and-forget hooks (pet-hook / pet-statusline / reporters/*.js)
-       ▼
-  [Windows Named Pipe  \\.\pipe\ai-terminal-pet-v1-<8hex>]
-  [macOS/Linux Socket  $TMPDIR|$XDG_RUNTIME_DIR/...-v1-<8hex>.sock]
-       │  + disk snapshot fallback (<data dir>/runtime/*.json)
-       ▼
-AI-Terminal-Pet (Go 1.23+, CGO_ENABLED=0)
-  ├─ internal/pipeserver  ── 32 concurrent conns, 5 s deadline, exact OK / ERR
-  ├─ internal/store       ── max 256 sessions, OS-verified existence + 2 min grace + tombstones
-  ├─ internal/ui          ── shared buffer & attention policy + Win32 / X11 / AppKit backends
-  └─ internal/app         ── single-instance mutex/flock, signals, --doctor, --connect
-```
-
-| File / Directory | Purpose |
+| Path | Purpose |
 |---|---|
-| **Data root** (`internal/home`) | Windows: `%LOCALAPPDATA%\AI-Terminal-Pet` · macOS: `~/Library/Application Support/AI-Terminal-Pet` · Linux: `$XDG_DATA_HOME/ai-terminal-pet` (or `~/.local/share/ai-terminal-pet`) |
-| `config.json` | User settings (notifications, sound cues, always-on-top, edge auto-hide, opacity, language, auto-approve allow/delay) |
-| `state.json` | Last expand/zoom state + per-display layout memory (`layouts` keyed by monitor bounds signature) |
-| `runtime/*.json` | Reporter session snapshots merged at startup and pruned cleanly when host PIDs disappear |
-| `approvals/` | Transient auto-approve pending handshakes (`pending-*.json` / `.deny`) |
-| `alerts.json` | Attention classifier receipt log (`approval` / `question` / `plan` / `done`) |
-| `error.log` | Fatal/diagnostic error log (`0600`, auto-rotated above 1 MiB) |
+| **Data root** | Windows `%LOCALAPPDATA%\AI-Terminal-Pet` · macOS `~/Library/Application Support/AI-Terminal-Pet` · Linux `$XDG_DATA_HOME/ai-terminal-pet` (or `~/.local/share/ai-terminal-pet`) — one resolver, `internal/home` |
+| `config.json` | notifications, sound cue and scheme, always-on-top, edge retract, opacity, theme, language, per-session mutes, auto-approve |
+| `state.json` | zoom, expand state, and one position per monitor layout |
+| `runtime/*.json` | reporter session snapshots, merged at startup and pruned when a host disappears |
+| `approvals/` | transient auto-approve handshakes (`pending-*.json`, `.deny`) |
+| `alerts.json` | the alert decision record |
+| `error.log` | diagnostic log (`0600`, rotated above 1 MiB) |
 
----
-
-## Develop & verify from source
-
-All CI gates across Windows (`windows-latest`), Linux (`ubuntu-latest`), macOS (`macos-latest`), and static/vulnerability scanning (`govulncheck` + `gosec`) mirror these local checks:
+## Develop
 
 ```sh
 gofmt -l .
 go vet ./...
 go test -count=1 ./...
-bash scripts/cross-build.sh                     # verifies all 16 Go packages compile for win/linux/darwin (CGO_ENABLED=0)
-for f in reporters/*.js; do node --check "$f"; done
-node --test reporters/opencode-events.test.mjs
-node integrations/deepseek-harness/verify.mjs
+bash scripts/cross-build.sh                  # all 16 packages, win/linux/darwin, CGO_ENABLED=0
 node packages/dsh-ai-terminal-pet/verify.mjs
 node tests/fresh-machine.mjs --no-overlay
 node tools/check_versions.mjs
-node --test tools/check_versions.test.mjs
 python tools/check_docs_links.py
 ```
 
-Key maintainer references:
-- [docs/PLATFORMS.md](docs/PLATFORMS.md) — measured per-OS capability table
-- [docs/PROTOCOL.md](docs/PROTOCOL.md) — `ai-terminal-pet.v1` JSON wire contract
-- [docs/ROADMAP.md](docs/ROADMAP.md) — current baseline and remaining platform/feature plans
-- [docs/HANDOVER.md](docs/HANDOVER.md) — full engineering & release runbooks
-- [docs/UPSTREAM.md](docs/UPSTREAM.md) — upstream marketplace index & two-commit release order
+Maintainer references: [docs/PLATFORMS.md](docs/PLATFORMS.md) (what works where, measured) · [docs/PROTOCOL.md](docs/PROTOCOL.md) (the wire contract, if you want to write your own reporter) · [docs/HANDOVER.md](docs/HANDOVER.md) (engineering and release runbooks) · [docs/UPSTREAM.md](docs/UPSTREAM.md) (marketplace entries and the two-commit release order) · [docs/ROADMAP.md](docs/ROADMAP.md) (what is next).
 
----
+## FAQ
+
+**Does it read my prompts or code?** No. A reporter sends state, the project path, a short reason (often just the tool name), tool name and timings. Nine secret patterns are redacted before anything is stored, and the field bounds are in [docs/PROTOCOL.md](docs/PROTOCOL.md) §5.
+
+**Wayland?** The panel is an X11 window; it runs under XWayland on most Wayland desktops, and a pure-Wayland session has no X11 surface for it. WSLg is tested; GNOME, KDE and other desktop environments are not.
+
+**Remote hosts / SSH?** The strip is a desktop window and reporters write to the local endpoint, so both halves must run on the same machine. Agents in a local terminal or a local `tmux` are fine; agents on a remote host report to that host.
+
+**Why not Electron / a browser tab?** Because the point is a 56 px strip that is always there and costs nothing: one static binary, no runtime, no DLLs beyond standard system libraries.
+
+**How do I get rid of it?** `install.cmd -Uninstall` on Windows, `sh ./install.sh --uninstall` elsewhere, `dsh plugin --profile <profile> remove dsh-ai-terminal-pet` for the plugin. Nothing stays resident: with no sessions the process exits on its own.
 
 ## License & third-party libraries
 
-- Project license: [MIT](LICENSE)
-- Third-party Go modules (all statically compiled with `CGO_ENABLED=0`, no external runtime DLLs/libs):
-  - [`github.com/Microsoft/go-winio`](https://github.com/Microsoft/go-winio) (MIT) — Windows named pipe ACLs & overlapped I/O
-  - [`github.com/lxn/win`](https://github.com/lxn/win) (BSD-3-Clause) — Win32 API bindings
-  - [`github.com/ebitengine/purego`](https://github.com/ebitengine/purego) (Apache-2.0) — zero-cgo macOS Objective-C / CoreGraphics / AppKit calls
-  - [`github.com/jezek/xgb`](https://github.com/jezek/xgb) (BSD-3-Clause) — pure-Go X11 wire client on Linux
-  - [`golang.org/x/image`](https://pkg.go.dev/golang.org/x/image) &amp; [`golang.org/x/sys`](https://pkg.go.dev/golang.org/x/sys) (BSD-3-Clause) — OpenType glyph rasterization &amp; OS syscalls
+[MIT](LICENSE). All Go dependencies are statically compiled with `CGO_ENABLED=0`:
+
+- [`github.com/Microsoft/go-winio`](https://github.com/Microsoft/go-winio) (MIT) — Windows named pipe ACLs & overlapped I/O
+- [`github.com/lxn/win`](https://github.com/lxn/win) (BSD-3-Clause) — Win32 API bindings
+- [`github.com/ebitengine/purego`](https://github.com/ebitengine/purego) (Apache-2.0) — zero-cgo Objective-C / CoreGraphics / AppKit calls on macOS
+- [`github.com/jezek/xgb`](https://github.com/jezek/xgb) (BSD-3-Clause) — pure-Go X11 wire client on Linux
+- [`golang.org/x/image`](https://pkg.go.dev/golang.org/x/image) &amp; [`golang.org/x/sys`](https://pkg.go.dev/golang.org/x/sys) (BSD-3-Clause) — OpenType glyph rasterization &amp; syscalls
 
 ---
 
@@ -308,171 +321,167 @@ Key maintainer references:
 ## 中文说明
 
 <p>
-  <strong>一个轻量的置顶桌面状态浮窗，把所有运行中的 AI 编程终端汇总到一块条带上 — 现已全面支持 Windows、Linux (X11) 与 macOS (AppKit)。</strong><br />
-  DeepSeek Harness · Claude Code · OpenCode · Antigravity
+  <strong>你的 agent 在等你，而你在另一个标签页里。</strong><br />
+  一条 56&nbsp;px 的置顶窄条，告诉你哪个 AI 编程终端卡住了、在等什么、等了多久 —— 再点一下，直接回到那个终端。
 </p>
 
-### 解决什么问题
+<p>DeepSeek Harness · Claude Code · OpenCode · Antigravity</p>
 
-同时开多个 AI 编程终端 tab 时，最常见也最浪费时间的两种卡点：
+### 那个"十五分钟"的问题
 
-1. 某个终端在等审批或刚跑完任务，你正在另一个窗口写代码，回头才发现它干等了十几分钟。
-2. 听到提示音后，多个窗口长相一致，一眼分不清**哪个项目**在等、**在等什么**。
+四个 agent，四个标签页。其中一个在等权限确认，没等到 —— 因为你在另一个窗口看 diff，或者在另一块屏，或者只有一块屏而它正好被压在这一页下面。
 
-**ai-terminal-pet** 把本机各终端会话的状态聚合到一个轻量浮窗（收起时仅 `56 × 156 px` 窄条，悬停或点击展开为 `200 px`）：
+没崩、没报错，只是白等了十五分钟；而你要切回去才看得到它还在等。
 
-- **全局一览**：按最高优先级显示状态徽标（`ASK` / `PLAN` / `WORK` / `TOOL` / `ERR` / `DONE`）、停留时长、项目名与阻塞原因。
-- **一键回跳终端 / 复制路径**：点击行尾箭头直接激活对应终端窗口或标签页（Win32 支持 `Windows Terminal` 页签跳转，Linux X11 通过 `_NET_ACTIVE_WINDOW`，macOS 通过 `NSRunningApplication`）；点击行正文一键复制工作区路径。
-- **键盘导航与多显示器记忆**：展开面板支持 `Up` / `Down` / `Home` / `End` 选行、`Enter` 跳转、`Esc` 收起；`Ctrl`/`Cmd` + `+`/`-`/`0` 或鼠标滚轮缩放；坐标按显示器工作区指纹（`State.Layouts`）独立记忆，外接屏来回切换互不覆盖。
-- **纯原生零运行期依赖**：全项目使用 `CGO_ENABLED=0` 静态编译 Go 二进制，无 Electron、无 WebView、无 libgtk/cgo，reporter 仅用 Node 标准库（零 npm 依赖）。
+提示音解决不了这件事，每个终端自己窗口里的那个转圈也解决不了：信息确实存在，但它**在你没看的地方**。
 
-### 全平台支持矩阵
+**ai-terminal-pet** 把它放到你不可能错过的地方：一条 56&nbsp;px 宽、始终置顶、贴屏幕边的窄条。它认识本机每一个 agent 会话，知道每个会话在等什么、等了多久。
 
-三个操作系统全部通过 `CGO_ENABLED=0` 全量静态构建与多平台 CI 验证，详细实测方法与边界见 [docs/PLATFORMS.md](docs/PLATFORMS.md)：
+### 它做什么
 
-| 平台 | 窗口与字体光栅 | 本地 IPC 端点 | 系统集成 | 设置与提示音 |
-|---|---|---|---|---|
-| **Windows (x64)** | Win32 分层 ARGB DIB 窗口 + GDI ClearType | 命名管道 `\\.\pipe\ai-terminal-pet-v1-<8hex>` | 托盘图标 + 右键菜单、`HKCU\...\Run` 自启、`Windows Terminal` 页签跳转 | 完整四页签原生 Win32 设置窗口 + `winmm` 合成 WAV 提示音 |
-| **Linux (amd64 / arm64, X11)** | 纯 Go `jezek/xgb` X11 ARGB 工具窗 + OpenType 复合字体光栅器 | Unix domain socket `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` | `/proc` + `_NET_CLIENT_LIST` + MIT-SCREEN-SAVER + XRandR + X11 `CLIPBOARD` + XDG `.desktop` 自启 | 直接编辑 `config.json`；合成 WAV 交给探测到的系统播放器（`pw-play` / `paplay` / `aplay`），提醒走 `notify-send` —— 零 cgo，两者都不存在时保持静音 |
-| **macOS (arm64 / amd64)** | 纯 Go `purego` AppKit 无边框浮窗 + OpenType 复合字体光栅器 | Unix domain socket `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` | `NSStatusBar` 菜单栏图标、`sysctl` + `CGWindowListCopyWindowInfo` + `NSRunningApplication`、`NSPasteboard`、`LaunchAgent` | 直接编辑 `config.json` + AppKit `NSSound` 异步 WAV 提示音；提醒走 `osascript`（尽力而为，无苹果硬件、未实测弹窗） |
+- **一条窄条，所有 agent。** Windows / Linux (X11) / macOS；DeepSeek Harness、Claude Code、OpenCode、Antigravity 汇成一张列表 —— 排序把**最需要你**的会话放最上面，附带项目目录、卡住的原因、已经等了多久。
+- **点一下就能回去。** 行尾箭头激活对应终端（平台允许时连标签页一起切）；点行正文则复制它的工作区路径，并用一张"已复制 / 复制失败"的小条告诉你结果，而不是点了没反应。
+- **只在真事件上出声。** 向你提问、出错、你不在时跑完 —— 只有这三种会打扰你。会话消失不算完成，普通命令不算事件，被你静音的会话保持安静。完整规则表在 [docs/HANDOVER.md](docs/HANDOVER.md) §40–§43。
 
-> **实测边界说明**：GitHub Actions 在三个真实系统 runner（`windows-latest`、`ubuntu-latest`、`macos-latest`）上全量运行 `go vet`、单元测试、三端编译和无头安装/hook/CLI 冒烟验证。Linux X11 浮窗已在 WSLg 实际渲染联调；macOS 图形交互探针（`PET_COCOA_PROBE=1`）受限于无实体苹果硬件尚未在实体桌面实机目视调窗，Objective-C 运行时绑定与几何/控制单测均已在真实 `macos-latest` runner 通过。详见 [docs/PLATFORMS.md](docs/PLATFORMS.md)。
+### 它长什么样
 
----
+<table>
+  <tr>
+    <td width="46%" valign="top">
+      <strong>收起态</strong> —— 空闲时 56&nbsp;px<br />
+      <img src="docs/assets/overlay-compact.png" width="100%" alt="收起的窄条" />
+    </td>
+    <td width="54%" valign="top">
+      <strong>展开态</strong> —— 悬停或点击<br />
+      <img src="docs/assets/overlay-expanded.png" width="100%" alt="展开的会话行" />
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <strong>六行会话</strong><br />
+      <img src="docs/assets/overlay-expanded-many.png" width="100%" alt="六个会话的展开面板" />
+    </td>
+    <td valign="top">
+      <strong>未读标记</strong> —— 你还没看过的<br />
+      <img src="docs/assets/overlay-expanded-unread.png" width="100%" alt="未读标记" />
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <strong>复制回执</strong><br />
+      <img src="docs/assets/overlay-copy.png" width="100%" alt="复制回执" />
+    </td>
+    <td valign="top">
+      <strong>自动审批撤回窗</strong> —— 默认关闭，启用后 5 秒倒计时<br />
+      <img src="docs/assets/overlay-auto-approve.png" width="100%" alt="自动审批倒计时" />
+    </td>
+  </tr>
+</table>
 
-### 安装方式（三选一）
+| 行上写着 | 含义 |
+|---|---|
+| **等待** | 权限确认、一个问题、或一个方案在等你决定 |
+| **工具调用** / **进行中** / **思考中** | agent 正忙 —— 现在还没你的事 |
+| **出错** | 这一轮失败了，原因在行上 |
+| **空闲** / **已结束** | 跑完了，等你去看 |
 
-#### 方式 A — DeepSeek Harness 插件安装（`dsh-ai-terminal-pet`，Windows）
+### 安装
 
-> 当前版本是 **1.2.25**（包声明 `dsh.bundle.platforms: ["win32", "linux", "darwin"]`）。三个平台的 DeepSeek Harness 0.2.x 都是安装即用：Windows 上首次加载会把内置的浮窗本体与 `protocol.js` 离线落盘，Linux / macOS 上会先下载一次钉住的发布归档（校验 SHA-256）再装同一份浮窗。
->
-> **边界说明**：装完包即可在面板看到 **DeepSeek Harness** 的会话；如果需要把 OpenCode、Claude Code 或 Antigravity 也汇入同一块浮窗，请再运行一次下面的 `--connect`。
+浮窗本体是每个平台一个静态二进制（`CGO_ENABLED=0`，无 Electron、无 WebView、无 libgtk、无 cgo）；上报端只用 Node.js 标准库，零 npm 依赖。
 
-<details>
-<summary>通过 DSH CLI 安装（npm / tarball / git tag）</summary>
+**Windows (x64)** —— 从[**最新 Release（`pet-v1.0.14`）**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.14) 下载 `pet-setup.exe` 双击运行：写入前先逐文件核对内嵌载荷的 SHA-256，然后装到 `%LOCALAPPDATA%\AI-Terminal-Pet\`。想要绿色版就用 `ai-terminal-pet-1.0.14-win-x64.zip`，解压后运行 `.\install.cmd`（支持 `-VerifyOnly` / `-AddToPath` / `-Uninstall`）。
 
-已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.25）：
+**macOS（Apple Silicon `arm64` / Intel `amd64`）**：
 
 ```sh
-# 1. 通过 npm
+tar -xzf ai-terminal-pet-1.0.14-darwin-arm64.tar.gz   # 或 darwin-amd64
+cd ai-terminal-pet-1.0.14-darwin-arm64
+xattr -dr com.apple.quarantine .                      # 未签名、未公证
+sh ./install.sh
+```
+
+**Linux（`amd64` / `arm64`，X11）**：
+
+```sh
+tar -xzf ai-terminal-pet-1.0.14-linux-amd64.tar.gz    # 或 linux-arm64
+cd ai-terminal-pet-1.0.14-linux-amd64
+sh ./install.sh
+```
+
+两个 POSIX 安装脚本都装进各平台的数据目录、在 `~/.local/bin/ai-terminal-pet` 建软链，并支持 `--verify-only` / `--uninstall`。
+
+**DeepSeek Harness 用户** —— 插件是零配置路径，现在三个平台都行：
+
+> 当前版本是 **1.2.25**（包声明 `dsh.bundle.platforms: ["win32", "linux", "darwin"]`）。装完即可看到 DeepSeek Harness 的会话：Windows 上首次加载会把内置的浮窗本体与 `protocol.js` 离线落盘；Linux / macOS 上会先下载一次钉住的发布归档（校验 SHA-256）再装同一份浮窗。
+
+```sh
+# 通过 npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
-# 2. 通过 Release tarball 直链
+# 或钉住 Release tarball
 dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.25/dsh-ai-terminal-pet-1.2.25.tgz
 
-# 3. 钉死 Release tag 的 git 源（无 npm 网络兜底）
+# 或钉住 git tag（不需要 npm）
 dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.25&path:/packages/dsh-ai-terminal-pet"
 ```
 
-更多说明与卸载方式见 [packages/dsh-ai-terminal-pet/README.zh.md](packages/dsh-ai-terminal-pet/README.zh.md)。
+已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.25）。更多说明与卸载方式见 [packages/dsh-ai-terminal-pet/README.zh.md](packages/dsh-ai-terminal-pet/README.zh.md)。
 
-</details>
+装插件默认只显示 **DeepSeek Harness** 的会话；另外三个终端各接一次上报端即可，一条命令，见下。
 
-#### 方式 B — 独立安装包 / 压缩包（Windows · macOS · Linux）
-
-前往 [**最新 GitHub Release（`pet-v1.0.14`）**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.14) 下载对应系统产物：
-
-- **Windows (x64)**：
-  - **单文件安装器（`pet-setup.exe`）** — 双击运行，先对内置所有载荷做 SHA-256 逐文件校验再写入 `%LOCALAPPDATA%\AI-Terminal-Pet\`。*（未购置代码签名证书，SmartScreen 弹窗按「更多信息 → 仍要运行」放行即可。）*
-  - **绿色压缩包（`ai-terminal-pet-1.0.14-win-x64.zip`）** — 解压后双击 `install.cmd`（支持 `-VerifyOnly` 核对 SHA-256、`-AddToPath` 加 PATH、`-Uninstall` 卸载）。
-- **macOS（Apple Silicon `arm64` / Intel `amd64`）**：
-  ```sh
-  tar -xzf ai-terminal-pet-1.0.14-darwin-arm64.tar.gz   # 或 darwin-amd64
-  cd ai-terminal-pet-1.0.14-darwin-arm64
-  xattr -dr com.apple.quarantine .                      # 解除未公证下载的隔离属性
-  sh ./install.sh
-  ```
-  默认安装到 `~/Library/Application Support/AI-Terminal-Pet` 并在 `~/.local/bin/ai-terminal-pet` 建软链；支持 `--verify-only` 与 `--uninstall`。
-- **Linux（`amd64` / `arm64`，X11）**：
-  ```sh
-  tar -xzf ai-terminal-pet-1.0.14-linux-amd64.tar.gz    # 或 linux-arm64
-  cd ai-terminal-pet-1.0.14-linux-amd64
-  sh ./install.sh
-  ```
-  默认安装到 `$XDG_DATA_HOME/ai-terminal-pet`（通常 `~/.local/share/ai-terminal-pet`）并在 `~/.local/bin/ai-terminal-pet` 建软链；支持 `--verify-only` 与 `--uninstall`。
-
-#### 方式 C — 从源码自行编译（Go 1.23+，零 cgo）
-
-<details>
-<summary>Windows PowerShell 与 macOS / Linux 编译安装命令</summary>
-
-```powershell
-# Windows (PowerShell)
-git clone https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git
-cd ai-terminal-pet
-go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
-go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
-go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
-.\scripts\install.cmd -AddToPath
-```
-
-```sh
-# macOS / Linux
-git clone https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git
-cd ai-terminal-pet
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/AI-Terminal-Pet ./cmd/ai-terminal-pet
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-statusline ./cmd/pet-statusline
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o ./bin/pet-hook ./cmd/pet-hook
-sh ./scripts/install.sh
-```
-
-</details>
-
----
-
-### 接入终端（`--connect`）与诊断（`--doctor`）
-
-安装完成后运行只读向导，它会自动检测本机各宿主状态并输出可直接粘贴的配置片段（自动填写当前 OS 真实路径与二进制文件名，**绝不偷偷修改任何配置**）：
+### 接入本机终端
 
 ```sh
 ai-terminal-pet --connect
 ```
 
-随后运行 13 项系统体检（安装文件、版本、管道/socket、宿主接入状态、自启动与提醒判定、声音与通知表面，任何 fail 返回码为 1）：
+只读地读一遍本机宿主配置（**绝不替你修改**），打印当前 OS 可直接粘贴的片段。支持的宿主、机制与每个事件跑什么，见上方的英文表格（DeepSeek Harness / Claude Code / OpenCode / Antigravity / 任意 CLI）。
+
+随后体检：
 
 ```sh
 ai-terminal-pet --doctor
 ```
 
-### 常用命令与路径速查
+共 **13 项**：安装文件、版本、端点、实例、Node、宿主接入、自启动、提醒判定记录，以及这台机器**能不能真的出声、能不能真的弹通知**。任一 `[fail]` 返回码为 1，并且每一项都打印它量到的值。
 
-- **命令行参数**：
-  - `--show` / `--toggle` / `--reset` / `--settings` / `--quit`
-  - `--autostart[=on|off]`：查询或开关开机自启（Windows 注册表 / macOS `LaunchAgent` / Linux XDG `.desktop`）
-  - `--connect[=opencode|claude|antigravity]`：只读打印对应宿主接入配置
-  - `--doctor`：运行 13 项健康诊断
-  - `--json [--pretty]`：输出实时会话与提醒判定状态 JSON
-  - `--version`：打印版本信息（v1.0.14）
-  - `--help`：打印帮助说明
-- **本地数据目录（`internal/home` 统一解析）**：
-  - Windows：`%LOCALAPPDATA%\AI-Terminal-Pet\`
-  - macOS：`~/Library/Application Support/AI-Terminal-Pet/`
-  - Linux：`$XDG_DATA_HOME/ai-terminal-pet/`（默认 `~/.local/share/ai-terminal-pet/`）
-- **文件说明**：`config.json`（开关与外观配置）、`state.json`（位置/缩放/`layouts` 分显示器坐标）、`runtime/*.json`（各终端会话快照）、`approvals/`（可撤回自动审批握手文件）、`alerts.json`（提醒判定记录）、`error.log`（故障日志，`0600` 权限，超过 1 MB 自动轮转）。
+### 本地优先
 
-### 自动审批安全门控（默认关闭）
+- **不出网、无账号、无遥测。** 上报端与浮窗只走按用户派生的本地端点（Windows 命名管道 / 其他平台 Unix domain socket），端点名由 `sha256(小写化的用户目录)` 前 4 字节派生；发行版二进制里没有 HTTP 客户端。
+- **落盘前先脱敏。** 线协议层丢弃 9 类机密（Bearer、`sk-`/`pk-`/`rk-`/`ak-` 开头的 key、GitHub token 等），并对每个字段设上限；面板永远看不到原始 prompt。
+- **自动审批默认关闭。** 即使启用，命中危险命令黑名单的一律转人工；安全命令进入可一键撤回的倒计时窗。
 
-auto-approve 功能默认完全关闭；即使启用，也需先通过以下两道保护：
+### 全平台矩阵
 
-1. **危险命令静态拦截**：包含 `rm -rf`、`rd /s`、`format`、`mkfs`、`git push --force`、`git reset --hard` 等高风险模式时，直接拒绝自动放行并强制人工确认。
-2. **倒计时撤回窗**：安全命令进入默认 5 秒倒计时进度条，期间任意点击即写入 `.deny` 撤回；静默超时才放行。
+三个系统全部以 `CGO_ENABLED=0` 通过 16 个 Go 包的构建；Win64 上的浮窗本体是 **4.50 MiB**（4,717,568 B）。逐项实测方法与边界见 [docs/PLATFORMS.md](docs/PLATFORMS.md)，矩阵表与英文版一致。
 
-### 本地验证（全平台 CI 同源）
+### 验证到什么程度 —— 以及哪些没有
 
-```sh
-gofmt -l .
-go vet ./...
-go test -count=1 ./...
-bash scripts/cross-build.sh                     # 三端 CGO_ENABLED=0 跨编译门禁（windows/linux/darwin）
-for f in reporters/*.js; do node --check "$f"; done
-node --test reporters/opencode-events.test.mjs
-node integrations/deepseek-harness/verify.mjs
-node packages/dsh-ai-terminal-pet/verify.mjs
-node tests/fresh-machine.mjs --no-overlay
-node tools/check_versions.mjs
-node --test tools/check_versions.test.mjs
-python tools/check_docs_links.py
-```
+**每次推送都会在真实 runner 上量到的**：`go vet`、15 个包共 **463 个 `func Test`**、linux/amd64 与 darwin/arm64 交叉构建、Ubuntu 上的 `go test -race`、两个插件校验、**172 项 fresh-machine 检查**（沙箱里装 → 上报 → `--doctor` → 卸载）、版本声明与文档链接门禁、`govulncheck` 与 `gosec`。
+
+**没有验证、而且不打算验证的** —— 这个项目没有苹果硬件，也没有多余的 Linux 桌面，维护者的决定是不做这些实测、也不把它们写成"已验证"：
+
+- macOS 面板从未在苹果硬件上真的开过窗（CI 只构建它、跑 AppKit/几何单测）；
+- macOS 通知走 `osascript`，从未在 Mac 上被看到；
+- Linux 的声音与通知只验证到进程边界（探测、argv、WAV 字节确实进了播放器 stdin、下载的摘要），**没有**验证"音箱响了"或"横幅出现了"。
+
+### 命令行与文件
+
+常用参数：`--show` / `--toggle` / `--reset` / `--settings` / `--autostart[=on|off]` / `--connect[=HOST]` / `--doctor` / `--json [--pretty]` / `--quit` / `--version`（打印版本信息（v1.0.14））/ `--help`。
+
+数据目录：Windows `%LOCALAPPDATA%\AI-Terminal-Pet\`、macOS `~/Library/Application Support/AI-Terminal-Pet/`、Linux `$XDG_DATA_HOME/ai-terminal-pet/`（默认 `~/.local/share/ai-terminal-pet/`）。其中 `config.json`（开关与外观）、`state.json`（位置/缩放/分屏坐标）、`runtime/*.json`（会话快照）、`approvals/`（自动审批握手）、`alerts.json`（提醒判定记录）、`error.log`（故障日志，`0600`，超过 1 MiB 轮转）。
+
+### 常见问题
+
+**它会读我的 prompt 和代码吗？** 不会。上报的是状态、项目路径、一个很短的 reason（常常只是工具名）、工具名与时间戳；9 类机密在落盘前被替换，字段上限见 [docs/PROTOCOL.md](docs/PROTOCOL.md) §5。
+
+**Wayland 呢？** 面板是 X11 窗口，在多数 Wayland 桌面上经 XWayland 运行；纯 Wayland 会话没有 X11 表面。WSLg 实测过，GNOME / KDE 等桌面未实测。
+
+**SSH / 远程主机呢？** 窄条是桌面窗口，上报端写本地端点，所以两半必须在同一台机器上。本机终端或本机 `tmux` 里的 agent 没问题；远程主机上的 agent 只会报到那台主机。
+
+**为什么不用 Electron / 网页？** 因为它的意义就是一条 56 px、一直存在、几乎不占资源的窄条：一个静态二进制，没有运行时，除系统库外没有 DLL。
+
+**怎么彻底去掉？** Windows 用 `install.cmd -Uninstall`，其它平台 `sh ./install.sh --uninstall`，插件用 `dsh plugin --profile <profile> remove dsh-ai-terminal-pet`。它也常驻不了：没有会话时进程会自己退出。
 
 ### 开源协议与依赖致谢
 

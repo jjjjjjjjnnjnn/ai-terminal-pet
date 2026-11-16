@@ -85,7 +85,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (382 func Test across 14 packages)
+# 1. Static analysis and all unit tests (463 func Test across 15 packages)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -115,7 +115,7 @@ go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-statusline.exe ./cmd/pet-statusline
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\pet-hook.exe ./cmd/pet-hook
 
-# 3a. The cross-platform gate. 13 packages must build for linux/amd64 and darwin/arm64,
+# 3a. The cross-platform gate. 16 packages must build for linux/amd64 and darwin/arm64,
 #     and the two that must not are named so a port that silently regresses one is seen
 #     (docs/PLATFORMS.md is the measured table this list has to agree with). Same logic
 #     as CI's "Cross-platform build gate"; on Windows run it from Git Bash or WSL.

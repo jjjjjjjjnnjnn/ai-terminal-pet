@@ -6,10 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.25** 已发版；**§67 第 67 轮：DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗），插件不再手写 Windows 路径；§66 POSIX 平权：Linux 有了提示音与通知面、跳转失败不再一声不响、`--doctor` 13 项；§64 查清了上游那行为什么是旧的**）
+## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.25** 已发版；**§68 第 68 轮（公开文案）：README 重写、4 张坏图与 3 处不实描述修掉、链接门禁开始查图片；§67 DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗）；§66 POSIX 平权：Linux 提示音与通知面、跳转失败不再静默、`--doctor` 13 项**）
 
-> 接手请先读本节与 **§67「DSH 插件三平台」**
-> （四个改动面、三个"看起来对其实错"的地方、尺寸方案为什么是"首启按 pin 下载"、以及两条未验证项），
+> 接手请先读本节与 **§68「公开文案重做」**
+> （README 的新结构、被抓到的三处不实描述、图片门禁与它的自测、以及"硬件实测永久跳过"的对外写法），
+> 再读 **§67「DSH 插件三平台」**
+> （四个改动面、三个"看起来对其实错"的地方、尺寸方案为什么是"首启按 pin 下载"、以及两条过程教训），
 > 再读 **§66「POSIX 平权落地」**
 > （Linux 提示音与通知面、macOS 的 osascript、跳转失败反馈、`--doctor` 从 11 项变 13 项、三条证不到的事），
 > 再读 **§65「交接：下个会话从这里开始」**
@@ -63,7 +65,7 @@
   （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `DB2DD2AB…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**461 个** `func Test`，
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**463 个** `func Test`，
   本轮 +33）；`internal/ui` 的 linux 测试二进制在 WSL 里 **122 PASS**；CI 四条 job
   （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.14 的提交上重跑；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
@@ -75,7 +77,7 @@
   设置窗口原样放 40 秒不消失）；1.0.14 的装机实测见 §66.6：`-VerifyOnly` 11/11、
   `--doctor` **12 ok / 1 warn / 0 fail**、`--version` 报 `ai-terminal-pet 1.0.14`。
 - **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.14 实测）：非测试 **143 文件 / 27,185 行**、
-  测试 **93 文件 / 13,444 行**、**461 个 `func Test`**。
+  测试 **93 文件 / 13,444 行**、**463 个 `func Test`**。
   `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `DB2DD2AB…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
   三个二进制合计 **12,101,632 B** = 11.54 MiB。
@@ -4756,7 +4758,7 @@ node tools/catalog-status.mjs                # 目录那行现在是 current 还
 
 ### 66.4 本机验证做到哪一步（以及一个新学会的办法）
 
-- `gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 13 个包全过（Windows，**461 个 `func Test`**，
+- `gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 15 个包全过（Windows，**463 个 `func Test`**，
   本轮 +33）；`scripts/cross-build.sh` 16 个包在 linux/amd64 与 darwin/arm64 上全绿。
 - **Linux 专属代码在这台机器上真的跑过了**：`GOOS=linux CGO_ENABLED=0 go test -c -o %TEMP%\petui.test ./internal/ui`
   编出 linux 测试二进制，WSL 里直接执行 → **122 PASS**，包含 4 个投递测试（探针顺序、argv、WAV 进了 stdin、
@@ -4910,6 +4912,75 @@ node tools/catalog-status.mjs                # 目录那行现在是 current 还
    两条路会写同一个目录——值得在文档里明确"先装的赢"，避免用户以为要装两次。
 3. 视觉不变量门禁（本轮盘点过的候选 B）：preview PNG 已被确认**同机逐字节可复现**，
    跨机器只能做颜色/几何探针，不能比整图。
+
+## 68. 交接：公开文案重做（README 是这一轮的交付物），以及它逼出来的三处假话（2026-11-16，第 68 轮；**未发版**）
+
+这一轮不改产品代码、不发版。交付物是**给外人看的那一页**：README 重写、配图重生成、
+以及一个让"配图坏掉"不可能再悄悄发生的门禁。改的过程中抓到三处长期存在的不实描述。
+
+### 68.1 为什么要重做
+
+原来的 README 是**工程记事**的口吻：平台矩阵、IPC 端点、`internal/*` 目录树都写得比"它能替你解决什么"
+更早出现。对第一次打开仓库的人（以及任何转发这条链接的人），前 30 秒应该是这个问题：
+
+> 你的 agent 在等你，而你在另一个标签页里。
+
+所以新版的结构是：**痛点 → 它能做什么 → 长什么样（真图）→ 怎么装（一条命令）→ 接哪些终端 →
+提醒策略 → 本地优先 → 平台矩阵 → 验证到什么程度（含没验证的）→ CLI/文件/开发/FAQ**。
+英文在前、中文同构在后，两边的数字与承诺完全一致。
+
+### 68.2 抓到并修掉的三处假话
+
+1. **四张配图是坏的。** "Visual showcase" 表格引用了 `panel-dark-expanded.png` / `panel-light-expanded.png` /
+   `panel-error.png` / `panel-autoapprove.png` —— 这四个文件在 `docs/assets/` 里**根本不存在**
+   （真实文件名是 `overlay-*.png`）。仓库首页一直显示四个破图，而 `check_docs_links.py` **只查 `[链接](…)`、
+   不查 `<img src>`**，所以从来没人报警。现在改用真实资产，并且门禁补上了这一课。
+2. **状态词是编的。** README 写状态徽标是 `ASK / PLAN / WORK / TOOL / ERR / DONE`；代码里
+   `stateLabel()` 与 i18n 实际给的是 **Waiting / Tool call / Working / Thinking / Error / Idle**
+   （紧凑条上也是整词，不是三字母码）。这就是"文案看着专业、但与实现不符"的典型，已改成真实标签表。
+3. **数字全都旧了。** 同一页里同时出现 `--doctor` **11 项**（实为 13）、主程序 **4.49 MiB**
+   （实为 4,717,568 B = 4.50 MiB）、测试数 **425 / 461 / 382**（`AGENTS.md` 还写着 382 func Test / 14 包，
+   实为 **463 / 15 包**）、跨平台门禁 **13 包**（实为 **16 包**，`scripts/portable-packages.txt`）。
+   这一轮把这几处一次对齐，并在 §67.4 的教训之外补了第 3 条：**数字要由命令产出，不要由记忆产出**。
+
+### 68.3 门禁补强：`tools/check_docs_links.py` 现在看图片
+
+- 新增 `<img src="…">` 与 `![alt](…)` 两种形态的本地路径检查；`![…](…)` 不会同时被当成链接重复报告。
+- **自测**（不进仓库）：在临时目录造一个 `README.md`，放一张存在的图、一张不存在的 `<img>`、一个不存在的
+  `![]()`，跑 `main()` → 必须报 **2 条 image 问题并退出 1**；真实仓库里跑 → 仍然全绿（12 份文档）。
+  这条自测正是"新门禁第一次运行才是验收"的应用（§67.4 第 1 条教训）。
+
+### 68.4 配图重新生成（不是手工替换）
+
+`docs/assets/render_assets.py` 从真实光栅器的 preview 输出重建素材，所以图**不可能与界面漂移**。
+这一轮跑了一遍：10 张 PNG 字节变了（平均颜色差 <1、约 6% 像素不同、尺寸不变），说明之前那批是旧版本的界面；
+`demo.gif` 与 `desktop-scene.png` 未变。**规则**：以后改面板外观，重跑
+`PET_PREVIEW_DIR=… go test ./internal/ui -run TestRenderPreview` + `python docs/assets/render_assets.py`，
+不要手修 PNG。
+
+### 68.5 硬件实测：按用户决定永久跳过（这一次写进了对外文案）
+
+README 新增 **"How this is verified — and what is not"** 一节，把三件事**主动写出来**：
+macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从未被看到、Linux 的声音/通知只验证到进程边界。
+措辞是"没有验证、而且**不打算**验证（没有硬件，维护者的决定是不做这些实测）"，而不是含糊的"待验证"。
+中文版同一段逐句对应。
+
+### 68.6 这一轮没有做的事（诚实清单）
+
+- **没有新版本号**：产品代码零改动（只改了 README、AGENTS 的数字、`tools/check_docs_links.py` 与 10 张 PNG）。
+- **没有重发 LAUNCH 的 X / Show HN / DSH Discuss 文案**：§1 记录它们**已经发过**，改写历史帖子没有意义；
+  需要再发时以 README 现在的开头为准。
+- **没有动 PLATFORMS / PROTOCOL / UPSTREAM 的实质内容**：它们已经是实测口径，本轮只跟随数字。
+
+### 68.7 下一轮从这里开始
+
+1. **门禁方面**：`check_docs_links.py` 现在覆盖图片，但**不覆盖 HTML 表格里的相对链接**（`<a href>`）；
+   如果下一轮重排表格时用到，顺手补上。
+2. **对外文案**：README 的"头像/社交预览"（GitHub 的 og:image）仍是仓库默认图；要让它好看需要一张
+   1280×640 的 `social-preview.png`，这是纯素材工作（`docs/assets/make_launch_assets.py` 里已有桌面场景的
+   画法，可以复用）。
+3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
+   视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 

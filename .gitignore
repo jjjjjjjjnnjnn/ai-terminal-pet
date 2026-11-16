@@ -58,6 +58,9 @@ panel-preview.png
 # output and one-off probe scripts. Not project source; safe to delete at any time.
 .local/
 
+# Python bytecode from tools/*.py run by hand (python -X utf8 tools/check_docs_links.py).
+__pycache__/
+
 # The DSH plugin package ships a prebuilt overlay so `dsh plugin add` needs no
 # Go toolchain. It is the one exception to the build-output rule above: it is
 # a release artifact, not a local build. Regenerate it with `npm run vendor`

@@ -142,7 +142,7 @@ DeepSeek Harness sessions appear, through the DSH plugin (bundled overlay on Win
 one pinned download on Linux and macOS); the other three
 terminals need their reporter wired once (one line, README table). Not code-signed, so
 first run shows SmartScreen. Three native executables: a 4.50 MiB overlay, a statusline
-shim, a hook. MIT, no account, no network, no telemetry. 461 Go tests plus a 172-check
+shim, a hook. MIT, no account, no network, no telemetry. 463 Go tests plus a 172-check
 fresh-machine suite.
 
 https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
@@ -163,9 +163,38 @@ Three tombstone kinds keep closed, expired and evicted apart, so a late report c
 entry.
 ```
 
-## 4. X 线程（英文，5 条，每条 ≤270 字符）
+### 3.1 下一次再发时用的开头（2026-11-16，依据 README 重写；**未发布**）
+
+上面 §3/§4/§5 是**已经发过**的版本，保留原文作为历史。如果还有下一次（新版本、新渠道、或别人转载时
+要一句准确的介绍），用下面这段：它把痛点放在第一句，而不是先讲架构。
+
+**一句话介绍（仓库描述/目录条目/转发时用）**
 
 ```text
+Your agents are waiting. You are in another tab. A 56px always-on-top strip shows which AI
+coding agent is blocked on you, for what, and for how long - then jumps you back in one click.
+```
+
+**帖子开头（≤120 词，可接 §3 正文其余部分）**
+
+```text
+Four agents, four tabs. One of them asks for permission, gets no answer, and waits - because
+you are reading a diff in another window, or on another monitor, or that tab is simply behind
+this one. Nothing crashed. You just paid fifteen minutes of an agent's life for nothing, and you
+will only notice when you switch back.
+
+A bell does not fix that. Neither does a spinner inside each terminal: the information exists,
+but it is inside the thing you are not looking at. So I put it where you cannot miss it - a
+56px strip, always on top, showing every local agent session, what it is asking for, and how
+long it has been asking.
+```
+
+**发布时仍然必须守住的三条**：数字只引用末尾那套实测（461→**463** 个 Go 测试、**172** 项 fresh-machine、
+**4.50 MiB** 浮窗、`--doctor` **13** 项）；不写"已收录"只写"已提交/已被渲染"（§1.1 的分界线）；
+不写任何我们没验证过的东西——macOS 面板与通知、Linux 的真实出声/弹窗，一律按 README 的
+"How this is verified — and what is not" 原样说。
+
+## 4. X 线程（英文，5 条，每条 ≤270 字符）```text
 1/5 Running Claude Code, OpenCode and Antigravity in three terminals means one of them eventually sits blocked on a permission prompt while you are focused in another window. I built a 56px strip that shows which project is waiting, and for how long.
 
 2/5 State arrives as one JSON line per event over a per-user Windows named pipe. Lifecycle is not heartbeat-based: the overlay checks the OS process table and window titles, so a reporter that goes quiet never ends a session. Click a row to jump back to that terminal.
@@ -174,7 +203,7 @@ entry.
 
 4/5 Three native exes, no runtime at install: the 4.49 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
 
-5/5 Windows / Linux (X11) / macOS (AppKit), one CGO-free Go codebase. MIT, no account, no network, no telemetry. 461 Go tests plus a 172-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 Windows / Linux (X11) / macOS (AppKit), one CGO-free Go codebase. MIT, no account, no network, no telemetry. 463 Go tests plus a 172-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 265。

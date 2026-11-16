@@ -156,7 +156,7 @@
 - **macOS 的任何实际显示**：没有苹果硬件，CI 只跑编译与单测。
 
 ### 门禁与版本
-- `gofmt` / `go vet` / 13 个包全部单测（Windows）；`internal/ui` 另用 `GOOS=linux go test -c` 编出的测试二进制在
+- `gofmt` / `go vet` / 15 个包全部单测（Windows）；`internal/ui` 另用 `GOOS=linux go test -c` 编出的测试二进制在
   WSL 里跑全量（含 4 个新的 Linux 投递测试、3 个 POSIX 跳转失败测试）；`scripts/cross-build.sh` 三平台全绿。
 - 浮窗 **1.0.14**（`internal/app/version.go`）、插件包 **1.2.23**。
 - 二进制：`AI-Terminal-Pet.exe` **4,717,568 B**（sha256 `DB2DD2AB…`）、`pet-statusline.exe` **3,678,720 B**、

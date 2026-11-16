@@ -1,8 +1,12 @@
-"""Verify every relative link and in-document anchor in the docs we wrote.
+"""Verify every relative link, in-document anchor and local image in the docs we wrote.
 
 A launch week is the wrong time to discover that `#connect-your-terminal` does
-not exist, so this checks the two things markdown renders without warning: a
-relative file path that is not there, and a fragment that names no heading.
+not exist, so this checks what markdown renders without warning: a relative file
+path that is not there, a fragment that names no heading, and - since 2026-11-16 -
+a local `<img src>` or `![](path)` that points at a file nobody committed. The
+last one is not hypothetical: the README's showcase table pointed at four PNGs
+that had been renamed, and the page rendered four broken images for weeks
+because this checker only looked at `[links](...)`.
 
 Usage: python tools/check_docs_links.py  (from the repository root)
 """
@@ -24,6 +28,10 @@ DOCS = ["README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "AGENTS.md", "CHAN
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
 HEADING = re.compile(r"^#{1,6} ")
 CODE_FENCE = re.compile(r"```")
+# <img src="..."> and markdown images ![alt](path). Images are the one asset a
+# reader notices immediately when it is broken and a link checker never sees.
+IMG_TAG = re.compile(r"<img\b[^>]*\bsrc=\"([^\"]+)\"", re.I)
+IMG_MD = re.compile(r"!\[[^\]]*\]\(([^)\s]+)")
 
 
 def slug(text: str) -> str:
@@ -65,24 +73,36 @@ def main() -> int:
         text = path.read_text(encoding="utf-8")
         # Links inside fenced blocks are examples, not links.
         stripped = re.sub(r"```.*?```", "", text, flags=re.S)
-        for raw in LINK.findall(stripped):
-            if raw.startswith(("http://", "https://", "mailto:")):
-                continue
-            target, _, fragment = raw.partition("#")
-            if not target:
-                # Same-file anchor.
-                if fragment and fragment not in anchors(path):
-                    problems.append(f"{name}: #{fragment} names no heading in this file")
-                continue
-            resolved = (path.parent / target).resolve()
-            if not resolved.exists():
-                problems.append(f"{name}: {target} does not exist")
-                continue
-            if fragment:
-                if resolved not in anchor_cache:
-                    anchor_cache[resolved] = anchors(resolved)
-                if fragment not in anchor_cache[resolved]:
-                    problems.append(f"{name}: {target}#{fragment} names no heading in {target}")
+        # Inline code is prose about links, not a link: `<img src="...">` in a
+        # sentence explaining this checker must not be reported as a broken
+        # image. Blank the spans, keeping the surrounding text.
+        stripped = re.sub(r"`[^`\n]*`", "``", stripped)
+        # A markdown image is not also a link: strip the whole construct first,
+        # or every `![alt](path)` would be reported twice.
+        without_images = IMG_MD.sub("", stripped)
+        for pattern, kind, body in (
+            (IMG_TAG, "image", stripped),
+            (IMG_MD, "image", stripped),
+            (LINK, "link", without_images),
+        ):
+            for raw in pattern.findall(body):
+                if raw.startswith(("http://", "https://", "mailto:", "data:")):
+                    continue
+                target, _, fragment = raw.partition("#")
+                if not target:
+                    # Same-file anchor.
+                    if fragment and fragment not in anchors(path):
+                        problems.append(f"{name}: #{fragment} names no heading in this file")
+                    continue
+                resolved = (path.parent / target).resolve()
+                if not resolved.exists():
+                    problems.append(f"{name}: {kind} {target} does not exist")
+                    continue
+                if fragment:
+                    if resolved not in anchor_cache:
+                        anchor_cache[resolved] = anchors(resolved)
+                    if fragment not in anchor_cache[resolved]:
+                        problems.append(f"{name}: {target}#{fragment} names no heading in {target}")
 
     if problems:
         print("link check: %d problem(s)" % len(problems))
