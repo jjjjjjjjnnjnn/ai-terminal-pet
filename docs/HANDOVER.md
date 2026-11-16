@@ -5078,8 +5078,13 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
   `ai-terminal-pet-1.0.15-win-x64.zip` 5,129,002 B / `5292B2E7…`（17 文件）、
   `dsh-ai-terminal-pet-1.2.27.tgz` 2,072,885 B / `FA50130D…`（20 文件），另有四个 POSIX tar.gz。
 - **npm**：`latest` = 1.2.27。
-- **上游条目**：`tools/upstream-entry.mjs` 开 `bump-tarball-1.2.27` 单文件 PR（号见下方 B 提交记录）；
-  按 §67.4 的教训，**三个平台的 CI 在同一个提交上全绿之后才打 tag**。
+- **上游条目**：PR [#16048](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16048)
+  （分支 `bump-tarball-1.2.27`，单文件 `+1 −1`，`MERGEABLE`，OPEN）；`--check` 报 in flight（健康状态）。
+  按 §67.4 的教训，**四个 job 在同一个提交（`c9733d2`）上全绿之后才打 tag**——1.0.15 的第一次 CI 是红的，
+  原因就是 §70.3 第 4 条那个 8.3 短名问题，所以 tag 比版本提交晚了三个（测试-only 的）提交。
+- **资产复验**：从公网 URL 下载回来核对过（`pet-setup.exe` 200 / 14,504,960 B / `AF9E854F…`、
+  zip 200 / 5,129,002 B / `5292B2E7…`、linux-amd64 tar.gz 200 / 5,418,747 B / `8CD33190…`、
+  tgz 200 / 2,072,885 B / `FA50130D…`）。
 
 ### 70.6 winget：清单已就绪，提交状态单独记账
 
