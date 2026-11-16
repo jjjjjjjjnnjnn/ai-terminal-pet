@@ -31,7 +31,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs'
-import { rmSync } from 'node:fs'
+import { rmSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -198,6 +198,25 @@ function runCmd(scriptArgs, cwd, timeout = 300000) {
 }
 
 /**
+ * canonicalPath resolves 8.3 short names (RUNNER~1) to the long form the
+ * registry stores.
+ *
+ * install.ps1 records InstallLocation from [System.IO.Path]::GetFullPath, which
+ * expands a short name - so on GitHub's Windows runner the row says
+ * C:\Users\runneradmin\... while the sandbox was created under
+ * C:\Users\RUNNER~1\.... The product stays self-consistent (uninstall expands
+ * the same way), but a comparison against the raw string reports "no row" for a
+ * row that is right there. That is what this suite did on 2026-11-16.
+ */
+function canonicalPath(target) {
+  try {
+    return realpathSync.native(target)
+  } catch {
+    return target
+  }
+}
+
+/**
  * readInstallEntry asks the registry what Settings > Apps would show for an
  * install in `installDir`.
  *
@@ -207,11 +226,11 @@ function runCmd(scriptArgs, cwd, timeout = 300000) {
  * "the installer did not write it" and "the lookup looked in the wrong shape",
  * and that question cost one CI round on 2026-11-16.
  *
- * The lookup filters on InstallLocation, so a real install of this project on the
- * developer's machine can never satisfy it.
+ * `installDir` must already be canonical (see canonicalPath); the lookup filters
+ * on InstallLocation so a real install on the developer's machine can never
+ * satisfy it.
  */
 function readInstallEntry(installDir) {
-  const quoted = String(installDir).replace(/'/g, "''")
   const script = [
     "$root = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'",
     'if (-not (Test-Path $root)) { "MISSING-ROOT"; exit 0 }',
@@ -221,8 +240,7 @@ function readInstallEntry(installDir) {
     '    version = [string]$p.DisplayVersion; install = [string]$p.UninstallString; quiet = [string]$p.QuietUninstallString;',
     '    noModify = $p.NoModify; size = $p.EstimatedSize }',
     '})',
-    "$match = $rows | Where-Object { $_.location -eq '" + quoted + "' } | Select-Object -First 1",
-    'ConvertTo-Json @{ entry = $match; seen = $rows } -Compress -Depth 4',
+    'ConvertTo-Json @{ seen = $rows } -Compress -Depth 4',
   ].join('\n')
   const result = runPowerShell(['-Command', script], 60000)
   const text = String(result.stdout || '').trim()
@@ -231,15 +249,22 @@ function readInstallEntry(installDir) {
   }
   try {
     const parsed = JSON.parse(text)
-    // PowerShell renders a missing match inside a hashtable as {} rather than
-    // null, so "no row" arrives as an empty object. Treating that as a row is
-    // how a gate silently stops checking anything.
-    const row = parsed.entry
-    const entry = row && typeof row === 'object' && Object.keys(row).length > 0 ? row : null
-    return { entry, seen: parsed.seen || [] }
+    const rows = Array.isArray(parsed.seen) ? parsed.seen : [parsed.seen].filter(Boolean)
+    // The comparison happens here, not in PowerShell, so both sides can be
+    // canonicalised: the registry holds the long form, and the sandbox was
+    // created under a short one.
+    const entry = rows.find((row) => samePath(row.location, installDir)) || null
+    return { entry, seen: rows }
   } catch {
     return { entry: null, seen: text }
   }
+}
+
+/** samePath compares two Windows paths, tolerating 8.3 short names on either side. */
+function samePath(left, right) {
+  if (!left || !right) return false
+  if (left.toLowerCase() === right.toLowerCase()) return true
+  return canonicalPath(left).toLowerCase() === canonicalPath(right).toLowerCase()
 }
 
 /** rmSync with retries: Windows keeps handles for a moment after an exit. */
@@ -1092,7 +1117,8 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
   equal('installed installer copy is the one that ran', sha256(installedScript), sha256(installScript))
   const versionRun = runExe(overlayExe, ['--version'], sandbox.env)
   const overlayVersion = /(\d+\.\d+\.\d+)/.exec(String(versionRun.stdout || ''))?.[1]
-  const listed = readInstallEntry(sandbox.petDir)
+  const installedDir = canonicalPath(sandbox.petDir)
+  const listed = readInstallEntry(installedDir)
   const entry = listed.entry
   check(
     'Apps & Features lists this install',
@@ -1100,7 +1126,7 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
     JSON.stringify(listed) + '\ninstall stdout: ' + String(install.stdout || ''),
   )
   equal('the Apps & Features row names the overlay version', entry?.version, overlayVersion)
-  equal('the Apps & Features row names the install directory', entry?.location, sandbox.petDir)
+  equal('the Apps & Features row names the install directory', entry?.location, installedDir)
   check(
     'the recorded uninstall command runs the installed copy',
     Boolean(entry?.quiet) && entry.quiet.includes(installedScript),
@@ -1377,11 +1403,15 @@ function scenarioUninstall(sandbox, overlayExe) {
   // string is the product's uninstall path, and it must work when nothing but
   // the install directory exists (the zip is gone by then). Since 1.0.15 the
   // row is also what a package manager drives, so this is the whole contract.
-  const listed = readInstallEntry(sandbox.petDir)
+  const listed = readInstallEntry(canonicalPath(sandbox.petDir))
   const entry = listed.entry
   check('the install is listed before uninstalling', entry !== null, JSON.stringify(listed))
   const command = String(entry?.quiet || '')
   check('the row records a quiet uninstall command', command.length > 0, JSON.stringify(listed))
+  // Captured before the delete: after it the directory is gone and the canonical
+  // form can no longer be resolved, which would make the "row is gone" check
+  // pass for the wrong reason.
+  const installedDir = canonicalPath(sandbox.petDir)
   const uninstall = command
     ? spawnSync(command, {
         encoding: 'utf8',
@@ -1396,7 +1426,7 @@ function scenarioUninstall(sandbox, overlayExe) {
     String(uninstall.stdout || '') + String(uninstall.stderr || ''),
   )
   check('the install directory is gone', !existsSync(sandbox.petDir), 'still present')
-  const after = readInstallEntry(sandbox.petDir)
+  const after = readInstallEntry(installedDir)
   check('the Apps & Features row is gone', after.entry === null, JSON.stringify(after))
   check('uninstall reports completion', /uninstall: done/.test(uninstall.stdout || ''), uninstall.stdout)
   const doctor = runDoctor(overlayExe, sandbox.env)

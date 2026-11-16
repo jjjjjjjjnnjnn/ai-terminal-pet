@@ -5026,7 +5026,7 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 | 自检 | `-VerifyOnly` 多一行 `[ok]/[warn] apps list/…`：**"装得对"现在包括"能卸掉"** | `Invoke-VerifyOnly` |
 | pet-setup | `--uninstall --force`；`--force` 单独出现或与 `--verify`/`--add-to-path` 组合都拒绝 | `cmd/pet-setup/main.go` + 两条新测试 |
 
-### 70.3 三个"看起来对、其实错"的地方（下一轮别再犯）
+### 70.3 四个"看起来对、其实错"的地方（下一轮别再犯）
 
 1. **键名不能按"有没有传 `-Destination`"派生。** 第一版是这么写的，于是真实安装也踩了坑：
    注册表里记录的命令**总是**把 `-Destination` 拼在末尾（沙箱需要，真实安装拼出来就是默认路径），
@@ -5040,6 +5040,13 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 3. **测试要执行"记录下来的那条命令"，不是自己再拼一条。** S8 原来用 `install.ps1 -Uninstall -Force`
    自己拼参数，那只证明脚本能卸；现在读注册表里 `QuietUninstallString` 的**原文**去执行，
    才证明"设置 › 应用"点下去真的能卸。两者差的正是这一轮的全部价值。
+4. **`[System.IO.Path]::GetFullPath` 会展开 8.3 短名。** GitHub 的 Windows runner 把沙盒建在
+   `C:\Users\RUNNER~1\...` 下，而安装器记录的 `InstallLocation` 是 `C:\Users\runneradmin\...`
+   （`GetFullPath` 展开了 `RUNNER~1`）。产品侧是自洽的——卸载时同样展开，键名派生与守卫都一致，
+   `-VerifyOnly` 也绿——但测试拿**原始字符串**比较，于是报"这一行不存在"，而那一行就在注册表里。
+   修法：比较放到 JS 侧，两边各做一次 canonical 化（`realpathSync.native` 在 Windows 上走
+   `GetFinalPathNameByHandle`，本机实测 `C:\PROGRA~1` → `C:\Program Files`）；
+   并且把**注册表里实际看到的键**写进失败详情——没有 `seen` 的那一轮只能靠猜，白花一次 CI。
 
 ### 70.4 本轮实测（全部当场跑出来）
 
@@ -5055,6 +5062,7 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 沙箱：    -Destination %TEMP%\pet-arp-check-*\AI-Terminal-Pet
           装上 → -VerifyOnly 12/12 → 执行那一行里的命令 → 目录没了、键没了
 门禁：    tests/fresh-machine.mjs --no-overlay      -> 183/183 (44.6 s)
+          node -e "realpathSync.native('C:\\PROGRA~1')" -> C:\Program Files（8.3 展开，S5/S8 的比较靠它）
           node packages/dsh-ai-terminal-pet/verify.mjs -> VERIFY PASSED
           vendor.mjs --check                       -> 两个 vendor 文件都与源码同摘要
           tools/check_versions.mjs / check_facts.mjs -> 全绿
