@@ -33,6 +33,26 @@
 已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 
+## [1.0.13] & [1.2.22] — 2026-11-16（修 1.0.11 引入的回归：结束的 agy 会话被标签页标题留在面板上）
+
+### 修：`title` 等于窗口标题时，它不再算"这个会话还存在"的证据
+- **回归来源**：1.0.11 让 `pet-statusline` 把**控制台标题**写进 `title`，好让跳转能找到正确的 Windows Terminal
+  标签。而 `internal/platform/presence.go` 也把 `title` 当作会话存在性的证据。控制台标题**就是标签页标题**，
+  一个标签页装着它里面跑过的**每一个**会话 —— 于是结束几小时的 agy 会话永远"有一个窗口在叫它的名字"。
+- **现场实测（修复前的 runtime 目录）**：四条 antigravity 记录年龄 2h01m / 2h08m / 2h56m，`parentPid` 全部已死，
+  `--json` 全部列着（因为 `SessionAlive` 正是 scanner 的 `KeepAlive`）。
+- **修法**：只有窗口标题**包含** `title` 才算证据（`OC | <题目>`、`agy · <项目>` 这些真实形态）；
+  与窗口标题**完全相同**的值只证明"那个窗口还在"，不算这个会话存在的证据。项目名那一半完全没动。
+- **端到端复验（装好的二进制）**：把那条三小时前、`title` 为标签标题的记录写回磁盘，一次扫描内消失、文件被删；
+  同一目录里真实的会话不受影响。
+- **三条测试**：纯函数规则、结束 3 小时的会话必须判死、宿主还活着时必须判活。
+- **文档**：`docs/PROTOCOL.md` 新增 **§4.0**，把这条规则在第三方上报端动手之前就说清楚；字段表里 `title` 那一行也改了措辞。
+
+### 另外两条如实记录的残留（`docs/ROADMAP.md` §6）
+- 上游目录条目仍停在旧版本：每版都开 `+1 −1` 的 PR，但合并只有人工，`--check` 报 in-flight 是健康状态。
+- 超过 1 MiB 的单行上报是**直接断开连接、不回 `ERR`**（实测 1,100,000 B 那次拿到"连接被中断"、零字节）。
+  这是 `readPayload` 超限即返回、`read` 立刻 `Close` 的必然结果；`ERR` 的语义是**解析失败**，不是超长。**不修**。
+
 ## [1.0.12] & [1.2.21] — 2026-11-15（L5：快照扫描不再每 5 秒重读整目录）
 
 ### 改：常驻 scanner 复用上次解析结果（`internal/store/snapshot_cache.go`）
@@ -112,6 +132,18 @@
   - **F2 键盘行导航**（`internal/ui/keyboard.go`，展开后 `Up/Down/Home/End` + `Enter` + `Esc`）；
   - **F5 按显示器工作区记忆坐标**（`internal/config` `State.Layouts` + `internal/ui/placement.go`）。
 - **文档与版本工具链重构**：全面重构 `README.md`（中英文）、`docs/PLATFORMS.md`、`docs/ROADMAP.md`、`docs/HANDOVER.md` 与 `docs/LAUNCH.md` 为跨 Windows / Linux / macOS 的一致描述；`tools/check_versions.mjs` 对齐 `internal/app/version.go` 并增设 Linux/macOS `.tar.gz` 版本校验条目。
+
+### 1.0.13 / 1.2.22 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.13` | `pet-setup.exe` | 14,488,064 B | `397ED1097B21E1CA2F01A82EFCEAD298B8402A21012F781E3D81812FFA6ACB80` |
+| `pet-v1.0.13` | `ai-terminal-pet-1.0.13-win-x64.zip` | 5,124,060 B（17 文件） | `3324EA78DC7447CEA8418CA667292198ACB2088CEC0201A84C6F855D719CA689` |
+| `pet-v1.0.13` | `ai-terminal-pet-1.0.13-linux-amd64.tar.gz` | 5,408,227 B | `BBB9E06DB02CBBAF36387C2B49A4850A617E9AF59522A2E4E71A57F3FE77ED35` |
+| `pet-v1.0.13` | `ai-terminal-pet-1.0.13-linux-arm64.tar.gz` | 4,917,879 B | `3E11C389DDDCA8B0F8B78E62ED0EF218AB3A3672A253364FDCC0F8EE4B186929` |
+| `pet-v1.0.13` | `ai-terminal-pet-1.0.13-darwin-arm64.tar.gz` | 5,118,330 B | `8E6F593B0E4563AA684CD3390CF9E0E6D19397C3CE60AEF6C6FB70792D4FB1EA` |
+| `pet-v1.0.13` | `ai-terminal-pet-1.0.13-darwin-amd64.tar.gz` | 5,508,391 B | `8C9D143DD91403E81CEE8327BE559EFEBB7FD55E62231D7A16D6832DB8207C46` |
+| `dsh-plugin-v1.2.22` | `dsh-ai-terminal-pet-1.2.22.tgz` | 2,067,790 B（19 文件） | `879AD24654677D809B5B613119F8E55905F7C7B6468FD25C0F81EF9479457D34` |
 
 ### 1.0.12 / 1.2.21 发布包实测清单
 

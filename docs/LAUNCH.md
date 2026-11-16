@@ -1,4 +1,4 @@
-# LAUNCH — 对外发布素材与渠道（2026-11-11）
+# LAUNCH — 对外发布素材与渠道（2026-11-11 建立，2026-11-16 刷新）
 
 > 本文件是**对外可见文案的唯一存放处**：X 线程、Show HN 帖、市场条目描述、issue 回复模板。
 > 这份文案最初（2026-11-11）由 `agy --model gemini-3.8-flash-high --effort high` 起草后逐条核对；
@@ -9,12 +9,12 @@
 ## 0. 发布顺序（**已全部就绪**）
 
 ```
-P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.12 / 1.2.21）──► ✅ 现在可以发声
+P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.13 / 1.2.22）──► ✅ 现在可以发声
 ```
 
-**前提条件全部满足，可以发了。** 浮窗 1.0.12（Windows / Linux X11 / macOS AppKit）、插件 1.2.21、npm `latest` = 1.2.21、`pet-v1.0.12` 的
+**前提条件全部满足，可以发了。** 浮窗 1.0.13（Windows / Linux X11 / macOS AppKit）、插件 1.2.22、npm `latest` = 1.2.22、`pet-v1.0.13` 的
 安装包与各平台压缩包都已构建并在发布时传回复验。
-发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.12` 这个链接。
+发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.13` 这个链接。
 
 **唯一还需要人做的一步**：`docs/assets/smartscreen-unsigned.png` 是**示意图**（图左下角写着 MOCKUP）。
 真机截图只有一台「从没构建过本项目」的机器才拍得到；如果能在发帖前补一张真的，更好；补不到就用示意图，
@@ -87,10 +87,11 @@ imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 
 
 ## 2. 发布前必须就位的东西
 
-- [x] `ai-terminal-pet-1.0.0-win-x64.zip`（`scripts/package.ps1`，17 文件 / 4,983,903 B / sha256 `70D992B1…`）
-- [x] **`pet-setup.exe`**（14,125,568 B / sha256 `87D5E60B…`）：自解压单文件，双击即装；**先**校验载荷再动手
-- [x] 独立的 `pet-v1.0.0` tag + Release（两个资产都已从公开 URL 下载回来实测：`--version` → `pet-setup 1.0.0`，沙箱里 install → `--verify` 11/11 → `--uninstall` 归零）
-- [x] 插件包 `dsh-ai-terminal-pet` **1.2.6**（npm `latest`、`dsh-plugin-v1.2.6` Release、tarball sha256 `671CDC95…`）
+- [x] **六个跨平台资产**（`pet-v1.0.13`）：`pet-setup.exe` / `ai-terminal-pet-1.0.13-win-x64.zip` /
+      `linux-{amd64,arm64}.tar.gz` / `darwin-{arm64,amd64}.tar.gz`；字节与 sha256 见
+      [CHANGELOG](../CHANGELOG.md) 的「1.0.13 / 1.2.22 发布包实测清单」，全部从公开 URL 下载回来逐字节核对过
+- [x] 独立 tag `pet-v1.0.13` + Release；`scripts\install.cmd -VerifyOnly` **11/11**，`--doctor` 10 ok / 1 warn / 0 fail
+- [x] 插件包 `dsh-ai-terminal-pet` **1.2.22**（npm `latest`、`dsh-plugin-v1.2.22` Release、上游 `+1 −1` 的跟进 PR）
 - [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 342,606 B），三段真实动作
       —— 等待呼吸 → 悬停展开 → 点击等待行。循环时长 5.4 秒而不是 15 秒：GIF 是循环播放的，
       15 秒的循环第一遍没人看完，5 秒刚好一遍读完三句话。由 `docs/assets/make_launch_assets.py`
@@ -136,12 +137,13 @@ Permission prompts get an optional 5 second veto window: a draining bar, tap to 
 silence to allow. Off by default. Destructive commands - rm -rf, rd /s, git push --force,
 format - are checked before the countdown and always go to manual review.
 
-Limits: Windows only. Out of the box only DeepSeek Harness sessions appear; the other
-three need their reporter wired once (one line per terminal, table in the README). Not
+Runs on Windows, Linux (X11) and macOS (AppKit) from one CGO-free Go codebase; the DSH
+bundle itself is Windows-only for now. Out of the box only DeepSeek Harness sessions appear;
+the other three terminals need their reporter wired once (one line each, README table). Not
 code-signed, so first run shows SmartScreen.
 
-Three native executables, nothing to install first: a 4.36 MiB overlay, a statusline shim,
-a hook binary. No account, no network, no telemetry, MIT. 341 Go tests plus a 162-check
+Three native executables, nothing to install first: a 4.49 MiB overlay, a statusline shim,
+a hook binary. No account, no network, no telemetry, MIT. 425 Go tests plus a 172-check
 suite that installs into a throwaway sandbox.
 
 https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
@@ -171,9 +173,9 @@ entry.
 
 3/5 Auto-approve is off by default and opt-in per terminal. Before the 5-second countdown starts a denylist is checked: rm -rf, rd /s, format, git push --force. Those always go to manual review; silence only approves an ordinary tool prompt you chose to delegate.
 
-4/5 Three native exes, no runtime at install: the 4.36 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
+4/5 Three native exes, no runtime at install: the 4.49 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
 
-5/5 Windows only. MIT, no account, no network, no telemetry. 341 Go tests plus a 162-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 Windows / Linux (X11) / macOS (AppKit), one CGO-free Go codebase. MIT, no account, no network, no telemetry. 425 Go tests plus a 172-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 213。
@@ -194,9 +196,9 @@ entry.
 
 3/5 自动同意默认关闭、按终端单独开启。倒计时开始前先过黑名单：rm -rf、rd /s、format、git push --force 一律走人工确认；沉默只放行你主动委托的普通工具调用。
 
-4/5 三个原生 exe，装完不需要任何运行时：4.36 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
+4/5 三个原生 exe，装完不需要任何运行时：4.49 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
 
-5/5 仅 Windows。MIT，无账号、不联网、无遥测。341 个 Go 单测 + 162 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 支持 Windows / Linux (X11) / macOS (AppKit)，同一份零 cgo 的 Go 代码。MIT，无账号、不联网、无遥测。425 个 Go 单测 + 172 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 132。
@@ -207,34 +209,25 @@ entry.
 市场列表只显示摘要，所以它必须是**事实**而不是卖点，而且**它已经存在，不能直接换**：
 `docs/market-index.json` 的 `plugins[0].description`、`packages/dsh-ai-terminal-pet/package.json`
 的 `dsh.catalog.summary`、以及仓库根 `package.json` 的同一块，三处是**逐字相同的一段文字**
-（`verify.mjs` 有断言钉住它们），并且它属于已发布 1.2.5 tarball 的字节。
+（`verify.mjs` 有断言钉住它们），并且它属于已发布的 1.2.22 tarball 的字节。
 
-**当前线上用的（225 字符英文 / 114 字符中文，已在 1.2.5 里）**
+**当前线上用的（1.2.22，中英文各一段）**
 
 ```text
-A floating overlay for Windows. DeepSeek Harness sessions show up as soon as you install this bundle; OpenCode, Claude Code and Antigravity sessions join the same panel once each of those terminals has its reporter installed.
+Which of your agents is waiting on you? One always-on-top panel answers it: DeepSeek Harness, Claude Code, OpenCode and Antigravity sessions on one strip, each row saying working, waiting for approval, failed or finished, and a collapsed strip showing how long the blocked one has been blocked. The arrow at a row's end jumps to that terminal; the row itself copies its project path. It rings only for real events, and approvals still happen in DSH. Harness sessions appear on install; the other three need their reporter.
 ```
 
 ```text
-Windows 桌面浮窗。装上本插件后 DeepSeek Harness 的会话立刻出现在置顶面板里；OpenCode、Claude Code 与 Antigravity 的会话要先各自装好该终端的上报端，才会汇总进同一个面板。
+哪个 agent 在等你？一块置顶面板就能回答：DeepSeek Harness、Claude Code、OpenCode 与 Antigravity 的会话都在这一条上，每行写着进行中、等待确认、出错还是完成，收起成一条时还会显示那个卡住的会话已经卡了多久。点行尾箭头跳到对应终端，点行本身复制项目路径。它只在真事件上响，授权仍在 DSH 里完成。装上即接上 Harness 的会话；另外三个终端要先各自装好上报端。
 ```
 
-它已经说清了「开箱即用只有 Harness」，所以 **1.2.6 不必为文案而发**。
+**这两段为什么必须说「其他三个要先装上报端」**：这条声明是市场条目页的摘要，读的人会据此判断
+"装上就能看到全部终端吗"。实际上这个 bundle **开箱即用映射的只有 Harness 自己的会话**——OpenCode、
+Claude Code 与 Antigravity 要走各自的 `reporters/*.js`（或 `pet-hook`）。1.2.4 就是因为原稿读起来像
+"全都开箱可用"才只改文案发了一版；**这条底线不能为了更短的文案而丢**。
 
-**下一版（1.2.6）的候选措辞**（agy 起草，211 / 114 字符，更短、更像条目摘要）：
-
-```text
-Windows only. Native floating overlay tracking DeepSeek Harness session states out of the box. Other terminals (Claude Code, OpenCode, Antigravity) require their own reporter wired. Zero telemetry, MIT licensed.
-```
-
-```text
-仅限 Windows。原生桌面悬浮窗，安装后直接显示 DeepSeek Harness 会话状态；接入 Claude Code、OpenCode 或 Antigravity 需单独配置各自的上报器。零网络遥测，MIT 开源协议。
-```
-
-**用哪一段取决于 1.2.6 那天**：如果那时没有别的东西要发，保持现有文字、跳过这次改号更划算
-——纯文案改动的代价是 tag + Release + npm + 一个上游 PR（1.2.1 与 1.2.4 都是这么来的）。
-真正改的时候，上面这份候选要同时落进三处清单与 `docs/market-index.json` 的同一段，
-再跑 `node packages/dsh-ai-terminal-pet/verify.mjs`。
+想换措辞时：三处清单 + `docs/market-index.json` 的同一段一起改，再跑
+`node packages/dsh-ai-terminal-pet/verify.mjs`。纯文案改动的代价仍是一个新版本号（tag + Release + npm + 上游 PR）。
 
 ## 7. Issue / PR 回复模板
 
@@ -270,13 +263,13 @@ files alone does not wire it. The connect table in the README has one line per t
 
 没有遥测，所以只能看代理指标：
 
-| 指标 | 怎么读 | 基线（2026-11-12 08:5xZ） |
+| 指标 | 怎么读 | 基线（2026-11-16） |
 |---|---|---|
-| Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.0` = **4**（发帖后约 22 小时未变）／`pet-v0.9.0` = 3／`v1.2.6` = **7**（发帖时是 1）／`v1.2.5` = 13／`v1.2.4` = 4／`v1.2.3` = 47 |
-| 仓库浏览 | `gh api .../traffic/views` | 30 天 7 views / 2 uniques（发帖前，尚未刷新） |
-| star / fork | `gh repo view` | 1 / 0 |
-| npm | `npm view dsh-ai-terminal-pet version` | **1.2.21**（`dist-tags.latest`，2026-11-15 发版同步） |
-| DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后约 22 小时） |
+| Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.9` = 4／`v1.0.10` = 6／`v1.0.11` = 7／`v1.0.12` = 6／`dsh-plugin-v1.2.17` = 28／`v1.2.18` = 18／`v1.2.19` = 11／`v1.2.20` = 7／`v1.2.21` = 14（2026-11-16 复读；**1.2.17 仍是这批里最高的 28**，说明换代而不是发帖在带下载） |
+| 仓库浏览 | `gh api .../traffic/views` | 近 14 天 **28 views / 8 uniques**（2026-11-16） |
+| star / fork | `gh repo view` | **1 / 0** |
+| npm | `npm view dsh-ai-terminal-pet version` | **1.2.22**（`dist-tags.latest`，2026-11-16 发版同步） |
+| DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后已数日未动） |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条 |
 

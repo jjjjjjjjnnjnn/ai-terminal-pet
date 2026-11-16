@@ -6,10 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-15；浮窗 **1.0.12**、插件包 **1.2.21** 已发版；**§62 第 62 轮：L5 快照扫描按身份/size/mtime 复用上次解析（200 文件 22.7 ms → 0.51 ms），并修掉缓存命中时删除守卫拿不到 FileInfo 的真 bug；§61 是 agy 跳转那一轮**）
+## 1. 当前状态（2026-11-16；浮窗 **1.0.13**、插件包 **1.2.22** 已发版；**§63 第 63 轮：修 1.0.11 引入的回归（结束的 agy 会话被标签页标题留在面板上），并用装机实测把交付前的稳定性查了一遍**；§62 是 L5 快照缓存那一轮**）
 
-> 接手请先读本节与 **§62「L5 快照扫描复用解析结果，以及缓存命中时删除守卫的真 bug」**
-> （最新一轮：200 文件 22.7 ms → 0.51 ms；命中路径拿不到 `FileInfo` 导致的过期快照泄漏；三条安全性质与一个 NTFS 实测事实），
+> 接手请先读本节与 **§63「修 1.0.11 的回归：`title` 等于窗口标题时不算会话存在，以及交付前的装机实测清单」**
+> （最新一轮：结束几小时的 agy 会话被标签页标题留在面板上，四条现场记录、修法与三条测试；附装机稳定性实测的结论），
+> 再读 **§62「L5 快照扫描复用解析结果，以及缓存命中时删除守卫的真 bug」**
+> （200 文件 22.7 ms → 0.51 ms；命中路径拿不到 `FileInfo` 导致的过期快照泄漏；三条安全性质与一个 NTFS 实测事实），
 > 再读 **§61「agy 点不跳的根因、设置布局搬出 Windows 文件、`-race` 进 CI，以及 L3/L5 的两个数字」**
 > （三层取证、控制台标题锚点、一个被否掉的方案、没修的半边，以及本轮数字的来源），
 > 再读 **§60「POSIX 路径/信号收口、文档全面重构与 1.0.10 / 1.2.19 全平台全量化发布」**（再上一轮的收口与发版），
@@ -45,33 +47,28 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.12`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.21`**。
+- **版本**：浮窗 **`1.0.13`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.22`**。
   两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.10` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.19`。
   **工作区与本机安装目录已经与 `1.0.10` / `1.2.19` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` **4,702,208 B**，sha256 `B69CA725…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**425 个** `func Test`，
-  本机 Windows 全过；CI 四条 job 覆盖 windows / ubuntu / macOS / scan，其中 ubuntu 跑 `go test -race`）；
-  `scripts/cross-build.sh` 全 16 个包三端 `CGO_ENABLED=0` 通过；上报端逐个 `node --check` 全过；
-  两个 `verify.mjs` 全 PASS；`vendor.mjs --check` 两文件吻合（源码摘要与 1.0.12 的 `bin/` 一致）；
-  `tools/check_versions.mjs` 20 条版本形状一致；`tests/fresh-machine.mjs --no-overlay` 172/172；
-  `tools/check_docs_links.py` 12 份文档全解；`govulncheck` + `gosec` 零告警。
-  **本轮新增**：`internal/store` 的快照缓存有 9 条测试，其中 2 条在去掉兜底后确实失败（见 §62.2）。
-- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.12 实测）：非测试 **136 文件 / 26,517 行**、
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**425 个** `func Test`）；
+  CI 四条 job（windows / ubuntu / macOS / scan，ubuntu 跑 `go test -race`）；`scripts/cross-build.sh` 全 16 包三端通过；
+  两个 `verify.mjs` 全 PASS；`vendor.mjs --check` 与 1.0.13 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致；
+  `tests/fresh-machine.mjs --no-overlay` **172/172**；`tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 零告警。
+  **交付前装机实测**（§63.1）：120 次上报 **ok=120 / failed=0**，句柄 468→469、线程 30→30、WS 36–55 MB 不爬升，
+  洪峰后 `runtime/` 回到基线，设置窗口原样放 40 秒不消失，`--doctor` 全程 10 ok / 1 warn / 0 fail。
+- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.13 实测）：非测试 **136 文件 / 26,526 行**、
   测试 **86 文件 / 12,570 行**、**425 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,711,424 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `FDFFF5C8…`）、
+  `bin/AI-Terminal-Pet.exe` **4,711,424 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `161C6083…`）、
   `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`，本轮未改）、
   `bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`，本轮未改）。
-  三个二进制合计 **12,095,488 B** = 11.53 MiB。
 - **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.21**（发布后复查 `dist-tags.latest` 与 `versions[]` 两处都已是 1.2.21）；
-    `dsh-plugin-v1.2.21` 的 Release 资产 `dsh-ai-terminal-pet-1.2.21.tgz`
-    **2,067,752 B / sha256 `AF26A671…` / 19 文件**；上游条目跟进 PR
-    [#15674](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15674)（分支 `bump-tarball-1.2.21`，
-    commit `9fc4b29`，单文件 `+1 −1`，`MERGEABLE`）已开、`tools/upstream-entry.mjs --check` = OK（in flight）；
-    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
+  - 插件线：npm `latest` = **1.2.22**；`dsh-plugin-v1.2.22` 的 Release 资产是这一版新打的 tag
+    （`.tgz` 的字节数与 sha256 见 CHANGELOG 的发布清单）；钉 tag 的 git 源；仓库根的清单 shim；
+    自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
   索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
   提供的**替代**路径，而不是权宜之计。
    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
@@ -4385,6 +4382,84 @@ sha256 `FDFFF5C8…`，+9,216 B 来自缓存与其测试）；`pet-statusline.ex
 2. **macOS 设置窗口**：仍然**不做**（没有真机，CI 上 AppKit 窗口探针是 opt-in skip）；
 3. 目录级短路（L5 当初列的方案 1）现在**不需要**了：缓存已经把 225 文件压到 0.5 ms，
    再加"目录 mtime 未变则跳过整轮"只会多一个已知的 mtime 精度坑。
+
+## 63. 交接：修 1.0.11 的回归（`title` 等于窗口标题时不算会话存在），以及交付前的装机实测清单（2026-11-16，第 63 轮；浮窗 **1.0.13** / 插件 **1.2.22**）
+
+本轮的任务是"稳定性和全量化推送"。稳定性的第一站是**先在自己的机器上把装好的程序按用户的用法查一遍**，
+查的过程中撞上一个自己上一轮引入的回归，于是先修它，然后才更新文案。
+
+### 63.1 装机实测做了什么（都跑在**装好的** 1.0.12 上）
+
+| 查什么 | 怎么查 | 结论 |
+|---|---|---|
+| 协议契约 | 直连命名管道逐条发：合法载荷 / 未知字段 / 坏 JSON / 超长行 | `OK` / `ERR` / `ERR` / **连接被断开（无回复）** |
+| 连接受压 | 并发开 40 条（上限 32） | 40 条全部连上（上限是"同时处理"而不是"同时打开"），之后仍能正常收报 |
+| 设置窗口 | `--settings` 打开、**原样放 40 秒**、再 `WM_CLOSE` | 40 秒里一直可见（这正是当年"闪一下就没了"活不过的场景）；关闭是**隐藏**而不是销毁，面板与进程都活着 |
+| 报告洪峰 | 120 次上报（16 个会话轮转 6 种状态） | `ok=120 err=0 failed=0` |
+| 句柄/内存 | 每批 40 次、批间等 5 秒，共 5 批 | 句柄 **468→469**、线程 **30→30**、WS 在 36–55 MB 之间浮动 —— **不爬升**，洪峰后 60 秒回落到 468 |
+| 文件泄漏 | 洪峰后把 16 个会话全部 `closed`，等 6 秒 | `runtime/` 回到基线的 5 个文件 |
+| `--doctor` | 全程多次 | 始终 10 ok / 1 warn / 0 fail（唯一 warn 是"Antigravity 只接了 statusline、没有结束信号"，已知） |
+| 新机端到端 | `tests/fresh-machine.mjs --no-overlay` | **172/172** |
+
+**一条必须记住的实测事实**：`tests/fresh-machine.mjs` **不带 `--no-overlay`** 时会红（182/184），
+因为它要起沙箱里的浮窗，而单实例互斥体是 `Local\AI-Terminal-Pet-v1-SingleInstance`、**按 Windows 会话**
+而不是按沙箱隔离——外面那个真实例先拿到互斥体，沙箱里那份就 `exit 0` 且不开管道。脚本自己的输出已经把这条
+写成人话（"the overlay scenarios raced a real instance ... only meaningful on a machine with no host hooks"），
+所以这不是缺陷，是**在有宿主 hook 的机器上跑全量套件的正确用法是 `--no-overlay`**。
+
+### 63.2 撞到的回归：`title` 等于窗口标题时，被当成了"这个会话还存在"
+
+**现象**：`--json` 里四条 antigravity 记录，年龄 **2h01m / 2h08m / 2h56m**，`parentPid` 全部已死
+（`ProcessAlive=false`），却全部列着。
+
+**机制（两件各自正确的事撞在一起）**：
+
+1. 第 61 轮为了修"agy 点不跳"，让 `pet-statusline` 把**控制台标题**写进载荷的 `title`；
+   那个字符串**就是** Windows Terminal 的标签页标题。
+2. `internal/platform/presence.go` 的存在性模型把 `title` 当作**时间无关**的身份证据
+   （这是第 21/43/51/52 轮修幽灵会话时立下的规则：一个真正叫出这个会话名字的标签页是永恒证据）。
+
+一个标签页装着它里面跑过的**每一个**会话，所以"窗口在叫它的名字"对已结束的会话也永远成立。
+
+**修法（`windowIdentifiesSession`）**：`title` 必须**被窗口标题包含且不完全等于它**才算证据。
+
+| `title` | 窗口标题 | 算证据？ |
+|---|---|---|
+| `项目交接与下一步计划` | `OC \| 项目交接与下一步计划` | **算** |
+| `命令提示符 - agy` | `命令提示符 - agy`（完全相同） | **不算** |
+| `agy` / `cmd` / `powershell` | 任意 | 不算（`bareWindowTitle` 原有规则） |
+| 任意 | 任意（`project` 命中窗口标题） | **算**（项目名那一半完全没动） |
+
+**端到端复验（装好的二进制）**：把那条"三小时前、`title` 为标签标题"的记录写回 `runtime/`，
+一次扫描内从 `--json` 消失、文件被删；同目录里三条真实的 opencode 会话不受影响。
+把四条历史记录**原样**写回再留着不动，也是一次扫描内全部消失。
+
+**三条测试**（`internal/platform/presence_anchor_test.go`，**无构建标签**，三平台都跑）：
+纯函数规则、结束 3 小时的会话必须判死、宿主还活着时必须判活（防止修成"什么都不算证据"）。
+
+### 63.3 为什么这条回归值得单独记一笔
+
+- **它是"上一轮的修法"造成的**，不是老缺陷。第 61 轮的报告里写过"控制台标题就是标签标题"，
+  也写过 `presence.go` 用 `title` 做证据 —— 但没有把这两句话放在一起推一遍。
+  **教训**：一个字段被两处消费时，往它里面塞新语义之前，先把每个消费点列出来。
+- **它只在"结束且宿主进程已退出"的状态下可见**，所以单元测试与 CI 都是绿的：所有测试用的都是
+  构造好的窗口与进程表，不会有一个真实的、挂着旧标签页的桌面。
+  发现它的唯一途径是**在真机上把装好的程序放一段时间再看 `--json`**。
+- 文档侧也补了：`docs/PROTOCOL.md` 新增 **§4.0**，在第三方上报端动手之前就把这条规则写清楚
+  （"让 `title` 描述这次会话，而不是描述它所在的窗口"）。
+
+### 63.4 版本与发版
+
+浮窗 **1.0.13** / 插件 **1.2.22**。只有 overlay 变了（`AI-Terminal-Pet.exe` 4,711,424 B，
+sha256 `161C6083…`；`pet-statusline.exe` / `pet-hook.exe` 字节未动）。
+vendor 源码摘要随 `internal/platform` 变动重算。
+
+### 63.5 下一轮从这里开始
+
+1. **POSIX 平权**（`docs/PLATFORMS.md` 的 config 表第 1、2 行）：Linux/macOS 的 `notifications`
+   没有任何气泡表面；Linux 的整个 `sound*` 区块连 `beep` 都没有。
+2. **macOS 设置窗口**仍然**不做**（没有真机，CI 上 AppKit 窗口探针是 opt-in skip）。
+3. 超长行不回 `ERR` 已记进 ROADMAP §6 且**不修**——写错的第三方上报端不该由服务端替它兜。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 

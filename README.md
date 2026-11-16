@@ -9,7 +9,7 @@
 
 <p>
   <a href="https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/actions/workflows/ci.yml"><img src="https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/version-1.0.12-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.0.13-blue" alt="Version" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20X11%20%7C%20macOS%20AppKit-0078D4" alt="Platforms" />
   <img src="https://img.shields.io/badge/Go-1.23%2B%20(CGO__ENABLED%3D0)-00ADD8" alt="Go 1.23+ CGO_ENABLED=0" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
@@ -47,7 +47,7 @@ When you run Claude Code, OpenCode, Antigravity, or DeepSeek Harness across mult
 - **See every session in one strip**: highest-priority state badge (`ASK` / `PLAN` / `WORK` / `TOOL` / `ERR` / `DONE`), elapsed hold duration, project folder, and prompt reason across terminals.
 - **Jump straight back to the terminal or copy the workspace path**: click the row arrow to activate that terminal window/tab (`Windows Terminal`, `SetForegroundWindow` on Win32; EWMH `_NET_ACTIVE_WINDOW` on Linux X11; `NSRunningApplication` on macOS); click the row body to copy its workspace path to clipboard.
 - **Keyboard navigation & per-display layout memory**: use `Up` / `Down` / `Home` / `End`, `Enter` to focus, and `Esc` to collapse when expanded; `Ctrl`/`Cmd` + `+`/`-`/`0` (or scroll wheel) scales the panel; window coordinates remember each monitor arrangement independently.
-- **Zero-dependency native runtime**: compiled statically with `CGO_ENABLED=0` (`4.48 MiB` main binary on Win64, no runtime DLLs, no Electron, no libgtk, and zero npm dependencies for reporters).
+- **Zero-dependency native runtime**: compiled statically with `CGO_ENABLED=0` (`4.49 MiB` main binary on Win64, no runtime DLLs, no Electron, no libgtk, and zero npm dependencies for reporters).
 
 ---
 
@@ -92,24 +92,24 @@ Choose **either** the zero-config DeepSeek Harness plugin (Windows), a prebuilt 
 
 ### Option A — DeepSeek Harness Plugin (`dsh-ai-terminal-pet`)
 
-> The package is now **1.2.21** (`dsh.bundle.platforms: ["win32"]`). On Windows it connects DeepSeek Harness sessions immediately and auto-bootstraps the bundled Win32 overlay + `protocol.js` on first run.
+> The package is now **1.2.22** (`dsh.bundle.platforms: ["win32"]`). On Windows it connects DeepSeek Harness sessions immediately and auto-bootstraps the bundled Win32 overlay + `protocol.js` on first run.
 >
 > **Important scope note**: Installing the plugin out-of-the-box shows **DeepSeek Harness** sessions. To also aggregate OpenCode, Claude Code, or Antigravity into the same strip, wire those reporters once using `--connect` below.
 
 <details>
 <summary>Install via DSH CLI / npm / tarball / pinned git</summary>
 
-Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.21):
+Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.22):
 
 ```sh
 # 1. From npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # 2. Direct release tarball
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.21/dsh-ai-terminal-pet-1.2.21.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.22/dsh-ai-terminal-pet-1.2.22.tgz
 
 # 3. Pinned git release tag (no npm required)
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.21&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.22&path:/packages/dsh-ai-terminal-pet"
 ```
 
 See [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) for full details and uninstall instructions.
@@ -118,23 +118,23 @@ See [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README
 
 ### Option B — Standalone Prebuilt Release (Windows · macOS · Linux)
 
-Download the archive for your OS from the [**latest GitHub Release (`pet-v1.0.12`)**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.12):
+Download the archive for your OS from the [**latest GitHub Release (`pet-v1.0.13`)**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.13):
 
 - **Windows (x64)**:
   - **Installer (`pet-setup.exe`)** — single executable; verifies SHA-256 checksums of all embedded files before writing anything, then installs into `%LOCALAPPDATA%\AI-Terminal-Pet\`. *(Not Authenticode-signed yet — see [Unsigned binary notice](#unsigned-binary-notice) below.)*
-  - **Portable ZIP (`ai-terminal-pet-1.0.12-win-x64.zip`)** — unzip and double-click `install.cmd` (or run `.\install.cmd` in PowerShell; use `-VerifyOnly` to verify SHA-256, `-AddToPath` to register `AI-Terminal-Pet.exe`, `-Uninstall` to remove).
+  - **Portable ZIP (`ai-terminal-pet-1.0.13-win-x64.zip`)** — unzip and double-click `install.cmd` (or run `.\install.cmd` in PowerShell; use `-VerifyOnly` to verify SHA-256, `-AddToPath` to register `AI-Terminal-Pet.exe`, `-Uninstall` to remove).
 - **macOS (Apple Silicon `arm64` & Intel `amd64`)**:
   ```sh
-  tar -xzf ai-terminal-pet-1.0.12-darwin-arm64.tar.gz   # or darwin-amd64
-  cd ai-terminal-pet-1.0.12-darwin-arm64
+  tar -xzf ai-terminal-pet-1.0.13-darwin-arm64.tar.gz   # or darwin-amd64
+  cd ai-terminal-pet-1.0.13-darwin-arm64
   xattr -dr com.apple.quarantine .                      # unsigned binary Gatekeeper opt-in
   sh ./install.sh
   ```
   Installs into `~/Library/Application Support/AI-Terminal-Pet` and symlinks `~/.local/bin/ai-terminal-pet`. Supports `sh ./install.sh --verify-only` and `--uninstall`.
 - **Linux (`amd64` & `arm64`, X11)**:
   ```sh
-  tar -xzf ai-terminal-pet-1.0.12-linux-amd64.tar.gz    # or linux-arm64
-  cd ai-terminal-pet-1.0.12-linux-amd64
+  tar -xzf ai-terminal-pet-1.0.13-linux-amd64.tar.gz    # or linux-arm64
+  cd ai-terminal-pet-1.0.13-linux-amd64
   sh ./install.sh
   ```
   Installs into `$XDG_DATA_HOME/ai-terminal-pet` (default `~/.local/share/ai-terminal-pet`) and symlinks `~/.local/bin/ai-terminal-pet`. Supports `sh ./install.sh --verify-only` and `--uninstall`.
@@ -344,24 +344,24 @@ Key maintainer references:
 
 #### 方式 A — DeepSeek Harness 插件安装（`dsh-ai-terminal-pet`，Windows）
 
-> 当前版本是 **1.2.21**（包声明 `dsh.bundle.platforms: ["win32"]`）。在 Windows 的 DeepSeek Harness 0.2.x 中安装即用，插件首次加载会自动把 Win32 浮窗本体与 `protocol.js` 落盘到本机。
+> 当前版本是 **1.2.22**（包声明 `dsh.bundle.platforms: ["win32"]`）。在 Windows 的 DeepSeek Harness 0.2.x 中安装即用，插件首次加载会自动把 Win32 浮窗本体与 `protocol.js` 落盘到本机。
 >
 > **边界说明**：装完包即可在面板看到 **DeepSeek Harness** 的会话；如果需要把 OpenCode、Claude Code 或 Antigravity 也汇入同一块浮窗，请再运行一次下面的 `--connect`。
 
 <details>
 <summary>通过 DSH CLI 安装（npm / tarball / git tag）</summary>
 
-已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.21）：
+已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.22）：
 
 ```sh
 # 1. 通过 npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # 2. 通过 Release tarball 直链
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.21/dsh-ai-terminal-pet-1.2.21.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.22/dsh-ai-terminal-pet-1.2.22.tgz
 
 # 3. 钉死 Release tag 的 git 源（无 npm 网络兜底）
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.21&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.22&path:/packages/dsh-ai-terminal-pet"
 ```
 
 更多说明与卸载方式见 [packages/dsh-ai-terminal-pet/README.zh.md](packages/dsh-ai-terminal-pet/README.zh.md)。
@@ -370,23 +370,23 @@ dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-term
 
 #### 方式 B — 独立安装包 / 压缩包（Windows · macOS · Linux）
 
-前往 [**最新 GitHub Release（`pet-v1.0.12`）**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.12) 下载对应系统产物：
+前往 [**最新 GitHub Release（`pet-v1.0.13`）**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.13) 下载对应系统产物：
 
 - **Windows (x64)**：
   - **单文件安装器（`pet-setup.exe`）** — 双击运行，先对内置所有载荷做 SHA-256 逐文件校验再写入 `%LOCALAPPDATA%\AI-Terminal-Pet\`。*（未购置代码签名证书，SmartScreen 弹窗按「更多信息 → 仍要运行」放行即可。）*
-  - **绿色压缩包（`ai-terminal-pet-1.0.12-win-x64.zip`）** — 解压后双击 `install.cmd`（支持 `-VerifyOnly` 核对 SHA-256、`-AddToPath` 加 PATH、`-Uninstall` 卸载）。
+  - **绿色压缩包（`ai-terminal-pet-1.0.13-win-x64.zip`）** — 解压后双击 `install.cmd`（支持 `-VerifyOnly` 核对 SHA-256、`-AddToPath` 加 PATH、`-Uninstall` 卸载）。
 - **macOS（Apple Silicon `arm64` / Intel `amd64`）**：
   ```sh
-  tar -xzf ai-terminal-pet-1.0.12-darwin-arm64.tar.gz   # 或 darwin-amd64
-  cd ai-terminal-pet-1.0.12-darwin-arm64
+  tar -xzf ai-terminal-pet-1.0.13-darwin-arm64.tar.gz   # 或 darwin-amd64
+  cd ai-terminal-pet-1.0.13-darwin-arm64
   xattr -dr com.apple.quarantine .                      # 解除未公证下载的隔离属性
   sh ./install.sh
   ```
   默认安装到 `~/Library/Application Support/AI-Terminal-Pet` 并在 `~/.local/bin/ai-terminal-pet` 建软链；支持 `--verify-only` 与 `--uninstall`。
 - **Linux（`amd64` / `arm64`，X11）**：
   ```sh
-  tar -xzf ai-terminal-pet-1.0.12-linux-amd64.tar.gz    # 或 linux-arm64
-  cd ai-terminal-pet-1.0.12-linux-amd64
+  tar -xzf ai-terminal-pet-1.0.13-linux-amd64.tar.gz    # 或 linux-arm64
+  cd ai-terminal-pet-1.0.13-linux-amd64
   sh ./install.sh
   ```
   默认安装到 `$XDG_DATA_HOME/ai-terminal-pet`（通常 `~/.local/share/ai-terminal-pet`）并在 `~/.local/bin/ai-terminal-pet` 建软链；支持 `--verify-only` 与 `--uninstall`。
@@ -442,7 +442,7 @@ ai-terminal-pet --doctor
   - `--connect[=opencode|claude|antigravity]`：只读打印对应宿主接入配置
   - `--doctor`：运行 11 项健康诊断
   - `--json [--pretty]`：输出实时会话与提醒判定状态 JSON
-  - `--version`：打印版本信息（v1.0.12）
+  - `--version`：打印版本信息（v1.0.13）
   - `--help`：打印帮助说明
 - **本地数据目录（`internal/home` 统一解析）**：
   - Windows：`%LOCALAPPDATA%\AI-Terminal-Pet\`
