@@ -163,7 +163,16 @@ func windowIdentifiesSession(windows []focusWindow, target FocusTarget) bool {
 			continue
 		}
 		windowTitle := strings.ToLower(candidate.title)
-		if title != "" && strings.Contains(windowTitle, title) {
+		// A title that IS the window's title verbatim names the WINDOW, and one
+		// window hosts every conversation in that tab - so it is not evidence
+		// that this conversation still exists. The Antigravity statusline started
+		// sending the console title (which is exactly the Windows Terminal tab
+		// title) in 1.0.11 so jump-to-terminal could find the tab; reading that
+		// same string as identity here kept finished conversations on the panel
+		// for hours after their host had exited (handover §63). A conversation
+		// title, by contrast, is a proper part of a tab title ("OC | <title>",
+		// "agy · <project>"), so it still counts.
+		if title != "" && windowTitle != title && strings.Contains(windowTitle, title) {
 			return true
 		}
 		if base != "" && strings.Contains(windowTitle, base) {
