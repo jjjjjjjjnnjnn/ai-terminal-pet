@@ -1129,7 +1129,7 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
   equal('the Apps & Features row names the install directory', entry?.location, installedDir)
   check(
     'the recorded uninstall command runs the installed copy',
-    Boolean(entry?.quiet) && entry.quiet.includes(installedScript),
+    Boolean(entry?.quiet) && entry.quiet.includes(canonicalPath(installedScript)),
     String(entry?.quiet || ''),
   )
   check(
