@@ -4,7 +4,7 @@
   "goVersion": "go1.27.0",
   "source": {
     "files": 125,
-    "sha256": "84a68129bdb04e802409e527a22005cc32df90d9c4078b297578538f1a9075cc"
+    "sha256": "508415103ecf650795f2adaf958e7cda68ea6453e1051bf8334e130db5cc38e0"
   },
   "overlay": {
     "file": "vendor/AI-Terminal-Pet.exe",

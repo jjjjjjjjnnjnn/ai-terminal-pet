@@ -33,6 +33,39 @@
 已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
 
+## [1.2.25] — 2026-11-16（macOS 的提示音第一次被执行就崩了：AppKit 会话之前不许碰 NSSound）
+
+这一版只有一个原因，而它值得单独记：**1.2.24 的 macOS 提示音路径，第一次被执行就 SIGSEGV**。
+
+- **触发**：第 66 轮加的"跳转失败要响一声"在 macOS 上会走 `sound_darwin.go` 的 `beep`，
+  但**此前从没有任何东西执行过这条路**——没有苹果硬件，也没有测试调它。这一轮给 `go test` 加了
+  `TestFocusFailedArmsTheJumpPill`，macOS CI 第一次真的跑进 `beep`：`SIGSEGV`，
+  `PC` 落在 `objc.ID.Send`，`signal arrived during cgo execution`，崩在延迟的
+  `NSAutoreleasePool drain` 里。
+- **根因（就事论事的版本）**：`go test` 进程里**没有 NSApplication、没有 run loop、没有音频会话**，
+  AppKit 在这个状态下自己会 fault。真机上从来没验过，所以这条路径一直"看着没问题"。
+- **修法**：新增 `darwinAudioReady`，**只由 `initCocoa` 在 NSApplication 就绪后置位**
+  （`sharedApplication` + `setActivationPolicy` + `finishLaunching` 之后）。在此之前 `beep`
+  直接返回，不碰 AppKit；之后行为完全不变。两条 darwin 测试钉住：无会话时提示音是惰性的
+  （删掉闸门测试会**崩**而不是失败）、无窗口无 AppKit 时"未能切换"的小条照样能画。
+- **顺带**：`packages/dsh-ai-terminal-pet/vendor/manifest.json` 的源码摘要随这次 Go 改动前移
+  （vendored 的 Windows exe 字节未变，仍是 `DB2DD2AB…`）。发这一版正是因为**包里的浮窗清单
+  必须描述它对应的源码**——`vendor.mjs --check` 就是这么判的。
+
+### 这一轮的两条过程教训（比代码更值钱）
+1. **新门禁的第一次运行才是它的验收**：插件三平台的 `verify.mjs` 在 Windows 上 118/118 通过，
+   而 ubuntu job 一跑就发现旧用例假定了 Windows 布局。写测试的机器验不了另一半。
+2. **发版前没跑过的平台，等于没验过**：1.2.24 是先发版、后看 CI，于是 macOS 的两个问题
+   （用例没钉平台、提示音 SIGSEGV）都在 tag 之后才暴露，才有了这一版。
+
+### 1.2.25 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `dsh-plugin-v1.2.25` | `dsh-ai-terminal-pet-1.2.25.tgz` | 2,072,904 B（20 文件） | `0E5DE443CB574EE78489085DC1608D5EA712CD7513E3EAA613C0CA843C0B82DF` |
+
+浮窗的六个平台资产仍未重发：`pet-v1.0.14` 那六个是当前版本，插件与 `lib/release-pins.json` 都指向它们。
+
 ## [1.2.24] — 2026-11-16（DSH 插件三平台：Linux/macOS 首次使用按 pin 取浮窗；插件不再手写 Windows 路径）
 
 ### 为什么这一轮值得单独发版
