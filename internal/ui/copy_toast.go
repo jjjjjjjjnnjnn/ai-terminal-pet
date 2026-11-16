@@ -23,10 +23,50 @@ const (
 	// copyToastDuration is long enough to read one short word and short enough
 	// that a second tap on another row is not fighting the first pill.
 	copyToastDuration = 1200 * time.Millisecond
+	// jumpToastDuration is longer because "could not switch" is three words and
+	// arrives after the jump already failed - there is no second signal behind
+	// it to correct a missed read.
+	jumpToastDuration = 1600 * time.Millisecond
 	// toastCompactRow marks a toast that belongs to the compact strip, which
 	// has no row index. A negative value cannot collide with a drawn row.
 	toastCompactRow = -1
 )
+
+// toastKind is which sentence the pill states. Three, because a tap can fail in
+// two different ways and telling somebody "could not copy" after a jump they
+// know they attempted is worse than saying nothing.
+type toastKind uint8
+
+const (
+	toastNone toastKind = iota
+	toastCopied
+	toastCopyFailed
+	toastJumpFailed
+)
+
+// duration is how long this pill stays up. A zero kind has no lifetime, which
+// is why show() clears the receipt rather than arming it with nothing to say.
+func (k toastKind) duration() time.Duration {
+	if k == toastJumpFailed {
+		return jumpToastDuration
+	}
+	return copyToastDuration
+}
+
+// failed reports whether the gesture did not take effect. It picks the error
+// colour, so "failed" in the picture and "failed" in the key cannot disagree.
+func (k toastKind) failed() bool {
+	return k == toastCopyFailed || k == toastJumpFailed
+}
+
+// copyToastKind maps a copy outcome onto its pill. One place, because three
+// call sites passing !copied is how the two meanings drift apart.
+func copyToastKind(failed bool) toastKind {
+	if failed {
+		return toastCopyFailed
+	}
+	return toastCopied
+}
 
 // copyToast is the live receipt. Its zero value is inert: only `until` decides
 // whether anything is on screen, so an App that never copied anything behaves
@@ -39,17 +79,21 @@ const (
 type copyToast struct {
 	row      int
 	identity string
-	failed   bool
+	kind     toastKind
 	until    time.Time
 }
 
-// show arms the receipt for one target. failed says the clipboard refused, so
-// the pill can state that instead of claiming a copy that did not happen.
-func (t *copyToast) show(row int, identity string, failed bool, now time.Time) {
+// show arms the receipt for one target. kind says which sentence it will state;
+// a failed jump and a failed copy are both failures but not the same claim.
+func (t *copyToast) show(row int, identity string, kind toastKind, now time.Time) {
+	if kind == toastNone {
+		t.clear()
+		return
+	}
 	t.row = row
 	t.identity = identity
-	t.failed = failed
-	t.until = now.Add(copyToastDuration)
+	t.kind = kind
+	t.until = now.Add(kind.duration())
 }
 
 // clear removes the receipt early: a collapse, an expand toggle or a new
@@ -70,7 +114,7 @@ func (t *copyToast) frame(now time.Time, items []session.Session) panelToast {
 	if !t.active(now) || !toastSubjectThere(items, t.row, t.identity) {
 		return panelToast{}
 	}
-	return panelToast{row: int32(t.row), tick: tickOf(t.until, now), failed: t.failed}
+	return panelToast{row: int32(t.row), tick: tickOf(t.until, now), kind: t.kind}
 }
 
 func tickOf(until, now time.Time) int64 {
@@ -104,9 +148,9 @@ func toastSubjectThere(items []session.Session, row int, identity string) bool {
 // tick == 0 is unreachable for a live receipt (see frame), which is what lets
 // the key distinguish "pill gone" from "pill on row 0".
 type panelToast struct {
-	row    int32
-	tick   int64
-	failed bool
+	row  int32
+	tick int64
+	kind toastKind
 }
 
 func (p panelToast) visible() bool {
@@ -117,14 +161,28 @@ func (p panelToast) compact() bool {
 	return p.visible() && int(p.row) == toastCompactRow
 }
 
-// copyToastLabel is the one word the pill says. It is deliberately a statement
-// about what happened ("copied" / "could not copy") rather than a noun, so the
-// user does not have to infer the verb from the gesture.
-func copyToastLabel(p panelToast, lang i18n.Lang) string {
-	if p.failed {
-		return i18n.T(lang, i18n.KeyCopyFailed)
+// toastColour is the pill's ink: primary for a confirmation, error for a
+// gesture that did not take effect. Both the row pill and the compact subject
+// line read it, so the two cannot disagree about what "failed" looks like.
+func toastColour(p panelToast) rgba {
+	if p.kind.failed() {
+		return colors.Error
 	}
-	return i18n.T(lang, i18n.KeyCopyDone)
+	return colors.Primary
+}
+
+// copyToastLabel is the one phrase the pill says. It is deliberately a statement
+// about what happened ("copied" / "copy failed" / "could not switch") rather
+// than a noun, so the user does not have to infer the verb from the gesture.
+func copyToastLabel(p panelToast, lang i18n.Lang) string {
+	switch p.kind {
+	case toastCopyFailed:
+		return i18n.T(lang, i18n.KeyCopyFailed)
+	case toastJumpFailed:
+		return i18n.T(lang, i18n.KeyJumpFailed)
+	default:
+		return i18n.T(lang, i18n.KeyCopyDone)
+	}
 }
 
 // drawCopyToastRow paints the pill over one expanded row's text area: the
@@ -155,10 +213,7 @@ func drawCopyToastRow(target *canvas, p panelToast, items []session.Session, lan
 	// Primary, not Accent: the palette comment pins Accent to the settings
 	// chrome ("marks on/selected, never used on the overlay itself"), and a
 	// receipt is a neutral confirmation rather than a control state.
-	colour := colors.Primary
-	if p.failed {
-		colour = colors.Error
-	}
+	colour := toastColour(p)
 	fill := colors.Raised
 	fill.A = 236
 	target.fillRounded(textLeft, pillTop, pillWidth, pillHeight, maxInt(scale(5), 2), fill)

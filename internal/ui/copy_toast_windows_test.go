@@ -45,7 +45,7 @@ func TestCopyToastEntersTheFrameKeyAndLeavesItAgain(t *testing.T) {
 	items := toastFixture()
 	start := time.Unix(1000, 0)
 	var toast copyToast
-	toast.show(1, session.Identity(items[1]), false, start)
+	toast.show(1, session.Identity(items[1]), toastCopied, start)
 
 	live := toast.frame(start.Add(100*time.Millisecond), items)
 	if !live.visible() {
@@ -95,7 +95,7 @@ func TestCopyToastRowZeroIsNotTheSameKeyAsNoToast(t *testing.T) {
 		t.Fatal("the row is part of the key")
 	}
 	var failed renderedKey
-	failed.withToast(panelToast{row: 0, tick: 5, failed: true})
+	failed.withToast(panelToast{row: 0, tick: 5, kind: toastCopyFailed})
 	if key == failed {
 		t.Fatal("the failure flag changes what is drawn, so it changes the key")
 	}
@@ -107,7 +107,7 @@ func TestCopyToastDiesWhenItsRowChangesOwner(t *testing.T) {
 	items := toastFixture()
 	start := time.Unix(1000, 0)
 	var toast copyToast
-	toast.show(0, session.Identity(items[0]), false, start)
+	toast.show(0, session.Identity(items[0]), toastCopied, start)
 
 	if p := toast.frame(start.Add(time.Second), items); !p.visible() {
 		t.Fatal("the receipt should be visible while its own session is on that row")
@@ -129,7 +129,7 @@ func TestCopyToastCompactFollowsTheMostUrgentSession(t *testing.T) {
 		t.Fatal("the fixture has a jumpable session")
 	}
 	var toast copyToast
-	toast.show(toastCompactRow, session.Identity(most), false, start)
+	toast.show(toastCompactRow, session.Identity(most), toastCopied, start)
 	p := toast.frame(start.Add(200*time.Millisecond), items)
 	if !p.compact() {
 		t.Fatalf("the compact receipt = %+v, want a compact toast", p)

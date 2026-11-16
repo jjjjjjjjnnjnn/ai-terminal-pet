@@ -117,16 +117,16 @@ type renderedKey struct {
 	// above - and a stale highlight is exactly the shape of bug this project
 	// has already shipped twice.
 	hoverRow int32
-	// toastRow, toastTick and toastFailed are the copy receipt. It is drawn,
+	// toastRow, toastTick and toastKind are the receipt. It is drawn,
 	// so it belongs in the key; and because it is time-driven (a pill that
 	// disappears on its own) it cannot ride on clock - the breathing path
 	// ignores clock on purpose, and a receipt that never left the screen
 	// would be the same bug as 1.0.1's frozen duration. toastTick is 0 when
 	// there is no receipt, which is why "pill gone" and "pill on row 0"
 	// cannot be confused.
-	toastRow    int32
-	toastTick   int64
-	toastFailed bool
+	toastRow  int32
+	toastTick int64
+	toastKind toastKind
 	// selectedSlot encodes the keyboard-selected expanded row as (row+1),
 	// leaving 0 for "no keyboard selection" so row 0 and absent selection
 	// cannot collide in zero-valued keys.
@@ -140,7 +140,7 @@ type renderedKey struct {
 func (k *renderedKey) withToast(p panelToast) {
 	k.toastRow = p.row
 	k.toastTick = p.tick
-	k.toastFailed = p.failed
+	k.toastKind = p.kind
 }
 
 // withSelectedRow folds keyboard row selection into the frame key.
@@ -383,11 +383,7 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 			// has no second row to spare, and a confirmation that appeared
 			// somewhere else would be a change of layout, not of one line.
 			subject = target.fitText(copyToastLabel(toast, lang), value(8), 700, width-value(8))
-			if toast.failed {
-				subjectColor = colors.Error
-			} else {
-				subjectColor = colors.Primary
-			}
+			subjectColor = toastColour(toast)
 		}
 		target.text(value(4), value(119), width-value(8), value(13), subject, value(8), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 		_, copyable := compactCopyText(items)
@@ -398,11 +394,7 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 	subject = target.fitText(subject, value(9), 400, width-value(8))
 	if toast.visible() {
 		subject = target.fitText(copyToastLabel(toast, lang), value(9), 700, width-value(8))
-		if toast.failed {
-			subjectColor = colors.Error
-		} else {
-			subjectColor = colors.Primary
-		}
+		subjectColor = toastColour(toast)
 	}
 	target.text(value(4), value(124), width-value(8), value(14), subject, value(9), 400, subjectColor, dtSingleLine|dtVCenter|dtCenter|dtNoPrefix)
 }

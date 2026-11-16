@@ -156,7 +156,11 @@ func TestRenderPreview(t *testing.T) {
 		}
 		var toast panelToast
 		if tc.toastRow != toastNonePreview {
-			toast = panelToast{row: int32(tc.toastRow), tick: 900, failed: tc.toastFail}
+			kind := toastCopied
+			if tc.toastFail {
+				kind = toastCopyFailed
+			}
+			toast = panelToast{row: int32(tc.toastRow), tick: 900, kind: kind}
 		}
 		drawVerticalPanel(target, panelState{
 			Items:     tc.items,

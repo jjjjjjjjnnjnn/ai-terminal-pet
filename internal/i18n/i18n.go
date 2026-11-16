@@ -101,10 +101,14 @@ const (
 	KeyPanelHint     = "panel.hint"
 	KeyPanelEmpty    = "panel.empty"
 	KeyPanelJump     = "panel.jump"
-	// The copy receipt's two states. Short verbs: they are drawn in an
+	// The copy receipt's three states. Short verbs: they are drawn in an
 	// 18-unit pill (expanded) or take over the strip's subject line.
 	KeyCopyDone   = "copy.done"
 	KeyCopyFailed = "copy.failed"
+	// KeyJumpFailed is the third state: the tap was a jump, the terminal was
+	// not there. It is deliberately not KeyCopyFailed - the sentence has to be
+	// about the gesture the user actually made.
+	KeyJumpFailed = "jump.failed"
 
 	KeySummaryEmpty    = "summary.empty"
 	KeySummarySessions = "summary.sessions"
@@ -291,6 +295,7 @@ var dictEn = map[string]string{
 	KeyPanelJump:     "Jump",
 	KeyCopyDone:      "Copied",
 	KeyCopyFailed:    "Copy failed",
+	KeyJumpFailed:    "Could not switch",
 
 	KeySummaryEmpty:    "No sessions",
 	KeySummarySessions: "%d sessions",
@@ -467,6 +472,7 @@ var dictZhCN = map[string]string{
 	KeyPanelJump:     "跳转",
 	KeyCopyDone:      "已复制",
 	KeyCopyFailed:    "复制失败",
+	KeyJumpFailed:    "未能切换",
 
 	KeySummaryEmpty:    "暂无会话",
 	KeySummarySessions: "%d 个会话",

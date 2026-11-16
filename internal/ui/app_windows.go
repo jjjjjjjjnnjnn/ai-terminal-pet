@@ -1232,7 +1232,7 @@ func (a *App) copyTo(value string, row int) {
 		identity = session.Identity(a.sessions[row])
 	}
 	copied := copyToClipboard(value)
-	a.toast.show(row, identity, !copied, time.Now())
+	a.toast.show(row, identity, copyToastKind(!copied), time.Now())
 	if !copied {
 		beep(beepExclamation)
 	}

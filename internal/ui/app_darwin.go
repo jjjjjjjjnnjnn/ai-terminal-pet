@@ -150,7 +150,7 @@ type App struct {
 	refreshCh  chan struct{}
 	activateCh chan struct{}
 	closeCh    chan struct{}
-	focusCh    chan uintptr
+	focusCh    chan focusRequest
 	closeOnce  sync.Once
 	closed     atomic.Bool
 	cocoaReady atomic.Bool
@@ -243,7 +243,7 @@ func New(values *store.Store, options Options) *App {
 		refreshCh:      make(chan struct{}, 1),
 		activateCh:     make(chan struct{}, 1),
 		closeCh:        make(chan struct{}),
-		focusCh:        make(chan uintptr, 4),
+		focusCh:        make(chan focusRequest, 4),
 		dpi:            96,
 		zoom:           zoom,
 		expanded:       options.Initial.Expanded,
@@ -414,11 +414,13 @@ func (a *App) Run() error {
 			case <-a.activateCh:
 				drained = true
 				a.showWindow()
-			case handle := <-a.focusCh:
+			case request := <-a.focusCh:
 				drained = true
-				if handle != 0 && platform.ActivateTarget(handle) {
+				if request.handle != 0 && platform.ActivateTarget(request.handle) {
 					a.holdTuck(2 * time.Second)
 					a.syncTuck()
+				} else {
+					a.focusFailed(request, time.Now())
 				}
 			case <-a.refreshCh:
 				drained = true
@@ -1379,7 +1381,12 @@ func (a *App) copyTo(value string, row int) {
 		identity = session.Identity(a.sessions[row])
 	}
 	copied := copyToClipboard(value)
-	a.toast.show(row, identity, !copied, time.Now())
+	a.toast.show(row, identity, copyToastKind(!copied), time.Now())
+	if !copied {
+		// Same cue as Windows: a clipboard that refused must be audible as well
+		// as visible, because the pill can be missed while looking away.
+		beep(beepExclamation)
+	}
 	a.syncAnimation()
 	_ = a.present()
 }
@@ -1409,13 +1416,18 @@ func (a *App) jumpTo(row int) bool {
 	if a.unread.clearOne(target) {
 		a.postRefresh()
 	}
+	// The tap is timestamped before the resolver leaves the UI thread:
+	// jumpStaleAfter measures how long the user has waited, not how long the
+	// goroutine happened to run.
+	requested := time.Now()
+	identity := session.Identity(target)
 	go func() {
 		resolved, _, ok := platform.ResolveTarget(request)
 		if !ok {
 			resolved = 0
 		}
 		select {
-		case a.focusCh <- resolved:
+		case a.focusCh <- focusRequest{handle: resolved, row: row, identity: identity, at: requested}:
 		default:
 		}
 		a.postCocoaWakeup()
