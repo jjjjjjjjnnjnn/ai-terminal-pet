@@ -3,10 +3,12 @@
 A launch week is the wrong time to discover that `#connect-your-terminal` does
 not exist, so this checks what markdown renders without warning: a relative file
 path that is not there, a fragment that names no heading, and - since 2026-11-16 -
-a local `<img src>` or `![](path)` that points at a file nobody committed. The
-last one is not hypothetical: the README's showcase table pointed at four PNGs
-that had been renamed, and the page rendered four broken images for weeks
-because this checker only looked at `[links](...)`.
+a local `<img src>`, `![](path)` or `<a href>` that points at a file nobody
+committed. The image check exists because the README's showcase table pointed at
+four PNGs that had been renamed, and the page rendered four broken images for
+weeks because this checker only looked at `[links](...)`. The `<a href>` form
+exists because the HTML tables in the same documents are a blind spot of exactly
+that kind: they render fine in GitHub's preview and 404 for a reader.
 
 Usage: python tools/check_docs_links.py  (from the repository root)
 """
@@ -28,10 +30,20 @@ DOCS = ["README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "AGENTS.md", "CHAN
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
 HEADING = re.compile(r"^#{1,6} ")
 CODE_FENCE = re.compile(r"```")
+# <a id="..."> and id=/name= on any HTML tag. GitHub prefixes author ids with
+# "user-content-" and resolves #fragment against that prefix, the same machinery
+# its own heading anchors use (a heading renders as <h2>...</h2><a
+# id="user-content-install" href="#install">), so an explicit anchor is a real
+# destination. Verified against the rendered README, not assumed: docs/ROADMAP.md
+# carried the opposite claim for one round (HANDOVER §69.1).
+HTML_ANCHOR = re.compile(r"<(?:a|[a-z0-9]+)\b[^>]*\b(?:id|name)=[\"']([^\"']+)[\"']", re.I)
 # <img src="..."> and markdown images ![alt](path). Images are the one asset a
 # reader notices immediately when it is broken and a link checker never sees.
 IMG_TAG = re.compile(r"<img\b[^>]*\bsrc=\"([^\"]+)\"", re.I)
 IMG_MD = re.compile(r"!\[[^\]]*\]\(([^)\s]+)")
+# <a href="..."> inside an HTML table or a <details> block. Markdown link syntax
+# is covered by LINK; this is the other half of what GitHub renders.
+HREF_TAG = re.compile(r"<a\b[^>]*\bhref=[\"']([^\"']+)[\"']", re.I)
 
 
 def slug(text: str) -> str:
@@ -48,6 +60,11 @@ def slug(text: str) -> str:
 
 
 def anchors(path: Path) -> set[str]:
+    """Every fragment target a reader can land on: markdown headings and HTML ids.
+
+    Fenced blocks are skipped for headings but not for ids: an `<a id>` inside a
+    fence is code, so it is skipped there too by the same in_fence flag.
+    """
     found = set()
     in_fence = False
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -58,6 +75,8 @@ def anchors(path: Path) -> set[str]:
             continue
         if HEADING.match(line):
             found.add(slug(line.lstrip("#")))
+        for match in HTML_ANCHOR.finditer(line):
+            found.add(match.group(1))
     return found
 
 
@@ -83,6 +102,7 @@ def main() -> int:
         for pattern, kind, body in (
             (IMG_TAG, "image", stripped),
             (IMG_MD, "image", stripped),
+            (HREF_TAG, "link", without_images),
             (LINK, "link", without_images),
         ):
             for raw in pattern.findall(body):

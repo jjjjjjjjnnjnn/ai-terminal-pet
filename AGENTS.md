@@ -108,6 +108,8 @@ node tools/upstream-entry.mjs --check   # catalogue entry points at this package
 node --test tools/upstream-entry.test.mjs
 node tools/check_versions.mjs           # every documented version equals the code's (badge, links, install commands)
 node --test tools/check_versions.test.mjs
+node tools/check_facts.mjs              # every documented count equals the tree's (func Test, packages, --doctor)
+node --test tools/check_facts.test.mjs
 python tools/check_docs_links.py   # every relative path and #anchor in the docs we maintain
 
 # 3. Production build

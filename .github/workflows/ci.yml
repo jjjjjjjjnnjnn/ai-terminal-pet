@@ -323,6 +323,30 @@ jobs:
       - name: Version claim rules
         run: node --test tools/check_versions.test.mjs
 
+      # Counts rot the way version strings do, and round 68 proved that fixing the
+      # README by hand is not a fix: one round later docs/ROADMAP.md's baseline
+      # table said "428 个 func Test" while the tree had 463 (the same file said
+      # 463 one section lower). This measures the tree - `func Test` declarations,
+      # packages with tests, the cross-build package list, the `runCheck` entries
+      # in internal/app/doctor.go - and requires every claim shape in README
+      # (English and Chinese), AGENTS.md and the ROADMAP baseline to agree.
+      #
+      # What it deliberately does not pin: file/line counts and binary sizes.
+      # Those change with every edit and with the toolchain (`go 1.23.0` is a
+      # floor, so this runner's bytes legitimately differ from the release
+      # machine's), so `--print` reports them instead, for whoever is writing a
+      # dated baseline row. See the tool's header for the exact rules.
+      - name: Check documented facts
+        run: node tools/check_facts.mjs
+
+      # The rules behind the check above: the counting definitions (what counts as
+      # a `func Test`, a package with tests, a doctor check), the section scoping
+      # that keeps ROADMAP history out of the baseline claims, and one integration
+      # case that fails when a watched sentence is reworded and its claim stops
+      # matching.
+      - name: Fact claim rules
+        run: node --test tools/check_facts.test.mjs
+
       # The catalogue-status verdicts decide what a stale upstream row MEANS
       # (ours to fix / waiting on a merge / upstream's own bug), so they are
       # pinned like every other rule. Offline by construction: the file is a

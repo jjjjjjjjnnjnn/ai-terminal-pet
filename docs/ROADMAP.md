@@ -9,15 +9,15 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-15，浮窗 1.0.14 / 插件 1.2.26 已发布） |
+| 维度 | 数值（2026-11-16，浮窗 1.0.14 / 插件 1.2.26 已发布） |
 |---|---|
 | 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
 | 版本 | `1.0.14`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.26` |
-| 主程序 | `bin/AI-Terminal-Pet.exe` **4,702,208 B**（4.48 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
-| 状态行 shim | `bin/pet-statusline.exe` **3,675,136 B**（3.50 MiB） |
-| 原生 hook | `bin/pet-hook.exe` **3,701,760 B**（3.53 MiB）；三个 Windows 二进制合计 **12,079,104 B** = 11.52 MiB |
-| 代码量 | Go 非测试源码 **136 文件 / 26,526 行**、测试 **87 文件 / 12,673 行**（**428** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本） |
+| 主程序 | `bin/AI-Terminal-Pet.exe` **4,717,568 B**（4.50 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
+| 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
+| 原生 hook | `bin/pet-hook.exe` **3,705,344 B**（3.53 MiB）；三个 Windows 二进制合计 **12,101,632 B** = 11.54 MiB |
+| 代码量 | Go 非测试源码 **143 文件 / 27,200 行**、测试 **94 文件 / 13,493 行**（**463** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
 | 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
@@ -28,14 +28,19 @@
 | 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标；**L5 快照扫描按身份/size/mtime 复用上次解析**（200 文件 22.7 ms → 0.51 ms）；**存在性判据：`title` 必须被窗口标题"包含"且不完全等于它**（§63 修掉的回归） |
 | 持久化 | `state.json`（位置/缩放/展开/`layouts`）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run` / `LaunchAgent` / XDG `.desktop`（开机自启）· `approvals/` |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--connect[=HOST]/--doctor/--version/--help` |
-| 单测与门禁 | **463 个 `func Test`** across 15 packages（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 12 + 26 + 26 条 Node 断言 |
+| 单测与门禁 | **463 个 `func Test`** 分布在 15 个包（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 12 + 26 + 26 条 Node 断言 |
 | 持续集成 | `.github/workflows/ci.yml`：四条并行 Job — `windows-latest`（全套单测/构建/打包/fresh-machine/版本链接检查）、`ubuntu-latest`（`cross-build.sh` / `go test` / Linux 二进制 / `install.sh` + tar 校验）、`macos-latest`（`go vet` / `go test` / Darwin 二进制 / `install.sh` + hook 冒烟）、`scan`（`govulncheck` + `gosec`） |
 | 自检 | `ai-terminal-pet --doctor` **13 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts / audio / notifications），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘** |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
-| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.26**，19 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.26`，Windows bundle） |
+| 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.26**，20 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.26`，Windows bundle） |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | `PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif` 与 `desktop-scene.png`，`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图 |
+
+> **这些数字是怎么保证的**：`func Test` 数量、有测试的包数、Go 包总数与 `--doctor` 项数由
+> `node tools/check_facts.mjs` **断言**（README 中英、`AGENTS.md`、本表写错就红）；文件/行数、
+> 二进制体积与依赖清单**没有断言**——它们每次编辑、每个工具链都会变（`go 1.23.0` 是下限而不是钉死，
+> 所以 CI 与本机编出的字节本来就不该相同），由 `node tools/check_facts.mjs --print` 现测后连日期一起写进来。
 
 ## 1. 已交付批次（按时间倒序）
 
@@ -451,12 +456,20 @@ hook 建 `pending-<source>-<session>-<pid>-<epochMs>.json` 后每 100 ms 轮询�
 **验收补充**：fail-closed（config 缺失/损坏 → auto-approve off）；hook 侧每步文件操作都包住，
 绝不向宿主 CLI 抛异常（AGENTS.md 的铁律）。
 
-### E5 — 配置档扩展 ⏳ 部分交付（2026-11-09，v0.9.0）
-**已交付**：`config.json` 现在覆盖 `notifications` / `sound` / `soundVolume` / `soundScheme` /
+### E5 — 配置档扩展 ✅ 已交付（2026-11-16 复核；原先只记到 v0.9.0 的部分交付）
+**已交付**：`config.json` 覆盖 `notifications` / `sound` / `soundVolume` / `soundScheme` /
 `soundOnWaiting` / `soundOnError` / `notifyOnFinish` / `alwaysOnTop` / `edgeRetract` / `opacity` /
-`language` / `autoApprove` / `autoApproveTimeoutSec`，并有设置窗口（三页签）作为 UI。
-**未交付的部分（仍按原计划）**：`theme`（配色组）、`size`（紧凑/展开的基准尺寸预设）、
-`perSourceColor`（按 source 指定强调色）、`hidden`（启动即隐藏到托盘）。
+`language` / `autoApprove` / `autoApproveTimeoutSec`，并有设置窗口（四页签 general/sound/sessions/look）作为 UI。
+
+原先列在这里的四个"未交付"项，本轮逐个对着代码核过，**三项早已落地、一项按设计不做**：
+
+| 项 | 现状 | 落点 |
+|---|---|---|
+| `theme`（配色组） | **已交付**：`slate` / `paper` / `contrast` 三套命名调色板，设置窗口的外观页签可直接切 | `internal/config/config.go:74`（`ThemeSlate` 等）、`ValidTheme`（:191）、`internal/ui/drawing.go:235` 的 `applyAppearance`，三个平台的 `app_*.go` 各调一次 |
+| `perSourceColor`（按 source 着色） | **已交付**：展开行里来源名的颜色跟随终端来源；开关在设置窗口 | `internal/ui/drawing.go:186` 的 `perSourceColors`、`drawing_compact.go:668`、`settings_layout.go:633` |
+| `hidden`（启动即隐藏到托盘） | **已交付**：`hiddenAtLaunch`，Windows 走托盘、Linux/macOS 走面板不显示 | `internal/ui/app_windows.go:433`、`app_linux.go:287`、`app_darwin.go:357`、`settings_layout.go:636` |
+| `size`（紧凑/展开的基准尺寸预设） | **不做**：需求已被缩放取代——滚轮与 `Ctrl/Cmd` + `+`/`-`/`0` 逐显示器记忆在 `state.json` 的 `layouts` 里 | `internal/config/config.go` 的 `LayoutPlacement.Zoom`、`app_windows.go:707` 的滚轮缩放、`darwin_geometry.go` 的 `Cmd+Plus/Minus/0` |
+
 `internal/config` 的「缺字段用默认」解码方式未变，加字段仍不会破坏旧文件。
 
 ### E1 — 把 Node 上报端全部原生化（收益最高）✅ 已交付（2026-11-11）

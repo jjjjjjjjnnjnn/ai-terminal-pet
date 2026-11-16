@@ -4995,6 +4995,103 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
 
+## 69. 交接：把"文档里的数字"变成门禁，以及它第一次运行抓到的两件事（2026-11-16，第 69 轮；**不发版**，浮窗仍 **1.0.14** / 插件仍 **1.2.26**）
+
+这一轮不改产品代码、不发版。交付物是**一条新门禁**（`tools/check_facts.mjs`）和它顺手逼出来的四处修正：
+`docs/ROADMAP.md` §0 的基线表、§2 的 E5 清单、`tools/check_docs_links.py` 的 HTML 盲区、
+以及 `AGENTS.md` 的验证命令表。
+
+### 69.1 为什么需要它（第 68 轮已经写过一次教训）
+
+§68.2 抓到 README 的数字全旧了，当时的结论是"**数字要由命令产出，不要由记忆产出**"。
+但那一轮只改了 README，**没有让这件事可检查**；一轮之后同一类漂移已经在 `docs/ROADMAP.md` 的基线表里，
+而且同一份文件里两处自相矛盾（§0 写 428 个 `func Test`，§0 的另一行写 463）：
+
+| 项 | 表里写的 | 实测（当场跑） |
+|---|---|---|
+| `func Test` | **428** | **463** |
+| 测试文件 / 行 | 87 / 12,673 | **94 / 13,493** |
+| 非测试源码 文件 / 行 | 136 / 26,526 | **143 / 27,200** |
+| 主程序 | 4,702,208 B（4.48 MiB） | **4,717,568 B（4.50 MiB）** |
+| statusline / hook | 3,675,136 / 3,701,760 B | **3,678,720 / 3,705,344 B** |
+| 三个二进制合计 | 12,079,104 B | **12,101,632 B** |
+| 插件 tarball 文件数 | 19 | **20**（CHANGELOG 的 1.2.24–1.2.26 三节都写着 20） |
+
+### 69.2 新门禁钉住什么、不钉什么（边界写在这里，免得下次重新想一遍）
+
+**钉住**（写错就红，11 个 claim 形状，覆盖 README 中英 / `AGENTS.md` / ROADMAP §0）：
+
+| 事实 | 规则 | 现值 |
+|---|---|---|
+| `func Test` 数量 | 以 `func Test` 开头的行（**含 `TestMain`**，这是历年计数的口径） | 463 |
+| 有测试的包数 | 目录里有 `*_test.go` 的包。**故意不用 `go list`**：只有 Windows 才编的测试文件会让同一条声明在 ubuntu 上量出别的数，而这句话说的是树、不是某个 OS 的构建 | 15 |
+| Go 包总数 | `scripts/portable-packages.txt` 的非注释行（同时也是跨编译门禁的清单） | 16 |
+| `--doctor` 项数 | `internal/app/doctor.go` 里 `runCheck("名字", …)` 的条目；函数定义 `func runCheck(` 不算 | 13 |
+
+**不钉**（写进表里也只会变成噪声）：文件数、行数、二进制体积、依赖清单。
+`go 1.23.0` 是**下限**不是钉死，所以 CI 与本机编出的字节本来就不该相同——
+把体积做成断言，等于要求 CI 与本机同字节，而那正是 `-buildvcs=false` 那条约定在避免的事。
+这些值由 `node tools/check_facts.mjs --print` 现测输出（本轮的输出记在 69.4），写进文档时**连日期一起写**。
+
+ROADMAP §0 因此多了一段"这些数字是怎么保证的"，说明哪几项是断言、哪几项是带日期的现状测量。
+
+### 69.3 它第一次运行抓到的两件事（都是"看起来是 bug，其实是认知错"）
+
+1. **`README.md` 的 `#english` 不是坏链接，是门禁不认识它。** 新加的 `<a href>` 检查立刻报
+   `README.md: #english names no heading in this file`。README 顶部导航是 `<a href="#english">English</a>`，
+   而英文页的锚点是手写的 `<a id="english"></a>`（第 40 行），标题式锚点里没有 "English"。
+   **没有直接改 README**：先把 GitHub 真正渲染出来的 HTML 取下来看——
+   `gh api repos/jjjjjjjjnnjnn/ai-terminal-pet/readme -H 'Accept: application/vnd.github.html+json'`。
+   结果是 GitHub 把作者的 id 加前缀渲染成 `<a id="user-content-english">`，**与它自己给标题加的锚点
+   完全同一套机制**（`<h2>Install</h2><a id="user-content-install" href="#install">`）。
+   也就是说这个链接一直是好的，缺的是门禁的识别能力。于是改成：
+   `anchors()` 除 markdown 标题外，也把 `id=`/`name=` 当作本文件的锚点目标。
+   这条记下来的价值不在代码，在于**"先读对方渲染出来的东西，再决定改自己还是改门禁"**。
+2. **E5 的"未交付"清单已经过期四轮。** `theme` / `perSourceColor` / `hidden` 三项早已落地并在
+   三平台接线，`size`（基准尺寸预设）则被缩放取代。§2 的 E5 现在是一张逐项列出**代码落点**的表
+   （`config.go:74`/`:191`、`drawing.go:186`/`:235`、`settings_layout.go:625`/`:633`/`:636`、
+   三个 `app_*.go` 的 `applyAppearance`）。`size` 标成**不做**，理由与落点都写着。
+
+### 69.4 本轮实测（全部当场跑出来）
+
+```
+gofmt -l .                                   # 空
+go vet ./...                                 # 0
+go test -count=1 ./...                       # 15 个包全过（463 个 func Test，本轮未改 Go 代码）
+node tools/check_facts.mjs                   # 11 个 claim 形状一致
+node --test tools/check_facts.test.mjs       # 14/14
+node tools/check_versions.mjs                # 20 条一致（overlay 1.0.14 / plugin 1.2.26）
+node --test tools/check_versions.test.mjs    # 26/26
+python tools/check_docs_links.py             # 12 份全解（含新增的 <a href> 与 HTML id）
+node tools/check_facts.mjs --print           # 见下
+```
+
+`--print` 在写这份记录时的输出（**这些数字随时会变，引用时请重跑**）：
+
+```
+packages (scripts/portable-packages.txt): 16
+packages with tests: 15
+func Test declarations: 463
+test files / lines: 94 / 13,493
+source files / lines: 143 / 27,200
+--doctor checks: 13
+AI-Terminal-Pet.exe: 4717568 B
+pet-statusline.exe: 3678720 B
+pet-hook.exe: 3705344 B
+```
+
+`check_docs_links.py` 的自测（临时目录、不进仓库）：造一份文档，里面同时有一个存在的 `<a href>`、
+一个不存在的 `<a href>`、一个不存在的 `#锚点`、一个坏 `<img>`、一个坏 `![]()`，
+以及**围栏代码块与行内代码里的假链接**；要求恰好报 **4 条**并退出 1，代码块与行内代码里的示例一条都不许报。
+
+### 69.5 这一轮没有做的事（诚实清单）
+
+- **没有发版**：产品代码零改动（Go 源码、`reporters/`、插件包全部未动），`1.0.14 / 1.2.26` 仍是最新。
+- **`172 项 fresh-machine 检查`没有进门禁**：它是"执行到的检查条数"，只能跑整套才算得出，
+  静态数 `check(...)` 的调用数会被循环与条件分支骗。留在 `--print` 之外，写作时以那次的实跑输出为准。
+- **`docs/assets/` 的社交预览图（og:image）仍然没有**：§68.7 第 2 项，纯素材工作，下一轮或再下一轮做。
+- **视觉不变量门禁**（§68.7 第 3 项）仍然只是候选：本轮把"数字"这条先钉住了，几何/配色探针没有动。
+
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 
 本机为 Intel `i7-14650HX` HP OMEN Windows 11 笔记本（无苹果硬件，遵循许可与 SLA 不部署非授权 macOS VM），按用户确认选用 **零 cgo `github.com/ebitengine/purego v0.9.1` + GitHub Actions `macos-latest` 原生验证**路线交付 macOS 全端适配：
