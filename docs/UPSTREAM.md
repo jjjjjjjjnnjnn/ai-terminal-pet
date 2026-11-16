@@ -238,6 +238,26 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
   和「该谁动」；要确认对方那两次重建有没有跑完，用
   `gh run list --repo awesome-dsh-plugin/awesome-dsh-plugin --workflow build-site.yml --limit 3`。
 
+### 4.3 winget：它不是一个"目录"，而是 Windows 自己的那一行
+
+`microsoft/winget-pkgs` 不是市场目录，是**清单仓库**；真正的可见性来自用户机器上的
+「设置 › 应用」那一行。所以这一条与前面的目录有一个根本区别：**能不能装、能不能卸，由我们的安装器决定。**
+
+- 清单在 [`packaging/winget/`](../packaging/winget/README.md)，布局就是 winget-pkgs 的
+  `manifests/j/jjjjjjjjnnjnn/AI-Terminal-Pet/<版本>/`（三份 YAML）。
+- 1.0.15 起 `scripts/install.ps1` 写 `HKCU\...\Uninstall\AI-Terminal-Pet` 并把 `install.ps1`
+  复制进安装目录，因此静默安装（`pet-setup.exe --install`）与静默卸载
+  （那一行的 `QuietUninstallString`）都成立。**这是 winget 能接这个包的前提，不是附加项。**
+- 本地校验用 `winget validate --manifest <目录>`（必须打印"清单验证成功"），
+  `winget show --manifest <目录>` 可以肉眼核对解析结果。
+- 提交是一个只**新增**一个版本目录的 PR；他们的 pipeline 会下载 exe、核对 sha256、跑静默安装与卸载。
+- **判断可见性**：`winget search jjjjjjjjnnjnn.AI-Terminal-Pet`
+  （合并后要等索引同步，通常几小时）；**不要**拿 PR 状态当"已上架"。
+- **一个已知风险，写在这里免得下次重新发现**：`pet-setup.exe` 未做 Authenticode 签名，
+  自动校验时 SmartScreen 有可能拦住 — 若如此，记录原因、保留安装器改进，**不要**改成
+  `InstallerType: zip` + `portable` 的降级清单（那会绕过 `install.ps1`，没有 `protocol.js`、
+  没有 bundle、没有自启动，见 [docs/ROADMAP.md](ROADMAP.md) §5）。
+
 ---
 
 ## 5. 描述怎么写（这条最容易让我们被退回）
@@ -290,6 +310,7 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 [ ] gh pr view <号>：mergeable=MERGEABLE，check 跑起来（不是「没检查」）
 [ ] node tools/upstream-entry.mjs --check      → OK 或 OK（in flight）
 [ ] 从公网下载三个资产复验；沙箱 install → -VerifyOnly → --doctor → -Uninstall
+[ ] packaging/winget 加新版本目录；winget validate 通过；向 microsoft/winget-pkgs 开 PR（只加这一个目录）
 [ ] HANDOVER 记本轮：发了什么、上游 PR 号与状态、判可见性读的是哪个文件
 [ ] node tools/check_versions.mjs 绿（徽章/发布链接/安装命令/基线行都与代码里的版本一致）
 ```
@@ -298,6 +319,9 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 
 ## 8. 还没做完的事（诚实清单）
 
+- **winget（1.0.15 起）**：清单已写在 `packaging/winget/`、`winget validate` 通过，
+  但**提交到 `microsoft/winget-pkgs` 的 PR 还没开**（见 §4.3）。他们会在 pipeline 里真的静默安装再静默卸载；
+  未签名的 `pet-setup.exe` 有被 SmartScreen 拦住的可能，那是这一条唯一的真实风险。
 - 上游 PR **合并仍要人工**：我们只能保证「随时可合」（无冲突、检查跑过、只改一行）。
 - 站点渲染有延迟：合并后要等对方重建，`plugins.json` 才换新版本。**我们会读到旧值，这是正常的。**
 - 其他目录（dshbase / dsh.so / dsh-plugin.org / AllDSH）都是人工复核，已投过，等对方。

@@ -30,8 +30,72 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.10**（tag `pet-v1.0.10`）/ **1.2.19**（tag `dsh-plugin-v1.2.19`）：这一批合并了第 56–60 轮的跨平台架构、Track 3、Linux 纯 Go X11 ARGB 面板、macOS 纯 Go AppKit 面板、POSIX 安装器/打包器、公开文档重构与多平台 CI 全绿发版（见下面的 `[1.0.10]` / `[1.2.19]` 一节）。
+已发版到 **1.0.15**（tag `pet-v1.0.15`）/ **1.2.27**（tag `dsh-plugin-v1.2.27`）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
+
+## [1.0.15] / [1.2.27] — 2026-11-16（安装器写卸载项：删掉 zip 之后，Windows 也能把它卸干净）
+
+这一版只解决一件对用户可见的事：**在 Windows 上装完，之前没有任何"正式"的卸载入口**。
+`install.cmd -Uninstall` 需要你还留着 zip（或至少还留着一个 checkout），
+`pet-setup --uninstall` 会停下来问一句，而"设置 › 应用"里根本没有这一行。
+对一个双击安装的东西来说，这三条加起来等于"装得上、卸不掉"。
+
+### 改了什么
+
+- **`scripts/install.ps1` 把自己复制进安装目录**（第 12 件制品），并在
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AI-Terminal-Pet` 写一行：
+  `DisplayName` / `DisplayVersion`（读 `internal/app/version.go`，zip 用户则问装好的二进制）/
+  `Publisher` / `DisplayIcon` / `InstallLocation` / `URLInfoAbout` /
+  `UninstallString` 与 `QuietUninstallString`（都指向那份副本，`-Uninstall -Force`）/ `NoModify` / `NoRepair` / `EstimatedSize`。
+  于是 **设置 › 应用 › AI Terminal Pet › 卸载** 可用，且 zip 删掉之后照样可用；
+  winget 之类的包管理器要的也正是这一行。
+- **`-Uninstall` 删这一行**，但只在它的 `InstallLocation` 指向刚刚删掉的目录时才删（与 `HKCU\...\Run`
+  同一条守卫：属于别的安装的条目不动）。
+- **`-VerifyOnly` 从 11 件变 12 件**，并多打一行 `[ok] apps list/…`：现在"装得对"包括"能卸掉"。
+- **`cmd/pet-setup` 接受 `--uninstall --force`**（免交互卸载，包管理器与脚本用），
+  `--force` 单独出现、或与 `--verify` / `--add-to-path` 组合都会被拒绝（不再把拼写错误转成 PowerShell 报错）；
+  `--uninstall` 单独仍然会问。
+- **沙箱安装（`-Destination` 指向非默认目录）用派生的键名** `AI-Terminal-Pet-<12hex>`，
+  这样测试装出来的那一行不会混进真实的"设置 › 应用"，卸载也不会删错条目。
+- `tests/fresh-machine.mjs` 从 172 条变 **183** 条：S5 断言那一行的每个字段与"命令指向安装目录里的副本"，
+  S8 **执行注册表里记录的那条命令**（不是自己拼一条），再断言目录与那一行同时消失。
+
+### 为什么插件包也发了一版（1.2.27）
+
+版本常量在 `internal/app/version.go` 里，它会被编进浮窗二进制，所以 `1.0.14 → 1.0.15` 必然改变
+`bin/AI-Terminal-Pet.exe` 的字节；插件包里的 `vendor/AI-Terminal-Pet.exe` 与
+`vendor/manifest.json` 的源码摘要必须跟着前移（`vendor.mjs --check` 判的就是这个）。
+`lib/`、`protocol.js`、清单字段与协议**均未改动**。
+
+### 1.0.15 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.15` | `ai-terminal-pet-1.0.15-win-x64.zip`（17 文件） | 5,129,002 B | `5292B2E7E7D5E699578E99404D7571A902B63173FBCAA4B446B543CAFE10319C` |
+| `pet-v1.0.15` | `pet-setup.exe`（载荷 17 文件） | 14,504,960 B | `AF9E854FDAF5697CD84D26ABCA7885F5E62D599C40C1E37337DEDD8F2B9CB8EB` |
+| `dsh-plugin-v1.2.27` | `dsh-ai-terminal-pet-1.2.27.tgz`（20 文件） | 2,072,885 B | `FA50130DDC51A9D0C3DD5320D8D97A7A363DBA46B0B555E4877D740116584270` |
+
+Linux / macOS 的四个 tar.gz 同样按 1.0.15 重发（`install.sh` 与 POSIX 行为未改）。
+
+### 实测
+
+- 本机：`scripts\install.cmd` 装 1.0.15 → `-VerifyOnly` **12/12 一致**、`0 warning`；
+  `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接了 statusline）；
+  `AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.15`；
+  注册表那一行 `DisplayName=AI Terminal Pet`、`DisplayVersion=1.0.15`、
+  `InstallLocation=%LOCALAPPDATA%\AI-Terminal-Pet`、`QuietUninstallString` 指向安装目录里的 `install.ps1`。
+- 沙箱（`-Destination %TEMP%\pet-arp-check-*\AI-Terminal-Pet`）：装上 → `-VerifyOnly` 12/12 →
+  用**注册表里那条命令**卸载 → 目录与键都没了（键名是派生的 `AI-Terminal-Pet-C9D59440F865`）。
+- `tests/fresh-machine.mjs --no-overlay` **183/183**；`node packages/dsh-ai-terminal-pet/verify.mjs` PASS；
+  `vendor.mjs --check` 两个文件都与源码同摘要；`tools/check_versions.mjs` 与
+  `tools/check_facts.mjs` 均全绿。
+
+### 没有做的事
+
+- **没有 Authenticode 签名**，也没有公证；因此 `pet-setup.exe` 仍会触发 SmartScreen，README 里照旧明说。
+- **没有提交 winget 清单**：清单里的 `InstallerSha256` 必须是这一版资产的真实摘要，所以只能在 Release 建好之后写。
+  清单放在 `packaging/winget/` 并随仓库走，提交到 `microsoft/winget-pkgs` 的 PR 另行记录在
+  [docs/UPSTREAM.md](docs/UPSTREAM.md)。
 
 ## [1.2.26] — 2026-11-16（只改文案：包的内页开头重写，npm 页与仓库同源）
 

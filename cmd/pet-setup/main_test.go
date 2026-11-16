@@ -66,6 +66,8 @@ func TestParseArgsMapsOntoInstallerSwitches(t *testing.T) {
 		{[]string{"--verify"}, []string{"-VerifyOnly"}},
 		{[]string{"--verify-only"}, []string{"-VerifyOnly"}},
 		{[]string{"--uninstall"}, []string{"-Uninstall"}},
+		{[]string{"--uninstall", "--force"}, []string{"-Uninstall", "-Force"}},
+		{[]string{"--UNINSTALL", "--FORCE"}, []string{"-Uninstall", "-Force"}},
 		{[]string{"--add-to-path"}, []string{"-AddToPath"}},
 		{[]string{"--ADD-TO-PATH"}, []string{"-AddToPath"}},
 	}
@@ -92,6 +94,37 @@ func TestParseArgsDoesNotForwardUninstallForce(t *testing.T) {
 	}
 	if len(got.passthrough) != 1 || got.passthrough[0] != "-Uninstall" {
 		t.Fatalf("passthrough %v, want exactly -Uninstall", got.passthrough)
+	}
+}
+
+// TestParseArgsForceOnlyMeansUninstall: -Force is the flag that removes the
+// prompt, so it must not be accepted on its own or next to a read-only or
+// PATH-writing operation. A typo that silently means "do not ask me" is exactly
+// the kind of thing this parser refuses to forward.
+func TestParseArgsForceOnlyMeansUninstall(t *testing.T) {
+	for _, args := range [][]string{
+		{"--force"},
+		{"--verify", "--force"},
+		{"--add-to-path", "--force"},
+	} {
+		if _, err := parseArgs(args); err == nil {
+			t.Fatalf("args %v: expected an error", args)
+		}
+	}
+}
+
+// TestParseArgsRefusesTwoOperations: install.ps1 rejects these combinations
+// itself, but a setup exe that starts PowerShell only to be told "bad usage"
+// has already unpacked 5 MB and printed a PowerShell error.
+func TestParseArgsRefusesTwoOperations(t *testing.T) {
+	for _, args := range [][]string{
+		{"--verify", "--uninstall"},
+		{"--uninstall", "--add-to-path"},
+		{"--verify", "--add-to-path"},
+	} {
+		if _, err := parseArgs(args); err == nil {
+			t.Fatalf("args %v: expected an error", args)
+		}
 	}
 }
 

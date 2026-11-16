@@ -85,7 +85,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (463 func Test across 15 packages)
+# 1. Static analysis and all unit tests (465 func Test across 15 packages)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...

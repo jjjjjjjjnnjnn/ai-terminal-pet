@@ -13,7 +13,7 @@
 
 <p>
   <a href="https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/actions/workflows/ci.yml"><img src="https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/version-1.0.14-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.0.15-blue" alt="Version" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20X11%20%7C%20macOS%20AppKit-0078D4" alt="Platforms" />
   <img src="https://img.shields.io/badge/Go-1.23%2B%20(CGO__ENABLED%3D0)-00ADD8" alt="Go 1.23+ CGO_ENABLED=0" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
@@ -111,13 +111,13 @@ A bell does not fix this. Neither does a spinner in each terminal's own window: 
 
 The overlay is one statically linked binary per platform (`CGO_ENABLED=0`, no Electron, no WebView, no libgtk, no cgo). Reporters use the Node.js standard library only — zero npm dependencies.
 
-**Windows (x64)** — download `pet-setup.exe` from the [**latest release (`pet-v1.0.14`)**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.14) and run it. It verifies the SHA-256 of every embedded file before writing anything, then installs into `%LOCALAPPDATA%\AI-Terminal-Pet\`. Prefer a portable archive? Grab `ai-terminal-pet-1.0.14-win-x64.zip`, unzip, and run `.\install.cmd` (`-VerifyOnly`, `-AddToPath`, `-Uninstall` included).
+**Windows (x64)** — download `pet-setup.exe` from the [**latest release (`pet-v1.0.15`)**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.15) and run it. It verifies the SHA-256 of every embedded file before writing anything, then installs into `%LOCALAPPDATA%\AI-Terminal-Pet\` and registers an uninstall entry, so Windows can remove it later even if you delete the download. Prefer a portable archive? Grab `ai-terminal-pet-1.0.15-win-x64.zip`, unzip, and run `.\install.cmd` (`-VerifyOnly`, `-AddToPath`, `-Uninstall` included).
 
 **macOS (Apple Silicon `arm64` / Intel `amd64`)**:
 
 ```sh
-tar -xzf ai-terminal-pet-1.0.14-darwin-arm64.tar.gz   # or darwin-amd64
-cd ai-terminal-pet-1.0.14-darwin-arm64
+tar -xzf ai-terminal-pet-1.0.15-darwin-arm64.tar.gz   # or darwin-amd64
+cd ai-terminal-pet-1.0.15-darwin-arm64
 xattr -dr com.apple.quarantine .                      # unsigned, not notarized yet
 sh ./install.sh
 ```
@@ -125,8 +125,8 @@ sh ./install.sh
 **Linux (`amd64` / `arm64`, X11)**:
 
 ```sh
-tar -xzf ai-terminal-pet-1.0.14-linux-amd64.tar.gz    # or linux-arm64
-cd ai-terminal-pet-1.0.14-linux-amd64
+tar -xzf ai-terminal-pet-1.0.15-linux-amd64.tar.gz    # or linux-arm64
+cd ai-terminal-pet-1.0.15-linux-amd64
 sh ./install.sh
 ```
 
@@ -134,20 +134,20 @@ Both POSIX installers land in the platform's data directory, symlink `~/.local/b
 
 **DeepSeek Harness users** — the plugin is the zero-config path, on all three platforms now:
 
-> The package is now **1.2.26** (`dsh.bundle.platforms: ["win32", "linux", "darwin"]`). It connects DeepSeek Harness sessions immediately: on Windows it installs the bundled overlay + `protocol.js` offline on first run, on Linux and macOS it fetches the pinned release archive once (SHA-256 verified) and installs the same overlay.
+> The package is now **1.2.27** (`dsh.bundle.platforms: ["win32", "linux", "darwin"]`). It connects DeepSeek Harness sessions immediately: on Windows it installs the bundled overlay + `protocol.js` offline on first run, on Linux and macOS it fetches the pinned release archive once (SHA-256 verified) and installs the same overlay.
 
 ```sh
 # from npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # or pinned to the release tarball
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.26/dsh-ai-terminal-pet-1.2.26.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.27/dsh-ai-terminal-pet-1.2.27.tgz
 
 # or pinned to a git tag, no npm needed
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.26&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.27&path:/packages/dsh-ai-terminal-pet"
 ```
 
-Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.26). Details and uninstall: [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md).
+Published on [npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet) (1.2.27). Details and uninstall: [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md).
 
 Installing the plugin shows **DeepSeek Harness** sessions out of the box. The other three terminals need their reporter wired once — one command, below.
 
@@ -240,7 +240,7 @@ Every platform compiles all 16 Go packages cleanly with `CGO_ENABLED=0`. The ove
 
 This is the part most projects leave out, and it is the part that decides whether you can trust a status strip: a strip that lies about state is worse than no strip.
 
-**Measured on every push, on real runners:** `go vet`, **463 `func Test`** across 15 packages, cross-builds for linux/amd64 and darwin/arm64, `go test -race` on Ubuntu, both plugin verifiers, **172 fresh-machine checks** (install → report → `--doctor` → uninstall in a sandbox), version-claim and documentation-link gates, `govulncheck` and `gosec`.
+**Measured on every push, on real runners:** `go vet`, **465 `func Test`** across 15 packages, cross-builds for linux/amd64 and darwin/arm64, `go test -race` on Ubuntu, both plugin verifiers, **183 fresh-machine checks** (install → report → `--doctor` → uninstall in a sandbox), version-claim and documentation-link gates, `govulncheck` and `gosec`.
 
 **Not verified, and not planned** — this project has no Apple hardware and no spare Linux desktop, and the maintainer's decision is to skip those runs rather than claim them:
 
@@ -276,6 +276,9 @@ Everything above is also written in [docs/PLATFORMS.md](docs/PLATFORMS.md), with
 | `approvals/` | transient auto-approve handshakes (`pending-*.json`, `.deny`) |
 | `alerts.json` | the alert decision record |
 | `error.log` | diagnostic log (`0600`, rotated above 1 MiB) |
+| `install.ps1` | Windows only: the installer's own copy, so the uninstall entry works after you delete the zip |
+
+A Windows install also adds one registry entry, `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AI-Terminal-Pet` — the Settings › Apps row (`DisplayVersion`, `InstallLocation`, and an uninstall command that asks no prompt). Uninstalling removes it.
 
 ## Develop
 
@@ -302,7 +305,7 @@ Maintainer references: [docs/PLATFORMS.md](docs/PLATFORMS.md) (what works where,
 
 **Why not Electron / a browser tab?** Because the point is a 56 px strip that is always there and costs nothing: one static binary, no runtime, no DLLs beyond standard system libraries.
 
-**How do I get rid of it?** `install.cmd -Uninstall` on Windows, `sh ./install.sh --uninstall` elsewhere, `dsh plugin --profile <profile> remove dsh-ai-terminal-pet` for the plugin. Nothing stays resident: with no sessions the process exits on its own.
+**How do I get rid of it?** On Windows: `Settings › Apps › AI Terminal Pet › Uninstall`, or `install.cmd -Uninstall` if you still have the zip. The first path keeps working after the download is gone — the installer leaves its own copy of `install.ps1` in `%LOCALAPPDATA%\AI-Terminal-Pet` and points the uninstall entry at it. On macOS/Linux: `sh ./install.sh --uninstall`. For the plugin: `dsh plugin --profile <profile> remove dsh-ai-terminal-pet`. Nothing stays resident: with no sessions the process exits on its own.
 
 ## License & third-party libraries
 
@@ -389,13 +392,13 @@ Maintainer references: [docs/PLATFORMS.md](docs/PLATFORMS.md) (what works where,
 
 浮窗本体是每个平台一个静态二进制（`CGO_ENABLED=0`，无 Electron、无 WebView、无 libgtk、无 cgo）；上报端只用 Node.js 标准库，零 npm 依赖。
 
-**Windows (x64)** —— 从[**最新 Release（`pet-v1.0.14`）**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.14) 下载 `pet-setup.exe` 双击运行：写入前先逐文件核对内嵌载荷的 SHA-256，然后装到 `%LOCALAPPDATA%\AI-Terminal-Pet\`。想要绿色版就用 `ai-terminal-pet-1.0.14-win-x64.zip`，解压后运行 `.\install.cmd`（支持 `-VerifyOnly` / `-AddToPath` / `-Uninstall`）。
+**Windows (x64)** —— 从[**最新 Release（`pet-v1.0.15`）**](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.15) 下载 `pet-setup.exe` 双击运行：写入前先逐文件核对内嵌载荷的 SHA-256，然后装到 `%LOCALAPPDATA%\AI-Terminal-Pet\`，并登记一条卸载项——之后就算你把下载的 zip 删了，Windows 也能把它卸干净。想要绿色版就用 `ai-terminal-pet-1.0.15-win-x64.zip`，解压后运行 `.\install.cmd`（支持 `-VerifyOnly` / `-AddToPath` / `-Uninstall`）。
 
 **macOS（Apple Silicon `arm64` / Intel `amd64`）**：
 
 ```sh
-tar -xzf ai-terminal-pet-1.0.14-darwin-arm64.tar.gz   # 或 darwin-amd64
-cd ai-terminal-pet-1.0.14-darwin-arm64
+tar -xzf ai-terminal-pet-1.0.15-darwin-arm64.tar.gz   # 或 darwin-amd64
+cd ai-terminal-pet-1.0.15-darwin-arm64
 xattr -dr com.apple.quarantine .                      # 未签名、未公证
 sh ./install.sh
 ```
@@ -403,8 +406,8 @@ sh ./install.sh
 **Linux（`amd64` / `arm64`，X11）**：
 
 ```sh
-tar -xzf ai-terminal-pet-1.0.14-linux-amd64.tar.gz    # 或 linux-arm64
-cd ai-terminal-pet-1.0.14-linux-amd64
+tar -xzf ai-terminal-pet-1.0.15-linux-amd64.tar.gz    # 或 linux-arm64
+cd ai-terminal-pet-1.0.15-linux-amd64
 sh ./install.sh
 ```
 
@@ -412,20 +415,20 @@ sh ./install.sh
 
 **DeepSeek Harness 用户** —— 插件是零配置路径，现在三个平台都行：
 
-> 当前版本是 **1.2.26**（包声明 `dsh.bundle.platforms: ["win32", "linux", "darwin"]`）。装完即可看到 DeepSeek Harness 的会话：Windows 上首次加载会把内置的浮窗本体与 `protocol.js` 离线落盘；Linux / macOS 上会先下载一次钉住的发布归档（校验 SHA-256）再装同一份浮窗。
+> 当前版本是 **1.2.27**（包声明 `dsh.bundle.platforms: ["win32", "linux", "darwin"]`）。装完即可看到 DeepSeek Harness 的会话：Windows 上首次加载会把内置的浮窗本体与 `protocol.js` 离线落盘；Linux / macOS 上会先下载一次钉住的发布归档（校验 SHA-256）再装同一份浮窗。
 
 ```sh
 # 通过 npm
 dsh plugin --profile <profile> add dsh-ai-terminal-pet
 
 # 或钉住 Release tarball
-dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.26/dsh-ai-terminal-pet-1.2.26.tgz
+dsh plugin --profile <profile> add https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/download/dsh-plugin-v1.2.27/dsh-ai-terminal-pet-1.2.27.tgz
 
 # 或钉住 git tag（不需要 npm）
-dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.26&path:/packages/dsh-ai-terminal-pet"
+dsh plugin --profile <profile> add "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git#dsh-plugin-v1.2.27&path:/packages/dsh-ai-terminal-pet"
 ```
 
-已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.26）。更多说明与卸载方式见 [packages/dsh-ai-terminal-pet/README.zh.md](packages/dsh-ai-terminal-pet/README.zh.md)。
+已在 npm 发布（[npmjs.com/package/dsh-ai-terminal-pet](https://www.npmjs.com/package/dsh-ai-terminal-pet)，1.2.27）。更多说明与卸载方式见 [packages/dsh-ai-terminal-pet/README.zh.md](packages/dsh-ai-terminal-pet/README.zh.md)。
 
 装插件默认只显示 **DeepSeek Harness** 的会话；另外三个终端各接一次上报端即可，一条命令，见下。
 
@@ -457,7 +460,7 @@ ai-terminal-pet --doctor
 
 ### 验证到什么程度 —— 以及哪些没有
 
-**每次推送都会在真实 runner 上量到的**：`go vet`、15 个包共 **463 个 `func Test`**、linux/amd64 与 darwin/arm64 交叉构建、Ubuntu 上的 `go test -race`、两个插件校验、**172 项 fresh-machine 检查**（沙箱里装 → 上报 → `--doctor` → 卸载）、版本声明与文档链接门禁、`govulncheck` 与 `gosec`。
+**每次推送都会在真实 runner 上量到的**：`go vet`、15 个包共 **465 个 `func Test`**、linux/amd64 与 darwin/arm64 交叉构建、Ubuntu 上的 `go test -race`、两个插件校验、**183 项 fresh-machine 检查**（沙箱里装 → 上报 → `--doctor` → 卸载）、版本声明与文档链接门禁、`govulncheck` 与 `gosec`。
 
 **没有验证、而且不打算验证的** —— 这个项目没有苹果硬件，也没有多余的 Linux 桌面，维护者的决定是不做这些实测、也不把它们写成"已验证"：
 
@@ -467,7 +470,7 @@ ai-terminal-pet --doctor
 
 ### 命令行与文件
 
-常用参数：`--show` / `--toggle` / `--reset` / `--settings` / `--autostart[=on|off]` / `--connect[=HOST]` / `--doctor` / `--json [--pretty]` / `--quit` / `--version`（打印版本信息（v1.0.14））/ `--help`。
+常用参数：`--show` / `--toggle` / `--reset` / `--settings` / `--autostart[=on|off]` / `--connect[=HOST]` / `--doctor` / `--json [--pretty]` / `--quit` / `--version`（打印版本信息（v1.0.15））/ `--help`。
 
 数据目录：Windows `%LOCALAPPDATA%\AI-Terminal-Pet\`、macOS `~/Library/Application Support/AI-Terminal-Pet/`、Linux `$XDG_DATA_HOME/ai-terminal-pet/`（默认 `~/.local/share/ai-terminal-pet/`）。其中 `config.json`（开关与外观）、`state.json`（位置/缩放/分屏坐标）、`runtime/*.json`（会话快照）、`approvals/`（自动审批握手）、`alerts.json`（提醒判定记录）、`error.log`（故障日志，`0600`，超过 1 MiB 轮转）。
 
@@ -481,7 +484,7 @@ ai-terminal-pet --doctor
 
 **为什么不用 Electron / 网页？** 因为它的意义就是一条 56 px、一直存在、几乎不占资源的窄条：一个静态二进制，没有运行时，除系统库外没有 DLL。
 
-**怎么彻底去掉？** Windows 用 `install.cmd -Uninstall`，其它平台 `sh ./install.sh --uninstall`，插件用 `dsh plugin --profile <profile> remove dsh-ai-terminal-pet`。它也常驻不了：没有会话时进程会自己退出。
+**怎么彻底去掉？** Windows 走 `设置 › 应用 › AI Terminal Pet › 卸载`，或者还留着 zip 时用 `install.cmd -Uninstall`。第一条在下载文件删掉之后照样有效——安装器把 `install.ps1` 自己的副本留在 `%LOCALAPPDATA%\AI-Terminal-Pet`，卸载项指的就是它。其它平台 `sh ./install.sh --uninstall`，插件用 `dsh plugin --profile <profile> remove dsh-ai-terminal-pet`。它也常驻不了：没有会话时进程会自己退出。
 
 ### 开源协议与依赖致谢
 

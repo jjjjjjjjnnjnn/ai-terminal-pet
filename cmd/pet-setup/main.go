@@ -58,6 +58,9 @@ Usage:
   pet-setup --add-to-path   install, then add the install directory to HKCU Path
   pet-setup --verify        check the installed files against the payload hashes
   pet-setup --uninstall     stop the overlay and delete the install directory
+  pet-setup --uninstall --force
+                            the same, with no confirmation prompt (what the
+                            Settings > Apps entry and winget call)
   pet-setup --version       print the version of the payload this build carries
   pet-setup --help          print this text
 
@@ -163,7 +166,17 @@ type options struct {
 // deliberately accepts nothing else: an unknown flag is a typo, and forwarding a
 // typo to PowerShell would produce a PowerShell error message instead of a
 // usage message.
+//
+// --force is only meaningful next to --uninstall. It is not implied: the prompt
+// is the last chance to stop before a directory is deleted, and an installer
+// that deletes without asking is a worse default than one extra keystroke. The
+// caller that must not have a prompt - the Settings > Apps entry, and every
+// package manager that drives it - spells both flags.
 func parseArgs(args []string) (options, error) {
+	verify := false
+	uninstall := false
+	addToPath := false
+	force := false
 	for _, arg := range args {
 		switch strings.ToLower(strings.TrimSpace(arg)) {
 		case "", "--install":
@@ -173,19 +186,42 @@ func parseArgs(args []string) (options, error) {
 		case "--version", "-v":
 			return options{mode: modeVersion}, nil
 		case "--verify", "--verify-only":
-			return options{mode: modeInstall, passthrough: []string{"-VerifyOnly"}}, nil
+			verify = true
 		case "--uninstall":
-			// -Force is not implied: the prompt is the last chance to stop
-			// before a directory is deleted, and an installer that deletes
-			// without asking is a worse default than one extra keystroke.
-			return options{mode: modeInstall, passthrough: []string{"-Uninstall"}}, nil
+			uninstall = true
 		case "--add-to-path":
-			return options{mode: modeInstall, passthrough: []string{"-AddToPath"}}, nil
+			addToPath = true
+		case "--force", "-f":
+			force = true
 		default:
 			return options{}, fmt.Errorf("unknown option %q", arg)
 		}
 	}
-	return options{mode: modeInstall}, nil
+	selected := 0
+	for _, chosen := range []bool{verify, uninstall, addToPath} {
+		if chosen {
+			selected++
+		}
+	}
+	if selected > 1 {
+		return options{}, errors.New("--verify, --uninstall and --add-to-path are mutually exclusive")
+	}
+	if force && !uninstall {
+		return options{}, errors.New("--force only means something with --uninstall")
+	}
+	result := options{mode: modeInstall}
+	switch {
+	case verify:
+		result.passthrough = []string{"-VerifyOnly"}
+	case uninstall:
+		result.passthrough = []string{"-Uninstall"}
+		if force {
+			result.passthrough = append(result.passthrough, "-Force")
+		}
+	case addToPath:
+		result.passthrough = []string{"-AddToPath"}
+	}
+	return result, nil
 }
 
 // payloadReady reports whether this build carries a staged payload or the

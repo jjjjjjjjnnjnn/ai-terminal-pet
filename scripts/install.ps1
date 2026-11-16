@@ -7,6 +7,13 @@
 #   powershell -NoProfile -File scripts\install.ps1 -AddToPath    # install + user PATH entry
 # -Uninstall also removes the HKCU Path entry that -AddToPath added.
 #
+# An install is self-contained in one way that matters to somebody who deletes
+# the zip: this script is copied into the install directory, and an entry under
+# HKCU ...\Uninstall\ is written that runs that copy with -Uninstall -Force.
+# So "Settings > Apps > AI Terminal Pet > Uninstall" works with no zip, no
+# checkout and no prompt - which is also the only shape a package manager
+# (winget included) can drive.
+#
 # Exit codes: 0 success, 1 install or verification failed, 2 bad usage,
 # 3 the user cancelled. Every message is plain ASCII on purpose: Windows
 # PowerShell 5.1 reads a script without a byte-order mark in the ANSI code page,
@@ -22,6 +29,7 @@ param(
   [string]$ProtocolDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\protocol.js'),
   [string]$BundleSource = (Join-Path (Split-Path -Parent $PSScriptRoot) 'integrations\deepseek-harness\ai-terminal-pet-bridge'),
   [string]$BundleDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\bundles\ai-terminal-pet-bridge'),
+  [string]$UninstallerDestination = (Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet\install.ps1'),
   [switch]$VerifyOnly,
   [switch]$Uninstall,
   [switch]$AddToPath,
@@ -39,6 +47,14 @@ $ErrorActionPreference = 'Stop'
 $NewLine = [Environment]::NewLine
 $RunKeyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
 $RunValueName = 'AITerminalPet'
+$UninstallKeyRoot = 'Software\Microsoft\Windows\CurrentVersion\Uninstall'
+
+# The copy of this script that the install writes into the install directory.
+# $PSCommandPath is the absolute path of the running script; it is set whenever
+# PowerShell started us with -File, which is the only documented way to run this
+# (install.cmd and pet-setup both do). $MyInvocation covers the pasted-in case.
+$SelfScript = $PSCommandPath
+if (-not $SelfScript) { $SelfScript = $MyInvocation.MyCommand.Path }
 
 # Everything this script creates, verifies or deletes lives under exactly one
 # directory. Deriving it from -Destination (instead of hard-coding
@@ -65,6 +81,29 @@ if ($PSBoundParameters.ContainsKey('Destination')) {
   if (-not $PSBoundParameters.ContainsKey('BundleDestination')) {
     $BundleDestination = Join-Path $InstallDirectory 'bundles\ai-terminal-pet-bridge'
   }
+  if (-not $PSBoundParameters.ContainsKey('UninstallerDestination')) {
+    $UninstallerDestination = Join-Path $InstallDirectory 'install.ps1'
+  }
+}
+
+# The Apps & Features entry this install writes, and the one -Uninstall removes.
+# A rehearsed install (a directory other than the real one) gets its own key name
+# derived from that directory: writing the real name would put a test install
+# into Settings next to a real one, and uninstalling the test would then remove
+# the real entry. The comparison is against the default directory rather than
+# "-Destination was passed", because the recorded uninstall command spells
+# -Destination out even for a real install.
+$DefaultInstallDirectory = Join-Path $env:LOCALAPPDATA 'AI-Terminal-Pet'
+$UninstallKeyName = 'AI-Terminal-Pet'
+$Rehearsal = $InstallDirectory -and (-not [string]::Equals($InstallDirectory.TrimEnd('\'), $DefaultInstallDirectory.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase))
+if ($Rehearsal) {
+  $hash = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = $hash.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($InstallDirectory.ToLowerInvariant()))
+  } finally {
+    $hash.Dispose()
+  }
+  $UninstallKeyName = 'AI-Terminal-Pet-' + ([System.BitConverter]::ToString($bytes) -replace '-', '').Substring(0, 12)
 }
 
 # A read-only check and a destructive delete cannot mean the same invocation,
@@ -131,7 +170,12 @@ function Get-InstallArtifacts {
     @{ Group = 'overlay'; Label = 'AI-Terminal-Pet.exe'; From = $Source; To = $Destination; Binary = $true },
     @{ Group = 'statusline'; Label = 'pet-statusline.exe'; From = $ShimSource; To = $ShimDestination; Binary = $true },
     @{ Group = 'hook'; Label = 'pet-hook.exe'; From = $HookSource; To = $HookDestination; Binary = $true },
-    @{ Group = 'protocol'; Label = 'protocol.js'; From = $ProtocolSource; To = $ProtocolDestination; Binary = $false }
+    @{ Group = 'protocol'; Label = 'protocol.js'; From = $ProtocolSource; To = $ProtocolDestination; Binary = $false },
+    # The installer copies itself so that the Apps & Features entry (and a
+    # winget uninstall) can run after the zip or checkout is gone. It is an
+    # artifact like the rest: it is hashed before and after the copy, and
+    # -VerifyOnly proves the installed copy is the one that shipped.
+    @{ Group = 'uninstaller'; Label = 'install.ps1'; From = $SelfScript; To = $UninstallerDestination; Binary = $false }
   )
   foreach ($relative in $bundleFiles) {
     if ($relative -eq 'package.json' -or $relative -eq 'cordis.patch.yml') {
@@ -201,6 +245,90 @@ function Test-PathInsideDirectory {
   return $fullPath.StartsWith($fullDirectory + '\', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+# Get-OverlayVersion answers "which version did we just install" for the Apps &
+# Features row, from the two sources that can be the truth: in a checkout,
+# internal\app\version.go (the constant --version prints); in an unzipped
+# release, the installed binary itself. A process that does not answer in five
+# seconds must not hang the installer, so the version is allowed to fall back to
+# 0.0.0 with a warning rather than blocking the copy that already succeeded.
+function Get-OverlayVersion {
+  param([Parameter(Mandatory)][string]$Exe)
+  $versionFile = Join-Path $RepoRoot 'internal\app\version.go'
+  if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
+    $match = [regex]::Match([System.IO.File]::ReadAllText($versionFile), 'const Version = "(\d+\.\d+\.\d+)"')
+    if ($match.Success) { return $match.Groups[1].Value }
+  }
+  $outFile = Join-Path $env:TEMP ('ai-terminal-pet-version-' + [guid]::NewGuid().ToString('n') + '.txt')
+  try {
+    $proc = Start-Process -FilePath $Exe -ArgumentList '--version' -RedirectStandardOutput $outFile -PassThru -NoNewWindow
+    $null = $proc | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
+    if (-not $proc.HasExited) { $proc | Stop-Process -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $outFile -PathType Leaf) {
+      $match = [regex]::Match((Get-Content -LiteralPath $outFile -Raw), '(\d+\.\d+\.\d+)')
+      if ($match.Success) { return $match.Groups[1].Value }
+    }
+  } catch {
+    Write-Output ('[warn] apps list: could not ask ' + $Exe + ' for its version: ' + $_.Exception.Message)
+  } finally {
+    Remove-Item -LiteralPath $outFile -Force -ErrorAction SilentlyContinue
+  }
+  return '0.0.0'
+}
+
+# Write-UninstallEntry is what makes the install removable by something other
+# than the zip it came from: Settings > Apps shows one row, and its Uninstall
+# button runs the copy of this script that sits in the install directory. Every
+# package manager that uninstalls a per-user install (winget included) reads
+# exactly this key, so a missing entry is a missing uninstaller, not a detail.
+function Write-UninstallEntry {
+  param([Parameter(Mandatory)][string]$Version)
+  $keyPath = $UninstallKeyRoot + '\' + $UninstallKeyName
+  $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($keyPath)
+  if ($null -eq $key) { throw ('cannot open HKCU\' + $keyPath + ' for writing') }
+  try {
+    # -Force is deliberate in both command values: Settings has already asked
+    # ("are you sure"), and a package manager has no console to answer a
+    # Read-Host prompt. The interactive prompt still guards the zip path.
+    # -Destination is repeated so the recorded command means the same thing even
+    # when this install was rehearsed into a scratch directory; for a real
+    # install it is the default path spelled out.
+    $command = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $UninstallerDestination + '" -Uninstall -Force -Destination "' + $Destination + '"'
+    $size = 0
+    foreach ($item in (Get-InstallArtifacts)) {
+      try { $size = $size + (Get-Item -LiteralPath $item.To -ErrorAction Stop).Length } catch { }
+    }
+    $key.SetValue('DisplayName', 'AI Terminal Pet')
+    $key.SetValue('DisplayVersion', $Version)
+    $key.SetValue('Publisher', 'jjjjjjjjnnjnn')
+    $key.SetValue('DisplayIcon', $Destination)
+    $key.SetValue('InstallLocation', $InstallDirectory)
+    $key.SetValue('URLInfoAbout', 'https://github.com/jjjjjjjjnnjnn/ai-terminal-pet')
+    $key.SetValue('UninstallString', $command)
+    $key.SetValue('QuietUninstallString', $command)
+    $key.SetValue('NoModify', 1, [Microsoft.Win32.RegistryValueKind]::DWord)
+    $key.SetValue('NoRepair', 1, [Microsoft.Win32.RegistryValueKind]::DWord)
+    $key.SetValue('EstimatedSize', [int][Math]::Ceiling($size / 1024), [Microsoft.Win32.RegistryValueKind]::DWord)
+  } finally {
+    $key.Close()
+  }
+}
+
+# Get-UninstallEntryLocation answers "which directory does the Apps & Features
+# entry claim to belong to". It is the guard that keeps -Uninstall from deleting
+# an entry that belongs to a different copy - same rule as the Run entry.
+function Get-UninstallEntryLocation {
+  $keyPath = $UninstallKeyRoot + '\' + $UninstallKeyName
+  $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($keyPath, $false)
+  if ($null -eq $key) { return $null }
+  try {
+    $location = [string]$key.GetValue('InstallLocation', '')
+    if (-not $location) { return '' }
+    return $location
+  } finally {
+    $key.Close()
+  }
+}
+
 # Assert-SafeInstallDirectory refuses the two ways a typo turns -Uninstall into
 # a data-loss story: a drive root (or any path with only one component), and a
 # directory whose name is not the one this project owns.
@@ -229,7 +357,7 @@ function Assert-SafeInstallDirectory {
 # intact instead of taking the installer's word for it.
 function Invoke-VerifyOnly {
   $items = Get-InstallArtifacts
-  $groupOrder = @('overlay', 'statusline', 'hook', 'protocol', 'bundle manifest', 'bundle runtime')
+  $groupOrder = @('overlay', 'statusline', 'hook', 'protocol', 'uninstaller', 'bundle manifest', 'bundle runtime')
   $stats = @{}
   foreach ($group in $groupOrder) { $stats[$group] = @{ Files = 0; Failed = 0; Warned = 0 } }
   $failures = 0
@@ -286,6 +414,21 @@ function Invoke-VerifyOnly {
     $entry = $stats[$group]
     if ($entry.Files -eq 0) { continue }
     Write-Output ('  ' + $group.PadRight(17) + $entry.Files.ToString() + ' file(s), ' + $entry.Failed.ToString() + ' failed, ' + $entry.Warned.ToString() + ' cannot be compared')
+  }
+
+  # The entry that lets Settings > Apps remove this install. A warning, not a
+  # failure: -VerifyOnly's promise is about the files, and re-running the
+  # installer writes the entry without touching them.
+  $entryLocation = Get-UninstallEntryLocation
+  if ($null -eq $entryLocation) {
+    $warnings = $warnings + 1
+    Write-Output ('[warn] apps list/' + $UninstallKeyName + ': no HKCU uninstall entry, so Settings cannot remove this install')
+    Write-Output '       Re-run scripts\install.ps1 (no flags) to write it.'
+  } elseif ($entryLocation -and -not [string]::Equals($entryLocation.TrimEnd('\'), $InstallDirectory.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase)) {
+    $warnings = $warnings + 1
+    Write-Output ('[warn] apps list/' + $UninstallKeyName + ': points at ' + $entryLocation + ', not ' + $InstallDirectory)
+  } else {
+    Write-Output ('[ok] apps list/' + $UninstallKeyName + ': Settings > Apps can uninstall this install')
   }
   Write-Output ''
   if ($failures -gt 0) {
@@ -389,6 +532,23 @@ function Invoke-Uninstall {
       Write-Output ('[warn] uninstall: HKCU Run entry ' + $RunValueName + ' points at ' + $target)
       Write-Output '       That is not inside the directory just deleted, so it was left alone.'
       Write-Output ('       Remove it by hand if it is stale: Remove-ItemProperty -Path HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name ' + $RunValueName)
+    }
+  }
+  # The Apps & Features entry goes too, but only when it names the directory
+  # that was just deleted: an entry for a different install belongs to it.
+  $entryLocation = Get-UninstallEntryLocation
+  if ($null -eq $entryLocation) {
+    Write-Output ('[ok] uninstall: no HKCU uninstall entry named ' + $UninstallKeyName)
+  } elseif ($entryLocation -and -not [string]::Equals($entryLocation.TrimEnd('\'), $InstallDirectory.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase)) {
+    Write-Output ('[warn] uninstall: the HKCU uninstall entry ' + $UninstallKeyName + ' points at ' + $entryLocation)
+    Write-Output '       That is not the directory just deleted, so it was left alone.'
+  } else {
+    try {
+      [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($UninstallKeyRoot + '\' + $UninstallKeyName, $false)
+      Write-Output ('[ok] uninstall: removed HKCU uninstall entry ' + $UninstallKeyName)
+    } catch {
+      Write-Output ('[fail] uninstall: could not remove the HKCU uninstall entry: ' + $_.Exception.Message)
+      exit 1
     }
   }
   # A PATH entry that points at the directory just deleted is a dead entry, so
@@ -615,8 +775,22 @@ if ($AddToPath) {
 Write-Output ''
 Write-Output ('install: ok - ' + $Items.Count + ' file(s) copied and hash-verified into ' + $InstallDirectory)
 
-Get-Item -LiteralPath $Destination, $ShimDestination, $HookDestination, $ProtocolDestination | Select-Object FullName, Length, LastWriteTime
-Get-Item -LiteralPath $BundleDestination | Select-Object FullName, LastWriteTime
+# The Apps & Features entry is written only after the copy and its hashes are
+# good, so a failed install leaves no entry pointing at a half-installed tree.
+$EntryFailed = $false
+try {
+  $overlayVersion = Get-OverlayVersion -Exe $Destination
+  Write-UninstallEntry -Version $overlayVersion
+  Write-Output ('[ok] apps list: ' + $UninstallKeyName + ' (version ' + $overlayVersion + '); uninstall from Settings > Apps')
+} catch {
+  $EntryFailed = $true
+  Write-Output ('[fail] apps list: could not write the HKCU uninstall entry: ' + $_.Exception.Message)
+  Write-Output '       The files ARE installed and hash-verified; only the Settings > Apps entry is missing.'
+  Write-Output '       Rerun scripts\install.ps1 (no flags) to write it.'
+}
 
-if ($PathFailed) { exit 1 }
+Get-Item -LiteralPath $Destination, $ShimDestination, $HookDestination, $ProtocolDestination | Select-Object FullName, Length, LastWriteTime
+Get-Item -LiteralPath $BundleDestination, $UninstallerDestination | Select-Object FullName, Length, LastWriteTime
+
+if ($PathFailed -or $EntryFailed) { exit 1 }
 

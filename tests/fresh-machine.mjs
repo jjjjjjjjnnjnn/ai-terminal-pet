@@ -197,6 +197,39 @@ function runCmd(scriptArgs, cwd, timeout = 300000) {
   })
 }
 
+/**
+ * readInstallEntry asks the registry what Settings > Apps would show for an
+ * install in `installDir`, or null when there is no row.
+ *
+ * The row matters twice: before uninstall it is the only thing a package
+ * manager can drive (winget reads exactly these values), and after uninstall its
+ * absence is the difference between "the folder is gone" and "Windows no longer
+ * lists this product". The lookup filters on InstallLocation, so a real install
+ * of this project on the developer's machine can never satisfy it.
+ */
+function readInstallEntry(installDir) {
+  const quoted = String(installDir).replace(/'/g, "''")
+  const script = [
+    "$root = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'",
+    'if (-not (Test-Path $root)) { "none"; exit 0 }',
+    "$key = Get-ChildItem $root | Where-Object { $_.PSChildName -like 'AI-Terminal-Pet*' } | " +
+      "Where-Object { (Get-ItemProperty $_.PSPath).InstallLocation -eq '" + quoted + "' } | Select-Object -First 1",
+    'if (-not $key) { "none"; exit 0 }',
+    '$p = Get-ItemProperty $key.PSPath',
+    'ConvertTo-Json @{ key = $key.PSChildName; display = $p.DisplayName; version = $p.DisplayVersion; ' +
+      'location = $p.InstallLocation; uninstall = $p.UninstallString; quiet = $p.QuietUninstallString; ' +
+      'noModify = $p.NoModify; size = $p.EstimatedSize } -Compress',
+  ].join('\n')
+  const result = runPowerShell(['-Command', script], 60000)
+  const text = String(result.stdout || '').trim()
+  if (!text || text === 'none') return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { raw: text, status: result.status }
+  }
+}
+
 /** rmSync with retries: Windows keeps handles for a moment after an exit. */
 function removeWithRetry(target) {
   for (let attempt = 0; attempt < 12; attempt++) {
@@ -999,7 +1032,7 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
     console.log('   host      : ' + windowsPowerShell())
   }
   check('install.ps1 succeeds', install.status === 0, install.stdout + install.stderr)
-  check('installer reports 11 artifacts', /install: ok - 11 file/.test(install.stdout || ''), install.stdout)
+  check('installer reports 12 artifacts', /install: ok - 12 file/.test(install.stdout || ''), install.stdout)
 
   // S5b: the documented entry point is scripts\install.cmd, not the bare .ps1.
   // On a stock Windows install the effective execution policy is RemoteSigned,
@@ -1019,7 +1052,7 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
   check(
     'install.cmd -VerifyOnly forwards to the installer',
     verifyThroughWrapper.status === 0 &&
-      /install: verified - 11 file\(s\) match the repository, 0 warning/.test(verifyThroughWrapper.stdout || ''),
+      /install: verified - 12 file\(s\) match the repository, 0 warning/.test(verifyThroughWrapper.stdout || ''),
     String(verifyThroughWrapper.stdout || '') + String(verifyThroughWrapper.stderr || ''),
   )
   const usageThroughWrapper = runCmd(
@@ -1032,16 +1065,41 @@ function scenarioStandaloneInstall(sandbox, overlayExe, hookExe, statuslineExe) 
     'status=' + usageThroughWrapper.status,
   )
 
-  for (const name of ['AI-Terminal-Pet.exe', 'pet-statusline.exe', 'pet-hook.exe', 'protocol.js']) {
+  for (const name of ['AI-Terminal-Pet.exe', 'pet-statusline.exe', 'pet-hook.exe', 'protocol.js', 'install.ps1']) {
     check('installed ' + name, existsSync(path.join(sandbox.petDir, name)))
   }
   equal('installed hook is the built one', sha256(path.join(sandbox.petDir, 'pet-hook.exe')), sha256(hookExe))
   equal('installed statusline is the built one', sha256(path.join(sandbox.petDir, 'pet-statusline.exe')), sha256(statuslineExe))
 
+  // The install has to be removable by Windows itself. Settings > Apps shows
+  // this row, and the command the row runs must be the copy of install.ps1 that
+  // lives in the install directory: the zip a user unzipped is often deleted
+  // long before they uninstall. Before 1.0.15 there was no row at all, so the
+  // only way to remove the app was the zip or a checkout.
+  const installedScript = path.join(sandbox.petDir, 'install.ps1')
+  equal('installed installer copy is the one that ran', sha256(installedScript), sha256(installScript))
+  const versionRun = runExe(overlayExe, ['--version'], sandbox.env)
+  const overlayVersion = /(\d+\.\d+\.\d+)/.exec(String(versionRun.stdout || ''))?.[1]
+  const entry = readInstallEntry(sandbox.petDir)
+  check('Apps & Features lists this install', entry !== null && entry.display === 'AI Terminal Pet', JSON.stringify(entry))
+  equal('the Apps & Features row names the overlay version', entry?.version, overlayVersion)
+  equal('the Apps & Features row names the install directory', entry?.location, sandbox.petDir)
+  check(
+    'the recorded uninstall command runs the installed copy',
+    Boolean(entry?.quiet) && entry.quiet.includes(installedScript),
+    String(entry?.quiet || ''),
+  )
+  check(
+    'the recorded uninstall command asks nothing',
+    Boolean(entry?.quiet) && /-Uninstall -Force/.test(entry.quiet),
+    String(entry?.quiet || ''),
+  )
+  equal('the Apps & Features row is not modifiable or repairable', Number(entry?.noModify), 1)
+
   const verify = runPowerShell(['-File', installScript, '-Destination', destination, '-VerifyOnly'])
   check(
     'verify-only matches everything',
-    /install: verified - 11 file\(s\) match the repository, 0 warning/.test(verify.stdout || ''),
+    /install: verified - 12 file\(s\) match the repository, 0 warning/.test(verify.stdout || ''),
     verify.stdout,
   )
 
@@ -1298,17 +1356,27 @@ function scenarioRobustness(sandbox, overlayExe, hookExe) {
 /** S8: uninstall must leave the machine as clean as it found it. */
 function scenarioUninstall(sandbox, overlayExe) {
   section('S8 uninstall')
-  const destination = path.join(sandbox.petDir, 'AI-Terminal-Pet.exe')
-  const uninstall = runPowerShell([
-    '-File',
-    path.join(repoDir, 'scripts', 'install.ps1'),
-    '-Destination',
-    destination,
-    '-Uninstall',
-    '-Force',
-  ])
-  check('uninstall succeeds', uninstall.status === 0, uninstall.stdout + uninstall.stderr)
+  // Run exactly what the Settings row runs, not a command assembled here: that
+  // string is the product's uninstall path, and it must work when nothing but
+  // the install directory exists (the zip is gone by then). Since 1.0.15 the
+  // row is also what a package manager drives, so this is the whole contract.
+  const entry = readInstallEntry(sandbox.petDir)
+  check('the install is listed before uninstalling', entry !== null, JSON.stringify(entry))
+  const command = String(entry?.quiet || '')
+  check('the row records a quiet uninstall command', command.length > 0, command)
+  const uninstall = spawnSync(command, {
+    encoding: 'utf8',
+    timeout: 300000,
+    shell: true,
+    cwd: sandbox.root,
+  })
+  check(
+    'uninstall succeeds',
+    uninstall.status === 0,
+    String(uninstall.stdout || '') + String(uninstall.stderr || ''),
+  )
   check('the install directory is gone', !existsSync(sandbox.petDir), 'still present')
+  check('the Apps & Features row is gone', readInstallEntry(sandbox.petDir) === null, 'row still present')
   check('uninstall reports completion', /uninstall: done/.test(uninstall.stdout || ''), uninstall.stdout)
   const doctor = runDoctor(overlayExe, sandbox.env)
   check('doctor fails again on the cleaned machine', doctor.status === 1, describeRun(doctor))

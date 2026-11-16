@@ -6,9 +6,13 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-16；浮窗 **1.0.14**、插件包 **1.2.26** 已发版；**§68 第 68 轮（公开文案）：README 重写、4 张坏图与 3 处不实描述修掉、链接门禁开始查图片；§67 DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗）；§66 POSIX 平权：Linux 提示音与通知面、跳转失败不再静默、`--doctor` 13 项**）
+## 1. 当前状态（2026-11-16；浮窗 **1.0.15**、插件包 **1.2.27** 已发版；**§70 第 70 轮（安装器写卸载项 + winget 清单）；§69 第 69 轮（把文档里的数字变成门禁）；§68 公开文案重做；§67 DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗）；§66 POSIX 平权：Linux 提示音与通知面、跳转失败不再静默、`--doctor` 13 项**）
 
-> 接手请先读本节与 **§68「公开文案重做」**
+> 接手请先读本节与 **§70「安装器写卸载项」**
+> （为什么"装得上、卸不掉"是个真缺陷、注册表那一行的每个字段、沙箱键名为什么必须派生、
+> 以及 winget 清单的提交状态），再读 **§69「把文档里的数字变成门禁」**
+> （`tools/check_facts.mjs` 钉什么/不钉什么；它第一次运行抓到的 `#english` 假警报与被修正的 E5 清单），
+> 再读 **§68「公开文案重做」**
 > （README 的新结构、被抓到的三处不实描述、图片门禁与它的自测、以及"硬件实测永久跳过"的对外写法），
 > 再读 **§67「DSH 插件三平台」**
 > （四个改动面、三个"看起来对其实错"的地方、尺寸方案为什么是"首启按 pin 下载"、以及两条过程教训），
@@ -58,42 +62,45 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.14`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.26`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.14` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.26`。
-  **工作区与本机安装目录已经与 `1.0.14` / `1.2.26` 同步**：`bin/`、
+- **版本**：浮窗 **`1.0.15`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.27`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.15` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.27`。
+  **工作区与本机安装目录已经与 `1.0.15` / `1.2.27` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
-  （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `DB2DD2AB…`）。
+  （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `E21CFDA7…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**463 个** `func Test`，
-  本轮 +33）；`internal/ui` 的 linux 测试二进制在 WSL 里 **122 PASS**；CI 四条 job
-  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.14 的提交上重跑；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**465 个** `func Test`，
+  本轮 +2，来自 `cmd/pet-setup` 的两条新参数规则）；CI 四条 job
+  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.15 的提交上全绿；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 与 1.0.14 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
-  （`node --test tools/check_versions.test.mjs` 26/26）、`tools/catalog-status.test.mjs` **12/12**、
-  `tools/upstream-entry.test.mjs` 26/26；`tests/fresh-machine.mjs --no-overlay` **172/172**（23.0 s）；
+  `vendor.mjs --check` 与 1.0.15 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
+  （`node --test tools/check_versions.test.mjs` 26/26）、**`tools/check_facts.mjs` 11 条一致**
+  （§69 新增：`func Test` 数量、有测试的包数、Go 包总数、`--doctor` 项数写错就红）、
+  `tools/catalog-status.test.mjs` **12/12**、`tools/upstream-entry.test.mjs` 26/26；
+  `tests/fresh-machine.mjs --no-overlay` **183/183**（44.6 s）；
   `tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  **交付前的装机实测**见 §64.5（1.0.13 那一轮：240 次 + 300 次上报 `failures: 0`、句柄与线程平、`runtime/` 回基线、
-  设置窗口原样放 40 秒不消失）；1.0.14 的装机实测见 §66.6：`-VerifyOnly` 11/11、
-  `--doctor` **12 ok / 1 warn / 0 fail**、`--version` 报 `ai-terminal-pet 1.0.14`。
-- **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.14 实测）：非测试 **143 文件 / 27,185 行**、
-  测试 **93 文件 / 13,444 行**、**463 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `DB2DD2AB…`）、
+  1.0.15 的装机实测见 §70.4：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
+  `--version` 报 `ai-terminal-pet 1.0.15`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.15 实测）：非测试 **143 文件 / 27,236 行**、
+  测试 **94 文件 / 13,526 行**、**465 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `E21CFDA7…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
-  三个二进制合计 **12,101,632 B** = 11.54 MiB。
-- **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.26**；`dsh-plugin-v1.2.26` 的 Release 资产 `dsh-ai-terminal-pet-1.2.26.tgz`
-    **2,072,884 B / sha256 `030545BB…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`）；
-    上游条目跟进 PR 见 §68.6（分支 `bump-tarball-1.2.26`，单文件 `+1 −1`）。
-    **当天发了三次插件版本**：1.2.24（插件三平台）→ 1.2.25（macOS 提示音 SIGSEGV 的修复，40 分钟后，
-    因为修 Go 源码会让 `vendor/manifest.json` 的源码摘要前移）→ 1.2.26（只改随包 README，
-    按规矩"改一句就要版本"）。三条都已 publish，前两条的资产同样不可变。
-    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
-  索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
-  提供的**替代**路径，而不是权宜之计。
-   `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
-   版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
-  细节与坑见 §27。
+  三个二进制合计 **12,101,632 B** = 11.54 MiB。安装目录里多了第 12 件制品：`install.ps1` 的副本。
+- **分发（两条线 + 一个包管理器）**：
+  - 插件线：npm `latest` = **1.2.27**；`dsh-plugin-v1.2.27` 的 Release 资产 `dsh-ai-terminal-pet-1.2.27.tgz`
+    **2,072,885 B / sha256 `FA50130D…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.15`）；上游条目跟进 PR 见 §70.5。
+  - 浮窗线：`pet-v1.0.15` 的六个资产——`pet-setup.exe` **14,504,960 B / `AF9E854F…`**、
+    `ai-terminal-pet-1.0.15-win-x64.zip` **5,129,002 B / `5292B2E7…`（17 文件）**，以及
+    linux-{amd64,arm64} 与 darwin-{arm64,amd64} 四个 tar.gz。
+  - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
+    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
+    版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
+    细节与坑见 §27。
+  - **winget**：清单在 `packaging/winget/`（`winget validate` 通过，`winget show` 解析正确），
+    提交到 `microsoft/winget-pkgs` 的 PR 见 §70.6。能不能上取决于对方 pipeline 里那次静默安装/卸载；
+    未签名带来的 SmartScreen 风险写在 [docs/UPSTREAM.md](UPSTREAM.md) §4.3。
 - **接入**：OpenCode（`reporters/opencode.js` 插件；本机 `opencode.json` 指向
   `~/.config/opencode/plugins/terminal-pet` 这个目录，里面的 `index.ts` 只做一次静态 re-export，
   见 §53）、Claude Code（`reporters/claude-hook.js` 7 事件）、
@@ -4994,6 +5001,98 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 70. 交接：安装器登记"设置 › 应用"那一行 —— 于是删掉 zip 也能卸，winget 才谈得上（2026-11-16，第 70 轮；浮窗 **1.0.15** / 插件 **1.2.27**）
+
+这一轮改的是**交付路径本身**：Windows 上"装得上、卸不掉"是个真缺陷，不是体验瑕疵。
+`install.cmd -Uninstall` 要你留着 zip 或 checkout，`pet-setup --uninstall` 会停下来问一句，
+而"设置 › 应用"里**根本没有这一行**——对一个双击安装的产品来说，这三条加起来就是"装得上、卸不掉"。
+
+### 70.1 三个入口原来为什么都不成立
+
+| 入口 | 之前 | 现在 |
+|---|---|---|
+| `设置 › 应用` | **没有这一行**（安装器从不写 `HKCU\...\Uninstall\*`） | 有：`DisplayName=AI Terminal Pet`、`DisplayVersion`、`InstallLocation`、`DisplayIcon`、`UninstallString` / `QuietUninstallString`、`NoModify` / `NoRepair`、`EstimatedSize` |
+| 卸载命令 | 只有 zip 里的 `install.cmd -Uninstall`（zip 删了就没了） | 安装器把自己复制成 `<安装目录>\install.ps1`，那一行指的就是这份副本，所以**源没了也能卸** |
+| 免交互卸载 | `pet-setup --uninstall` 一定 `Read-Host` 问 `yes`，包管理器无控制台时直接 exit 2 | `pet-setup --uninstall --force`（以及 `install.ps1 -Uninstall -Force`）；`--uninstall` 单独仍然会问 |
+
+### 70.2 四个改动面
+
+| 面 | 内容 | 关键文件 |
+|---|---|---|
+| 制品清单 | 第 12 件：`install.ps1` 自己（复制前后都算摘要，`-VerifyOnly` 会验它） | `scripts/install.ps1` 的 `Get-InstallArtifacts` |
+| 注册表 | 装完才写（复制与摘要都通过之后），卸载时**只在 `InstallLocation` 指向刚删的目录时才删**（与 `HKCU\...\Run` 同一条守卫） | `Write-UninstallEntry` / `Get-UninstallEntryLocation` / `Invoke-Uninstall` |
+| 版本号来源 | checkout 里读 `internal/app/version.go`；zip 用户问装好的二进制 `--version`（5 秒上限，问不到就 `0.0.0` 并 warn） | `Get-OverlayVersion` |
+| 自检 | `-VerifyOnly` 多一行 `[ok]/[warn] apps list/…`：**"装得对"现在包括"能卸掉"** | `Invoke-VerifyOnly` |
+| pet-setup | `--uninstall --force`；`--force` 单独出现或与 `--verify`/`--add-to-path` 组合都拒绝 | `cmd/pet-setup/main.go` + 两条新测试 |
+
+### 70.3 三个"看起来对、其实错"的地方（下一轮别再犯）
+
+1. **键名不能按"有没有传 `-Destination`"派生。** 第一版是这么写的，于是真实安装也踩了坑：
+   注册表里记录的命令**总是**把 `-Destination` 拼在末尾（沙箱需要，真实安装拼出来就是默认路径），
+   卸载时 `$PSBoundParameters` 里于是也有 `-Destination` → 键名变成派生的那个 → **找不到自己刚写的那一行**。
+   正解是拿**安装目录本身**与默认目录比较：等于默认目录就是真实安装（键名 `AI-Terminal-Pet`），
+   否则是演习（键名 `AI-Terminal-Pet-<12hex>`）。派生键名的意义也在这里：测试装出来的那一行
+   不会混进真实的"设置 › 应用"，卸载也不会删错条目。
+2. **`-Force` 不能默认带上。** 它只有一个含义：不再问。`--uninstall` 免掉提示是**用户少按一个键**的代价，
+   而"删错目录"是不可逆的；所以 `--force` 必须显式拼，并且在别的子命令旁边出现时直接报错
+   （否则一个手滑就变成"静默执行一个我没打算执行的操作"）。
+3. **测试要执行"记录下来的那条命令"，不是自己再拼一条。** S8 原来用 `install.ps1 -Uninstall -Force`
+   自己拼参数，那只证明脚本能卸；现在读注册表里 `QuietUninstallString` 的**原文**去执行，
+   才证明"设置 › 应用"点下去真的能卸。两者差的正是这一轮的全部价值。
+
+### 70.4 本轮实测（全部当场跑出来）
+
+```
+本机安装：scripts\install.cmd                      -> 12 file(s) copied and hash-verified
+          scripts\install.cmd -VerifyOnly          -> 12/12 一致, 0 warning
+          AI-Terminal-Pet.exe --version            -> ai-terminal-pet 1.0.15
+          AI-Terminal-Pet.exe --doctor             -> 12 ok, 1 warn, 0 fail
+注册表：  HKCU\...\Uninstall\AI-Terminal-Pet       -> DisplayName=AI Terminal Pet
+                                                       DisplayVersion=1.0.15
+                                                       InstallLocation=%LOCALAPPDATA%\AI-Terminal-Pet
+                                                       QuietUninstallString -> <安装目录>\install.ps1 -Uninstall -Force -Destination …
+沙箱：    -Destination %TEMP%\pet-arp-check-*\AI-Terminal-Pet
+          装上 → -VerifyOnly 12/12 → 执行那一行里的命令 → 目录没了、键没了
+门禁：    tests/fresh-machine.mjs --no-overlay      -> 183/183 (44.6 s)
+          node packages/dsh-ai-terminal-pet/verify.mjs -> VERIFY PASSED
+          vendor.mjs --check                       -> 两个 vendor 文件都与源码同摘要
+          tools/check_versions.mjs / check_facts.mjs -> 全绿
+```
+
+### 70.5 发版记录（2026-11-16）
+
+- **两个 tag**：`pet-v1.0.15`、`dsh-plugin-v1.2.27`。为什么插件也要发：版本常量在
+  `internal/app/version.go`、会被编进浮窗二进制，所以 `1.0.14 → 1.0.15` 必然改变
+  `bin/AI-Terminal-Pet.exe` 的字节，`vendor/AI-Terminal-Pet.exe` 与 `vendor/manifest.json`
+  的源码摘要必须跟着前移（`vendor.mjs --check` 判的就是这个）。`lib/`、`protocol.js`、清单字段均未改。
+- **资产**（详见 CHANGELOG 的「1.0.15 发布包实测清单」）：`pet-setup.exe` 14,504,960 B / `AF9E854F…`、
+  `ai-terminal-pet-1.0.15-win-x64.zip` 5,129,002 B / `5292B2E7…`（17 文件）、
+  `dsh-ai-terminal-pet-1.2.27.tgz` 2,072,885 B / `FA50130D…`（20 文件），另有四个 POSIX tar.gz。
+- **npm**：`latest` = 1.2.27。
+- **上游条目**：`tools/upstream-entry.mjs` 开 `bump-tarball-1.2.27` 单文件 PR（号见下方 B 提交记录）；
+  按 §67.4 的教训，**三个平台的 CI 在同一个提交上全绿之后才打 tag**。
+
+### 70.6 winget：清单已就绪，提交状态单独记账
+
+- 清单在 `packaging/winget/manifests/j/jjjjjjjjnnjnn/AI-Terminal-Pet/1.0.15/`（三份 YAML），
+  目录结构就是 `microsoft/winget-pkgs` 的布局；`winget validate --manifest <目录>` 打印"清单验证成功"，
+  `winget show --manifest <目录>` 能正确解析 URL 与 sha256。
+- 能不能装/卸由我们的安装器决定：静默安装是 `pet-setup.exe --install`（默认就是这个），
+  静默卸载是注册表那一行的 `QuietUninstallString`；`tests/fresh-machine.mjs` 的 S5/S8 就是按这条契约验的。
+- **真实风险写在前面**：`pet-setup.exe` 没有 Authenticode 签名，对方 pipeline 里那次静默安装可能被
+  SmartScreen 拦住。若如此，**不要**改成 `InstallerType: zip` + `portable` 的"解压版"清单
+  （那会绕过 `install.ps1`：没有 `protocol.js`、没有 bundle、没有自启动，等于 ROADMAP §5 禁止的降级安装），
+  而是记录原因、保留安装器改进（它对所有 Windows 用户都有效），等有证书再说。
+- 规则与判断可见性的方法写进 [docs/UPSTREAM.md](UPSTREAM.md) §4.3；提交要一个只新增一个版本目录的 PR。
+
+### 70.7 这一轮没有做的事
+
+- **没有签名、没有公证**：`pet-setup.exe` 仍会触发 SmartScreen，README 的「Unsigned binary notice」照旧。
+- **没有改 POSIX 的卸载路径**：`install.sh --uninstall` 本来就自洽（数据目录 + 软链 + `.desktop`/LaunchAgent），
+  这一轮只补 Windows 缺的那一半。
+- **没有把 winget 写进 README 的安装段**：清单还没被合并，写了就是一句没兑现的承诺；
+  合并之后再改 README 与本次的 README 不一致处（规矩见 AGENTS §8）。
 
 ## 69. 交接：把"文档里的数字"变成门禁，以及它第一次运行抓到的两件事（2026-11-16，第 69 轮；**不发版**，浮窗仍 **1.0.14** / 插件仍 **1.2.26**）
 
