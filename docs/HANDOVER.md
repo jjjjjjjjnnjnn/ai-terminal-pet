@@ -80,12 +80,12 @@
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
   三个二进制合计 **12,101,632 B** = 11.54 MiB。
 - **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.23**；`dsh-plugin-v1.2.23` 的 Release 资产 `dsh-ai-terminal-pet-1.2.23.tgz`
-    **2,069,513 B / sha256 `4C552C73…` / 19 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`）；
-    上游条目跟进 PR 见 §66.6（分支 `bump-tarball-1.2.23`）。
-    **#15674（1.2.21）已在该轮期间被合并**，所以 `--check` 现在报的是 1.2.21 而不是 1.2.19。
-    **这一条到此为止**：按用户 2026-11-16 的决定，上游那两项（重建 + 下载窗口）已有多位开发者反馈，
-    我们**不再发 PR、不催合并、不重发版**（理由与分解见 §64.2 / §64.3、[docs/UPSTREAM.md](UPSTREAM.md) §4.1）。
+  - 插件线：npm `latest` = **1.2.25**；`dsh-plugin-v1.2.25` 的 Release 资产 `dsh-ai-terminal-pet-1.2.25.tgz`
+    **2,072,904 B / sha256 `0E5DE443…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`）；
+    上游条目跟进 PR 见 §67.4（分支 `bump-tarball-1.2.25`，单文件 `+1 −1`）。
+    **1.2.24 在 40 分钟内被 1.2.25 取代**（理由见 §67.4）：1.2.24 是"插件三平台"，而它上线后 macOS CI
+    第一次真正执行提示音路径就 SIGSEGV；修好之后 `vendor/manifest.json` 的源码摘要必须跟着动，
+    所以必须再发一版。两条都已 publish，1.2.24 的资产同样不可变。
     钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
   索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
   提供的**替代**路径，而不是权宜之计。
@@ -4861,13 +4861,37 @@ node tools/catalog-status.mjs                # 目录那行现在是 current 还
 - `node packages/dsh-ai-terminal-pet/verify.mjs`（Windows）：**118 条 ok / 0 fail**，新增约 12 条——
   三平台数据目录、`platformKey()` 的 x64→amd64 映射、从本地 HTTP 服务器取一个真 tar.gz 后解出的字节
   与成员一致、摘要不符时**一个字节都不写**、没有 pin 的平台明确报 `no-pinned-overlay`。
-- 包**不含任何 POSIX 二进制**：tgz 体积与 1.2.23 同量级（2,069,513 B），`vendor/` 只有 Windows 那份。
-- 浮窗本体零改动 → 浮窗版本仍是 **1.0.14**，只发插件线 `dsh-plugin-v1.2.24`（资产不可变，
-  没必要重发同一份 overlay）。
+- 包**不含任何 POSIX 二进制**：`vendor/` 只有 Windows 那份，tgz 与 1.2.23 同量级
+  （1.2.24 **2,072,902 B / 20 文件**，1.2.25 **2,072,904 B / 20 文件**，差的是 `vendor/manifest.json`
+  里的源码摘要）。
+- 浮窗本体零改动 → 浮窗版本仍是 **1.0.14**，只发插件线（资产不可变，没必要重发同一份 overlay）。
 - 新增的 CI 步骤跑在 `ubuntu-latest` / `macos-latest` 上；`0755` 断言只在非 Windows 生效，所以它
   真正被执行是在那两条 job 里。
 
-### 67.4 未验证项
+### 67.4 发版记录与两条过程教训（2026-11-16）
+
+- **发了两次**：`dsh-plugin-v1.2.24`（插件三平台）之后 **40 分钟内**又发了 `dsh-plugin-v1.2.25`。
+  原因不是功能，而是 1.2.24 上线后 macOS CI 第一次真的执行到提示音路径：**SIGSEGV**（详见 CHANGELOG 的
+  1.2.25 一节）。修好之后 Go 源码动了 → `packages/dsh-ai-terminal-pet/vendor/manifest.json` 的源码摘要
+  必须跟着动（`vendor.mjs --check` 判的就是这个），所以包必须再发一版；vendored 的 Windows exe
+  **字节未变**（仍是 `DB2DD2AB…`），浮窗线仍是 **1.0.14**，没有重发任何浮窗资产。
+- **npm**：`latest` = **1.2.25**；tgz **2,072,904 B / sha256 `0E5DE443…` / 20 文件**。
+- **上游**：PR [#16031](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16031)
+  （`bump-tarball-1.2.25`）；#16010（1.2.23）与 #16023（1.2.24）都已**按"被取代"关闭**，
+  保持"同时只有一条 bump 在飞"。#16010 那次之后对方重建过一次，条目现在停在 1.2.22（§66.8 的重建确实跑了）。
+- **CI**：`013274e`（1.2.25 release）四条 job 全绿（windows / ubuntu / macOS / scan），
+  `7a5633a`（索引 pin）同样全绿；两条都用了重跑，因为 push 会取消前一次（`concurrency`）。
+
+**两条过程教训（比代码更值钱，下一轮别重犯）：**
+
+1. **新门禁的第一次运行才是它的验收。** 插件三平台的 `verify.mjs` 在 Windows 上 118/118 全过，
+   ubuntu job 一跑就发现两个旧用例假定了 Windows 布局（"no reports at all"）。写测试的那台机器
+   验不了另一半——所以**加 CI 步骤的那一轮，要等三个 job 都绿了再宣布"门禁成立"**。
+2. **发版前没跑过的平台，等于没验过。** 1.2.24 是先 tag、后看 CI，于是 macOS 的两个问题
+   （用例没钉平台、提示音 SIGSEGV）都在 tag 之后暴露。正确顺序是：**先让三个 job 在同一个 commit 上绿，
+   再打 tag**。这一轮最后就是这样收口的（`73bc51c` 三平台全绿之后才发 1.2.25）。
+
+### 67.5 未验证项
 
 1. **macOS 面板的真实显示**：没有苹果硬件。这一轮能证明的是"插件在 macOS 上选对目录、装对文件、
    跑通逻辑"，不是"窗口在 Mac 上出现过"。
@@ -4877,10 +4901,10 @@ node tools/catalog-status.mjs                # 目录那行现在是 current 还
 3. **macOS 首次下载的代理/证书环境**：`fetch` 走系统信任链，没有额外配置；企业代理下若失败，
    插件按设计只 warn 一次并保持不上报浮窗——这条没有在真实企业网络里验过。
 
-### 67.5 下一轮从这里开始
+### 67.6 下一轮从这里开始
 
-1. **上游目录那行**（§66.8 的后续）：对方 2026-11-16 16:39Z 之后的那次重建一旦跑完，
-   `version` 会自己变成 1.2.24；`tarball` 仍要等 PR 合并 + 再一次重建。查法仍是
+1. **上游目录那行**（§66.8 的后续）：对方那次重建已经把条目推到 1.2.22，剩下的只是
+   `tarball` 跟着我们的 PR 前进，**不需要我们再动**。查法仍是
    `node tools/catalog-status.mjs`。
 2. **插件在 Linux 上的手工安装体验**：`scripts/install.sh` 与插件的首启下载现在都能装浮窗，
    两条路会写同一个目录——值得在文档里明确"先装的赢"，避免用户以为要装两次。
