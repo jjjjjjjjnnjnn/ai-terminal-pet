@@ -6,11 +6,13 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-16；浮窗 **1.0.13**、插件包 **1.2.22** 已发版；**§64 第 64 轮：查清上游目录那行为什么是旧的（两个互不相关的原因，都不是重发版能改的）、新增 `tools/catalog-status.mjs`、又一轮装机实测；§63 是修 1.0.11 的回归**）
+## 1. 当前状态（2026-11-16；浮窗 **1.0.13**、插件包 **1.2.22** 已发版；**§65 第 65 轮（交接）：仓库干净、CI 全绿、本机装的就是发布那个版本、上游那条已按决定收尾；§64 查清了目录那行为什么是旧的；§63 修了 1.0.11 的回归**）
 
-> 接手请先读本节与 **§64「上游目录里我们那行为什么是旧的（两个不同的原因），以及交接前的又一轮装机实测」**
-> （最新一轮：站点 `version` 停在 1.2.16 是对方整站冻结（#15569 / #15579），下载数少一天是全站探针在 03:1x UTC 跑（#15864）；
-> 两条都不是重发版能改的，判断方式是一条命令 `node tools/catalog-status.mjs`），
+> 接手请先读本节与 **§65「交接：下个会话从这里开始」**
+> （这一刻的机器状态、四条上手命令、下一轮四项候选、以及"别做的事"），
+> 再读 **§64「上游目录里我们那行为什么是旧的（两个不同的原因），以及交接前的又一轮装机实测」**
+> （站点 `version` 停在 1.2.16 是对方整站冻结（#15569 / #15579），下载数少掉的 2,276 是两段叠加
+> （1,197 见 #15864 + 1,079 是冻结）；**已按决定不再跟进**，判断用 `node tools/catalog-status.mjs`），
 > 再读 **§63「修 1.0.11 的回归：`title` 等于窗口标题时不算会话存在」**
 > （结束几小时的 agy 会话被标签页标题留在面板上：四条现场记录、修法与三条测试），
 > 再读 **§62「L5 快照扫描复用解析结果，以及缓存命中时删除守卫的真 bug」**
@@ -57,24 +59,29 @@
   （`AI-Terminal-Pet.exe` **4,702,208 B**，sha256 `B69CA725…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**425 个** `func Test`）；
-  CI 四条 job（windows / ubuntu / macOS / scan，ubuntu 跑 `go test -race`）；`scripts/cross-build.sh` 全 16 包三端通过；
-  两个 `verify.mjs` 全 PASS；`vendor.mjs --check` 与 1.0.13 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致；
-  `tests/fresh-machine.mjs --no-overlay` **172/172**；`tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 零告警。
-  **交付前装机实测**（§63.1）：120 次上报 **ok=120 / failed=0**，句柄 468→469、线程 30→30、WS 36–55 MB 不爬升，
-  洪峰后 `runtime/` 回到基线，设置窗口原样放 40 秒不消失，`--doctor` 全程 10 ok / 1 warn / 0 fail。
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**428 个** `func Test`）；
+  CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）最近一次 Run `43894252617` 全绿；
+  `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
+  `vendor.mjs --check` 与 1.0.13 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
+  （`node --test tools/check_versions.test.mjs` 26/26）、`tools/catalog-status.test.mjs` **12/12**、
+  `tools/upstream-entry.test.mjs` 26/26；`tests/fresh-machine.mjs --no-overlay` **172/172**；
+  `tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 零告警。
+  **交付前的装机实测**见 §64.5：240 次 + 300 次上报 `failures: 0`、句柄与线程平、`runtime/` 回基线、
+  设置窗口原样放 40 秒不消失、`--doctor` 全程 10 ok / 1 warn / 0 fail。
 - **规模**（`git ls-files '*.go'` + 逐文件行数，1.0.13 实测）：非测试 **136 文件 / 26,526 行**、
-  测试 **86 文件 / 12,570 行**、**425 个 `func Test`**。
+  测试 **87 文件 / 12,673 行**、**428 个 `func Test`**。
   `bin/AI-Terminal-Pet.exe` **4,711,424 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `161C6083…`）、
-  `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`，本轮未改）、
-  `bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`，本轮未改）。
+  `bin/pet-statusline.exe` **3,678,720 B**（sha256 `563CF6FE…`）、`bin/pet-hook.exe` **3,705,344 B**（sha256 `737C46ED…`）。
+  三个二进制合计 **12,095,488 B** = 11.53 MiB。
 - **分发（两条线）**：
   - 插件线：npm `latest` = **1.2.22**；`dsh-plugin-v1.2.22` 的 Release 资产 `dsh-ai-terminal-pet-1.2.22.tgz`
     **2,067,790 B / sha256 `879AD246…` / 19 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.13`）；
     上游条目跟进 PR [#15814](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15814)
     （分支 `bump-tarball-1.2.22`，单文件 `+1 −1`，`MERGEABLE`）已开、`--check` = OK（in flight）。
-    **上一轮的 #15674（1.2.21）已于本轮期间被合并**——这解释了 `--check` 为什么现在报的是 1.2.21 而不是 1.2.19；钉 tag 的 git 源；仓库根的清单 shim；
-    自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
+    **#15674（1.2.21）已在该轮期间被合并**，所以 `--check` 现在报的是 1.2.21 而不是 1.2.19。
+    **这一条到此为止**：按用户 2026-11-16 的决定，上游那两项（重建 + 下载窗口）已有多位开发者反馈，
+    我们**不再发 PR、不催合并、不重发版**（理由与分解见 §64.2 / §64.3、[docs/UPSTREAM.md](UPSTREAM.md) §4.1）。
+    钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
   索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
   提供的**替代**路径，而不是权宜之计。
    `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
@@ -4623,6 +4630,86 @@ CI 里这条是 **informational**（`|| true`），因为对方站点挂了不�
    那行的 `version` 应该跳到 1.2.22、入口页安装命令也应换成 1.2.22。**这是唯一需要等的事**。
 2. **POSIX 平权**：Linux/macOS 的 `notifications` 没有气泡表面、Linux 整个 `sound*` 区块没有播放路径。
 3. macOS 设置窗口仍**不做**（没有真机）。
+
+## 65. 交接：下个会话从这里开始（2026-11-16 收尾，第 65 轮；**未发版**，浮窗 **1.0.13** / 插件 **1.2.22** 仍是最新）
+
+这一轮没有改产品代码，只把**交接状态**钉死：仓库干净、门禁全绿、本机装的就是发布的那个版本、
+上一轮那条上游问题也按用户拍板的方向收了尾。下一位可以直接从 §65.4 挑一项开工。
+
+### 65.1 这一刻的机器状态（全部当场跑出来，不是回忆）
+
+| 项 | 值 |
+|---|---|
+| 分支 | `main`，与 `origin/main` **同步**（`git status -sb` 只有 `## main...origin/main`） |
+| HEAD | `5e93d77`（`docs: the 30-day download count is short by 2,276, from two unrelated upstream bugs`） |
+| 版本 | 浮窗 **1.0.13**（`internal/app/version.go`）、插件 **1.2.22**；npm `latest` = **1.2.22** |
+| CI | 最近一次 Run **`43894252617` 四条 job 全绿**（windows / ubuntu（含 `go test -race`）/ macOS / scan） |
+| 单元测试 | **428 个 `func Test`**（`go test -count=1 ./...` 全过） |
+| 代码量 | Go 非测试 **136 文件 / 26,526 行**、测试 **87 文件 / 12,673 行** |
+| 二进制 | `AI-Terminal-Pet.exe` **4,711,424 B**（`161C6083…`）、`pet-statusline.exe` 3,678,720 B（`563CF6FE…`）、`pet-hook.exe` 3,705,344 B（`737C46ED…`） |
+| 本机安装 | **就是 1.0.13**：`scripts\install.cmd -VerifyOnly` **11/11**、`--doctor` **10 ok / 1 warn / 0 fail**（唯一 warn 仍是"Antigravity 只接了 statusline、没有结束信号"，已知且不是缺陷） |
+| 文档门禁 | `tools/check_docs_links.py` 12 份全解；`tools/check_versions.mjs` 20 条版本形状一致；`tools/catalog-status.test.mjs` **12/12**；`tools/upstream-entry.test.mjs` 26/26；`check_versions.test.mjs` 26/26 |
+
+**一条不要复跑就下结论的事**：`tests/fresh-machine.mjs` **必须带 `--no-overlay`**（172/172）。
+不带它时它会起沙箱浮窗，而单实例互斥体是 `Local\AI-Terminal-Pet-v1-SingleInstance`、**按 Windows 会话**
+而不是按沙箱隔离，外面那个真实例先拿到互斥体 → 沙箱那份 `exit 0` 且不开管道 → 182/184 红。
+脚本自己的输出把这条写成人话了（§63.1），**这不是缺陷**。
+
+### 65.2 上游那件事已经收尾（按用户决定：不跟进）
+
+`awesome-dsh-plugin` 那两条都**不再由我们推动**：站点的 `version` 停在 1.2.16 是对方整站冻结
+（对方 issue #15569 / PR #15579），`downloads (30d)` 少掉的 2,276 是两个上游 bug 叠加
+（对方 issue #15864 + 冻结）。**两条已有多位开发者反馈**，所以：不发 PR、不催合并、不重发版。
+
+我们只做了「把自己的记录改准」：
+
+- `docs/UPSTREAM.md` §4.1：三段分解（1,197 + 1,079 = 2,276，站点 1,179 + 2,276 = **3,455**）、
+  12/12 条目的同签名对照、以及**三种窗口改法的实际后果**（`end=today-2` 只能修到 2,694，比今天的 3,455 低，
+  所以正解是"两个窗口都查、取已聚合的那个"）。
+- `docs/LAUNCH.md` §8：对外**一律引用 npm 的数**（3,455，写明窗口 `2026-11-09 → 11-15`；
+  `point/last-month` 也是 3,455，因为 `1.2.4` 是 2026-11-11T12:10:46Z 才发的）。站点卡上的 1,179
+  **只作为"上游当前状态"出现，并明确写"不要抄这个数"**。
+- `tools/catalog-status.test.mjs`：12 条真实样本钉住这个签名。**上游哪天修好窗口，这些样本会开始失败**
+  —— 那就是我们要的通知，不是噪声。
+- `tools/catalog-status.mjs`：`ok` / `pending` / `fail` / `upstream` 四个判定，把"该我们动"与"对方的原因"
+  分开；CI 里跑成 **informational**（`|| true`），因为另一个仓库的夜间失败不该让本仓库变红。
+
+**上游 PR 线的现状（唯一还需要人做的事）**：`#15814`（把 `tarball` 推到 1.2.22）`OPEN` / `MERGEABLE`，
+`tools/upstream-entry.mjs --check` 报 in-flight（**那是健康状态**）。合并是维护者的事，我们不开新 PR。
+
+### 65.3 这一轮为什么没发版
+
+产品代码零改动：动的只有 `docs/`（UPSTREAM / LAUNCH / ROADMAP / HANDOVER）与 `tools/catalog-status.test.mjs`
+的样本。`1.0.13 / 1.2.22` 的资产、tag、npm 包都没动，**不占版本号**。
+
+### 65.4 下一轮从这里开始（按"用户可感知"排序）
+
+1. **POSIX 平权**（`docs/PLATFORMS.md` 的 config 表第 1、2 行，也是这两轮反复提到的那一项）：
+   - Linux/macOS 的 `notifications`：`PlanAlerts` 给出的 `Balloon` 在两个平台上被**直接丢掉**
+     （没有气泡表面：X11 没有 XEmbed 托盘、macOS 没有 `NSUserNotification` 绑定）。要么补一个
+     平台等价的提示面，要么在 `--doctor`/文档里把"这两个平台没有气泡"写成一条明确的已知项。
+   - Linux 的整个 `sound*` 区块：`internal/ui` 里**没有任何 `beep`**，`sound.go` 合成了 WAV 却没人消费，
+     `soundVolume` / `soundScheme` 被 `config` 读进来后**丢弃**。零 cgo 的可行路只有"探测外部播放器"
+     （`paplay` / `pw-play` / `aplay`，找不到就静音并在 `--doctor` 报 warn）——**这是用户已认可的方向**（§61 那一轮就定过）。
+2. **macOS 设置窗口**：仍然**不做**。没有真机，CI 上 AppKit 窗口探针是 opt-in skip
+   （`darwin_appkit_test.go` 的 `PET_COCOA_PROBE`），写 1,500 行没人跑过的 ObjC 与 §57.7 的规矩冲突。
+3. **验收 L5 的长期收益**（可选）：快照缓存在 §62 已交付（200 文件 22.7 ms → 0.51 ms），
+   但只在 `run.go` 的常驻 scanner 上生效；`--json` 仍走未缓存路径。若哪天 `--json` 变慢，先看这里。
+4. **README 里那张平台表**（`README.md` §Platform matrix）与 `docs/PLATFORMS.md` 的 config 表要保持一致 ——
+   两张表现在都由代码推导，改行为时**两处一起改**，否则下次交接又要花一轮去核对。
+
+### 65.5 接手时最先跑的四条命令
+
+```powershell
+gofmt -l .                                   # 必须无输出
+go test -count=1 ./...                       # 428 个 func Test，全过
+node tests/fresh-machine.mjs --no-overlay    # 172/172（带 --no-overlay，见 §65.1）
+node tools/catalog-status.mjs                # 目录那行现在是 current 还是 upstream，一条命令答完
+```
+
+**别做的事**：不要在仓库目录里直接跑 `bin\pet-hook.exe` 验证投递（该目录带 Low 完整性标签，
+从它启动的进程一律继承 Low IL，浮窗的管道 DACL 只给 OWNER RIGHTS + SYSTEM，**永远打不开**；
+复制到 `%TEMP%` 或安装目录就正常。详见 ROADMAP §2 E1 的实测记录）。
 
 ## 59. 交接：macOS 纯 Go AppKit 适配与 GitHub Actions `macos-latest` CI（2026-11-15，第 59 轮；**未发版**）
 

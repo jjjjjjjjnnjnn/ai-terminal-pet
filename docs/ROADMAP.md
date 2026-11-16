@@ -1,10 +1,10 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 **2026-11-15（浮窗 1.0.13 / 插件 1.2.22 已发版）**（上一版快照为 2026-11-13 的 v1.0.7）。本文分四块：现状基线、
+> 快照时间 **2026-11-16（浮窗 1.0.13 / 插件 1.2.22 已发版）**（上一版快照为 2026-11-13 的 v1.0.7）。本文分四块：现状基线、
 > 已交付批次、扩展计划、轻量化计划，以及一组实用功能候选与非目标。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
 >
-> 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§27 与 §35–§60；按版本发布的变更摘要在
+> 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§27 与 §35–§65（§65 是最新一轮的交接清单）；按版本发布的变更摘要在
 > [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 0. 现状基线
@@ -17,7 +17,7 @@
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,702,208 B**（4.48 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,675,136 B**（3.50 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,701,760 B**（3.53 MiB）；三个 Windows 二进制合计 **12,079,104 B** = 11.52 MiB |
-| 代码量 | Go 非测试源码 **135 文件 / 26,324 行**、测试 **84 文件 / 12,251 行**（**415** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本） |
+| 代码量 | Go 非测试源码 **136 文件 / 26,526 行**、测试 **87 文件 / 12,673 行**（**428** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本） |
 | 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
@@ -25,10 +25,10 @@
 | 协议 | `ai-terminal-pet.v1`，每行一个 JSON，上限 1 MiB，回执精确 `OK` / `ERR` |
 | 本地端点 | Windows `\\.\pipe\ai-terminal-pet-v1-<homedir-sha256 前 8hex>` · Linux `$XDG_RUNTIME_DIR/ai-terminal-pet/v1-<8hex>.sock` · macOS `$TMPDIR/ai-terminal-pet-v1-<8hex>.sock` |
 | 上报端 | `opencode.js` / `claude-hook.js` / `antigravity-hook.js` / `antigravity-statusline.js` / `generic.js` / `pet-statusline` / `pet-hook` / `integrations/deepseek-harness/ai-terminal-pet-bridge` |
-| 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标；**L5 快照扫描按身份/size/mtime 复用上次解析**（200 文件 22.7 ms → 0.51 ms） |
+| 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标；**L5 快照扫描按身份/size/mtime 复用上次解析**（200 文件 22.7 ms → 0.51 ms）；**存在性判据：`title` 必须被窗口标题"包含"且不完全等于它**（§63 修掉的回归） |
 | 持久化 | `state.json`（位置/缩放/展开/`layouts`）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run` / `LaunchAgent` / XDG `.desktop`（开机自启）· `approvals/` |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--connect[=HOST]/--doctor/--version/--help` |
-| 单测与门禁 | **415 个 `func Test`** across all packages（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race` |
+| 单测与门禁 | **428 个 `func Test`** across all packages（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 12 + 26 + 26 条 Node 断言 |
 | 持续集成 | `.github/workflows/ci.yml`：四条并行 Job — `windows-latest`（全套单测/构建/打包/fresh-machine/版本链接检查）、`ubuntu-latest`（`cross-build.sh` / `go test` / Linux 二进制 / `install.sh` + tar 校验）、`macos-latest`（`go vet` / `go test` / Darwin 二进制 / `install.sh` + hook 冒烟）、`scan`（`govulncheck` + `gosec`） |
 | 自检 | `ai-terminal-pet --doctor` **11 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘** |
