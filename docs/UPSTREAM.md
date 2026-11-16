@@ -175,7 +175,7 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 
 | 判定 | 含义 | 我们该做什么 |
 |---|---|---|
-| `upstream` | 站点那行落后于 npm（`row says 1.2.16, npm has 1.2.22`），或 30 天下载数正好少了窗口最后一天 | **什么都不做**。前者是对方站点构建失败，后者是对方探针在 03:1x UTC 跑、npm 还没聚合完前一天（issue #15864）；重发版、重探都不会改变它 |
+| `upstream` | 站点那行落后于 npm（`row says 1.2.16, npm has 1.2.23`），或 30 天下载数正好少了窗口最后一天 | **什么都不做**。前者是对方站点构建失败，后者是对方探针在 03:1x UTC 跑、npm 还没聚合完前一天（issue #15864）；重发版、重探都不会改变它 |
 | `pending` | 离线判定：入口的 `tarball` 落后于本工作区 | 跑 `node tools/upstream-entry.mjs --check` 看 PR 是在飞还是根本没开 |
 | `fail` | 入口 `tarball` 落后于 npm（线上判定） | 开一条 `+1 −1` 的 bump PR |
 | `ok` | 那行是当前版本 | 无 |
@@ -216,6 +216,27 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 
 人工复核制的四家（dshbase / dsh.so / dsh-plugin.org / AllDSH）已经投过、0 评论，
 **不要再投**：重复投递不会加快，只会让「我们不看规则」变成印象。
+
+### 4.2 2026-11-16 晚：冻结的根因已被上游修掉，重建正在跑（我们仍然什么都不做）
+
+- **16:39:48Z**：修复 PR **#15579** 被 **MERGED**；**16:39:49Z**：issue **#15569** 被 **CLOSED**。
+- **根因与我们记的不完全一样**（维护者 Eapp1e 在 #15569 里的回复，逐字摘要）：不是探针失败，而是
+  `data/plugins/Tests4gptplay__dsh-dots.yml` 与 `...--packages-dsh-dot-mcp.yml` 这两条**各自都合法**的条目
+  （monorepo 根 + 它的一个子目录）的 `package.json` 都叫 `dsh-dot-mcp`。format 1 按 `name` 建键，
+  解析器于是**拒掉整份文档** → 夜间 `Build` 失败 → 后面 `deploy-pages` 与两个 `npm publish` 步骤全部跳过，
+  于是站点与 npm 目录一起停在 2026-11-14T05:27Z。**重跑探针救不了**，输入本身没问题。
+  #15579 把这条冲突降级成「只拒掉那一行（后出现的那条），其余照常构建」，`skipped.refused` 里记是谁占了名字。
+- **16:39:59Z**：维护者手动 `workflow_dispatch` 了一次 `build-site.yml`（run **`43910005122`**），另有一条
+  push 触发的 `43910024003`。历史耗时 1h20m–2h50m，所以目录与 npm 包会在当天晚些时候前进到 2026-11-16 的戳。
+- **这对我们意味着什么（关键的一条）**：那行的 `version` 来自 **npm 探针**，不是入口 yml 里的字段，
+  所以**重建本身**就会把 `version` 刷到 1.2.23、把下载窗口往前推；而 `tarball`（也就是入口页那条安装命令）
+  仍要等 **#16010** 合并 + 再来一次重建才会从 1.2.21 前进。
+- **下载窗口那条（#15864）仍无维护者回复**，但 **#15982** 里另一位作者在同一窗口独立量到同样的缺失
+  （`dsh-rea-pro`：目录记 458，npm 同窗口实际 697，+52%；另有几个大盘包只差 1–4%），
+  说明这条不是我们一个条目的偶然。**决策不变**：不催合并、不发 PR，只把记录写准。
+- **下一次怎么查（一行）**：`node tools/catalog-status.mjs` 会给出 current / upstream / pending / fail
+  和「该谁动」；要确认对方那两次重建有没有跑完，用
+  `gh run list --repo awesome-dsh-plugin/awesome-dsh-plugin --workflow build-site.yml --limit 3`。
 
 ---
 
