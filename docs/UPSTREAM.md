@@ -251,11 +251,16 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 - 本地校验用 `winget validate --manifest <目录>`（必须打印"清单验证成功"），
   `winget show --manifest <目录>` 可以肉眼核对解析结果。
 - 提交是一个只**新增**一个版本目录的 PR；他们的 pipeline 会下载 exe、核对 sha256、跑静默安装与卸载。
-- **2026-11-16 的实际状态**：PR [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)
-  （`jjjjjjjjnnjnn.AI-Terminal-Pet` 1.0.15，3 文件 `+60 −0`，`MERGEABLE`）。它停在两步**不由我们决定**的事情上：
-  1. **Microsoft CLA** 要账号本人签署（机器人 `msftbot/needsCLA` 已贴出协议全文）；
-  2. 检查要维护者批准后才激活（fork PR 的 workflow 现在是 `skipping`）。
-  这两步做完、pipeline 真的跑过静默安装与卸载，才算"能被 winget 安装"。
+- **2026-11-16 22:xx 的实际状态**：PR [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)
+  （`jjjjjjjjnnjnn.AI-Terminal-Pet` 1.0.15，3 文件 `+60 −0`，`MERGEABLE`）。
+  - **CLA 已由账号本人签署**（`license/cla` = pass，`Needs-CLA` 标签已摘掉）；
+  - `01. Pull Request Validation` / `02. Manifest Validation` / `03. URLs Validation` /
+    `04. URL Domain Validation` / `05. Manifest Policy Validation` / `06. Catalog Content Verification` /
+    `07. Installers Scan` **全部 pass**；
+  - **`08. Installation Validation` 仍是 pending** —— 这一步就是真正的静默安装与卸载（在他们的 Windows VM 上排队，
+    2026-11-16 当天已等 35 分钟以上）。它跑完才有 `10. Validation Completed`；
+  - 另外还需要**一位有写权限的维护者批准**（`reviewDecision: REVIEW_REQUIRED`，分支保护要求）。
+  **这两件都不是我们能动的事**：不催、不重开、不改 PR 正文（改了还会让 08 重跑）。
 - **判断可见性**：`winget search jjjjjjjjnnjnn.AI-Terminal-Pet`
   （合并后要等索引同步，通常几小时）；**不要**拿 PR 状态当"已上架"。
 - **一个已知风险，写在这里免得下次重新发现**：`pet-setup.exe` 未做 Authenticode 签名，
@@ -326,8 +331,8 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 
 - **winget（1.0.15 起）**：清单已写在 `packaging/winget/`、`winget validate` 通过，
   PR 已开：[microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)（见 §4.3）。
-  **它现在卡在 CLA 签署与维护者批准上**，不是我们能推进的；pipeline 会真的静默安装再静默卸载，
-  未签名的 `pet-setup.exe` 有被 SmartScreen 拦住的可能，那是这一条唯一的真实风险。
+  **CLA 已签、01–07 号校验全过**；剩下的是 `08. Installation Validation`（他们的 Windows VM 上跑静默安装/卸载）
+  与一位维护者的批准。未签名的 `pet-setup.exe` 有被 SmartScreen 拦住的可能——那会在 08 里暴露出来。
 - 上游 PR **合并仍要人工**：我们只能保证「随时可合」（无冲突、检查跑过、只改一行）。
 - 站点渲染有延迟：合并后要等对方重建，`plugins.json` 才换新版本。**我们会读到旧值，这是正常的。**
 - 其他目录（dshbase / dsh.so / dsh-plugin.org / AllDSH）都是人工复核，已投过，等对方。
