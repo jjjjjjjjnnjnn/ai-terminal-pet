@@ -82,12 +82,12 @@
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
   三个二进制合计 **12,101,632 B** = 11.54 MiB。
 - **分发（两条线）**：
-  - 插件线：npm `latest` = **1.2.25**；`dsh-plugin-v1.2.25` 的 Release 资产 `dsh-ai-terminal-pet-1.2.25.tgz`
-    **2,072,904 B / sha256 `0E5DE443…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`）；
-    上游条目跟进 PR 见 §67.4（分支 `bump-tarball-1.2.25`，单文件 `+1 −1`）。
-    **1.2.24 在 40 分钟内被 1.2.25 取代**（理由见 §67.4）：1.2.24 是"插件三平台"，而它上线后 macOS CI
-    第一次真正执行提示音路径就 SIGSEGV；修好之后 `vendor/manifest.json` 的源码摘要必须跟着动，
-    所以必须再发一版。两条都已 publish，1.2.24 的资产同样不可变。
+  - 插件线：npm `latest` = **1.2.26**；`dsh-plugin-v1.2.26` 的 Release 资产 `dsh-ai-terminal-pet-1.2.26.tgz`
+    **2,072,884 B / sha256 `030545BB…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version` = `ai-terminal-pet 1.0.14`）；
+    上游条目跟进 PR 见 §68.6（分支 `bump-tarball-1.2.26`，单文件 `+1 −1`）。
+    **当天发了三次插件版本**：1.2.24（插件三平台）→ 1.2.25（macOS 提示音 SIGSEGV 的修复，40 分钟后，
+    因为修 Go 源码会让 `vendor/manifest.json` 的源码摘要前移）→ 1.2.26（只改随包 README，
+    按规矩"改一句就要版本"）。三条都已 publish，前两条的资产同样不可变。
     钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
   索引的自我描述也不再写成「不依赖 npm 发版」——两个版本都在 npm 上，索引现在是给偏好 git 源的市场
   提供的**替代**路径，而不是权宜之计。
@@ -4971,6 +4971,19 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 - **没有重发 LAUNCH 的 X / Show HN / DSH Discuss 文案**：§1 记录它们**已经发过**，改写历史帖子没有意义；
   需要再发时以 README 现在的开头为准。
 - **没有动 PLATFORMS / PROTOCOL / UPSTREAM 的实质内容**：它们已经是实测口径，本轮只跟随数字。
+
+### 68.6 顺带发了一次"只含文案"的插件版本：1.2.26
+
+包内 README 是**会随 npm tarball 发布**的公开文案。本仓库的规矩是"资产不可变，改一句就要新版本号"
+（1.2.1 与 1.2.4 就是这么来的），所以这次文案重做没有停在仓库里：
+
+- `dsh-plugin-v1.2.26`：`dsh-ai-terminal-pet-1.2.26.tgz` **2,072,884 B / sha256 `030545BB…` / 20 文件**，
+  npm `latest` = **1.2.26**；公开 URL 下载回来核对过（200 / 字节数 / 摘要三项一致）。
+- `lib/`、`vendor/`、`protocol.js`、清单字段与协议全部与 1.2.25 相同；浮窗仍是 **1.0.14**。
+- 上游 PR [#16038](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16038)（`bump-tarball-1.2.26`）；
+  #16023、#16031 已按"被取代"关闭。#16010 之后对方重建过一次，条目现在停在 1.2.22，
+  剩下的只是 tarball 跟着我们的 PR 前进。
+- CI：`78129c8`（release）与 `8474ca8`（索引 pin）四条 job 全绿。
 
 ### 68.7 下一轮从这里开始
 
