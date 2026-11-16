@@ -157,6 +157,8 @@ func New(values *store.Store, options Options) *App {
 	if options.Settings.Opacity > 0 {
 		options.Opacity = uint8(options.Settings.Opacity)
 	}
+	setSoundVolume(options.Settings.SoundVolume)
+	setSoundScheme(options.Settings.SoundScheme)
 	applyAppearance(options.Settings.Theme, options.Settings.PerSourceColor)
 	zoom := options.Initial.Zoom
 	if math.IsNaN(zoom) || zoom < 0.65 || zoom > 1.6 {
@@ -932,6 +934,8 @@ func (a *App) applyQueuedSettings(value Settings) {
 	if value.AutoApproveTimeoutSec > 0 {
 		a.approveTimeout = time.Duration(value.AutoApproveTimeoutSec) * time.Second
 	}
+	setSoundVolume(value.SoundVolume)
+	setSoundScheme(value.SoundScheme)
 	a.lang = i18n.Resolve(i18n.Setting(value.Language), i18n.SystemLocale())
 	a.applyTopmost(value.AlwaysOnTop)
 	applyAppearance(value.Theme, value.PerSourceColor)
@@ -994,6 +998,9 @@ func (a *App) alertOnTransitions() {
 	if !alertRecordsEqual(a.lastAlertRecord, receipt) {
 		a.lastAlertRecord = receipt
 		writeAlertRecord(receipt)
+	}
+	if plan.Tone != "" {
+		beep(toneKind(plan.Tone))
 	}
 	a.lastAlertAt = recordRememberedAlerts(a.lastAlertAt, inputs, plan, now)
 	if len(plan.Unread) > 0 {

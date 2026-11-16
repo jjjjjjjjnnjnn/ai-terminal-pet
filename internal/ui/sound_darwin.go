@@ -59,3 +59,10 @@ func beep(kind uint32) {
 		}
 	})
 }
+
+// SoundSurface names what the `sound` setting reaches on this machine, for
+// --doctor. AppKit ships with the OS, so the answer cannot depend on the
+// machine - only on whether the window layer loaded at all.
+func SoundSurface() string {
+	return "AppKit NSSound (built in)"
+}

@@ -44,3 +44,9 @@ func beep(kind uint32) {
 	}
 	runtime.KeepAlive(held)
 }
+
+// SoundSurface names what the `sound` setting reaches on this machine, for
+// --doctor. Winmm is a system DLL, so the answer cannot depend on the machine.
+func SoundSurface() string {
+	return "winmm PlaySoundW (built in)"
+}
