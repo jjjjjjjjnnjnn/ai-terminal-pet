@@ -104,6 +104,11 @@ async function caseMapping() {
   process.env.DSH_PET_TEST = '1'
   process.env.DSH_PET_PACKAGE_ROOT = fakeRoot
   process.env.DSH_PET_NO_BOOTSTRAP = '1'
+  // The stub is filed where Windows would look for it, so the seam pins the
+  // platform here too: without it this case silently reports nothing on Linux
+  // and macOS (a real finding from the first Linux CI run).
+  process.env.DSH_PET_PLATFORM = 'win32'
+  process.env.DSH_PET_ARCH = 'x64'
 
   const stub = require(path.join(petDir, 'protocol.js'))
   const plugin = await load(path.join(fakeRoot, 'lib', 'index.js'))
@@ -171,6 +176,8 @@ async function caseMapping() {
   check(afterCleanup === beforeCleanup, 'dispose does NOT end conversations (HMR is not an exit)')
   check(stub.calls.every((item) => item.updatedAt.endsWith('Z')), 'timestamps are UTC')
   check(typeof cleanup === 'function', 'apply returns a disposer')
+  delete process.env.DSH_PET_PLATFORM
+  delete process.env.DSH_PET_ARCH
 }
 
 /** Case 2: bootstrap copies both files, once, and never overwrites. */
@@ -464,6 +471,8 @@ async function caseThrowingProtocol() {
   process.env.DSH_PET_TEST = '1'
   process.env.DSH_PET_PACKAGE_ROOT = fakeRoot
   process.env.DSH_PET_NO_BOOTSTRAP = '1'
+  process.env.DSH_PET_PLATFORM = 'win32'
+  process.env.DSH_PET_ARCH = 'x64'
 
   const handlers = new Map()
   const plugin = await load(path.join(fakeRoot, 'lib', 'index.js'))
@@ -481,6 +490,8 @@ async function caseThrowingProtocol() {
   check(handlers.size > 0, 'event subscription survives a broken protocol module')
   check(plugin.__testing.officialProtocol() === null, 'a throwing protocol module is treated as absent')
   delete process.env.DSH_PET_NO_BOOTSTRAP
+  delete process.env.DSH_PET_PLATFORM
+  delete process.env.DSH_PET_ARCH
 }
 
 /** Case 4: the package can be loaded the way DSH loads it, from package.json. */
