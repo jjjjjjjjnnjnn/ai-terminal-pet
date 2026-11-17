@@ -23,6 +23,7 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 const OVERRIDES = ['USERPROFILE', 'HOME', 'LOCALAPPDATA', 'XDG_DATA_HOME', 'XDG_RUNTIME_DIR', 'TMPDIR']
 
@@ -136,7 +137,10 @@ test('the packaged entry point reports real payloads over a real endpoint', asyn
   const panel = path.join(protocol.dataDirectory(), 'AI-Terminal-Pet.exe')
   if (process.platform === 'win32') {
     assert.ok(existsSync(panel), 'the entry point installs the vendored panel on first load')
-    assert.equal(readFileSync(panel).length, readFileSync(path.join(process.cwd(), 'vendor', 'AI-Terminal-Pet.exe')).length)
+    // Relative to this file, not the cwd: `node --test` is run from the repo root
+    // in CI and from the package directory by hand.
+    const vendored = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vendor', 'AI-Terminal-Pet.exe')
+    assert.equal(readFileSync(panel).length, readFileSync(vendored).length)
   } else {
     assert.equal(existsSync(panel), false, 'POSIX installs the panel from the release tarball, not from this package')
   }
