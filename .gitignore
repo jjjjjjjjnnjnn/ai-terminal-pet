@@ -64,8 +64,11 @@ panel-preview.png
 # Python bytecode from tools/*.py run by hand (python -X utf8 tools/check_docs_links.py).
 __pycache__/
 
-# The DSH plugin package ships a prebuilt overlay so `dsh plugin add` needs no
-# Go toolchain. It is the one exception to the build-output rule above: it is
-# a release artifact, not a local build. Regenerate it with `npm run vendor`
-# (packages/dsh-ai-terminal-pet/scripts/vendor.mjs) after rebuilding bin/.
+# The two npm packages ship a prebuilt overlay so a plugin install needs no Go
+# toolchain. They are the exception to the build-output rule above: a release
+# artifact, not a local build. Regenerate each with its `npm run vendor`
+# (packages/*/scripts/vendor.mjs) after rebuilding bin/. .gitignore's own
+# history bit here once: `*.exe` swallowed the DSH copy, npm pack saw the
+# working tree and shipped fine while `git clone` shipped an empty package.
 !packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe
+!packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe
