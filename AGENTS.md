@@ -123,6 +123,8 @@ node --test tools/check_facts.test.mjs
 python tools/check_docs_links.py   # every relative path and #anchor in the docs we maintain
 python tools/check_assets.py       # every size/frame count in docs/assets/README.md matches the file
 node --test tools/check-tarball.test.mjs   # the .tgz reader/writer rules (no tarball needed)
+node tools/traffic-report.mjs       # reach / installs / npm, with the machine traffic separated (docs/METRICS.md)
+node --test tools/traffic-report.test.mjs  # latest share and the asset baseline rules
 
 # 2b. Doesn't run in CI (a clean checkout has no artifact) but must run before every
 #     plugin release, after `npm pack` in the package directory: it unpacks the
@@ -202,6 +204,7 @@ Two conventions in those commands are load-bearing, not style:
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |
 | **What works on which OS, and how was each claim measured?** | **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — the per-capability table (the reporting path is three platforms, the panel is one), what is unverified and why, and the two CI lists that pin it |
 | I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/PROMOTION.md](docs/PROMOTION.md) has the paste-ready copy; [docs/LAUNCH.md](docs/LAUNCH.md) has the measured numbers it must not exceed and the posting history |
+| **How many people actually use this, and is that download count real?** | **[docs/METRICS.md](docs/METRICS.md)** — the 2026-11-17 measurement (33 views, 0 external installs), the crawler-fleet proof, and the bot-resistant metric; re-measure with `node tools/traffic-report.mjs` |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does an OpenCode user install the reporter in one command? | [packages/opencode-ai-terminal-pet/README.md](packages/opencode-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |
@@ -299,3 +302,15 @@ Two conventions in those commands are load-bearing, not style:
    - This was recorded as an unexplained bug for a whole round (HANDOVER §44.7) and cost a re-verification
      in §45.1. `TestConfigSaverPersistsWithoutAFlush` / `TestConfigSaverFlushPersistsAStagedValue` pin both
      halves of the contract so the next reading starts from the mechanism.
+10. **A usage number in public text is measured, and machine traffic is subtracted**:
+   - `node tools/traffic-report.mjs` answers reach / installs / npm in one page, and
+     [docs/METRICS.md](docs/METRICS.md) records what the numbers mean. **Never quote npm download totals**:
+     on 2026-11-17 the package showed 4,586/week spread evenly over 25 versions - including 166 for the
+     uninstallable `0.0.0-stage` - while the comparable `dsh-pet` put 58% of its downloads on its two newest
+     versions. That flatness is a crawler fleet. The honest derived metric is `latest share` (humans ≈ 50%+,
+     a fleet ≈ 3-10%), always with its window.
+   - Release-asset downloads have a baseline too: each release downloads ~2 of its own assets back for
+     verification, so anything near 2 per release is us. Subtract before calling it a user.
+   - **Release cadence is a metric input**: every release adds an npm version, which the fleet fetches, which
+     raises the total and lowers the latest share. Batch changes into one release (aim for ≤ 2 a week;
+     security and regression fixes excepted) instead of shipping on every commit.

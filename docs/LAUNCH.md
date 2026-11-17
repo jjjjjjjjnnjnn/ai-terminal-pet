@@ -295,26 +295,30 @@ files alone does not wire it. The connect table in the README has one line per t
 
 ## 8. 发完之后看什么
 
-没有遥测，所以只能看代理指标：
+没有遥测，所以只能看代理指标。**全部指标用 `node tools/traffic-report.mjs` 一次量完**
+（口径与判读见 [docs/METRICS.md](METRICS.md)）：
 
-| 指标 | 怎么读 | 基线（2026-11-16） |
+| 指标 | 怎么读 | 基线（2026-11-17 实测） |
 |---|---|---|
-| Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.9` = 4／`v1.0.10` = 6／`v1.0.11` = 7／`v1.0.12` = 6／`dsh-plugin-v1.2.17` = 28／`v1.2.18` = 18／`v1.2.19` = 11／`v1.2.20` = 7／`v1.2.21` = 14（2026-11-16 复读；**1.2.17 仍是这批里最高的 28**，说明换代而不是发帖在带下载） |
-| 仓库浏览 | `gh api .../traffic/views` | 近 14 天 **28 views / 8 uniques**（2026-11-16） |
-| star / fork | `gh repo view` | **1 / 0** |
+| Release 资产下载 | `traffic-report.mjs` 的 INSTALLS 段 | 按类别：DSH tarball 431（12.3/版本）、setup 41（**2.0/版本**）、win zip 43（2.0/版本）、POSIX 75（1.9/版本）。**≈2 件/版本 = 本项目自己的发版复验**，不是用户 |
+| 仓库浏览 | GitHub traffic（14 天窗口） | **33 views / 11 uniques**；referrer 只有 github.com 15、HN 3、目录站 1 |
+| clone | 同上 | 1,798 次里 **852** 直接由 213 次 CI run × 4 job 解释；**不要把 clone 当人气** |
+| star / fork | `gh repo view` | **1 / 0**（那 1 个是作者本人） |
 | npm | `npm view dsh-ai-terminal-pet version` | **1.2.32**（`dist-tags.latest`，2026-11-17 发版同步）；OpenCode 上报端 `opencode-ai-terminal-pet` 同日 **1.0.19** |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后已数日未动） |
-| **npm 下载量（唯一可信的那个数）** | `npm i dsh-ai-terminal-pet` 的 npm 页面 Weekly Downloads，或 `api.npmjs.org/downloads/point/last-week` | **3,455**（2026-11-09 → 11-15）。`point/last-month`（2026-10-17 → 11-15）**也是 3,455**：首个版本 2026-11-11T12:10:46Z 才发布，之前 30 天每天都是 0，所以两个窗口真实值相同 |
-| **目录那行（只作参考，不当数据源）** | `node tools/catalog-status.mjs` | 站点写 `downloads: 1,179 (30d)`、`version: 1.2.16`、安装命令 `dsh-plugin-v1.2.16`。**这三个都落后于现实，且都不归我们修**：1,179 = 11-11 的 624 + 11-12 的 555，缺掉的 2,276 分两段（最后一天 1,197 见 issue #15864、窗口没前进 1,079 见 #15569/PR #15579）。分解表在 [docs/UPSTREAM.md](UPSTREAM.md) §4.1。**对外引用下载量一律用 npm 的 3,455，不要抄站点那个 1,179** |
+| **npm 下载量（会被爬虫放大，不能当用户数）** | `node tools/traffic-report.mjs` | 2026-11-17 实测 **4,586/周**，但它分布在 **25 个版本、每个 137–227 次**，连不可安装的 `0.0.0-stage` 都有 166 次 → **latest share 6%**，是爬虫队形不是用户（对照 `dsh-pet` 的 58%）。证据链见 [docs/METRICS.md](METRICS.md) §2；**任何对外文本都不要引用这个总量** |
+| **目录那行（只作参考，不当数据源）** | `node tools/catalog-status.mjs` | 站点写 `downloads: 3,455 (30d)`、`version: 1.2.27`、安装命令解析到最新版。**这三个都落后于现实，且都不归我们修**：站点数字来自同一个被爬虫放大的 npm 探针；版本停在 1.2.27 是对方夜间构建未成功（见 [docs/UPSTREAM.md](UPSTREAM.md) §4.1）。**对外引用一律不引用下载量；要引用就引用 latest share 与窗口** |
 | 社区健康度 | `gh api .../community/profile` | 85%（原因见 HANDOVER §33.4） |
 | issue 类型分布 | `gh issue list --json labels` | 0 条（本仓库；上游报的两条是该仓库的 issue，不是这里的） |
 
-**判断渠道是否真的起效，看下载数的增量，不看点赞数。** 发帖后 24 小时内的 Release 下载增量
-是唯一能说明「有人真的装了」的信号；star 与转推都可能只是路过。
+**判断渠道是否真的起效，看"减去基线后的安装增量"，不看点赞数。** 发帖后 24 小时内的
+Release 资产下载增量是唯一能说明「有人真的装了」的信号——**但要先扣掉本项目自己的复验下载
+（≈2 件/版本）**，否则你会把自己的核对当成用户。star 与转发都可能只是路过。
 
 **判断「目录里那行是不是当前版本」，跑 `node tools/catalog-status.mjs`，不要开浏览器**：
 它把"该我们动"与"对方的原因"分开写清楚（`docs/UPSTREAM.md` §4.1），
 而 PR 页面上的 `merged` 既不等于 `published`，也不等于 `rebuilt`。
 
-**判断"有人真的在用"，看 npm 的下载量，不看目录卡上的数字**：后者今天是两段 bug 叠出来的
-（1,179 对 3,455），前者任何时候都能自己复算。
+**判断"有人真的在用"，看 npm 的 latest share，不看任何下载总量**：总量两千多次里绝大部分是
+按版本爬取的机器流量（[docs/METRICS.md](METRICS.md) §2 有三条证据）。真要对外说一句，就说
+"最近一周 downloads 里 X% 落在最新两个版本"，并且写上窗口与日期。
