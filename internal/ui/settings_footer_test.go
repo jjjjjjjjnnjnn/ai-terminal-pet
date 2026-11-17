@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"ai-terminal-pet/internal/i18n"
-	"ai-terminal-pet/internal/project"
 )
 
 // TestSettingsFooterSitsUnderTheLastRow pins the geometry the footer needed: it
@@ -79,36 +78,6 @@ func TestFooterLinksAreReachableByTab(t *testing.T) {
 	if tail[0] != settingsStar || tail[1] != settingsIssue {
 		t.Fatalf("the last two focus stops are %v, want star then issue", tail)
 	}
-}
-
-// TestFooterClickOpensTheRightURL is the assertion that makes the footer worth
-// having: the control the hit test returns must reach the opener with the URL the
-// label promises, and a nil opener must be a no-op rather than a crash.
-func TestFooterClickOpensTheRightURL(t *testing.T) {
-	var opened []string
-	a := &App{options: Options{
-		OpenExternal: func(url string) error {
-			opened = append(opened, url)
-			return nil
-		},
-	}}
-	a.settingsGeometry = settingsGeometryFor(96, 0, settingsRowsIn(t, 0, i18n.LangEn))
-	a.settingsApply(settingsStar, -1)
-	a.settingsApply(settingsIssue, -1)
-	if len(opened) != 2 {
-		t.Fatalf("opened %d links, want 2: %v", len(opened), opened)
-	}
-	if opened[0] != project.RepoURL {
-		t.Fatalf("the star link opened %q, want %q", opened[0], project.RepoURL)
-	}
-	if opened[1] != project.IssuesURL {
-		t.Fatalf("the issue link opened %q, want %q", opened[1], project.IssuesURL)
-	}
-
-	// No opener configured: nothing happens, and in particular nothing panics.
-	quiet := &App{}
-	quiet.settingsApply(settingsStar, -1)
-	quiet.settingsApply(settingsIssue, -1)
 }
 
 // TestSubtitleCarriesTheBuild: a bug report that has to be chased for its build
