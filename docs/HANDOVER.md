@@ -5072,7 +5072,11 @@ Linux 与 macOS 只能手改 `config.json`，而 `--settings` 在那两个平台
   `1.0.15 → 1.0.16` 必改字节，`vendor/AI-Terminal-Pet.exe` 与源码摘要随之前移。
 - 资产：zip **5,137,799 B / `F1F2A578…`（17 文件）**、`pet-setup.exe` **14,540,800 B / `5A4462CB…`**、
   `dsh-ai-terminal-pet-1.2.28.tgz` **2,086,438 B / `E3259B96…`（20 文件）**，另有四个 POSIX tar.gz。
-- 按 §67.4 的教训：**四个 job 在同一个提交上全绿之后才打 tag**。
+- 上游条目 PR：awesome-dsh-plugin [#16228](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16228)
+  （ump-tarball-1.2.28，单文件 +1 −1，MERGEABLE）；--check 报 in flight（健康状态）。
+- 按 §67.4 的教训：**四个 job 在同一个提交（8a62017）上全绿之后才打 tag**。
+- 资产复验：pet-setup.exe 200 / 14,540,800 B / 5A4462CB…、zip 200 / 5,137,799 B / F1F2A578…、
+  tgz 200 / 2,086,438 B / E3259B96…（三个都从公网 URL 下载回来核对过）。
 
 ### 72.6 顺手修掉的一个老显示 bug
 
