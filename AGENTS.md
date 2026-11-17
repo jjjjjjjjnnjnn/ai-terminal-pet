@@ -114,7 +114,7 @@ python tools/check_docs_links.py   # every relative path and #anchor in the docs
 python tools/check_assets.py       # every size/frame count in docs/assets/README.md matches the file
 node --test tools/check-tarball.test.mjs   # the .tgz reader/writer rules (no tarball needed)
 
-# # 2b. Doesn't run in CI (a clean checkout has no artifact) but must run before every
+# 2b. Doesn't run in CI (a clean checkout has no artifact) but must run before every
 #     plugin release, after `npm pack` in packages/dsh-ai-terminal-pet/: it unpacks the
 #     tarball and compares it file for file with the working tree. 1.2.28 shipped a
 #     packaged README that still said 1.2.27 because the pack ran before the bump.
