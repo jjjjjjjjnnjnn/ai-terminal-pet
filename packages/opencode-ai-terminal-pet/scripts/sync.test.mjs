@@ -65,10 +65,10 @@ test('a missing or edited generated file is reported by name', (t) => {
   writeFileSync(target, `${readFileSync(target, 'utf8')}// hand edit\n`)
   const problems = compare(dir)
   assert.equal(problems.length, 1)
-  assert.match(problems[0], /server\.js: differs from reporters\/opencode\.js/)
+  assert.match(problems[0], /reporter\.js: differs from reporters\/opencode\.js/)
 
   rmSync(target)
-  assert.match(compare(dir)[0], /server\.js: missing/)
+  assert.match(compare(dir)[0], /reporter\.js: missing/)
 })
 
 test('the package in this checkout is in sync with reporters/', () => {

@@ -590,6 +590,10 @@ module.exports = {
   SCHEMA_VERSION,
   STATES,
   approvalPlan,
+  // Exported for a packaged bootstrap that has to put the overlay where
+  // launchApplication() looks for it: one answer to "where does this project
+  // keep its files" instead of a fourth spelling of the path.
+  dataDirectory,
   executablePath,
   isDangerousCommand,
   loadPetConfig,

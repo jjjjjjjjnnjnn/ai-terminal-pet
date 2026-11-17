@@ -6,9 +6,10 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-17；浮窗 **1.0.19**、插件包 **1.2.32** 已发版；**§75 第 75 轮（OpenCode 上报端成为 npm 包）；§74 第 74 轮（门禁、卸载项、像素、设置入口、推广功课）；§71（三平台视觉不变量门禁）；§70（安装器写卸载项 + winget 清单）**）
+## 1. 当前状态（2026-11-17；浮窗 **1.0.20**、插件包 **1.2.33** 已发版；**§77 第 77 轮（OpenCode 一行装到底）；§76（先量清楚有几个人在看）；§75（OpenCode 上报端成为 npm 包）；§74（门禁、卸载项、像素、设置入口、推广功课）**）
 
-> 接手请先读本节与 **§76「先量清楚有几个人在看」**（这一轮只做测量：33 浏览 / 11 唯一、外部安装 ≈ 0、
+> 接手请先读本节与 **§77「OpenCode 的一行真的只是一行」**（包里带面板、首次加载装机、为什么
+> Linux/macOS 故意不这么做），再读 **§76「先量清楚有几个人在看」**（那一轮只做测量：33 浏览 / 11 唯一、外部安装 ≈ 0、
 > npm latest share 6% 的证据，以及据此定下的四条取舍），再读 **§75「OpenCode 接入变成一行 npm 安装」**（为什么它是一个发行缺口、npm 包为什么是生成的、
 > 两个坑、以及本机为什么故意还没换配置），再读 **§74「一轮五件事，下个会话从这里开始」**（机器状态、外部世界谁在等谁、
 > 下一步顺序，以及三条只有本人能做的事），再读 **§72「Linux/macOS 终于有设置入口」**
@@ -68,32 +69,33 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.19`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.32`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.19` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.32`。
+- **版本**：浮窗 **`1.0.20`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.33`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.20` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.33`。
   OpenCode 上报端包 `opencode-ai-terminal-pet` **没有自己的版本线**：它与浮窗同号（`check_versions` 断言相等）。
-  **工作区与本机安装目录已经与 `1.0.19` / `1.2.32` 同步**：`bin/`、
+  **工作区与本机安装目录已经与 `1.0.20` / `1.2.33` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` 的字节数与 sha256 见下方规模一行）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**499 个** `func Test`，
-  本轮（第 75 轮）+4 来自 OpenCode 的 npm 包形状与包名解析）；CI 四条 job
-  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.19 的提交上全绿（见 §75）；
-  `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑：16 包 × linux/amd64 + darwin/arm64 全过）；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 与 1.0.19 的 `bin/` 一致；`tools/check_versions.mjs` **21** 条一致
-  （`node --test tools/check_versions.test.mjs` 27/27）、**`tools/check_facts.mjs` 11 条一致**、
-  `tools/catalog-status.test.mjs` **12/12**、`tools/upstream-entry.test.mjs` 26/26、
-  `tools/check-tarball.test.mjs` 8/8；**OpenCode 包**：`sync.mjs --check` 3/3、
-  `sync.test.mjs` 4/4、`server.test.mjs` 1/1（本机 Windows 走命名管道，Linux/macOS 在 CI 走 socket）；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**499 个** `func Test`）；
+  CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
+  `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑）；
+  两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**两个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
+  `tools/check_versions.mjs` **21** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
+  **`tools/check_facts.mjs` 11 条一致**、`tools/catalog-status.test.mjs` 12/12、
+  `tools/upstream-entry.test.mjs` 26/26、`tools/check-tarball.test.mjs` 8/8、
+  `tools/traffic-report.test.mjs` 4/4；**OpenCode 包**：`sync.mjs --check` 3/3、`sync.test.mjs` 4/4、
+  `bootstrap.test.mjs` **6/6**、`server.test.mjs` 1/1；
   `tests/fresh-machine.mjs --no-overlay` **183/183**；
-  `tools/check_docs_links.py` **14 份**全解、`tools/check_assets.py` 15 行一致；
+  `tools/check_docs_links.py` **15 份**全解、`tools/check_assets.py` 15 行一致；
   `govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.19 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  1.0.20 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.19`，注册表那一行 `DisplayVersion=1.0.19`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.19 实测）：非测试 **154 文件 / 28,309 行**、
+  `--version` 报 `ai-terminal-pet 1.0.20`，注册表那一行 `DisplayVersion=1.0.20`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.20 实测）：非测试 **154 文件 / 28,309 行**、
   测试 **101 文件 / 14,842 行**、**499 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,775,936 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `731EFC7A…`）、
+  `bin/AI-Terminal-Pet.exe` **4,775,936 B**（与 `packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`
+  和 `packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 三份逐字节相同，sha256 `70C5416F…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
   三个二进制合计 **12,160,000 B** = 11.60 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
 - **分发（两条版本线 + 两个 npm 包 + 一个包管理器）**：
@@ -5020,6 +5022,41 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 77. 交接：OpenCode 的"一行"真的只是一行 —— 包里带上面板（2026-11-17，**已发版** 浮窗 **1.0.20** / 插件 **1.2.33** / 上报端 **1.0.20**）
+
+上一轮把 OpenCode 做成了 npm 包，但那个包**只上报、不装面板**：装完什么都不会出现，因为包里没有
+可启动的文件，而 `protocol.launchApplication()` 不会启动一个不存在的路径。用户看到的是"装好了但
+没反应"——本项目一直在消灭的静默失败，这次是我自己造的。
+
+### 77.1 改了什么
+
+| 面 | 内容 |
+|---|---|
+| 包内带面板 | `vendor/AI-Terminal-Pet.exe`（4,775,936 B）+ `vendor/manifest.json`；首次加载时校验 sha256，临时文件 + rename 拷到 `%LOCALAPPDATA%\AI-Terminal-Pet\`，**从不覆盖**；`AI_TERMINAL_PET_NO_PANEL_INSTALL=1` 可关 |
+| 入口分两层 | `server.js` 手写（先 `installPanel()` 再导出），`reporter.js` 仍由 `reporters/opencode.js` 生成，`sync.mjs --check` 进 CI |
+| 一份摘要两个包 | `tools/overlay-vendor.mjs` 提供源码摘要；DSH 包的 `vendor.mjs` 改为 import 它，两个包对"二进制是否比源码旧"只有一个答案 |
+| 共享路径 | `reporters/protocol.js` 导出 `dataDirectory()`：装面板必须写到 reporter 自己找的位置 |
+| 测试 | `bootstrap.test.mjs` **6 条**（装机、绝不覆盖、摘要不符拒绝、无清单不猜、平台/开关短路、路径坏掉不抛）；`server.test.mjs` 在 Windows 上断言面板真的落地 |
+
+### 77.2 一个刻意的"不做"
+
+**Linux/macOS 不由这个包装面板。** 那边一个二进制不算装好：自启动项、上报端、卸载记录都在
+`install.sh` 里，用一次拷贝假装装好只会留下半个安装——那正是 ROADMAP §5 写的"降级版"。所以
+POSIX 仍是"装 tar.gz 一次"，包 README 与 `--doctor` 都把这件事说清楚。
+
+### 77.3 发布
+
+- 三个号一起走：浮窗 **1.0.20**、DSH 插件 **1.2.33**（它 vendor 的 `protocol.js` 与二进制都变了）、
+  上报端 **1.0.20**（同号规则）。
+- npm 包体积从 17,822 B 变成 **约 4.8 MB**：这是"一行就够"的价格，也是 DSH 包早就付过的价格。
+- 上游 bump PR 与 `pet-v1.0.20` 资产见下（开出来之后补号）。
+
+### 77.4 下个会话从这里开始
+
+1. 浏览器恢复后：社交预览图上传（`docs/assets/social-preview.png`）。
+2. 人手项：awesome-claude-code 表单（那一行在 [docs/PROMOTION.md](PROMOTION.md) §6）、HN/V2EX 正文。
+3. 工程项：ROADMAP §7.6 的 C 最小版（先补两条视觉不变量测试），仍排在分发之后。
 
 ## 76. 交接：先量清楚有几个人在看 —— 以及据此重排的优先级（2026-11-17；**不发版**，浮窗 1.0.19 / 插件 1.2.32 / 上报端 1.0.19 仍是最新）
 

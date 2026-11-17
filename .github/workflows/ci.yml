@@ -243,11 +243,14 @@ jobs:
         shell: bash
         run: |
           node packages/opencode-ai-terminal-pet/scripts/sync.mjs --check
+          node packages/opencode-ai-terminal-pet/scripts/vendor.mjs --check
           node --check packages/opencode-ai-terminal-pet/server.js
+          node --check packages/opencode-ai-terminal-pet/reporter.js
           node --check packages/opencode-ai-terminal-pet/protocol.cjs
+          node --check packages/opencode-ai-terminal-pet/bootstrap.mjs
           node --test packages/opencode-ai-terminal-pet/scripts/sync.test.mjs
       - name: Test the packaged OpenCode reporter
-        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs
+        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs packages/opencode-ai-terminal-pet/bootstrap.test.mjs
 
       # verify.mjs loads the Harness bundle the way the Harness loader does and
       # fails on an unloadable manifest, a missing locale or a broken patch.
@@ -507,7 +510,7 @@ jobs:
       # $XDG_RUNTIME_DIR, and this is the only job where that branch runs for a
       # package loaded out of its npm shape.
       - name: Test the packaged OpenCode reporter (Linux)
-        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs
+        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs packages/opencode-ai-terminal-pet/bootstrap.test.mjs
 
       - name: Headless Linux CLI, install, and hook smoke test
         run: |
@@ -591,7 +594,7 @@ jobs:
       # Same package, the third transport: on macOS the endpoint lives under
       # $TMPDIR, and this is the only runner where that derivation is exercised.
       - name: Test the packaged OpenCode reporter (macOS)
-        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs
+        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs packages/opencode-ai-terminal-pet/bootstrap.test.mjs
 
       - name: Headless macOS CLI, install, and hook smoke test
         run: |

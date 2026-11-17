@@ -61,10 +61,14 @@ const PROTOCOL_TARGET = path.join(vendorDir, 'protocol.js')
 const MANIFEST_TARGET = path.join(vendorDir, 'manifest.json')
 
 const MANIFEST_LABEL = 'vendor/manifest.json'
-const SOURCE_ROOTS = ['cmd', 'internal']
-// bin/ and vendor/ hold build output, never Go sources; skipping them keeps the
-// digest stable whether or not somebody has built the tree.
-const SKIP_DIRS = new Set(['bin', 'vendor', 'node_modules', '.git'])
+
+// The digest over the overlay's Go sources is shared with
+// packages/opencode-ai-terminal-pet: both packages ship the same binary, so
+// "is this copy older than the sources?" must have one answer, not two. The
+// helper carries the NON_OVERLAY_PACKAGES reasoning that makes the question
+// honest (cmd/pet-hook, cmd/pet-statusline, cmd/pet-setup and internal/reporter
+// are not linked into the panel, so editing them must not demand a re-vendor).
+import { sourceDigest } from '../../../tools/overlay-vendor.mjs'
 
 const BUILD_HINT = [
   'scripts/vendor.mjs: the overlay binary is missing at bin/AI-Terminal-Pet.exe.',
@@ -109,63 +113,13 @@ function currentGoVersion() {
   }
 }
 
-function walkGoSources(dir, found) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name.toLowerCase())) walkGoSources(full, found)
-    } else if (entry.isFile() && entry.name.endsWith('.go') && !entry.name.endsWith('_test.go')) {
-      found.push(path.relative(repoDir, full).split(path.sep).join('/'))
-    }
-  }
-}
-
 /**
- * One digest over every Go file the overlay is built from: a sorted list of
- * `<slash path>\0<sha256 of the file>\n` folded into a single sha256. Sorting
- * makes the digest independent of directory order, and hashing the path as well
- * as the bytes means a rename or a move between packages counts as a change.
- *
- * NON_OVERLAY_PACKAGES is what keeps that question honest. The sweep below
- * covers cmd/ and internal/, but not all of it is linked into
- * AI-Terminal-Pet.exe: cmd/pet-hook, cmd/pet-statusline and internal/reporter
- * are other binaries. A package that the overlay never imports cannot change one
- * byte of it, so leaving such a package in the digest means every unrelated edit
- * to it demands a re-vendor - and re-vendoring a released package's manifest is
- * exactly what the immutability rule forbids.
- *
- * cmd/pet-statusline was left inside this set in the first version of this
- * script, to avoid rewriting a manifest that had carried it since 1.0.0. That
- * reasoning does not survive contact: the first time the statusline shim was
- * touched, the digest broke anyway, while the overlay binary stayed
- * byte-identical. Being unlinked, not being old, is the property that matters.
- *
- * Add every new non-overlay command or package here. The list is explicit
- * rather than an import-closure walk because an explicit list fails loudly: a
- * new package shows up as a digest change and a reviewer adds it deliberately.
+ * The digest itself lives in tools/overlay-vendor.mjs, imported at the top of
+ * this file: the OpenCode package ships the same overlay and must reach the same
+ * answer about staleness. The reasoning that shaped it - why the digest is a
+ * source hash rather than a byte comparison, and why the non-overlay packages are
+ * excluded - is documented there.
  */
-const NON_OVERLAY_PACKAGES = ['cmd/pet-hook/', 'cmd/pet-setup/', 'cmd/pet-statusline/', 'internal/reporter/']
-
-function isOverlaySource(relative) {
-  return !NON_OVERLAY_PACKAGES.some((prefix) => relative.startsWith(prefix))
-}
-
-function sourceDigest() {
-  const found = []
-  for (const root of SOURCE_ROOTS) {
-    const dir = path.join(repoDir, root)
-    if (!existsSync(dir)) continue
-    const collected = []
-    walkGoSources(dir, collected)
-    for (const relative of collected) if (isOverlaySource(relative)) found.push(relative)
-  }
-  found.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
-  const fold = createHash('sha256')
-  for (const relative of found) {
-    fold.update(relative + '\0' + sha256(path.join(repoDir, relative)) + '\n', 'utf8')
-  }
-  return { files: found.length, sha256: fold.digest('hex') }
-}
 
 /** Copy when the destination is missing or differs; true when a write happened. */
 function sync(source, target, label) {

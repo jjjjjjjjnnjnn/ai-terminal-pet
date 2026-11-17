@@ -76,12 +76,16 @@ reporters/*.js  ──[pipe / unix socket, JSON lines]──►  cmd/ai-terminal
 - `reporters/`: host CLI hooks (`claude-hook.js`, `opencode.js`, `antigravity-hook.js`,
   `antigravity-statusline.js`, `generic.js`, shared `protocol.js`). **This is the only implementation**; every
   packaged copy is generated from it.
-- `packages/opencode-ai-terminal-pet/`: the OpenCode reporter as a publishable npm plugin. `server.js` and
-  `protocol.cjs` are **generated** by `scripts/sync.mjs` from `reporters/opencode.js` and `reporters/protocol.js`
-  (the one difference is the `require()` specifier: an npm plugin must be `"type": "module"`, the shared core
-  is CommonJS). `--check` plus its tests are a CI gate: a fix that lands in `reporters/` and never reaches
-  this package is the drift handover §52.3 paid for. The package is **versioned with the overlay**
-  (`tools/check_versions.mjs` asserts the equality), so an overlay release publishes it in the same step.
+- `packages/opencode-ai-terminal-pet/`: the OpenCode reporter **and the panel it carries**, as a publishable
+  npm plugin. `reporter.js` and `protocol.cjs` are **generated** by `scripts/sync.mjs` from
+  `reporters/opencode.js` and `reporters/protocol.js` (the one difference is the `require()` specifier: an
+  npm plugin must be `"type": "module"`, the shared core is CommonJS); `server.js` is hand-written because it
+  also installs `vendor/AI-Terminal-Pet.exe` on first load (temp file, digest check, rename, **never
+  overwrite**) so one `opencode plugin add` really is one command on Windows. `vendor.mjs --check` and the
+  bootstrap tests are CI gates: a fix that lands in `reporters/` and never reaches this package is the drift
+  handover §52.3 paid for, and an unverified file copy inside a host's plugin loader is the failure AGENTS
+  rule 1 forbids. The package is **versioned with the overlay** (`tools/check_versions.mjs` asserts the
+  equality), so an overlay release publishes it in the same step.
 - `integrations/deepseek-harness/ai-terminal-pet-bridge/`: host-only Cordis bundle plus `verify.mjs`.
 
 ---
@@ -112,7 +116,9 @@ node --test reporters/opencode-events.test.mjs   # the OpenCode event -> state t
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
 node packages/opencode-ai-terminal-pet/scripts/sync.mjs --check   # the npm reporter is generated from reporters/
+node packages/opencode-ai-terminal-pet/scripts/vendor.mjs --check  # the panel it ships is current (shared digest)
 node --test packages/opencode-ai-terminal-pet/scripts/sync.test.mjs
+node --test packages/opencode-ai-terminal-pet/bootstrap.test.mjs   # install-once rules: never overwrite, verify digest
 node --test packages/opencode-ai-terminal-pet/server.test.mjs      # loads the package the way npm install does
 node tools/upstream-entry.mjs --check   # catalogue entry points at this package version (SKIP is not a pass)
 node --test tools/upstream-entry.test.mjs

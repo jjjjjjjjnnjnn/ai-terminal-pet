@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/vendor.mjs",
+  "goVersion": "go1.27.0",
+  "source": {
+    "files": 136,
+    "sha256": "c98e5d5e48b81ca0fb2e6c16a8f37f73da70296a8a1eabb7a62f0900f4056497"
+  },
+  "overlay": {
+    "file": "vendor/AI-Terminal-Pet.exe",
+    "bytes": 4775936,
+    "sha256": "70c5416f77a4767dffb050264904a586033dd609258b25af635135c454d54f08"
+  }
+}

@@ -5,8 +5,11 @@ overlay: one always-on-top strip that shows which of your agent sessions is
 waiting on you, with the project, the reason it is blocked and how long it has
 been blocked — and one click back to that terminal.
 
-This package is the reporter only. The panel is a separate, small desktop app
-that you install once; this package feeds it.
+On Windows this package installs the panel too: `opencode plugin add` drops the
+vendored binary next to your other data and the overlay starts itself on the
+first session event. On Linux and macOS the reporting half is this package and
+the panel comes from the release tarball (the architecture is different: fonts,
+autostart entry, and a tray item that a single binary drop cannot reproduce).
 
 ## Requirements
 
@@ -14,7 +17,7 @@ that you install once; this package feeds it.
 |---|---|
 | OpenCode | **V2** (validated against 2.3.0; the reporter uses V2's `context.event.subscribe` and V2 event names) |
 | Node | 22 or newer (the one OpenCode already ships with) |
-| The AI Terminal Pet overlay | **1.0.19 or newer**, installed separately — see [Install the overlay](#install-the-overlay). This package is versioned with the overlay: `1.0.19` of the reporter and `1.0.19` of the panel are the pair that was tested together |
+| The AI Terminal Pet overlay | Windows: **installed automatically** by this package (vendored copy, no download). Linux/macOS: install the release tarball once — see [The panel on Linux and macOS](#the-panel-on-linux-and-macos). This package is versioned with the overlay: `1.0.20` of the reporter and `1.0.20` of the panel are the pair that was tested together |
 | Platform | anything OpenCode runs on; the reporting path is Windows, Linux and macOS |
 
 ## Install
@@ -35,17 +38,34 @@ Or pin it in `opencode.jsonc` yourself:
 }
 ```
 
-### Install the overlay
+### The panel on Windows
 
-The package reports; it does not draw. Install the overlay once:
+Nothing else to do. The package carries the panel (`vendor/AI-Terminal-Pet.exe`,
+~4.8 MB) and, on first load, copies it to
+`%LOCALAPPDATA%\AI-Terminal-Pet\AI-Terminal-Pet.exe` — through a temp file and
+a rename, verified against `vendor/manifest.json`, **never overwriting a file
+that is already there**. A copy you installed yourself, newer included, wins.
 
-- **Windows** — `pet-setup.exe` (or the portable zip) from
-  [Releases](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/latest).
-- **Linux / macOS** — the `linux-*` / `darwin-*` tarball from the same release,
-  then `./install.sh`.
+The panel exits by itself when there is nothing to show and is started again by
+the next report, so you never manage a daemon.
 
-You do not have to start it by hand: the first report launches it if it is
-missing, and it exits by itself when there is nothing to show.
+Two things it deliberately is not:
+
+- **not a download**: the binary ships inside the npm package, so an offline
+  machine works and no request leaves yours;
+- **not a silent installer of anything else**: one file, one path, one time.
+
+Set `AI_TERMINAL_PET_NO_PANEL_INSTALL=1` to keep the reporting half and manage
+the panel yourself.
+
+### The panel on Linux and macOS
+
+Install the `linux-*` / `darwin-*` tarball from
+[Releases](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/latest) and
+run `./install.sh`. A single binary drop is not an install on those platforms —
+the installer also places the autostart entry, the reporters and the uninstall
+record — so this package does not pretend otherwise; `ai-terminal-pet --doctor`
+tells you whether both halves are in place.
 
 ## What it reports
 
@@ -99,8 +119,11 @@ macOS: `~/Library/Application Support/AI-Terminal-Pet/runtime/`).
 
 | File | What it is |
 |---|---|
-| `server.js` | The OpenCode plugin. **Generated** from [`reporters/opencode.js`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/blob/main/reporters/opencode.js) — the reference implementation — with one line changed: the shared core is required as `./protocol.cjs` |
-| `protocol.cjs` | The shared core, byte for byte the same as `reporters/protocol.js`: payload normalisation, redaction, snapshot writing, endpoint delivery, acknowledgement |
+| `server.js` | The entry point. Hand-written: installs the panel on first load, then re-exports the plugin |
+| `reporter.js` | The OpenCode plugin. **Generated** from [`reporters/opencode.js`](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/blob/main/reporters/opencode.js) — the reference implementation — with one line changed: the shared core is required as `./protocol.cjs` |
+| `protocol.cjs` | The shared core, byte for byte the same as `reporters/protocol.js`: payload normalisation, redaction, snapshot writing, endpoint delivery, acknowledgement, and the data-directory answer |
+| `bootstrap.mjs` | The one-time panel install: temp file, digest check, rename, never overwrite |
+| `vendor/` | The panel binary and `manifest.json` — its sha256 plus a digest of the Go sources it was built from, so a stale copy is detectable |
 
 Two files instead of one because an npm plugin package is `"type": "module"`,
 while the shared core is CommonJS — it is `require()`d by five hooks and is
@@ -120,13 +143,17 @@ MIT.
 
 ## 中文速览
 
-`opencode plugin add opencode-ai-terminal-pet` 一行接入。这个包只负责**上报**：
-OpenCode 里哪个会话在等你、卡在什么原因上、等了多久，交给
+`opencode plugin add opencode-ai-terminal-pet` 一行接入。OpenCode 里哪个会话在等你、
+卡在什么原因上、等了多久，交给
 [AI Terminal Pet](https://github.com/jjjjjjjjnnjnn/ai-terminal-pet) 那块置顶小面板显示。
 
-面板本体要单独装一次（Windows 用 `pet-setup.exe`，Linux/macOS 用对应 tar.gz），
-装上之后**不需要手动启动**：第一次上报会把它拉起来，没有会话时它自己退出。
+**Windows 上这一行就够了**：包里带着面板本体（`vendor/`，约 4.8 MB），首次加载时校验
+sha256 后拷到 `%LOCALAPPDATA%\AI-Terminal-Pet\`，**从不覆盖已存在的文件**（你自己装的更新版本优先）；
+面板不需要手动启动，没有会话时它自己退出。`AI_TERMINAL_PET_NO_PANEL_INSTALL=1` 可以关掉这一步。
+
+**Linux / macOS** 的面板仍要装一次发布包里的 tar.gz（`./install.sh`）：那边一个二进制不够，
+还要自启动项、上报端与卸载记录，用一次拷贝假装装好只会留下半个安装。`--doctor` 会告诉你两半是否都在。
 
 不上报工具参数、命令内容或文件内容，只上报工具**名字**；不出网，无遥测，零依赖。
-包内 `server.js` 由仓库里的 `reporters/opencode.js` 生成，`protocol.cjs` 与
+`reporter.js` 由仓库里的 `reporters/opencode.js` 生成，`protocol.cjs` 与
 `reporters/protocol.js` 逐字节相同——这样同一个上报端不会在 npm 上悄悄变成第二份实现。

@@ -17,7 +17,7 @@
  *   protocol.cjs  a byte-for-byte copy of reporters/protocol.js (only the
  *                 extension differs, because .cjs is CommonJS regardless of the
  *                 package's type)
- *   server.js     reporters/opencode.js with exactly one line changed - the
+ *   reporter.js   reporters/opencode.js with exactly one line changed - the
  *                 specifier of that require() - and a banner saying so
  *
  * Every other byte of the reporter is copied, not rewritten: this is the same
@@ -45,7 +45,7 @@ export const SPECIFIER = 'require("./protocol.js")'
 export const REPLACEMENT = 'require("./protocol.cjs")'
 
 /**
- * The banner is part of the generated file on purpose: an empty server.js with
+ * The banner is part of the generated file on purpose: an empty reporter.js with
  * no provenance is how somebody decides to "just fix it here", and that edit is
  * silently overwritten by the next --write.
  */
@@ -63,8 +63,14 @@ export const COPIES = [
   { source: 'LICENSE', target: 'LICENSE' }
 ]
 
-/** The one generated file that is a copy plus a single edited specifier. */
-export const SERVER = { source: 'reporters/opencode.js', target: 'server.js' }
+/**
+ * The one generated file that is a copy plus a single edited specifier.
+ *
+ * It is target `reporter.js`, not `server.js`: the package entry point is
+ * hand-written because it also has to install the panel on first run, and a
+ * generated file is the wrong place for a decision like that.
+ */
+export const SERVER = { source: 'reporters/opencode.js', target: 'reporter.js' }
 
 /**
  * renderServer turns the reference reporter into this package's entry point.
@@ -85,7 +91,7 @@ export function renderServer(source) {
   if (occurrences !== 1) {
     throw new Error(
       `reporters/opencode.js must contain exactly one ${SPECIFIER}, found ${occurrences}. ` +
-        'If the require() moved or became conditional, update scripts/sync.mjs rather than hand-editing server.js.'
+        'If the require() moved or became conditional, update scripts/sync.mjs rather than hand-editing reporter.js.'
     )
   }
   return `${BANNER}\n${source.replace(SPECIFIER, REPLACEMENT)}`

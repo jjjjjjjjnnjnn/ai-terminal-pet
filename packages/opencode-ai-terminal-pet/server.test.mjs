@@ -129,6 +129,18 @@ test('the packaged entry point reports real payloads over a real endpoint', asyn
   assert.equal(plugin.id, 'ai-terminal-pet', 'the id OpenCode shows in its plugin list')
   assert.equal(typeof plugin.setup, 'function')
 
+  // The entry point is more than the reporter: on Windows it must leave the
+  // panel where protocol.launchApplication() looks for it, because that is what
+  // "one command" means. On POSIX this package deliberately does not install a
+  // panel (the README says so and the bootstrap returns skipped-platform).
+  const panel = path.join(protocol.dataDirectory(), 'AI-Terminal-Pet.exe')
+  if (process.platform === 'win32') {
+    assert.ok(existsSync(panel), 'the entry point installs the vendored panel on first load')
+    assert.equal(readFileSync(panel).length, readFileSync(path.join(process.cwd(), 'vendor', 'AI-Terminal-Pet.exe')).length)
+  } else {
+    assert.equal(existsSync(panel), false, 'POSIX installs the panel from the release tarball, not from this package')
+  }
+
   const events = [
     {
       type: 'session.execution.started',

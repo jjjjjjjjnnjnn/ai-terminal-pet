@@ -221,11 +221,11 @@ export const CLAIMS = [
   {
     // The reporter package is versioned with the overlay on purpose: there is
     // one number for "the pair that was tested together", and the package's
-    // manifest version is asserted equal to the constant below. This row is the
-    // only prose that states the compatibility, so it is the one that rots.
+    // manifest version is asserted equal to the constant below. This sentence is
+    // the only prose that states the pairing, so it is the one that rots.
     id: 'opencode package requirement',
     file: OPENCODE_README,
-    pattern: /AI Terminal Pet overlay \| \*\*(\d+\.\d+\.\d+) or newer\*\*/g,
+    pattern: /versioned with the overlay: `(\d+\.\d+\.\d+)` of the reporter/g,
     expect: ['overlay'],
     count: 1
   }

@@ -30,8 +30,33 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.19**（tag `pet-v1.0.19`）/ **1.2.32**（tag `dsh-plugin-v1.2.32`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.19**。
+已发版到 **1.0.20**（tag `pet-v1.0.20`）/ **1.2.33**（tag `dsh-plugin-v1.2.33`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.20**。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）；OpenCode 上报端包没有自己的版本线，它跟着浮窗走。
+
+## [1.0.20] / [1.2.33] — 2026-11-17（OpenCode 的"一行"真的只是一行：包里带上了面板）
+
+`opencode plugin add opencode-ai-terminal-pet` 在 1.0.19 里只接了上报端：装完什么也不会出现，
+因为包里没有面板，而 `protocol.launchApplication()` 不会启动一个不存在的文件。用户看到的是
+"装好了但没反应"——这正是本项目一直在消灭的那类静默失败。
+
+### 改了什么
+
+- **包里带面板**（`vendor/AI-Terminal-Pet.exe`，约 4.8 MB）：首次加载时按 `vendor/manifest.json` 校验
+  sha256，经临时文件 + rename 拷到 `%LOCALAPPDATA%\AI-Terminal-Pet\`，**从不覆盖已存在的文件**
+  （用户自己装的更新版本优先）；`AI_TERMINAL_PET_NO_PANEL_INSTALL=1` 可关。
+- **只拷一个文件，不上网**：与 DSH 包在 Windows 上的做法一致；Linux/macOS 仍走发布包 + `install.sh`
+  （那边还要自启动项与卸载记录，一次拷贝不算装好），包 README 写明了这一点。
+- **入口拆成两层**：`server.js` 手写（先装面板，再导出插件），`reporter.js` 由 `reporters/opencode.js`
+  生成（`sync.mjs --check` 仍进 CI）。生成器不再负责打包决策。
+- **两份清单共享同一个源码摘要**：`tools/overlay-vendor.mjs` 是"这份二进制是不是比源码旧"的唯一答案
+  （DSH 包的 `vendor.mjs` 改为 import 它，两个包不会再对同一件事给出两个判断）。
+- `reporters/protocol.js` 导出 `dataDirectory()`：装面板要写到 reporter 自己找的那个位置，
+  这里只能有一个答案。
+
+### 为什么值得单独一版
+
+1.0.19 的 OpenCode 路径是"两行"：先 `opencode plugin add`，再自己装面板。实测里没人会做第二步——
+本仓库自己的安装说明都得读第三遍才看明白该先做哪一步。现在第二行不存在了。
 
 ## [1.0.19] / [1.2.32] — 2026-11-17（doctor 找错了 OpenCode 包的位置 —— 1.0.18 的修正版）
 

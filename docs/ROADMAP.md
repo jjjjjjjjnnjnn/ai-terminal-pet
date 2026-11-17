@@ -1,6 +1,6 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 **2026-11-17（浮窗 1.0.19 / 插件 1.2.32 已发版）**。本文分六块：现状基线、
+> 快照时间 **2026-11-17（浮窗 1.0.20 / 插件 1.2.33 已发版）**。本文分六块：现状基线、
 > 已交付批次、扩展计划、轻量化计划、实用功能候选与非目标、已知残留、**增长计划（§7，2026-11-17 按
 > [docs/METRICS.md](METRICS.md) 的实测重定）**。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
@@ -10,12 +10,12 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-17，浮窗 1.0.19 / 插件 1.2.32 已发布） |
+| 维度 | 数值（2026-11-17，浮窗 1.0.20 / 插件 1.2.33 已发布） |
 |---|---|
 | 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.19`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.32` |
-| OpenCode 上报端包 | `opencode-ai-terminal-pet` **1.0.19**，**与浮窗同号**（`tools/check_versions.mjs` 断言相等），没有自己的版本线 |
+| 版本 | `1.0.20`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.33` |
+| OpenCode 上报端包 | `opencode-ai-terminal-pet` **1.0.20**，**与浮窗同号**（`tools/check_versions.mjs` 断言相等），没有自己的版本线 |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,717,568 B**（4.50 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,705,344 B**（3.53 MiB）；三个 Windows 二进制合计 **12,101,632 B** = 11.54 MiB |
@@ -37,7 +37,7 @@
 | 自检的 OpenCode 形状 | `reporters` 这一项认三种入口：**裸包名**（查 `<cache>/opencode/npm/<name>@<tag>/<epoch-ms>/node_modules/<name>/package.json`，即 `opencode plugin add` 真正安装的位置；配置目录的 `node_modules` 作为手动安装的第二种形状一并查；都没有只给 warn 并附安装命令）、**直接文件 URL**、**目录 + index.ts 两跳**（§52.3 的回归） |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
 | 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.31**，20 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.31`，三平台 bundle） |
-| OpenCode 上报端包 | `packages/opencode-ai-terminal-pet`（npm 名 `opencode-ai-terminal-pet` **1.0.19**，5 个文件 / ~48 KB，零依赖；`server.js` 与 `protocol.cjs` 均由 `scripts/sync.mjs` 从 `reporters/` 生成，`--check` 进 CI）；`opencode plugin add opencode-ai-terminal-pet` 一行接入，仅支持 OpenCode V2 |
+| OpenCode 上报端包 | `packages/opencode-ai-terminal-pet`（npm 名 `opencode-ai-terminal-pet` **1.0.20**，**包内带面板**：`vendor/AI-Terminal-Pet.exe` 4.78 MB + 清单，装包约 4.8 MB；`server.js` 手写负责首次装载，`reporter.js` / `protocol.cjs` 由 `scripts/sync.mjs` 从 `reporters/` 生成，两个包共享 `tools/overlay-vendor.mjs` 的源码摘要）；`opencode plugin add opencode-ai-terminal-pet` 一行接入，Windows 上这一行连面板一起装好 |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | **不变量门禁**：`go test ./internal/ui -run 'TestRenderedPanelKeepsItsShape|TestStateColourReachesTheScreen|TestStatesAndLanguagesLookDifferent|TestThemesAreActuallyDifferent'`（三平台都跑，断言尺寸/圆角透明/填色/文字已光栅化/状态色出现/状态与语言确实不同/两套配色确实不同，**不比像素**）；**看图**：`PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif`、`desktop-scene.png` 与 `social-preview.png`（GitHub 社交预览，1280×640，**上传是仓库设置里的手工步骤**），`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图；`python tools/check_assets.py` 钉住 `docs/assets/README.md` 表里的尺寸与帧数 |
 
