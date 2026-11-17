@@ -5076,7 +5076,8 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
   真实的 OpenCode 会话里验证的是**新包**，而换配置会让当前会话的插件重载一次；先确认包在 npm 上装得上、doctor
   认得出（两件事都当场验过），再换。换法是删掉 `plugins` 里那条 `file://…`、换成 `"opencode-ai-terminal-pet"`，
   或者直接 `opencode plugin add opencode-ai-terminal-pet`。
-- 上游条目：1.2.31 的 PR #16270 在合并前就被 1.2.32 取代，已按规矩关闭并改开新的 bump PR（只换 `tarball` 一行）。
+- 上游条目：1.2.31 的 PR #16270 在合并前就被 1.2.32 取代，已评论说明并关闭；1.2.32 的 bump PR 是 **#16277**
+  （只换 `tarball` 一行，`node tools/upstream-entry.mjs --check` 报 "in flight"）。
 
 ### 75.7 1.0.19 为什么存在：一条**假设**被真机推翻
 
