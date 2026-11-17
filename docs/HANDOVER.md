@@ -5093,12 +5093,14 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
   目录结构就是 `microsoft/winget-pkgs` 的布局；`winget validate --manifest <目录>` 打印"清单验证成功"，
   `winget show --manifest <目录>` 能正确解析 URL 与 sha256。
 - **已开 PR**：[microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)
-  （3 文件 `+60 −0`，`MERGEABLE`）。2026-11-16 22:xx 的状态：
-  - **CLA 已由账号本人签署**（`license/cla` = pass，`Needs-CLA` 摘掉）；
-  - `01`–`07` 号校验（PR / 清单 / URL / 域名 / 策略 / 目录内容 / 安装包扫描）**全 pass**；
-  - **`08. Installation Validation` pending** —— 真正的静默安装与卸载，在他们的 Windows VM 上排队；
-  - 还差**一位有写权限的维护者批准**（`REVIEW_REQUIRED`）。
-  这三件事里没有一件是我们能推进的；**改 PR 正文会让 08 重跑**，所以别动。
+  （3 文件 `+60 −0`，`MERGEABLE`）。2026-11-17 的状态：
+  - **CLA 已签**（`license/cla` pass）；
+  - **`01`–`10` 号校验全 SUCCESS** —— 11 项真检查全过，**`08. Installation Validation` 真的下载、
+    静默安装再静默卸载过 `pet-setup.exe`**；标签 `New-Package` + `Validation-Completed` + `Azure-Pipeline-Passed`；
+  - **机器人已开启 auto-merge（squash）**，只差一位**社区志愿维护者**批准（`REVIEW_REQUIRED`）。
+  也就是说：我们这一侧的活全干完了。**不催、不改 PR 正文**（改了会让校验重跑）。
+- 一条实测结论：`08` 通过意味着**未签名没有拦住他们的静默安装**（我们担心的那个风险这次没发生），
+  但用户首次双击 `pet-setup.exe` 仍会看到 SmartScreen —— README 的提示照旧有效。
 - 能不能装/卸由我们的安装器决定：静默安装是 `pet-setup.exe --install`（默认就是这个），
   静默卸载是注册表那一行的 `QuietUninstallString`；`tests/fresh-machine.mjs` 的 S5/S8 就是按这条契约验的。
 - **真实风险写在前面**：`pet-setup.exe` 没有 Authenticode 签名，对方 pipeline 里那次静默安装可能被

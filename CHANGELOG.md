@@ -93,10 +93,10 @@ Linux / macOS 的四个 tar.gz 同样按 1.0.15 重发（`install.sh` 与 POSIX 
 ### 没有做的事
 
 - **没有 Authenticode 签名**，也没有公证；因此 `pet-setup.exe` 仍会触发 SmartScreen，README 里照旧明说。
-- **winget 清单已提交但还没上架**：清单在 `packaging/winget/`（`winget validate` 通过），
-  已开 PR [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)（3 文件 +60 −0，`MERGEABLE`）。
-  CLA 已签、`01`–`07` 号校验全过；剩下 `08. Installation Validation`（他们的 Windows VM 上真跑静默安装/卸载）
-  与一位维护者的批准。因此 README 的安装段**没有**写 `winget install`——那会是一句没兑现的承诺。
+- **winget 清单已通过全部校验、还没合并**：清单在 `packaging/winget/`（`winget validate` 通过），
+  PR [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)（3 文件 +60 −0，`MERGEABLE`）。
+  CLA 已签，**`01`–`10` 号校验全部 SUCCESS**（含真跑静默安装/卸载的 `08`），机器人已开 auto-merge，
+  只等一位社区志愿维护者批准。因此 README 的安装段**没有**写 `winget install`——那要等合并之后才是事实。
 
 ## [1.2.26] — 2026-11-16（只改文案：包的内页开头重写，npm 页与仓库同源）
 

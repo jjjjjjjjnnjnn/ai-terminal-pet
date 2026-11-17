@@ -251,16 +251,20 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 - 本地校验用 `winget validate --manifest <目录>`（必须打印"清单验证成功"），
   `winget show --manifest <目录>` 可以肉眼核对解析结果。
 - 提交是一个只**新增**一个版本目录的 PR；他们的 pipeline 会下载 exe、核对 sha256、跑静默安装与卸载。
-- **2026-11-16 22:xx 的实际状态**：PR [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)
+- **2026-11-17 的实际状态**：PR [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)
   （`jjjjjjjjnnjnn.AI-Terminal-Pet` 1.0.15，3 文件 `+60 −0`，`MERGEABLE`）。
-  - **CLA 已由账号本人签署**（`license/cla` = pass，`Needs-CLA` 标签已摘掉）；
-  - `01. Pull Request Validation` / `02. Manifest Validation` / `03. URLs Validation` /
-    `04. URL Domain Validation` / `05. Manifest Policy Validation` / `06. Catalog Content Verification` /
-    `07. Installers Scan` **全部 pass**；
-  - **`08. Installation Validation` 仍是 pending** —— 这一步就是真正的静默安装与卸载（在他们的 Windows VM 上排队，
-    2026-11-16 当天已等 35 分钟以上）。它跑完才有 `10. Validation Completed`；
-  - 另外还需要**一位有写权限的维护者批准**（`reviewDecision: REVIEW_REQUIRED`，分支保护要求）。
-  **这两件都不是我们能动的事**：不催、不重开、不改 PR 正文（改了还会让 08 重跑）。
+  - **CLA 已签**（`license/cla` pass）；
+  - **`01`–`10` 号校验全部 SUCCESS**（30 项 skipped 是他们的 fork 骨架，11 项真检查全过），
+    其中 **`08. Installation Validation` 真的下载并静默安装了 `pet-setup.exe`、再静默卸载**；
+  - 标签：`New-Package` + `Validation-Completed` + `Azure-Pipeline-Passed`；
+  - **机器人已开启 auto-merge（squash）**，`reviewDecision: REVIEW_REQUIRED` ——
+    只等一位**社区志愿维护者**批准。他们的机器人原话："Our moderators are community volunteers,
+    please be patient and allow them sufficient time to review your submission."
+  **所以现在什么都别做**：不催、不重开、不改 PR 正文（改了会让校验重跑）。
+- **一条实测结论（值得记下来）**：`08` 通过说明**未签名并没有拦住他们的静默安装**——
+  `docs/UPSTREAM.md` §4.3 里那个"SmartScreen 可能让校验失败"的风险在这一版**没有发生**。
+  这不等于"用户不会看到 SmartScreen"：用户第一次双击 `pet-setup.exe` 时仍然会看到提示，
+  README 的 Unsigned binary notice 仍然有效。
 - **判断可见性**：`winget search jjjjjjjjnnjnn.AI-Terminal-Pet`
   （合并后要等索引同步，通常几小时）；**不要**拿 PR 状态当"已上架"。
 - **一个已知风险，写在这里免得下次重新发现**：`pet-setup.exe` 未做 Authenticode 签名，
@@ -331,8 +335,8 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 
 - **winget（1.0.15 起）**：清单已写在 `packaging/winget/`、`winget validate` 通过，
   PR 已开：[microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)（见 §4.3）。
-  **CLA 已签、01–07 号校验全过**；剩下的是 `08. Installation Validation`（他们的 Windows VM 上跑静默安装/卸载）
-  与一位维护者的批准。未签名的 `pet-setup.exe` 有被 SmartScreen 拦住的可能——那会在 08 里暴露出来。
+  **`01`–`10` 号校验全过（含真跑静默安装/卸载的 `08`），auto-merge 已由机器人开启**；
+  现在只等一位社区志愿维护者批准。在他的批准之前，"能被 winget 安装"仍不成立。
 - 上游 PR **合并仍要人工**：我们只能保证「随时可合」（无冲突、检查跑过、只改一行）。
 - 站点渲染有延迟：合并后要等对方重建，`plugins.json` 才换新版本。**我们会读到旧值，这是正常的。**
 - 其他目录（dshbase / dsh.so / dsh-plugin.org / AllDSH）都是人工复核，已投过，等对方。
