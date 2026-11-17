@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-17；浮窗 **1.0.18**、插件包 **1.2.31** 已发版；**§75 第 75 轮（OpenCode 上报端成为 npm 包）；§74 第 74 轮（门禁、卸载项、像素、设置入口、推广功课）；§71（三平台视觉不变量门禁）；§70（安装器写卸载项 + winget 清单）**）
+## 1. 当前状态（2026-11-17；浮窗 **1.0.19**、插件包 **1.2.32** 已发版；**§75 第 75 轮（OpenCode 上报端成为 npm 包）；§74 第 74 轮（门禁、卸载项、像素、设置入口、推广功课）；§71（三平台视觉不变量门禁）；§70（安装器写卸载项 + winget 清单）**）
 
 > 接手请先读本节与 **§75「OpenCode 接入变成一行 npm 安装」**（为什么它是一个发行缺口、npm 包为什么是生成的、
 > 两个坑、以及本机为什么故意还没换配置），再读 **§74「一轮五件事，下个会话从这里开始」**（机器状态、外部世界谁在等谁、
@@ -67,19 +67,19 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.18`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.31`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.18` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.31`。
+- **版本**：浮窗 **`1.0.19`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.32`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.19` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.32`。
   OpenCode 上报端包 `opencode-ai-terminal-pet` **没有自己的版本线**：它与浮窗同号（`check_versions` 断言相等）。
-  **工作区与本机安装目录已经与 `1.0.18` / `1.2.31` 同步**：`bin/`、
+  **工作区与本机安装目录已经与 `1.0.19` / `1.2.32` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` 的字节数与 sha256 见下方规模一行）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**498 个** `func Test`，
-  本轮（第 75 轮）+3 来自 OpenCode 的 npm 包形状与包名解析）；CI 四条 job
-  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.18 的提交上全绿（见 §75）；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**499 个** `func Test`，
+  本轮（第 75 轮）+4 来自 OpenCode 的 npm 包形状与包名解析）；CI 四条 job
+  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.19 的提交上全绿（见 §75）；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑：16 包 × linux/amd64 + darwin/arm64 全过）；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 与 1.0.18 的 `bin/` 一致；`tools/check_versions.mjs` **21** 条一致
+  `vendor.mjs --check` 与 1.0.19 的 `bin/` 一致；`tools/check_versions.mjs` **21** 条一致
   （`node --test tools/check_versions.test.mjs` 27/27）、**`tools/check_facts.mjs` 11 条一致**、
   `tools/catalog-status.test.mjs` **12/12**、`tools/upstream-entry.test.mjs` 26/26、
   `tools/check-tarball.test.mjs` 8/8；**OpenCode 包**：`sync.mjs --check` 3/3、
@@ -87,24 +87,25 @@
   `tests/fresh-machine.mjs --no-overlay` **183/183**；
   `tools/check_docs_links.py` **14 份**全解、`tools/check_assets.py` 15 行一致；
   `govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.18 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  1.0.19 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.18`，注册表那一行 `DisplayVersion=1.0.18`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.18 实测）：非测试 **154 文件 / 28,255 行**、
-  测试 **100 文件 / 14,735 行**、**498 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,764,160 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `B8DE4C94…`）、
+  `--version` 报 `ai-terminal-pet 1.0.19`，注册表那一行 `DisplayVersion=1.0.19`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.19 实测）：非测试 **154 文件 / 28,309 行**、
+  测试 **101 文件 / 14,842 行**、**499 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,775,936 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `731EFC7A…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
-  三个二进制合计 **12,148,224 B** = 11.585 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
+  三个二进制合计 **12,160,000 B** = 11.60 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
 - **分发（两条版本线 + 两个 npm 包 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.31**；`dsh-plugin-v1.2.31` 的 Release 资产 `dsh-ai-terminal-pet-1.2.31.tgz`
-    **2,091,456 B / sha256 `8CEA5882…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.18`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §75。
-  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.18**（与浮窗同号），
-    资产 `opencode-ai-terminal-pet-1.0.18.tgz` **17,822 B / sha256 `C6588551…` / 5 文件**。
-  - 浮窗线：`pet-v1.0.18` 的六个资产——`pet-setup.exe` **14,551,552 B / `8A589006…`**、
-    `ai-terminal-pet-1.0.18-win-x64.zip` **5,142,108 B / `70AE18C0…`（17 文件）**，以及
-    linux-{amd64,arm64}（**5,439,674 B / `5F74890E…`**、**4,949,913 B / `17E29037…`**）与
-    darwin-{arm64,amd64}（**5,143,588 B / `9416A411…`**、**5,536,325 B / `39193DBF…`**）四个 tar.gz。
+  - 插件线：npm `latest` = **1.2.32**；`dsh-plugin-v1.2.32` 的 Release 资产 `dsh-ai-terminal-pet-1.2.32.tgz`
+    **2,094,698 B / sha256 `A4669C91…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.19`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §75.6。
+  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.19**（与浮窗同号），
+    资产 `opencode-ai-terminal-pet-1.0.19.tgz` **17,822 B / sha256 `42716B39…` / 5 文件**。
+  - 浮窗线：`pet-v1.0.19` 的六个资产——`pet-setup.exe` **14,563,328 B / `DFE82FDD…`**、
+    `ai-terminal-pet-1.0.19-win-x64.zip` **5,148,567 B / `E0F7C0A9…`（17 文件）**，以及
+    linux-{amd64,arm64}（**5,446,000 B / `BB8DFE4D…`**、**4,954,670 B / `E5D881E5…`**）与
+    darwin-{arm64,amd64}（**5,151,829 B / `52E28E82…`**、**5,541,718 B / `F3ABD44E…`**）四个 tar.gz。
+  - **`pet-v1.0.18` / `dsh-plugin-v1.2.31` 也仍然有效且不可变**（它们的 doctor 查错了 OpenCode 包路径，见 §75.7）。
   - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
     `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
     版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
@@ -5014,7 +5015,7 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
 
-## 75. 交接：OpenCode 接入变成一行 npm 安装 —— 下个会话从这里开始（2026-11-17，**已发版** 浮窗 **1.0.18** / 插件 **1.2.31** / npm 新包 **1.0.18**）
+## 75. 交接：OpenCode 接入变成一行 npm 安装 —— 下个会话从这里开始（2026-11-17，**已发版** 浮窗 **1.0.19** / 插件 **1.2.32** / npm 新包 **1.0.19**）
 
 这一轮只做一件事，但它是 §74.4 排在第一的那件：**OpenCode 上报端变成一个真能 `opencode plugin add` 的 npm 包**。
 过程里发现它不只是体验问题——是发行缺口（zip 装出来的目录里根本没有那个上报端文件）。
@@ -5023,13 +5024,14 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 
 | 项 | 值 |
 |---|---|
-| 分支 / HEAD | `main`，本轮代码提交 `d709d78`（发版提交见 §75.6 的两步） |
-| 版本 | 浮窗 **1.0.18**、插件 **1.2.31**、`opencode-ai-terminal-pet` **1.0.18**（与浮窗同号） |
-| tag | `pet-v1.0.18`、`dsh-plugin-v1.2.31` |
+| 分支 / HEAD | `main`，本轮代码提交 `d709d78` + 两个测试修正 + 1.0.19 的 doctor 修正（见 §75.6） |
+| 版本 | 浮窗 **1.0.19**、插件 **1.2.32**、`opencode-ai-terminal-pet` **1.0.19**（与浮窗同号） |
+| tag | `pet-v1.0.19`、`dsh-plugin-v1.2.32`（`pet-v1.0.18` / `dsh-plugin-v1.2.31` 也已发布且不可变，它们的 doctor 查错了包路径，见 §75.7） |
 | CI | 四条 job 全绿（windows / ubuntu / macOS / scan） |
-| 测试 | **498 个 `func Test`** / 15 包；Node 侧 `sync.test.mjs` 4/4、`server.test.mjs` 1/1、`check_versions.test` 27/27 |
-| 本机安装 | **1.0.18**：`-VerifyOnly` **12/12**、`--doctor` **12 ok / 1 warn / 0 fail**、`DisplayVersion=1.0.18` |
+| 测试 | **499 个 `func Test`** / 15 包；Node 侧 `sync.test.mjs` 4/4、`server.test.mjs` 1/1、`check_versions.test` 27/27 |
+| 本机安装 | **1.0.19**：`-VerifyOnly` **12/12**、`--doctor` **12 ok / 1 warn / 0 fail**、`DisplayVersion=1.0.19` |
 | 门禁 | `check_versions` **21** 条、`check_facts` 11 条、`check_docs_links` **14 份**、`check_assets` 15 行、`check-tarball` 两个包都与工作区逐文件一致 |
+| 真机端到端 | `opencode plugin add opencode-ai-terminal-pet` 在临时 profile 里跑通（rc=0，包落在 `~/.cache/opencode/npm/…`，`server.js` 与工作区 sha256 相同），doctor 随即报 `ok … @1.0.19` |
 
 ### 75.2 交付了什么
 
@@ -5037,7 +5039,7 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 |---|---|
 | 新包 | `packages/opencode-ai-terminal-pet`（零依赖，5 文件约 48 KB）：`server.js` + `protocol.cjs` **生成**自 `reporters/`，`sync.mjs --check` 进 CI |
 | 包内测试 | 临时 home + 真实端点 + 真快照；三平台各跑一次（Windows 管道 / Linux socket / macOS socket） |
-| `--doctor` | `reporters` 认第三种入口：裸包名、`@version`、`{package}` 对象；证据是 `node_modules/<name>/package.json` 的版本 |
+| `--doctor` | `reporters` 认第三种入口：裸包名、`@version`、`{package}` 对象；证据是 `opencode plugin add` 真正写入的位置 `<cache>/opencode/npm/<name>@<tag>/<epoch-ms>/node_modules/<name>/package.json`，配置目录的 `node_modules`（手动安装）作为第二种形状 |
 | `--connect` | 包名优先；`file://` 检出形态只在真有检出现时进备注 |
 | 版本策略 | 这个包**与浮窗同号**，`check_versions` 断言相等——一次浮窗发版就是一次 npm 发布 |
 
@@ -5061,20 +5063,37 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 ### 75.5 下个会话从这里开始
 
 1. **把本机 OpenCode 也换成包名形态**（§75.6 特意没换，见那一条）。换完跑 `--doctor`，`reporters` 行应是
-   `opencode: ok - plugins[0] -> opencode-ai-terminal-pet@1.0.18`。
+   `opencode: ok - plugins[0] -> opencode-ai-terminal-pet@1.0.19`。
 2. **社交预览图上传**（`docs/assets/social-preview.png`，1280×640）。
 3. **brew / scoop**：`opencode` 与 winget 都已覆盖，这两个是下一层；先读它们的 manifest 要求再动手。
 4. **HN / V2EX 正文与 awesome-claude-code 表单**：只有本人能做（规则见 [docs/PROMOTION.md](PROMOTION.md)）。
 
 ### 75.6 发版记录与一个"故意没做"
 
-- 代码提交 `d709d78`（包 + doctor/connect + 门禁 + 版本 + vendor + 文档），tag 打在紧随其后的文档提交上；
-  索引 `source.commit` 由 B 提交钉上（git 无法在一个提交里引用自己）。
+- 代码提交 `d709d78`（包 + doctor/connect + 门禁 + 版本 + vendor + 文档），之后两个 CI 修正
+  （macOS 的 socket 路径长度、漏 import），最后是 1.0.19 的 doctor 路径修正（§75.7）。
 - **本机 `opencode.json` 故意仍指向 `~/.config/opencode/plugins/terminal-pet`（仓库检出）。** 理由：这一轮要在
   真实的 OpenCode 会话里验证的是**新包**，而换配置会让当前会话的插件重载一次；先确认包在 npm 上装得上、doctor
   认得出（两件事都当场验过），再换。换法是删掉 `plugins` 里那条 `file://…`、换成 `"opencode-ai-terminal-pet"`，
   或者直接 `opencode plugin add opencode-ai-terminal-pet`。
-- 上游条目：`bump-tarball-1.2.31` 的 PR 号与状态见本节下方（开出来之后补）；只换 `tarball` 一行。
+- 上游条目：1.2.31 的 PR #16270 在合并前就被 1.2.32 取代，已按规矩关闭并改开新的 bump PR（只换 `tarball` 一行）。
+
+### 75.7 1.0.19 为什么存在：一条**假设**被真机推翻
+
+1.0.18 的 doctor 在包形状下找 `<config>/node_modules/<name>/package.json`。那是我读 OpenCode 文档时的推断，
+   没有证据：文档只说"按包名安装"。真跑一次 `opencode plugin add opencode-ai-terminal-pet` 之后，
+   包里落在 **`~/.cache/opencode/npm/<name>@latest/<epoch-ms>/node_modules/<name>/`**，配置目录里只有
+   `opencode.json`——**一个文件都没有**。于是 1.0.18 会对「装对了」的机器报一条 warn。
+
+三件事因此值得写下来：
+
+- **单测挡不住这类错**：测试夹具按假设搭，断言当然通过；把它推翻的是一次真机安装。
+- **资产不可变**：二进制已经发布，修一行路径也要新版本号 → 1.0.19 / 1.2.32 / 上报端 1.0.19 一起发
+  （上报端与浮窗同号，这条规矩让补救也不便宜，但它保证「同一对」）。
+- **1.0.18 的资产与 tag 都保留**，不重传、不改写；`-VerifyOnly` 对它们仍然成立。
+
+修完之后用**真实**的 `~/.cache` 布局复验：`opencode: ok - plugins[0] -> opencode-ai-terminal-pet@1.0.18`（当时
+npm 上还是 1.0.18），以及对两条路径（store / 配置目录 `node_modules`）各一条测试、`$XDG_CACHE_HOME` 一条。
 
 ## 74. 交接：一轮五件事（门禁、卸载项、像素、设置入口、推广功课）—— 下个会话从这里开始（2026-11-17，**已发版** 浮窗 **1.0.17** / 插件 **1.2.30**）
 

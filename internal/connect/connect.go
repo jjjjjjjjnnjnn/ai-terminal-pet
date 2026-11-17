@@ -114,6 +114,11 @@ type Roots struct {
 	// XDGDataHome holds $XDG_DATA_HOME when resolving Linux installs without an
 	// explicit DataDir.
 	XDGDataHome string
+	// XDGCacheHome holds $XDG_CACHE_HOME. OpenCode keeps the plugin packages it
+	// installs under <cache>/opencode/npm, and on Windows it uses
+	// ~/.cache/opencode even though there is no XDG there -- which is why
+	// openCodeCacheRoots consults both.
+	XDGCacheHome string
 	// DataDir overrides the resolved data/install directory (home.Directory()).
 	DataDir string
 	// Executable is os.Executable(). Snippets uses it to find a repository
@@ -144,6 +149,7 @@ func DefaultRoots() Roots {
 		Home:          homeDir,
 		LocalAppData:  os.Getenv("LOCALAPPDATA"),
 		XDGDataHome:   os.Getenv("XDG_DATA_HOME"),
+		XDGCacheHome:  os.Getenv("XDG_CACHE_HOME"),
 		DataDir:       pethome.Directory(),
 		Executable:    executable,
 		ExecutableErr: executableErr,

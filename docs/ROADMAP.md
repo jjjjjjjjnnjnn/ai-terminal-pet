@@ -9,16 +9,16 @@
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-17，浮窗 1.0.18 / 插件 1.2.31 已发布） |
+| 维度 | 数值（2026-11-17，浮窗 1.0.19 / 插件 1.2.32 已发布） |
 |---|---|
 | 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.18`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.31` |
-| OpenCode 上报端包 | `opencode-ai-terminal-pet` **1.0.18**，**与浮窗同号**（`tools/check_versions.mjs` 断言相等），没有自己的版本线 |
+| 版本 | `1.0.19`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.32` |
+| OpenCode 上报端包 | `opencode-ai-terminal-pet` **1.0.19**，**与浮窗同号**（`tools/check_versions.mjs` 断言相等），没有自己的版本线 |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,717,568 B**（4.50 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,705,344 B**（3.53 MiB）；三个 Windows 二进制合计 **12,101,632 B** = 11.54 MiB |
-| 代码量 | Go 非测试源码 **154 文件 / 28,255 行**、测试 **100 文件 / 14,735 行**（**498** 个 `func Test`）；JS/MJS 侧为 6 个 reporter + 工具链 `tools/*.mjs` + 两个包的测试与生成物（`packages/*/vendor/protocol.js` 与 `protocol.cjs` 是 `reporters/protocol.js` 的逐字节副本，不算第二份实现）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
+| 代码量 | Go 非测试源码 **154 文件 / 28,309 行**、测试 **101 文件 / 14,842 行**（**499** 个 `func Test`）；JS/MJS 侧为 6 个 reporter + 工具链 `tools/*.mjs` + 两个包的测试与生成物（`packages/*/vendor/protocol.js` 与 `protocol.cjs` 是 `reporters/protocol.js` 的逐字节副本，不算第二份实现）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
 | 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
@@ -29,14 +29,14 @@
 | 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标；**L5 快照扫描按身份/size/mtime 复用上次解析**（200 文件 22.7 ms → 0.51 ms）；**存在性判据：`title` 必须被窗口标题"包含"且不完全等于它**（§63 修掉的回归） |
 | 持久化 | `state.json`（位置/缩放/展开/`layouts`）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run` / `LaunchAgent` / XDG `.desktop`（开机自启）· `approvals/` |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings`（有窗口开窗口，否则终端编辑器）`/--set k=v/--connect[=HOST]/--doctor/--version/--help` |
-| 单测与门禁 | **498 个 `func Test`** 分布在 15 个包（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 `tools/*.test.mjs`、两个包各自的测试，以及生成物一致性检查（`sync.mjs --check`） |
+| 单测与门禁 | **499 个 `func Test`** 分布在 15 个包（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 `tools/*.test.mjs`、两个包各自的测试，以及生成物一致性检查（`sync.mjs --check`） |
 | 持续集成 | `.github/workflows/ci.yml`：四条并行 Job — `windows-latest`（全套单测/构建/打包/fresh-machine/版本链接检查）、`ubuntu-latest`（`cross-build.sh` / `go test` / Linux 二进制 / `install.sh` + tar 校验）、`macos-latest`（`go vet` / `go test` / Darwin 二进制 / `install.sh` + hook 冒烟）、`scan`（`govulncheck` + `gosec`） |
 | 自检 | `ai-terminal-pet --doctor` **13 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts / audio / notifications），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘**；OpenCode 现在优先给**包名**形态（`opencode plugin add …`），`file://` 检出形态只作为开发路径附在备注里 |
-| 自检的 OpenCode 形状 | `reporters` 这一项认三种入口：**裸包名**（查 `~/.config/opencode/node_modules/<name>/package.json`，报告版本；找不到只给 warn 并附安装命令）、**直接文件 URL**、**目录 + index.ts 两跳**（§52.3 的回归） |
+| 自检的 OpenCode 形状 | `reporters` 这一项认三种入口：**裸包名**（查 `<cache>/opencode/npm/<name>@<tag>/<epoch-ms>/node_modules/<name>/package.json`，即 `opencode plugin add` 真正安装的位置；配置目录的 `node_modules` 作为手动安装的第二种形状一并查；都没有只给 warn 并附安装命令）、**直接文件 URL**、**目录 + index.ts 两跳**（§52.3 的回归） |
 | 线协议文档 | [docs/PROTOCOL.md](PROTOCOL.md)（388 行），第三方无需读源码即可编写上报端 |
 | 插件包 | `packages/dsh-ai-terminal-pet`（npm 名 `dsh-ai-terminal-pet` **1.2.31**，20 个文件含 vendor 与 `vendor/manifest.json`；release tag `dsh-plugin-v1.2.31`，三平台 bundle） |
-| OpenCode 上报端包 | `packages/opencode-ai-terminal-pet`（npm 名 `opencode-ai-terminal-pet` **1.0.18**，5 个文件 / ~48 KB，零依赖；`server.js` 与 `protocol.cjs` 均由 `scripts/sync.mjs` 从 `reporters/` 生成，`--check` 进 CI）；`opencode plugin add opencode-ai-terminal-pet` 一行接入，仅支持 OpenCode V2 |
+| OpenCode 上报端包 | `packages/opencode-ai-terminal-pet`（npm 名 `opencode-ai-terminal-pet` **1.0.19**，5 个文件 / ~48 KB，零依赖；`server.js` 与 `protocol.cjs` 均由 `scripts/sync.mjs` 从 `reporters/` 生成，`--check` 进 CI）；`opencode plugin add opencode-ai-terminal-pet` 一行接入，仅支持 OpenCode V2 |
 | 插件清单 | 仓库根 `package.json` 清单 shim（2,115 B / 68 行，无代码；1.2.3 起多九行 `dsh.marketplace`，1.2.4 只改 `dsh.catalog` 摘要）：`dsh.bundle.patch` + `dsh.catalog` + `private`，让 `add github:<owner>/<repo>` 可直接解析 |
 | 视觉验证 | **不变量门禁**：`go test ./internal/ui -run 'TestRenderedPanelKeepsItsShape|TestStateColourReachesTheScreen|TestStatesAndLanguagesLookDifferent|TestThemesAreActuallyDifferent'`（三平台都跑，断言尺寸/圆角透明/填色/文字已光栅化/状态色出现/状态与语言确实不同/两套配色确实不同，**不比像素**）；**看图**：`PET_PREVIEW_DIR=<dir> go test ./internal/ui -run TestRenderPreview`（浮窗状态）、`-run TestRenderSettingsPreview`（设置窗口 5 张），`docs/assets/render_assets.py` 由此产出 README 配图；`docs/assets/make_launch_assets.py` 产出 `demo.gif`、`desktop-scene.png` 与 `social-preview.png`（GitHub 社交预览，1280×640，**上传是仓库设置里的手工步骤**），`make_doctor_card.py` / `make_smartscreen_notice.py` 产出安装路径 B 的两张图；`python tools/check_assets.py` 钉住 `docs/assets/README.md` 表里的尺寸与帧数 |
 
@@ -47,7 +47,7 @@
 
 ## 1. 已交付批次（按时间倒序）
 
-### 1k. 2026-11-17（1.0.18 / 1.2.31）—— OpenCode 接入从「贴本机路径」变成一行 npm 安装
+### 1k. 2026-11-17（1.0.19 / 1.2.32）—— OpenCode 接入从「贴本机路径」变成一行 npm 安装
 
 **动机**：OpenCode 在此之前只能靠 `opencode.json` 里一条 `file:///…/reporters/opencode.js` 接上，而那条路径指向**仓库检出**。三个后果都是这一轮当场核实的：
 
@@ -60,9 +60,11 @@
 - 新包 `packages/opencode-ai-terminal-pet`（npm 名同名，零依赖，5 个文件约 48 KB）。`server.js` 与 `protocol.cjs` 由 `scripts/sync.mjs` 从 `reporters/opencode.js` / `reporters/protocol.js` **生成**，唯一差异是一处 `require()` 说明符：npm 插件按 OpenCode 规则必须 `"type": "module"`，而共享核心是 CommonJS（5 个 hook `require()` 它，安装器也以 `protocol.js` 部署它）。
 - 生成器三条规则各有测试：源里**恰好一处**说明符、副本**逐字节**相等、拒绝二次生成（源里已出现 `.cjs` 就报错）。`--check` 进 CI，与 `packages/dsh-ai-terminal-pet/vendor/protocol.js` 是同一套纪律。
 - 包内 `server.test.mjs` 用临时 home + **真实端点**验证「esm 入口 + cjs 核心 + 真投递 + 快照落盘」，三平台各跑一次：Windows 命名管道、Linux `$XDG_RUNTIME_DIR`、macOS `$TMPDIR`。
-- `internal/connect` 认第三种入口形状：**裸包名**（含 `@version`）与对象 `{ "package": … }`，证据是 `~/.config/opencode/node_modules/<name>/package.json` 里的版本；找不到只给 **warn** 并附安装命令——这个工具看不到 OpenCode 的全部解析路径，不能把一种能跑的装法判成坏的。
+- `internal/connect` 认第三种入口形状：**裸包名**（含 `@version`）与对象 `{ "package": … }`。证据是 OpenCode 自己装出来的那份清单——**实测位置是 `<cache>/opencode/npm/<name>@<tag>/<epoch-ms>/node_modules/<name>/package.json`**（`$XDG_CACHE_HOME` 或 `~/.cache`，Windows 上也是后者），配置目录的 `node_modules` 作为「手动 npm install」的第二种形状一并查；都没有只给 **warn** 并附安装命令，因为这个工具看不到对方的全部解析路径，不能把一种能跑的装法判成坏的。
 - `--connect=opencode` 改成包名优先；`file://` 检出形态只在真有检出现时进备注（给改 reporter 的人）。
-- 版本策略：这个包**与浮窗同号**（`tools/check_versions.mjs` 断言相等），所以一次浮窗发版就是一次 npm 发布，不存在「reporter 1.0.18 + 浮窗 1.0.17」这种没有一起测过的组合。
+- 版本策略：这个包**与浮窗同号**（`tools/check_versions.mjs` 断言相等），所以一次浮窗发版就是一次 npm 发布，不存在「reporter 1.0.19 + 浮窗 1.0.18」这种没有一起测过的组合。
+
+**第三个坑（1.0.19 存在的唯一理由）**：1.0.18 里 doctor 的包形状按「配置目录的 `node_modules`」找，而 `opencode plugin add` 实际把包装在 `~/.cache/opencode/npm/…`。写代码时那是**假设**，跑一次真的 `opencode plugin add` 才发现——于是在一台装好的机器上，doctor 会对正确的安装报一条「没找到」。修法只改了查找路径与测试夹具，但二进制已经发出去，**资产不可变**，于是有了 1.0.19 / 1.2.32 / 上报端 1.0.19（三个号一起走，因为上报端与浮窗同号）。
 
 **两个坑**：
 

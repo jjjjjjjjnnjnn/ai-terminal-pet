@@ -14,7 +14,7 @@ that you install once; this package feeds it.
 |---|---|
 | OpenCode | **V2** (validated against 2.3.0; the reporter uses V2's `context.event.subscribe` and V2 event names) |
 | Node | 22 or newer (the one OpenCode already ships with) |
-| The AI Terminal Pet overlay | **1.0.18 or newer**, installed separately — see [Install the overlay](#install-the-overlay). This package is versioned with the overlay: `1.0.18` of the reporter and `1.0.18` of the panel are the pair that was tested together |
+| The AI Terminal Pet overlay | **1.0.19 or newer**, installed separately — see [Install the overlay](#install-the-overlay). This package is versioned with the overlay: `1.0.19` of the reporter and `1.0.19` of the panel are the pair that was tested together |
 | Platform | anything OpenCode runs on; the reporting path is Windows, Linux and macOS |
 
 ## Install

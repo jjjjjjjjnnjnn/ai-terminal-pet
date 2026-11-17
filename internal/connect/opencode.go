@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -100,29 +101,83 @@ func InspectOpenCode(roots Roots) Finding {
 
 // inspectOpenCodePackage reports the npm-package shape.
 //
-// "Not found here" is a warn, not a fail, and the difference is deliberate: an
-// installed package is visible in <config>/node_modules, but OpenCode also keeps
-// its own resolution and cache, and this tool is not going to call a working
-// installation broken because it could not see the file it looks for. The line
-// still names the one command that fixes the common case.
+// The evidence is not the config directory. `opencode plugin add` installs the
+// package into OpenCode's own npm store -- measured on 2.3.0 with a throwaway
+// profile, the files land in
+//
+//	<cache>/opencode/npm/<name>@<tag>/<epoch-ms>/node_modules/<name>/
+//
+// where <cache> is $XDG_CACHE_HOME or ~/.cache (the latter on Windows too,
+// which has no XDG but uses that path anyway). A manual `npm install` inside
+// ~/.config/opencode puts it in that directory's node_modules instead, so both
+// are checked; the store is searched first because it is what the CLI writes.
+//
+// "Not found in either" is a warn, not a fail: an install this tool cannot see
+// is not proof that the plugin is missing, and calling a working setup broken
+// sends the user to redo work that is already done.
 func inspectOpenCodePackage(roots Roots, finding Finding, index int, name string) Finding {
-	manifest := filepath.Join(openCodeConfigDir(roots), "node_modules", filepath.FromSlash(name), "package.json")
-	raw, err := os.ReadFile(manifest)
-	if err != nil {
-		return finding.warn("plugins[%d] -> %s is listed but %s was not found (run `opencode plugin add %s`)",
-			index, name, abbreviate(roots, manifest), name)
-	}
-	version := ""
-	var parsed struct {
-		Version string `json:"version"`
-	}
-	if json.Unmarshal(raw, &parsed) == nil {
-		version = strings.TrimSpace(parsed.Version)
+	manifest, version := findOpenCodePackage(roots, name)
+	if manifest == "" {
+		return finding.warn("plugins[%d] -> %s is listed but no installed copy was found (run `opencode plugin add %s`)",
+			index, name, name)
 	}
 	if version == "" {
 		return finding.ok("plugins[%d] -> %s (installed in %s)", index, name, abbreviate(roots, filepath.Dir(manifest)))
 	}
 	return finding.ok("plugins[%d] -> %s@%s", index, name, version)
+}
+
+// findOpenCodePackage returns the manifest of an installed copy and the version
+// it states. Patterns are searched in order and each one's matches are sorted,
+// so with several past installs the newest timestamp wins.
+func findOpenCodePackage(roots Roots, name string) (string, string) {
+	for _, pattern := range openCodePackagePatterns(roots, name) {
+		matches, err := filepath.Glob(pattern)
+		if err != nil || len(matches) == 0 {
+			continue
+		}
+		sort.Strings(matches)
+		manifest := matches[len(matches)-1]
+		raw, err := os.ReadFile(manifest)
+		if err != nil {
+			continue
+		}
+		var parsed struct {
+			Version string `json:"version"`
+		}
+		if json.Unmarshal(raw, &parsed) != nil {
+			continue
+		}
+		return manifest, strings.TrimSpace(parsed.Version)
+	}
+	return "", ""
+}
+
+// openCodePackagePatterns lists where an installed copy can be, in the order
+// they are worth looking at.
+func openCodePackagePatterns(roots Roots, name string) []string {
+	patterns := make([]string, 0, 3)
+	for _, cache := range openCodeCacheRoots(roots) {
+		patterns = append(patterns, filepath.Join(cache, "npm", name+"@*", "*", "node_modules", filepath.FromSlash(name), "package.json"))
+	}
+	if directory := openCodeConfigDir(roots); directory != "" {
+		patterns = append(patterns, filepath.Join(directory, "node_modules", filepath.FromSlash(name), "package.json"))
+	}
+	return patterns
+}
+
+// openCodeCacheRoots is where OpenCode caches what it installs. $XDG_CACHE_HOME
+// is honoured first because that is the XDG rule, and ~/.cache is the fallback
+// that Windows uses as well (no XDG there; measured, not assumed).
+func openCodeCacheRoots(roots Roots) []string {
+	rootsOut := make([]string, 0, 2)
+	if roots.XDGCacheHome != "" {
+		rootsOut = append(rootsOut, filepath.Join(roots.XDGCacheHome, "opencode"))
+	}
+	if roots.Home != "" {
+		rootsOut = append(rootsOut, filepath.Join(roots.Home, ".cache", "opencode"))
+	}
+	return rootsOut
 }
 
 // npmPackageName returns the package name an entry refers to, or "" when the

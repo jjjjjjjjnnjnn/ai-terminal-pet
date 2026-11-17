@@ -109,9 +109,9 @@ func TestInspectOpenCodeDirectFileEntry(t *testing.T) {
 }
 
 // The package shape is the one a user who never cloned this repository has.
-// There is no file in the config to follow, so the evidence is the manifest
-// OpenCode installed for itself - and "not found there" stays a warn, because
-// the tool cannot see every place the host may resolve from.
+// There is no file in the config to follow, so the evidence is the copy
+// OpenCode installed for itself - and the layout below is the one measured on
+// 2.3.0 with a throwaway profile, not the one a `node_modules` guess suggests.
 func TestInspectOpenCodeAcceptsTheNpmPackage(t *testing.T) {
 	roots := home(t)
 	config := filepath.Join(roots.Home, ".config", "opencode", "opencode.json")
@@ -128,17 +128,55 @@ func TestInspectOpenCodeAcceptsTheNpmPackage(t *testing.T) {
 		t.Fatalf("a package name is not an unreadable path: %s", finding.Detail)
 	}
 
-	writeFile(t, filepath.Join(roots.Home, ".config", "opencode", "node_modules", OpenCodePackageName, "package.json"),
-		`{"name": "`+OpenCodePackageName+`", "version": "1.0.0"}`)
+	// Where `opencode plugin add` actually puts it: <cache>/opencode/npm/
+	// <name>@<tag>/<epoch-ms>/node_modules/<name>/package.json.
+	writeFile(t, filepath.Join(roots.Home, ".cache", "opencode", "npm", OpenCodePackageName+"@latest", "1794916941092",
+		"node_modules", OpenCodePackageName, "package.json"),
+		`{"name": "`+OpenCodePackageName+`", "version": "1.0.18"}`)
 	finding = InspectOpenCode(roots)
-	if finding.Status != StatusOK || !strings.Contains(finding.Detail, "1.0.0") {
+	if finding.Status != StatusOK || !strings.Contains(finding.Detail, "1.0.18") {
 		t.Fatalf("an installed package must be ok and carry its version, got %s: %s", finding.Status, finding.Detail)
+	}
+}
+
+func TestInspectOpenCodeFindsTheNewestStoreCopyAndTheManualInstall(t *testing.T) {
+	roots := home(t)
+	writeFile(t, filepath.Join(roots.Home, ".config", "opencode", "opencode.json"), `{"plugins": ["`+OpenCodePackageName+`"]}`)
+	store := filepath.Join(roots.Home, ".cache", "opencode", "npm", OpenCodePackageName+"@latest")
+	for stamp, version := range map[string]string{"1794916941092": "1.0.17", "1794917000000": "1.0.18"} {
+		writeFile(t, filepath.Join(store, stamp, "node_modules", OpenCodePackageName, "package.json"),
+			`{"name": "`+OpenCodePackageName+`", "version": "`+version+`"}`)
+	}
+	if finding := InspectOpenCode(roots); finding.Status != StatusOK || !strings.Contains(finding.Detail, "1.0.18") {
+		t.Fatalf("with two store timestamps the newest must win, got %s: %s", finding.Status, finding.Detail)
+	}
+
+	// $XDG_CACHE_HOME is honoured when it is set, which is the POSIX rule.
+	other := home(t)
+	writeFile(t, filepath.Join(other.Home, ".config", "opencode", "opencode.json"), `{"plugins": ["`+OpenCodePackageName+`"]}`)
+	cache := t.TempDir()
+	other.XDGCacheHome = cache
+	writeFile(t, filepath.Join(cache, "opencode", "npm", OpenCodePackageName+"@1.0.18", "1",
+		"node_modules", OpenCodePackageName, "package.json"),
+		`{"name": "`+OpenCodePackageName+`", "version": "1.0.18"}`)
+	if finding := InspectOpenCode(other); finding.Status != StatusOK {
+		t.Fatalf("$XDG_CACHE_HOME was not consulted, got %s: %s", finding.Status, finding.Detail)
+	}
+
+	// A manual `npm install` inside the config directory is the second shape.
+	manual := home(t)
+	writeFile(t, filepath.Join(manual.Home, ".config", "opencode", "opencode.json"), `{"plugins": ["`+OpenCodePackageName+`"]}`)
+	writeFile(t, filepath.Join(manual.Home, ".config", "opencode", "node_modules", OpenCodePackageName, "package.json"),
+		`{"name": "`+OpenCodePackageName+`", "version": "1.0.18"}`)
+	if finding := InspectOpenCode(manual); finding.Status != StatusOK {
+		t.Fatalf("a manual install in node_modules was not seen, got %s: %s", finding.Status, finding.Detail)
 	}
 }
 
 func TestInspectOpenCodeAcceptsAPinnedNameAndTheObjectForm(t *testing.T) {
 	roots := home(t)
-	writeFile(t, filepath.Join(roots.Home, ".config", "opencode", "node_modules", OpenCodePackageName, "package.json"),
+	writeFile(t, filepath.Join(roots.Home, ".cache", "opencode", "npm", OpenCodePackageName+"@1.0.18", "1794916941092",
+		"node_modules", OpenCodePackageName, "package.json"),
 		`{"name": "`+OpenCodePackageName+`", "version": "1.2.3"}`)
 	config := filepath.Join(roots.Home, ".config", "opencode", "opencode.json")
 

@@ -30,8 +30,25 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.18**（tag `pet-v1.0.18`）/ **1.2.31**（tag `dsh-plugin-v1.2.31`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.18**。
+已发版到 **1.0.19**（tag `pet-v1.0.19`）/ **1.2.32**（tag `dsh-plugin-v1.2.32`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.19**。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）；OpenCode 上报端包没有自己的版本线，它跟着浮窗走。
+
+## [1.0.19] / [1.2.32] — 2026-11-17（doctor 找错了 OpenCode 包的位置 —— 1.0.18 的修正版）
+
+1.0.18 把 OpenCode 上报端变成了 npm 包，而它的 `--doctor` 在包形状下去 `<配置目录>/node_modules` 找安装证据。
+真跑一次 `opencode plugin add` 才看见：包落在 **`~/.cache/opencode/npm/<name>@<tag>/<epoch-ms>/node_modules/<name>/`**，
+配置目录里只有 `opencode.json`。结果是一台**装对了**的机器会收到一条「没找到，请运行 opencode plugin add」的 warn。
+
+### 改了什么
+
+- 查找顺序改为：OpenCode 自己的 npm store（`$XDG_CACHE_HOME` 或 `~/.cache`，Windows 上也是后者）→
+  配置目录的 `node_modules`（手动 `npm install` 的形态）；多个时间戳目录取最新的一个，版本从清单里读，报 `name@version`。
+- 三条测试钉住：store 命中并报版本、两个时间戳取最新、`$XDG_CACHE_HOME` 与手动安装各命中一次。
+
+### 为什么修一行也要发版
+
+资产不可变：`pet-v1.0.18` 的 tag 与资产原样保留、不重传，修复只能走新号。上报端与浮窗同号，所以它也一起到 1.0.19——
+「reporter 1.0.19 + 浮窗 1.0.18」这种组合一天也不该存在。
 
 ## [1.0.18] / [1.2.31] — 2026-11-17（OpenCode 接入变成一行 npm 安装：`opencode plugin add opencode-ai-terminal-pet`）
 
