@@ -30,10 +30,27 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.20**（tag `pet-v1.0.20`）/ **1.2.33**（tag `dsh-plugin-v1.2.33`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.20**。
+已发版到 **1.0.21**（tag `pet-v1.0.21`）/ **1.2.34**（tag `dsh-plugin-v1.2.34`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.21**。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）；OpenCode 上报端包没有自己的版本线，它跟着浮窗走。
 
-## [未发布]
+## [1.0.21] / [1.2.34] — 2026-11-17（一个卡死的窗口：窗口过程里的 panic 不再静默；状态盘动效可以关掉）
+
+这一版来自一次真实现场，而不是一个功能清单：机器上有一个 `AI-Terminal-Pet.exe` 进程活着、窗口不响应，
+几小时里既不退出也不恢复，`error.log` 与 `hang.log` 都没有新内容，Windows 事件日志里只有一条没有 dump 的
+`AppHangB1`。取证结论（完整过程见 HANDOVER §79）：**UI 线程在窗口过程回调里触发了致命 panic，运行时正在
+打印 traceback 时卡死在运行时锁上**；因为 reporter 用 `stdio: "ignore"` 拉起浮窗，panic 文本被丢弃，
+而 `freezetheworld()` 又先冻住了看门狗，于是现场什么都没留下。
+
+### 窗口过程不再静默死掉
+
+- **回调边界收容**：`guardedDispatch` 统一包住浮窗与设置窗口的过程函数。panic 在这里被 `recover`，
+  panic 值、消息名、嵌套深度与截断后的栈写入 `error.log`；前两次保留进程继续工作，第三次干净关闭，
+  让下一次 reporter 事件重新拉起一个干净进程。
+- **嵌套派发上限 64**：现场线程栈（PE 头声明 2 MB）里几乎全是嵌套的 user32 send-message 帧。
+  超过上限的那条消息不再进入处理器，改为 `DefWindowProc`，并**只记一次** `dispatch-overflow`
+  （带消息名与深度），把"栈溢出致命错误"变成一行可诊断的记录。
+- **看门狗的盲点被写进测试**：`lastDispatchTicks` 仍然在每次进入窗口过程时刷新（模态菜单期间不能误报），
+  但新增的三条测试钉住了深度上限、嵌套刷新语义与"panic 必须落盘"。
 
 ### 状态盘动效可以关掉（`animations`）
 
@@ -44,13 +61,38 @@
   `opacity`，光晕画在静止相位。状态色与字形照旧，没有任何信息被拿走。
 - 三个入口都能改：设置窗口（外观页签，Windows）、`--set animations=on|off`（三平台）、以及 Linux/macOS 的
   `--settings` 表。
-- 图：`settings-appearance-en.png` 里那一行就是它（预览生成器现在按默认值渲染，所以它是开着的）。
+- 图：`settings-appearance-en.png` 里那一行就是它（预览生成器按默认值渲染，所以它是开着的）。
 
-**为什么现在做**：`docs/ROADMAP.md` §7.6 的 C 最小版（状态动画）必须先有一个能被关掉的开关，否则以后每加一帧
-都要重新讨论"怎么关"。这一项把那个开关立起来，帧留到下一批。
+### 目录文案：OpenCode 不再被写成"另外三个之一"
 
-**为什么还没有版本号**：`docs/ROADMAP.md` §7 定了「批次发版、≤2 周两次」，而今天已经发了 `1.0.18` / `1.0.19` /
-`1.0.20` 三次（两次是修正）。这一条与目录文案一起攒到下一批，随 `1.0.21` 发出。
+市场索引与 DSH 摘要统一成同一件事：装上即接 Harness；**OpenCode 只需一行命令**
+（`opencode plugin add opencode-ai-terminal-pet`，Windows 上连面板一起装）；Claude Code 与 Antigravity
+各需接一次上报端。三处（`docs/market-index.json`、两份 `package.json` 的 `dsh.catalog.summary`）逐字一致，
+粘贴稿在 `docs/LAUNCH.md` §6。
+
+### 为什么这一批值得发（批次规则）
+
+`docs/ROADMAP.md` §7 定的是「≤2 次/周、安全与回归修复除外」。这一条属于**回归/崩溃类**：一个会留下
+无响应僵尸窗口的缺陷，比多发一个版本号的代价大得多。动效开关本来攒在 `1.0.21`，因此同批发出，
+不再单独消耗一个版本。
+
+### 1.0.21 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.21` | `pet-setup.exe` | 14,571,520 | `907C8C29…` |
+| | `ai-terminal-pet-1.0.21-win-x64.zip`（17 文件） | 5,153,440 | `9FB0DC21…` |
+| | `ai-terminal-pet-1.0.21-linux-amd64.tar.gz` | 5,446,915 | `19283924…` |
+| | `ai-terminal-pet-1.0.21-linux-arm64.tar.gz` | 4,955,276 | `5CF6F46D…` |
+| | `ai-terminal-pet-1.0.21-darwin-arm64.tar.gz` | 5,152,832 | `D1B027F2…` |
+| | `ai-terminal-pet-1.0.21-darwin-amd64.tar.gz` | 5,542,276 | `8E25821E…` |
+| `dsh-plugin-v1.2.34` | `dsh-ai-terminal-pet-1.2.34.tgz`（20 文件） | 2,098,103 | `455AC1B6…` |
+| npm `opencode-ai-terminal-pet@1.0.21` | `opencode-ai-terminal-pet-1.0.21.tgz`（9 文件，含面板） | 2,044,125 | `EF6A47EE…` |
+
+两个包内 `vendor/AI-Terminal-Pet.exe` 都是 **4,783,616 B / sha256 `2AAE6F22…`**，与 `bin/AI-Terminal-Pet.exe`
+和本机安装目录逐字节相同；解包后运行 `--version` 都报 `ai-terminal-pet 1.0.21`。
+本机装机：`scripts\install.cmd -VerifyOnly` **12/12 一致、0 warning**、`--doctor` **12 ok / 1 warn / 0 fail**、
+`--version` = 1.0.21、注册表 `DisplayVersion=1.0.21`。
 
 ## [1.0.20] / [1.2.33] — 2026-11-17（OpenCode 的"一行"真的只是一行：包里带上了面板）
 

@@ -6,10 +6,11 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-17；浮窗 **1.0.20**、插件包 **1.2.33** 已发版；**§77 第 77 轮（OpenCode 一行装到底）；§76（先量清楚有几个人在看）；§75（OpenCode 上报端成为 npm 包）；§74（门禁、卸载项、像素、设置入口、推广功课）**）
+## 1. 当前状态（2026-11-17；浮窗 **1.0.21**、插件包 **1.2.34** 已发版；**§79 第 79 轮（窗口过程不再静默死掉，动效开关随批发版）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）；§75（OpenCode 上报端成为 npm 包）**）
 
-> 接手请先读本节与 **§78「状态盘的动效有了开关」**（`animations` 四个入口、为什么反着命名 `Still`、
-> 以及为什么它还没发版——批次发版的第一次实践），再读 **§77「OpenCode 的一行真的只是一行」**（包里带面板、首次加载装机、为什么
+> 接手请先读本节与 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
+> `hang.log` 没有转储、回调 panic 的收容/记录/深度上限），再读 **§78「状态盘的动效有了开关」**（`animations` 四个入口、为什么反着命名 `Still`、
+> 以及为什么它随 §79 一批发版），再读 **§77「OpenCode 的一行真的只是一行」**（包里带面板、首次加载装机、为什么
 > Linux/macOS 故意不这么做），再读 **§76「先量清楚有几个人在看」**（那一轮只做测量：33 浏览 / 11 唯一、外部安装 ≈ 0、
 > npm latest share 6% 的证据，以及据此定下的四条取舍），再读 **§75「OpenCode 接入变成一行 npm 安装」**（为什么它是一个发行缺口、npm 包为什么是生成的、
 > 两个坑、以及本机为什么故意还没换配置），再读 **§74「一轮五件事，下个会话从这里开始」**（机器状态、外部世界谁在等谁、
@@ -70,16 +71,17 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.20`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.33`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.20` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.33`。
+- **版本**：浮窗 **`1.0.21`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.34`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.21` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.34`。
   OpenCode 上报端包 `opencode-ai-terminal-pet` **没有自己的版本线**：它与浮窗同号（`check_versions` 断言相等）。
-  **工作区与本机安装目录已经与 `1.0.20` / `1.2.33` 同步**：`bin/`、
+  **工作区与本机安装目录已经与 `1.0.21` / `1.2.34` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` 的字节数与 sha256 见下方规模一行）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**499 个** `func Test`）；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**504 个** `func Test`）；
   CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
+  1.0.21 的本地门禁已全绿（§79.4），CI 结论在推送该提交后按实际运行补记；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑）；
   两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**两个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
   `tools/check_versions.mjs` **21** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
@@ -90,26 +92,27 @@
   `tests/fresh-machine.mjs --no-overlay` **183/183**；
   `tools/check_docs_links.py` **15 份**全解、`tools/check_assets.py` 15 行一致；
   `govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.20 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  1.0.21 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.20`，注册表那一行 `DisplayVersion=1.0.20`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.20 实测）：非测试 **154 文件 / 28,309 行**、
-  测试 **101 文件 / 14,842 行**、**499 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,775,936 B**（与 `packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`
-  和 `packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 三份逐字节相同，sha256 `70C5416F…`）、
+  `--version` 报 `ai-terminal-pet 1.0.21`，注册表那一行 `DisplayVersion=1.0.21`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.21 实测）：非测试 **156 文件 / 28,561 行**、
+  测试 **101 文件 / 14,946 行**、**504 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,783,616 B**（与 `packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`
+  和 `packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 三份逐字节相同，sha256 `2AAE6F22…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
-  三个二进制合计 **12,160,000 B** = 11.60 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
+  三个二进制合计 **12,167,680 B** = 11.60 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
 - **分发（两条版本线 + 两个 npm 包 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.32**；`dsh-plugin-v1.2.32` 的 Release 资产 `dsh-ai-terminal-pet-1.2.32.tgz`
-    **2,094,698 B / sha256 `A4669C91…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.19`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §75.6。
-  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.19**（与浮窗同号），
-    资产 `opencode-ai-terminal-pet-1.0.19.tgz` **17,822 B / sha256 `42716B39…` / 5 文件**。
-  - 浮窗线：`pet-v1.0.19` 的六个资产——`pet-setup.exe` **14,563,328 B / `DFE82FDD…`**、
-    `ai-terminal-pet-1.0.19-win-x64.zip` **5,148,567 B / `E0F7C0A9…`（17 文件）**，以及
-    linux-{amd64,arm64}（**5,446,000 B / `BB8DFE4D…`**、**4,954,670 B / `E5D881E5…`**）与
-    darwin-{arm64,amd64}（**5,151,829 B / `52E28E82…`**、**5,541,718 B / `F3ABD44E…`**）四个 tar.gz。
-  - **`pet-v1.0.18` / `dsh-plugin-v1.2.31` 也仍然有效且不可变**（它们的 doctor 查错了 OpenCode 包路径，见 §75.7）。
+  - 插件线：npm `latest` = **1.2.34**；`dsh-plugin-v1.2.34` 的 Release 资产 `dsh-ai-terminal-pet-1.2.34.tgz`
+    **2,098,103 B / sha256 `455AC1B6…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.21`），**与 npm 上那一份逐字节相同**；上游条目 PR 的提交与结果见 §79.5。
+  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.21**（与浮窗同号），
+    资产 `opencode-ai-terminal-pet-1.0.21.tgz` **2,044,125 B / sha256 `EF6A47EE…` / 9 文件（含面板）**。
+  - 浮窗线：`pet-v1.0.21` 的六个资产——`pet-setup.exe` **14,571,520 B / `907C8C29…`**、
+    `ai-terminal-pet-1.0.21-win-x64.zip` **5,153,440 B / `9FB0DC21…`（17 文件）**，以及
+    linux-{amd64,arm64}（**5,446,915 B / `19283924…`**、**4,955,276 B / `5CF6F46D…`**）与
+    darwin-{arm64,amd64}（**5,152,832 B / `D1B027F2…`**、**5,542,276 B / `8E25821E…`**）四个 tar.gz。
+  - **`pet-v1.0.20` / `dsh-plugin-v1.2.33` 也仍然有效且不可变**；`pet-v1.0.18` / `dsh-plugin-v1.2.31`
+    同样保留（它们的 doctor 查错了 OpenCode 包路径，见 §75.7）。
   - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
     `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
     版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
@@ -5024,7 +5027,107 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
 
-## 78. 交接：状态盘的动效有了开关 —— 以及为什么它还没发版（2026-11-17；**未发版**，浮窗 1.0.20 / 插件 1.2.33 / 上报端 1.0.20 仍是最新）
+## 79. 交接：一个卡死的进程，和它藏起来的 panic（2026-11-17；**已发版** 浮窗 1.0.21 / 插件 1.2.34 / 上报端 1.0.21）
+
+这一节是一次真实现场的完整取证，也是 1.0.21 存在的理由。它比"修了什么"更重要的是
+**怎么从一台只剩僵尸窗口的机器上读出结论**，以及**哪一部分结论仍然未知**。
+
+### 79.1 现场（用户报告"pet 进程卡死了"）
+
+| 观测 | 值 | 含义 |
+|---|---|---|
+| 进程 | PID 48644，15:25:04 启动；19:2x 与 22:3x 两次采样 | 活着，没有退出 |
+| 窗口 | `AITerminalPetWindow` 可见、`IsHungAppWindow=TRUE`、`Responding=False` | UI 线程不再泵消息 |
+| CPU | 388 s → 411 s（约 7 小时） | **不是死循环**；大部分时间在等待 |
+| 其它 goroutine | `alerts.json` 在 22:32:18 仍被改写 | 管道/采样/存储都还活着，只有 UI 线程死了 |
+| 窗口枚举 | 面板 + 两个 IME 窗口，**没有设置窗口/对话框** | 不是模态框把消息循环挡住 |
+| `hang.log` | 最后一次转储是 **11-14**，没有本次 | 看门狗没有报警 |
+| `error.log` | **不存在** | 回调里的 panic 没有被记录 |
+| Windows 事件 | 22:31:42 `AppHangB1`，签名 `cebc`，**没有 dump 文件** | WER 只知道"挂了"，不知道为什么 |
+
+### 79.2 取证（不依赖调试器，全部可复跑）
+
+这台机器没有 cdb/windbg，WCT API 也不可用，因此用了四步：
+
+1. **线程状态**：`SuspendThread` + `GetThreadContext(CONTEXT_CONTROL)`。x64 CONTEXT 的固定偏移是
+   `Rsp=0x98 / Rbp=0xA0 / Rip=0xF8`；UI 线程的 RIP 落在 `ntdll!ZwWaitForSingleObject+0x14`，
+   栈顶返回地址是 `KERNELBASE!WaitForSingleObjectEx+0xaf`。
+2. **栈扫描**：`ReadProcessMemory` 从 RSP 向上读，按模块基址把每个 8 字节值分类；帧指针链
+   （`RBP→[RBP]`）在这个现场是断的（RBP=0），但扫描仍给出了可用的返回地址集合。
+   这里有一个坑：Go 的 PE `SizeOfImage` 是 **38 MB**（`.bss` 很大），所以"落在模块范围内"的
+   堆指针非常多；必须先按 `.text` 的虚拟大小过滤，否则结论会被一堆假地址污染。
+3. **符号化**：安装目录里的二进制是 `-s -w` 的 1.0.20，`go tool addr2line` 直接报
+   "no runtime.pclntab symbol found"。于是从 tag `pet-v1.0.20`（commit `21dd400`）建一份**不剥离**
+   的二进制；比对 `.text` 只有开头 40 字节（0x10–0x62）不同，其余逐字节一致，因此地址可以直接用。
+   系统 DLL 的 RVA 则用它们自己的导出表翻译（`ntdll` 的 `RtlVirtualUnwind*`、`ZwWaitForSingleObject`，
+   `KERNELBASE!WaitForSingleObjectEx`）。
+4. **栈上的判据**：从 RSP 往上，可见
+   `runtime.printstring → runtime.writeErrData → runtime.tracebacksomeothers → runtime.dopanic_m →
+   runtime.startpanic_m → runtime.freezetheworld → runtime.fatalthrow → runtime.throw`，
+   旁边还有 `runtime.traceback1.func1`、`runtime.semasleep`、`runtime.lock2`、`runtime.sehhandler`、
+   `winthrow`、`sigtrampgo`，以及 `runtime.panicunsafeslicelen(1)`。
+   这不是业务阻塞，而是**致命错误正在打印、而打印自己卡在运行时锁上**。
+   另外，RSP 距离该线程栈底约 **1.8 MB**（PE 头 `SizeOfStackReserve = 2 MB`），
+   栈上每隔约 `0x1440` 字节重复出现 user32 的 `gapfnScSendMessage` 与 Go 回调帧。
+
+**结论（能证实的部分）**：
+
+- UI 线程在窗口过程回调里触发了致命错误；`freezetheworld()` 先冻住了包括看门狗在内的其它 goroutine，
+  所以 `hang.log` 不可能有转储；随后致命打印在 `printlock` 上等不到释放（另一个正在写 stderr 的 goroutine
+  被冻住了），进程再也走不到 `exit(2)`。
+- 深栈与"每 5 KB 一层 user32 派发"说明存在**嵌套消息派发**。一个 2 MB 线程栈被吃到 1.8 MB，
+  与"栈耗尽型致命错误"高度吻合；`panicunsafeslicelen` 与 `winthrow` 也在栈上，但仅凭这次现场
+  **不能确证**最初是 `unsafe.Slice` 的越界长度还是栈溢出，也不能确证是哪个消息触发的。
+
+**为什么以前没记录**：reporter 用 `stdio: "ignore"` 拉起浮窗（`reporters/protocol.js:318`），
+panic 文本没有落点；`error.log` 只由命令行入口写，窗口过程里没有 writer。
+
+### 79.3 修复：三层，各自有一类失败对应
+
+| 层 | 代码 | 挡住什么 |
+|---|---|---|
+| 收容 | `guardedDispatch`（`dispatch_windows.go`）包住浮窗与设置窗口的过程函数 | panic 不再穿过 `syscall.NewCallback` 变成致命错误；写入 `error.log`（消息名、深度、panic 值、截断到 64 KB 的栈）；第三次收容时干净关闭，交给下一次 reporter 事件重启 |
+| 上限 | `maxDispatchDepth = 64` | 嵌套派发不再能把 2 MB 线程栈吃光；超限的那条消息走 `DefWindowProc`，并**只记一次** `dispatch-overflow`（带消息名与深度） |
+| 可测 | `dispatch_windows_test.go` 3 条 | 深度上限与单次记录、嵌套进入仍刷新看门狗时钟、panic 必须落盘且深度归零 |
+
+`func Test` 从 501 到 **504**。`unsafe.Slice` 的两个自有调用点也复核过：`newCanvas` 有
+`4096` 边长与 `16M` 像素的上限，剪贴板在指针非空、长度为正时才构造切片——两者都不能凭现有输入
+产生"len out of range"，所以这次 panic 更可能来自被打印的其它 goroutine 或栈损坏；上限层覆盖的是
+"栈耗尽"那一路，收容层覆盖的是"panic 那一路"，两条路以后都会留下证据。
+
+### 79.4 本机验证（1.0.21）
+
+- `gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**504** 个 `func Test`）。
+- 交叉构建：16 个包 × linux/amd64 + darwin/arm64 全过（WSL 里用 `go.exe` 的 shim 跑同一份
+  `scripts/cross-build.sh`，因为本机 WSL 只认识 Windows 的 `go.exe`）。
+- `verify.mjs`（DSH）PASS；两个包的 `vendor.mjs --check` 与 `sync.mjs --check` 一致；
+  `sync.test 4/4`、`bootstrap 6/6`、`server 1/1`；`fresh-machine --no-overlay` **183/183**；
+  `check_docs_links` 15 份、`check_assets` 15 行；`check_versions` 21 条、`check_facts` 11 条。
+- 打包：`package.ps1`（zip/setup）与 `package-unix.mjs`（4 个 tar.gz）；两个 `npm pack` 后再跑
+  `check-tarball.mjs`，**逐文件一致**。
+- 装机：`install.cmd` → `-VerifyOnly` **12/12、0 warning**；`--doctor` **12 ok / 1 warn / 0 fail**；
+  `--version` = `ai-terminal-pet 1.0.21`；注册表 `DisplayVersion=1.0.21`。
+- 新实例：22:49:08 由 reporter 拉起，`Responding=True`；旧的僵尸进程在 22:31:42 被 WER 关闭。
+
+### 79.5 发布
+
+- A 提交：版本 + 两份清单 + `docs/market-index.json` 的 `versions[0].version` / `publishTimestamp`
+  + CHANGELOG + 本文件 + 目录文案。
+- tag `pet-v1.0.21` / `dsh-plugin-v1.2.34`；Release 六个浮窗资产 + 两个 tgz；npm 发布
+  `dsh-ai-terminal-pet@1.2.34` 与 `opencode-ai-terminal-pet@1.0.21`。
+- B 提交把索引的 `source.commit` 与 `icon` 钉到 A 的 sha；上游 `bump-tarball-1.2.34` PR。
+  **具体 PR 号与 CI 结论在本提交之后补记，不写死**。
+- 目录文案同步：市场索引、两份 `dsh.catalog.summary`、`docs/LAUNCH.md` §6 统一为
+  "Harness 装上即接；OpenCode 一行；Claude Code / Antigravity 各接一次上报端"。
+
+### 79.6 下一个会话从这里开始
+
+1. 若 `%LOCALAPPDATA%\AI-Terminal-Pet\error.log` 出现 `panic:` 或 `dispatch-overflow`，
+   那就是这次没抓到的那一段：先用其中的 "message=" / "depth=" 定位，再对照本节的取证步骤复核。
+2. 坚持 ROADMAP §7 的顺序：P1 转化 → P2 分发 → C 的最小版（帧）；动效开关已随本批发出。
+3. 仍然只有本人能做的：GitHub 社交预览图上传、awesome-claude-code 表单、HN / V2EX 正文。
+
+## 78. 交接：状态盘的动效有了开关 —— 以及为什么它还没发版（2026-11-17；**随 1.0.21 发出**）
 
 这一轮把 `docs/ROADMAP.md` §7.6 的第一步做完了：面板里**唯一自己会动的东西**（等待/出错时的呼吸）现在是
 一个能被关掉的开关。C 的"帧"留到下一批。
@@ -5043,13 +5146,12 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 `func Test` 从 499 到 **501**。设置窗口外观页签的四行在 4 个 DPI 下都放得下（`TestAppearanceTabIsLaidOutLikeEveryOtherTab`），
 预览图 `settings-appearance-en.png` 里那一行是开着的——预览夹具也跟着默认值改了，否则截图会显示一个关掉的默认值。
 
-### 78.2 为什么这一轮**不**发版
+### 78.2 为什么当时**不**单独发版（最终随 1.0.21 发出）
 
-`ROADMAP §7` 定了「批次发版、≤2 次/周」，而今天已经发了 **1.0.18 / 1.0.19 / 1.0.20**（其中两次是修正）。
-一个新开关不值得第四次发版，所以它连同"目录文案里 OpenCode 仍是旧说法"一起攒到下一批，随 `1.0.21` 发。
-
-**下个会话的第一件事**：把 `CHANGELOG.md` 的 `[未发布]` 变成立版条目，然后按 `docs/UPSTREAM.md` §2 走一遍
-（三个号一起：`1.0.21` / `1.2.34` / 上报端 `1.0.21`）。
+`ROADMAP §7` 定了「批次发版、≤2 次/周」，而当时已经发了 **1.0.18 / 1.0.19 / 1.0.20**（其中两次是修正）。
+一个新开关不值得第四次发版，所以它连同"目录文案里 OpenCode 仍是旧说法"一起攒到下一批。
+`1.0.21` 之所以还是发了，是因为 §79 的卡死修复属于**崩溃/回归类**；两件事合并成一批，
+按 `docs/UPSTREAM.md` §2 一次走完（`1.0.21` / `1.2.34` / 上报端 `1.0.21`）。
 
 ### 78.3 顺手确认的两件事
 

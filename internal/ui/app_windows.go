@@ -192,6 +192,13 @@ type App struct {
 	// lastMessage is the most recent window message id, recorded so a hang
 	// dump can name the message the UI thread was last asked to handle.
 	lastMessage atomic.Uint32
+	// dispatchDepth is how many window-procedure calls are on the UI thread's
+	// stack right now, and dispatchOverflowedOnce/recoveredPanics bound what a
+	// faulty one may do. All three are UI-thread-only; dispatch_windows.go owns
+	// the rules.
+	dispatchDepth          int
+	dispatchOverflowedOnce bool
+	recoveredPanics        int
 	// Settings window. It is a second top-level window on the same UI thread,
 	// created lazily the first time it is opened: most runs never need it, and
 	// a window plus a DIB is real memory for a panel nobody configured.
@@ -479,14 +486,20 @@ func (a *App) Run() error {
 	}
 }
 
+// procedure is the overlay's window procedure. A panic must not leave through
+// a syscall.NewCallback trampoline (the runtime makes that fatal, and the fatal
+// printer can deadlock - handover §79), so it is caught here, recorded and
+// contained. beginDispatch also bounds nesting: a message handler that sends
+// itself another message forever used to fill the thread's 2 MB stack.
 func procedure(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {
 	window := activeWindow.Load()
-	if window != nil {
-		window.lastMessage.Store(message)
-		window.lastDispatchTicks.Store(interruptTicks())
-		return window.handleMessage(hwnd, message, wParam, lParam)
+	if window == nil {
+		return win.DefWindowProc(hwnd, message, wParam, lParam)
 	}
-	return win.DefWindowProc(hwnd, message, wParam, lParam)
+	window.lastMessage.Store(message)
+	return window.guardedDispatch(hwnd, message, wParam, lParam, "overlay", func() uintptr {
+		return window.handleMessage(hwnd, message, wParam, lParam)
+	})
 }
 
 // watchHang dumps all goroutine stacks to hang.log when the UI thread

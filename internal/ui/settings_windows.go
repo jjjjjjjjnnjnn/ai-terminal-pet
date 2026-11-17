@@ -159,15 +159,18 @@ func (a *App) settingsMeasureCanvas() *canvas {
 
 var settingsWindowProcedure = syscall.NewCallback(settingsProcedure)
 
+// settingsProcedure is the settings window's procedure. It goes through the
+// same dispatch guard as the overlay: it runs on the same thread, so its
+// nesting counts toward the same stack, its messages refresh the same watchdog
+// timestamp, and a panic here would be just as fatal and just as silent.
 func settingsProcedure(hwnd win.HWND, message uint32, wParam, lParam uintptr) uintptr {
 	window := activeWindow.Load()
 	if window == nil {
 		return win.DefWindowProc(hwnd, message, wParam, lParam)
 	}
-	// The hang watchdog watches this timestamp, and the settings window runs on
-	// the same thread as the overlay, so its messages have to refresh it too.
-	window.lastDispatchTicks.Store(interruptTicks())
-	return window.handleSettingsMessage(hwnd, message, wParam, lParam)
+	return window.guardedDispatch(hwnd, message, wParam, lParam, "settings", func() uintptr {
+		return window.handleSettingsMessage(hwnd, message, wParam, lParam)
+	})
 }
 
 // registerSettingsClass registers the settings window class once, from Run.

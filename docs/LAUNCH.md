@@ -11,12 +11,12 @@
 ## 0. 发布顺序（**已全部就绪**）
 
 ```
-P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.20 / 1.2.31）──► ✅ 现在可以发声
+P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.21 / 1.2.31）──► ✅ 现在可以发声
 ```
 
-**前提条件全部满足，可以发了。** 浮窗 1.0.20（Windows / Linux X11 / macOS AppKit）、插件 1.2.33、npm `latest` = 1.2.33、`pet-v1.0.20` 的
+**前提条件全部满足，可以发了。** 浮窗 1.0.21（Windows / Linux X11 / macOS AppKit）、插件 1.2.34、npm `latest` = 1.2.34、`pet-v1.0.21` 的
 安装包与各平台压缩包都已构建并在发布时传回复验。
-发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.20` 这个链接。
+发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.21` 这个链接。
 
 **唯一还需要人做的一步**：`docs/assets/smartscreen-unsigned.png` 是**示意图**（图左下角写着 MOCKUP）。
 真机截图只有一台「从没构建过本项目」的机器才拍得到；如果能在发帖前补一张真的，更好；补不到就用示意图，
@@ -89,12 +89,13 @@ imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 
 
 ## 2. 发布前必须就位的东西
 
-- [x] **六个跨平台资产**（`pet-v1.0.20`）：`pet-setup.exe` / `ai-terminal-pet-1.0.20-win-x64.zip` /
+- [x] **六个跨平台资产已在本机构建**（`pet-v1.0.21`）：`pet-setup.exe` / `ai-terminal-pet-1.0.21-win-x64.zip` /
       `linux-{amd64,arm64}.tar.gz` / `darwin-{arm64,amd64}.tar.gz`；字节与 sha256 见
-      [CHANGELOG](../CHANGELOG.md) 的「1.0.20 / 1.2.33 发布包实测清单」，全部从公开 URL 下载回来逐字节核对过
-- [x] 独立 tag `pet-v1.0.20` + Release；`scripts\install.cmd -VerifyOnly` **12/12**，`--doctor` 12 ok / 1 warn / 0 fail
-- [x] 插件包 `dsh-ai-terminal-pet` **1.2.33**（npm `latest`、`dsh-plugin-v1.2.33` Release、上游 `+1 −1` 的跟进 PR）
-- [x] OpenCode 上报端 `opencode-ai-terminal-pet` **1.0.20**（npm `latest`，与浮窗同号）
+      [CHANGELOG](../CHANGELOG.md) 的「1.0.21 / 1.2.34 发布包实测清单」。**上传后从公开 URL 下载回来逐字节核对，结论补在 B 提交**
+- [x] 本机装机：`scripts\install.cmd -VerifyOnly` **12/12**，`--doctor` 12 ok / 1 warn / 0 fail，
+      `--version` = 1.0.21。独立 tag + Release 在推送 A 提交后创建
+- [ ] 插件包 `dsh-ai-terminal-pet` **1.2.34** 的 npm `latest` 与 `dsh-plugin-v1.2.34` Release（打包与 `check-tarball` 已通过）
+- [ ] OpenCode 上报端 `opencode-ai-terminal-pet` **1.0.21** 的 npm 发布（与浮窗同号）
 - [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 359,471 B），三段真实动作
       —— 等待呼吸 → 悬停展开 → 点击等待行。循环时长 5.4 秒而不是 15 秒：GIF 是循环播放的，
       15 秒的循环第一遍没人看完，5 秒刚好一遍读完三句话。由 `docs/assets/make_launch_assets.py`
@@ -248,20 +249,22 @@ long it has been asking.
 的 `dsh.catalog.summary`、以及仓库根 `package.json` 的同一块，三处是**逐字相同的一段文字**
 （`verify.mjs` 有断言钉住它们），并且它属于已发布的 1.2.30 tarball 的字节。
 
-**当前线上用的（1.2.30，中英文各一段）**
+**1.2.34 起用的（中英文各一段）**
 
 ```text
-Which of your agents is waiting on you? One always-on-top panel answers it: DeepSeek Harness, Claude Code, OpenCode and Antigravity sessions on one strip, each row saying working, waiting for approval, failed or finished, and a collapsed strip showing how long the blocked one has been blocked. The arrow at a row's end jumps to that terminal; the row itself copies its project path. It rings only for real events, and approvals still happen in DSH. Harness sessions appear on install; the other three need their reporter.
+Which of your agents is waiting on you? One always-on-top panel for DeepSeek Harness, Claude Code, OpenCode and Antigravity sessions: it rings only for real events, and the arrow at a row's end jumps to that terminal. Harness sessions appear on install; OpenCode is one command; Claude Code and Antigravity need their reporter.
 ```
 
 ```text
-哪个 agent 在等你？一块置顶面板就能回答：DeepSeek Harness、Claude Code、OpenCode 与 Antigravity 的会话都在这一条上，每行写着进行中、等待确认、出错还是完成，收起成一条时还会显示那个卡住的会话已经卡了多久。点行尾箭头跳到对应终端，点行本身复制项目路径。它只在真事件上响，授权仍在 DSH 里完成。装上即接上 Harness 的会话；另外三个终端要先各自装好上报端。
+哪个 agent 在等你？一块置顶面板汇总 DeepSeek Harness、Claude Code、OpenCode 与 Antigravity 的会话：只在真事件上响，点行尾箭头即可跳到对应终端。装上即接上 Harness 的会话；OpenCode 只需一行命令；Claude Code 与 Antigravity 各需接一次上报端。
 ```
 
-**这两段为什么必须说「其他三个要先装上报端」**：这条声明是市场条目页的摘要，读的人会据此判断
-"装上就能看到全部终端吗"。实际上这个 bundle **开箱即用映射的只有 Harness 自己的会话**——OpenCode、
-Claude Code 与 Antigravity 要走各自的 `reporters/*.js`（或 `pet-hook`）。1.2.4 就是因为原稿读起来像
-"全都开箱可用"才只改文案发了一版；**这条底线不能为了更短的文案而丢**。
+**这两段为什么仍然要交代"谁还要接上报端"**：这条声明是市场条目页的摘要，读的人会据此判断
+"装上就能看到全部终端吗"。这个 bundle **开箱即用映射的仍然只有 Harness 自己的会话**；区别只在
+OpenCode 现在是一条命令（`opencode plugin add opencode-ai-terminal-pet`，Windows 上连面板一起装），
+而 Claude Code 与 Antigravity 仍要走各自的 `reporters/*.js`（或 `pet-hook`）。1.2.4 就是因为原稿读起来像
+"全都开箱可用"才只改文案发了一版；**这条底线不能为了更短的文案而丢**。1.2.34 只把"另外三个"改成
+"一个一行、两个要接"，没有把 OpenCode 说成零配置。
 
 想换措辞时：三处清单 + `docs/market-index.json` 的同一段一起改，再跑
 `node packages/dsh-ai-terminal-pet/verify.mjs`。纯文案改动的代价仍是一个新版本号（tag + Release + npm + 上游 PR）。
@@ -307,7 +310,7 @@ files alone does not wire it. The connect table in the README has one line per t
 | 仓库浏览 | GitHub traffic（14 天窗口） | **33 views / 11 uniques**；referrer 只有 github.com 15、HN 3、目录站 1 |
 | clone | 同上 | 1,798 次里 **852** 直接由 213 次 CI run × 4 job 解释；**不要把 clone 当人气** |
 | star / fork | `gh repo view` | **1 / 0**（那 1 个是作者本人） |
-| npm | `npm view dsh-ai-terminal-pet version` | **1.2.33**（`dist-tags.latest`，2026-11-17 发版同步）；OpenCode 上报端 `opencode-ai-terminal-pet` 同日 **1.0.20** |
+| npm | `npm view dsh-ai-terminal-pet version` | **1.2.34**（`dist-tags.latest`，2026-11-17 发版同步）；OpenCode 上报端 `opencode-ai-terminal-pet` 同日 **1.0.21** |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后已数日未动） |
 | **npm 下载量（会被爬虫放大，不能当用户数）** | `node tools/traffic-report.mjs` | 2026-11-17 实测 **4,586/周**，但它分布在 **25 个版本、每个 137–227 次**，连不可安装的 `0.0.0-stage` 都有 166 次 → **latest share 6%**，是爬虫队形不是用户（对照 `dsh-pet` 的 58%）。证据链见 [docs/METRICS.md](METRICS.md) §2；**任何对外文本都不要引用这个总量** |
 | **目录那行（只作参考，不当数据源）** | `node tools/catalog-status.mjs` | 站点写 `downloads: 3,455 (30d)`、`version: 1.2.27`、安装命令解析到最新版。**这三个都落后于现实，且都不归我们修**：站点数字来自同一个被爬虫放大的 npm 探针；版本停在 1.2.27 是对方夜间构建未成功（见 [docs/UPSTREAM.md](UPSTREAM.md) §4.1）。**对外引用一律不引用下载量；要引用就引用 latest share 与窗口** |
