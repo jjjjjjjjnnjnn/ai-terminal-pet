@@ -17,7 +17,7 @@
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,717,568 B**（4.50 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,705,344 B**（3.53 MiB）；三个 Windows 二进制合计 **12,101,632 B** = 11.54 MiB |
-| 代码量 | Go 非测试源码 **143 文件 / 27,236 行**、测试 **95 文件 / 13,956 行**（**469** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
+| 代码量 | Go 非测试源码 **143 文件 / 27,236 行**、测试 **96 文件 / 14,042 行**（**470** 个 `func Test`）；JS/MJS **18 文件**（不含 `packages/dsh-ai-terminal-pet/vendor/protocol.js`——那是 `reporters/protocol.js` 的逐字节副本）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
 | 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
@@ -28,7 +28,7 @@
 | 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标；**L5 快照扫描按身份/size/mtime 复用上次解析**（200 文件 22.7 ms → 0.51 ms）；**存在性判据：`title` 必须被窗口标题"包含"且不完全等于它**（§63 修掉的回归） |
 | 持久化 | `state.json`（位置/缩放/展开/`layouts`）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run` / `LaunchAgent` / XDG `.desktop`（开机自启）· `approvals/` |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings/--connect[=HOST]/--doctor/--version/--help` |
-| 单测与门禁 | **469 个 `func Test`** 分布在 15 个包（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 12 + 26 + 26 条 Node 断言 |
+| 单测与门禁 | **470 个 `func Test`** 分布在 15 个包（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 12 + 26 + 26 条 Node 断言 |
 | 持续集成 | `.github/workflows/ci.yml`：四条并行 Job — `windows-latest`（全套单测/构建/打包/fresh-machine/版本链接检查）、`ubuntu-latest`（`cross-build.sh` / `go test` / Linux 二进制 / `install.sh` + tar 校验）、`macos-latest`（`go vet` / `go test` / Darwin 二进制 / `install.sh` + hook 冒烟）、`scan`（`govulncheck` + `gosec`） |
 | 自检 | `ai-terminal-pet --doctor` **13 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts / audio / notifications），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘** |
@@ -628,11 +628,24 @@ go-winio 的 `makeConnectedServerPipe` 每次 Accept 前都会预建一个 `conn
 真要压，只有「上报端变化才连」这一条有意义，而 L1 的 30 秒短路已经在 statusline 上做了；
 再往下压属于为 1.84 µs 增加复杂度。
 
-### L4 — 光栅化与重绘
+### L4 — 光栅化与重绘 ✅ 已实测（2026-11-17）：不做优化
 **已做**：DIB 画布复用、命中缓冲复用、动画定时器按状态装/卸。
-**可做**：脏区重绘（当前每帧全画），或把 `fillRounded`/`fillEllipse` 的内层循环向量化。
-面板只有 56×156（紧凑）与 200×<内容高度>（展开，1–6 行自适应）逻辑像素，收益有限——
-**建议先测再动**，别为 0.3 ms 增加复杂度。（旧版本节写的 `40×190 / 200×250` 是 v0.5.0 之前的固定几何，早已被 `drawing_compact_windows.go:23-35` 的常量取代。）
+**这一次把"先测再动"真的测了**：`internal/ui/paint_panel_cost_test.go`（`go test ./internal/ui -run TestMeasurePanelPaint -v`，
+每例 50 帧取均值，本机 i7-14650HX）：
+
+| 帧 | 尺寸 | Windows（GDI） | Linux（纯 Go OpenType） |
+|---|---|---|---|
+| 紧凑·等待 | 56×156 | 0.450 ms | 0.699 ms |
+| 紧凑·空 | 56×156 | 0.416 ms | 0.298 ms |
+| 展开·3 行 | 200×212 | 2.250 ms | 1.851 ms |
+| 展开·6 行 | 200×314 | 3.953 ms | 3.411 ms |
+| 展开·3 行 + 悬停 | 200×212 | 2.047 ms | 1.980 ms |
+
+结论：**脏区重绘与内层循环向量化都不做**。最坏的那一帧（6 行展开）约 4 ms，
+而提醒层的动画是 20 FPS（50 ms 预算）——余量 12 倍；常驻的紧凑帧是 0.3–0.7 ms。
+把每帧全画换成脏区重绘会引入"哪些东西必须重画"的状态机，而它换来的时间在用户眼里不存在。
+
+（旧版本节写的 `40×190 / 200×250` 是 v0.5.0 之前的固定几何，早已被 `drawing_compact.go:23-35` 的常量取代。）
 
 ### L5 — 启动与扫描路径 ✅ 已交付（2026-11-15，按 mtime/size 复用上次解析）
 **现状**：快照扫描 5 s 一次（`internal/app/app.go` 的 `scanInterval`；本节旧文写的 2 s 已过时），全目录 `Readdir` + 每个文件完整读取与解析。
@@ -858,7 +871,7 @@ I1 原本被写成一件「高复杂度」的事，实测把它拆开之后三�
 **β 已交付**（浮窗 1.0.0 / 插件 1.2.6，`pet-v1.0.0` 与 `dsh-plugin-v1.2.6` 双 Release，npm `latest` = 1.2.6），
 所以那条「正式发声排在 β 之后」的约束**已经满足**：现在可以发声，而且四个数字终于一致。
 **2026-11-12 又交付了 F9**（浮窗 1.0.1 / 插件 1.2.7），见下方 F9 小节。
-宣传素材里的每一个数字都必须是当场跑出来的（**469** 个 `func Test` / 183 项新机检查 / **4.50** MiB（本节数字更新到 1.0.15）），
+宣传素材里的每一个数字都必须是当场跑出来的（**470** 个 `func Test` / 183 项新机检查 / **4.50** MiB（本节数字更新到 1.0.15）），
 **不要写「全量安全扫描」**：`govulncheck` 与 `gosec` 从 2026-11-12 起已跑（见 §6），
 `go test -race` 自 2026-11-15 起在 CI 的 `ubuntu-latest` job 里跑（本机没有 gcc，Windows runner 也没有），
 但「竞态检测只在 Linux 上跑」这句话要跟着说，所以「静态扫描 + 依赖漏洞扫描通过 + Linux 上的竞态检测通过」

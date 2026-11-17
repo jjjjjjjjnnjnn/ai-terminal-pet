@@ -71,8 +71,8 @@
   （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `E21CFDA7…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**469 个** `func Test`，
-  1.0.15 那一轮 +2 来自 `cmd/pet-setup` 的两条参数规则；第 71 轮 +4 来自视觉不变量门禁）；CI 四条 job
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**470 个** `func Test`，
+  1.0.15 那一轮 +2 来自 `cmd/pet-setup` 的两条参数规则；第 71 轮 +5 来自视觉不变量门禁与面板绘制测量）；CI 四条 job
   （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.15 的提交上全绿；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
   `vendor.mjs --check` 与 1.0.15 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
@@ -85,7 +85,7 @@
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
   `--version` 报 `ai-terminal-pet 1.0.15`。
 - **规模**（`node tools/check_facts.mjs --print`，1.0.15 实测）：非测试 **143 文件 / 27,236 行**、
-  测试 **95 文件 / 13,956 行**、**469 个 `func Test`**。
+  测试 **96 文件 / 14,042 行**、**470 个 `func Test`**。
   `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `E21CFDA7…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
   三个二进制合计 **12,101,632 B** = 11.54 MiB。安装目录里多了第 12 件制品：`install.ps1` 的副本。
@@ -5076,7 +5076,7 @@ diffs: waiting-vs-working 24.14%, waiting-vs-idle 14.93%, working-vs-idle 14.73%
 具体像素数没有记在这里：`go test ./...` 不带 `-v`，`t.Logf` 只在失败时进日志——
 要看数字就在本机跑 `go test ./internal/ui -run TestRenderedPanel -v`，或在那个 job 上临时加 `-v`。
 
-顺带一个观察：新测试让 `func Test` 从 465 变 469，`tools/check_facts.mjs` 立刻变红并点名五处——
+顺带一个观察：新测试让 `func Test` 从 465 变 470（4 条不变量 + 1 条测量），`tools/check_facts.mjs` 立刻变红并点名五处——
 第 69 轮那条门禁第一次被"真实的工作"撞到，而不是被造出来的样例。
 
 ### 71.5 这一轮没有做的事
@@ -5086,6 +5086,24 @@ diffs: waiting-vs-working 24.14%, waiting-vs-idle 14.93%, working-vs-idle 14.73%
   三平台共有的东西才值得写跨机断言。
 - **没有把不变量接到 `--doctor`**：那是运行期环境自检，不该承担像素回归的职责。
 - **没有发版**：产品代码零改动。
+
+### 71.6 顺手把 L4 结掉了：测过了，不做
+
+`docs/ROADMAP.md` §3 的 L4（脏区重绘 / 向量化）从项目初期就挂着"先测再动"，但一直没有数字。
+同一个提交里补了 `internal/ui/paint_panel_cost_test.go`（无标签，三平台都能跑；报告，不断言）：
+每例 50 帧取均值。本机（i7-14650HX）与 WSL 上的 Linux：
+
+| 帧 | 尺寸 | Windows（GDI） | Linux（OpenType） |
+|---|---|---|---|
+| 紧凑·等待 | 56×156 | 0.450 ms | 0.699 ms |
+| 紧凑·空 | 56×156 | 0.416 ms | 0.298 ms |
+| 展开·3 行 | 200×212 | 2.250 ms | 1.851 ms |
+| 展开·6 行 | 200×314 | 3.953 ms | 3.411 ms |
+| 展开·3 行 + 悬停 | 200×212 | 2.047 ms | 1.980 ms |
+
+**结论：不做。** 最坏一帧 ~4 ms，而提醒动画是 20 FPS（50 ms 预算）；常驻的紧凑帧 0.3–0.7 ms。
+脏区重绘要引入"什么必须重画"的状态机，换来的时间用户根本看不到。ROADMAP 的 L4 已按此写成"已实测：不做优化"。
+这条也顺带证明了一件容易被忽略的事：**Linux/macOS 那条纯 Go 字体路径并不比 GDI 慢**（6 行时还更快）。
 
 ## 70. 交接：安装器登记"设置 › 应用"那一行 —— 于是删掉 zip 也能卸，winget 才谈得上（2026-11-16，第 70 轮；浮窗 **1.0.15** / 插件 **1.2.27**）
 
