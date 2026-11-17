@@ -17,10 +17,11 @@ layout. Nothing here is hand-drawn or mocked up.
 | `overlay-compact-en.png` | 168x468 | not referenced | Same compact strip under the English locale, kept for localization checks |
 | `overlay-compact-hover.png` | 168x468 | not referenced | Compact strip in the hovered state (raised background and stroke) |
 | `overlay-expanded-en.png` | 400x424 | not referenced | Expanded list under the English locale, kept for localization checks |
-| `demo.gif` | 760x600, 56 frames | launch posts (X, HN) | Breathe → hover → expand → a click on the row-end arrow, one caption per beat |
+| `demo.gif` | 760x660, 25 frames | launch posts (X, HN) | Breathe → hover → expand → a click on the row-end arrow, one caption per beat |
 | `desktop-scene.png` | 1500x860 | launch posts | The panel beside two terminals, so the strip is shown in context |
 | `smartscreen-unsigned.png` | 1320x560 | README install path B, launch posts | The two SmartScreen states an unsigned build produces - **a mockup, see below** |
 | `doctor-green.png` | 1798x358 | README install path B | `--doctor` output from a real healthy install, redacted and typeset |
+| `social-preview.png` | 1280x640 | GitHub social preview (repository settings) | The panel beside the one-line pitch; see the note below about the one manual step |
 
 The three `-en` / `-hover` variants are not linked from the README because the
 Chinese captures already carry the same geometry; they exist so a locale or
@@ -30,8 +31,12 @@ hover regression is visible without running a window.
 changes only what the product changes: the whole-window opacity during the
 breathe, the hovered frame, the two panel sizes, and a ring standing in for the
 click on a row (a layered window draws no cursor, so the artefact of the click
-has to be drawn). It is 56 frames because a 12-frame breath cycle at 90 ms is
-what `pulseInterval` (160 ms, 6.25 fps) actually looks like.
+has to be drawn). It is 25 frames because that is what the beats add up to:
+twelve breathing frames at 90 ms (the 160 ms `pulseInterval` sampled at its own
+rate), then one held frame per beat - 700 ms hover, 1500 ms unfolded, ten 70 ms
+ring frames, 1400 ms hold - for 5.38 s per loop. A beat that should last is
+expressed in its frame's duration, because a GIF encoder collapses identical
+consecutive frames and keeps only one of their durations.
 
 **`desktop-scene.png` is half illustration.** The panel half is real rasterizer
 output; the two terminal windows are drawn, because a real capture of somebody's
@@ -72,8 +77,18 @@ python docs/assets/make_smartscreen_notice.py
 
 `render_assets.py` reads the rasterizer output from `PET_PREVIEW_DIR`, trims the
 flat background, and writes all the PNGs above. `make_launch_assets.py` reads
-the same directory and writes `demo.gif` and `desktop-scene.png`.
-`make_doctor_card.py` takes the captured report and needs `%USERPROFILE` as its
-second argument so it can redact it - forgetting that argument ships a real
-username. The settings-window previews are written to
+the same directory and writes `demo.gif`, `desktop-scene.png` and
+`social-preview.png`. `make_doctor_card.py` takes the captured report and needs
+`%USERPROFILE` as its second argument so it can redact it - forgetting that
+argument ships a real username. The settings-window previews are written to
 `$env:TEMP\petpreview-settings` and are not published here.
+
+`social-preview.png` has **one manual step that no script can do**: GitHub's
+repository settings → *Social preview* is the only place the card is uploaded,
+and there is no API for it. Regenerating the file does nothing until somebody
+uploads it again - so a change to the pitch means "regenerate, then upload",
+not just "regenerate".
+
+`python tools/check_assets.py` reads the sizes in the table above out of the
+files themselves (PNG header, GIF screen descriptor and image-descriptor count)
+and fails when the two disagree, so this table cannot quietly go stale.

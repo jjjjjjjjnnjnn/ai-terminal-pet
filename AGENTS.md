@@ -111,6 +111,7 @@ node --test tools/check_versions.test.mjs
 node tools/check_facts.mjs              # every documented count equals the tree's (func Test, packages, --doctor)
 node --test tools/check_facts.test.mjs
 python tools/check_docs_links.py   # every relative path and #anchor in the docs we maintain
+python tools/check_assets.py       # every size/frame count in docs/assets/README.md matches the file
 
 # 3. Production build
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet

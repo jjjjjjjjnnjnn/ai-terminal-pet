@@ -33,7 +33,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
 except ImportError:
     print(
         "缺少 Pillow 依赖，无法生成 GIF 与实景图。\n"
@@ -345,12 +345,106 @@ def desktop_scene(preview: Path) -> Path:
     return target
 
 
+def fit_text(draw: ImageDraw.ImageDraw, text: str, maximum: int, size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+    """Largest font at or below `size` whose measured width fits `maximum`.
+
+    Measured, not estimated: the social preview is the one asset nobody can
+    regenerate on a machine without Segoe UI, and a headline that overflows on
+    the maintainer's fallback font would be a permanently clipped image in the
+    repository.
+    """
+    chosen = font(size, bold)
+    while size > 10 and draw.textlength(text, font=chosen) > maximum:
+        size -= 2
+        chosen = font(size, bold)
+    return chosen
+
+
+def social_preview(preview: Path) -> Path:
+    """The GitHub social preview: 1280x640, the panel beside the one-line pitch.
+
+    GitHub renders this card wherever the repository is shared, so it has to
+    survive being looked at 400 px wide - which is why the headline is the
+    README's own first sentence and there is nothing else to read.
+
+    The panel half is the real rasterizer output, scaled; the gradient, the glow
+    and the words are drawn here. The caption says which is which, the same way
+    desktop-scene.png does, because the alternative is an image that quietly
+    claims a product screenshot it is not.
+    """
+    width, height = 1280, 640
+    base = Image.new("RGB", (width, height), (0x0D, 0x0F, 0x15))
+    draw = ImageDraw.Draw(base)
+    for y in range(height):
+        shade = int(0x0B * (y / height))
+        draw.line([(0, y), (width, y)], fill=(0x0D + shade, 0x0F + shade, 0x15 + shade + 0x06))
+
+    expanded = load(preview, "expanded-waiting-en.png")
+    # Native size, never resized: the preview is already 400x424 (the panel at
+    # scale 2), and LANCZOS scaling it to fill more of the card is what made the
+    # first version look blurred next to crisp vector text.
+    panel_x = width - 72 - expanded.width
+    panel_y = (height - expanded.height) // 2
+    radius = corner_radius(expanded, 200)
+
+    # A soft amber glow behind the panel, and a shadow under it. Both are drawn
+    # on a separate layer and blurred, so nothing here depends on the panel's
+    # own pixels being anything other than what the rasterizer produced.
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse(
+        [panel_x - 210, panel_y - 190, panel_x + expanded.width + 210, panel_y + expanded.height + 190],
+        fill=(0xFF, 0xC8, 0x6A, 30),
+    )
+    base.paste(Image.alpha_composite(base.convert("RGBA"), glow.filter(ImageFilter.GaussianBlur(90))).convert("RGB"), (0, 0))
+
+    mask = Image.new("L", expanded.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, expanded.width - 1, expanded.height - 1], radius=radius, fill=255)
+    shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    shadow.paste((0, 0, 0, 130), (panel_x + 6, panel_y + 14), mask)
+    base.paste(
+        Image.alpha_composite(base.convert("RGBA"), shadow.filter(ImageFilter.GaussianBlur(22))).convert("RGB"),
+        (0, 0),
+    )
+    base.paste(expanded, (panel_x, panel_y), mask)
+
+    draw = ImageDraw.Draw(base)
+    left = 72
+    available = panel_x - left - 40
+    draw.text((left, 96), "ai-terminal-pet", font=mono(20), fill=(0x7E, 0x87, 0x97))
+    draw.line([(left, 132), (left + 56, 132)], fill=(0xFF, 0xC8, 0x6A), width=4)
+
+    headline = "Your agents are waiting."
+    headline_two = "You are in another tab."
+    head_font = fit_text(draw, headline, available, 58, bold=True)
+    draw.text((left, 176), headline, font=head_font, fill=INK)
+    draw.text((left, 176 + int(head_font.size * 1.22)), headline_two, font=head_font, fill=INK)
+
+    body_top = 176 + int(head_font.size * 1.22) * 2 + 34
+    body = fit_text(draw, "Which AI coding terminal is blocked on you \u2014 and one click back to it.", available, 24)
+    draw.text((left, body_top), "Which AI coding terminal is blocked on you \u2014", font=body, fill=MUTED)
+    draw.text((left, body_top + int(body.size * 1.45)), "and one click back to it.", font=body, fill=MUTED)
+
+    meta_top = body_top + int(body.size * 1.45) * 2 + 26
+    draw.text((left, meta_top), "DeepSeek Harness · Claude Code · OpenCode · Antigravity",
+              font=font(19), fill=(0xC8, 0xD0, 0xDC))
+    draw.text((left, meta_top + 34), "Windows · Linux X11 · macOS · MIT · local only, no account",
+              font=font(17), fill=(0x6B, 0x73, 0x82))
+
+    draw.text((left, height - 46), "panel: rendered by the product's own rasterizer.",
+              font=font(14), fill=(0x4E, 0x55, 0x63))
+
+    target = ASSETS / "social-preview.png"
+    base.save(target, optimize=True)
+    return target
+
+
 def main() -> None:
     preview = preview_dir()
     ASSETS.mkdir(parents=True, exist_ok=True)
     gif = demo_gif(preview)
     scene = desktop_scene(preview)
-    for path in (gif, scene):
+    social = social_preview(preview)
+    for path in (gif, scene, social):
         size = path.stat().st_size
         print("wrote: %s (%d bytes)" % (path.name, size))
     sys.exit(0)

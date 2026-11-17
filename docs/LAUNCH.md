@@ -92,12 +92,16 @@ imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 
       [CHANGELOG](../CHANGELOG.md) 的「1.0.15 / 1.2.27 发布包实测清单」，全部从公开 URL 下载回来逐字节核对过
 - [x] 独立 tag `pet-v1.0.15` + Release；`scripts\install.cmd -VerifyOnly` **12/12**，`--doctor` 12 ok / 1 warn / 0 fail
 - [x] 插件包 `dsh-ai-terminal-pet` **1.2.27**（npm `latest`、`dsh-plugin-v1.2.27` Release、上游 `+1 −1` 的跟进 PR）
-- [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 342,606 B），三段真实动作
+- [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 359,471 B），三段真实动作
       —— 等待呼吸 → 悬停展开 → 点击等待行。循环时长 5.4 秒而不是 15 秒：GIF 是循环播放的，
       15 秒的循环第一遍没人看完，5 秒刚好一遍读完三句话。由 `docs/assets/make_launch_assets.py`
       从同一份光栅器输出合成，`README.md` 中英两段都已引用
 - [x] **「两个终端 + 浮窗同框」实景图**：`docs/assets/desktop-scene.png`（1500x860，59,029 B）。
       面板那一半是真实光栅器输出，两个终端是画出来的，图注里写明了这一点
+- [x] **GitHub 社交预览图**：`docs/assets/social-preview.png`（1280x640）。
+      同样是"面板是真实光栅器输出、背景与文字是画出来的"，右上角那一半就是用户实际看到的面板。
+      **唯一的手工步骤**：仓库 Settings → Social preview 上传它——那个位置没有 API，
+      重生成文件不等于换上去
 - [x] `--doctor` 全绿（9 ok, 0 warn, 0 fail），截图 `docs/assets/doctor-green.png`
       （1798x358 / 63,335 B）已生成：那是程序自己的 stdout，只加了着色与窗口边框，
       并把捕获机器上的用户名换成 `<you>`

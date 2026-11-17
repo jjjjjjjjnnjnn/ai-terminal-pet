@@ -305,6 +305,15 @@ jobs:
       - name: Check documentation links
         run: python tools/check_docs_links.py
 
+      # The sizes in docs/assets/README.md were the third hand-written table
+      # nobody read: it claimed demo.gif was 760x600 with 56 frames while the
+      # committed file is 760x660 with 25, and no gate could tell. This reads
+      # the numbers out of the files (PNG IHDR, GIF screen descriptor and
+      # image-descriptor count) and fails when the table disagrees, so the
+      # table that release notes are copied from cannot rot quietly.
+      - name: Check documented asset sizes
+        run: python tools/check_assets.py
+
       # Version strings in the documentation rot independently of the release
       # number: the README badge sat at 1.0.2 across three releases, and both
       # "the package is now" paragraphs said 1.2.8 while npm served 1.2.13. This
