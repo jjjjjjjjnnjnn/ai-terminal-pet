@@ -227,6 +227,11 @@ type panelState struct {
 	Toast panelToast
 	// Tuck is 0 when the panel is fully on screen and 1 when it has slid all
 	// the way into its docked edge.
+	Still bool
+	// still is inverted on purpose: the zero value must keep the old
+	// behaviour, so every existing test and every panelState literal without
+	// an opinion still renders a breathing disc. The app sets it from
+	// config.animations.
 	Tuck float64
 	// Sliver is the width in canvas pixels that stays visible at Tuck 1.
 	Sliver int
@@ -293,7 +298,7 @@ func drawVerticalPanel(target *canvas, state panelState) {
 			if state.Toast.compact() {
 				toast = state.Toast
 			}
-			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed, state.Lang, toast)
+			drawVerticalCompact(target, items, state.Now, aggregate, accent, state.Pressed, state.Lang, toast, state.Still)
 		}
 		target.setAlphaScale(1)
 	}
@@ -340,7 +345,7 @@ func drawDockedTab(target *canvas, state session.State, dock dockSide, sliver in
 // arrow-labelled counters, a divider and a chevron - encoded those same two
 // facts six different ways, which made the panel dense without making it
 // informative.
-func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent rgba, pressed bool, lang i18n.Lang, toast panelToast) {
+func drawVerticalCompact(target *canvas, items []session.Session, now time.Time, state session.State, accent rgba, pressed bool, lang i18n.Lang, toast panelToast, still bool) {
 	width := target.width
 	unit := float64(width) / compactWidth
 	value := func(base int) int {
@@ -348,7 +353,13 @@ func drawVerticalCompact(target *canvas, items []session.Session, now time.Time,
 	}
 	center := width / 2
 
-	drawStatusOrb(target, center, value(14), value(28), state, now, pressed)
+	// The breath is the one thing the panel does on its own, so "no motion"
+	// is exactly one value here rather than a branch inside the orb.
+	pulse := 0.0
+	if !still {
+		pulse = alertPulse(state, now)
+	}
+	drawStatusOrb(target, center, value(14), value(28), state, pulse, pressed)
 
 	// The big slot answers whichever question the panel is actually asking.
 	// While somebody is blocked on the user it shows HOW LONG ("12m" / "12分",
@@ -554,10 +565,9 @@ func drawExpandedEmpty(target *canvas, top, width int, scale func(int) int, lang
 	target.text(scale(16), top+scale(6), width-scale(32), scale(34), i18n.T(lang, i18n.KeyPanelEmpty), scale(9), 400, colors.Muted, dtVCenter|dtCenter|dtNoPrefix|dtWordBreak)
 }
 
-func drawStatusOrb(target *canvas, centerX, top, size int, state session.State, now time.Time, pressed bool) {
+func drawStatusOrb(target *canvas, centerX, top, size int, state session.State, pulse float64, pressed bool) {
 	accent := stateColor(state)
 	if state == session.StateWaitingPermission || state == session.StateError {
-		pulse := alertPulse(state, now)
 		outer := size + 4 + int(float64(pulse)*5+0.5)
 		outerColor := accent
 		outerColor.A = uint8(18 + float64(pulse)*22)

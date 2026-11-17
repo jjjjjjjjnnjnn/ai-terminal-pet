@@ -308,6 +308,7 @@ func uiSettings(settings config.Config) ui.Settings {
 		Theme:                 settings.Theme,
 		PerSourceColor:        settings.PerSourceColor,
 		HiddenAtLaunch:        settings.HiddenAtLaunch,
+		Animations:            settings.Animations,
 		SettingsTextSize:      settings.SettingsTextSize,
 		SettingsKeyboard:      settings.SettingsKeyboard,
 		SettingsTooltips:      settings.SettingsTooltips,

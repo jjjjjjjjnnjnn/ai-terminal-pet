@@ -410,6 +410,31 @@ func TestThemesAreActuallyDifferent(t *testing.T) {
 	}
 }
 
+// TestTheBreathIsTheOnlyThingMotionControls is the contract behind
+// config.animations: with the switch off, a clock tick may not change one
+// pixel; with it on, the waiting frame must actually breathe. Without the
+// first half "reduce motion" would be a switch that only stopped the timer and
+// left a frozen halo at whatever phase it happened to be drawn in.
+func TestTheBreathIsTheOnlyThingMotionControls(t *testing.T) {
+	later := previewNow.Add(300 * time.Millisecond)
+	waiting := func(still bool, at time.Time) panelState {
+		return panelState{Items: invariantSessions()[:1], Now: at, Still: still}
+	}
+
+	moving := renderInvariantFrame(t, waiting(false, previewNow))
+	movingLater := renderInvariantFrame(t, waiting(false, later))
+	if differingRatio(moving, movingLater) < 0.005 {
+		t.Errorf("two frames 300 ms apart are identical (%.4f): the waiting disc is not breathing, so the switch has nothing to turn off",
+			differingRatio(moving, movingLater))
+	}
+
+	still := renderInvariantFrame(t, waiting(true, previewNow))
+	stillLater := renderInvariantFrame(t, waiting(true, later))
+	if ratio := differingRatio(still, stillLater); ratio != 0 {
+		t.Errorf("%.4f of the pixels changed while animations are off: the disc must be drawn at rest", ratio)
+	}
+}
+
 // unpremultipliedCenter reads the middle pixel as a straight colour, so the
 // luminance comparison is about hue and not about how translucent the panel is.
 // Text pixels are stored premultiplied; the panel body is not, but normalising

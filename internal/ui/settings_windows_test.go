@@ -132,9 +132,9 @@ func TestRenderSettingsPreview(t *testing.T) {
 		Opacity: 235, Volume: 85, ApproveTimeout: 5,
 		Scheme: config.SoundSchemeChime, Language: "zh-CN",
 		// The previews must show the shipped default, so the theme here is
-		// slate and the provenance switch is off. The appearance tab is rendered
-		// separately below, once per palette.
-		Theme: config.ThemeSlate,
+		// slate, the provenance switch is off and the status disc animates.
+		Theme:      config.ThemeSlate,
+		Animations: true,
 	}
 	cases := []struct {
 		name    string

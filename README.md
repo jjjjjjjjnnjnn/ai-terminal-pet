@@ -255,7 +255,7 @@ Every platform compiles all 16 Go packages cleanly with `CGO_ENABLED=0`. The ove
 
 This is the part most projects leave out, and it is the part that decides whether you can trust a status strip: a strip that lies about state is worse than no strip.
 
-**Measured on every push, on real runners:** `go vet`, **499 `func Test`** across 15 packages, cross-builds for linux/amd64 and darwin/arm64, `go test -race` on Ubuntu, both plugin verifiers, the packaged OpenCode reporter (built from `reporters/` and loaded out of its npm shape on all three platforms), **183 fresh-machine checks** (install → report → `--doctor` → uninstall in a sandbox), version-claim and documentation-link gates, `govulncheck` and `gosec`.
+**Measured on every push, on real runners:** `go vet`, **501 `func Test`** across 15 packages, cross-builds for linux/amd64 and darwin/arm64, `go test -race` on Ubuntu, both plugin verifiers, the packaged OpenCode reporter (built from `reporters/` and loaded out of its npm shape on all three platforms), **183 fresh-machine checks** (install → report → `--doctor` → uninstall in a sandbox), version-claim and documentation-link gates, `govulncheck` and `gosec`.
 
 **Not verified, and not planned** — this project has no Apple hardware and no spare Linux desktop, and the maintainer's decision is to skip those runs rather than claim them:
 
@@ -286,7 +286,7 @@ Everything above is also written in [docs/PLATFORMS.md](docs/PLATFORMS.md), with
 | Path | Purpose |
 |---|---|
 | **Data root** | Windows `%LOCALAPPDATA%\AI-Terminal-Pet` · macOS `~/Library/Application Support/AI-Terminal-Pet` · Linux `$XDG_DATA_HOME/ai-terminal-pet` (or `~/.local/share/ai-terminal-pet`) — one resolver, `internal/home` |
-| `config.json` | notifications, sound cue and scheme, always-on-top, edge retract, opacity, theme, language, per-session mutes, auto-approve |
+| `config.json` | notifications, sound cue and scheme, always-on-top, edge retract, status-disc animation, opacity, theme, language, per-session mutes, auto-approve |
 | `state.json` | zoom, expand state, and one position per monitor layout |
 | `runtime/*.json` | reporter session snapshots, merged at startup and pruned when a host disappears |
 | `approvals/` | transient auto-approve handshakes (`pending-*.json`, `.deny`) |
@@ -490,7 +490,7 @@ ai-terminal-pet --doctor
 
 ### 验证到什么程度 —— 以及哪些没有
 
-**每次推送都会在真实 runner 上量到的**：`go vet`、15 个包共 **499 个 `func Test`**、linux/amd64 与 darwin/arm64 交叉构建、Ubuntu 上的 `go test -race`、两个插件校验、**打包后的 OpenCode 上报端**（由 `reporters/` 生成，按 npm 包形态在三个平台上加载并投递）、**183 项 fresh-machine 检查**（沙箱里装 → 上报 → `--doctor` → 卸载）、版本声明与文档链接门禁、`govulncheck` 与 `gosec`。
+**每次推送都会在真实 runner 上量到的**：`go vet`、15 个包共 **501 个 `func Test`**、linux/amd64 与 darwin/arm64 交叉构建、Ubuntu 上的 `go test -race`、两个插件校验、**打包后的 OpenCode 上报端**（由 `reporters/` 生成，按 npm 包形态在三个平台上加载并投递）、**183 项 fresh-machine 检查**（沙箱里装 → 上报 → `--doctor` → 卸载）、版本声明与文档链接门禁、`govulncheck` 与 `gosec`。
 
 **没有验证、而且不打算验证的** —— 这个项目没有苹果硬件，也没有多余的 Linux 桌面，维护者的决定是不做这些实测、也不把它们写成"已验证"：
 

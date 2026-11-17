@@ -309,6 +309,14 @@ type Config struct {
 	// a heuristic: a forked conversation also carries a parent id, and the two
 	// cannot be told apart from what reporters send.
 	QuietSubagents bool `json:"quietSubagents"`
+	// Animations lets the status disc breathe while a session waits or fails.
+	// On by default, because that breath is how the strip says "still blocked"
+	// without a sound - but constant motion on a second monitor is a real
+	// distraction, and "reduce motion" is a preference people already hold.
+	// Off means: the disc is drawn, the pulse timer is never installed, and the
+	// window alpha stays at Opacity. Nothing informational is lost; the colour
+	// and the glyph carry the state.
+	Animations bool `json:"animations"`
 	// SettingsTextSize scales the settings window: "small", "standard" or
 	// "large". It exists because the settings window's type ramp is a
 	// judgement call about someone else's eyesight, and the first version
@@ -337,7 +345,7 @@ func Default() Config {
 		Theme:                 DefaultTheme, PerSourceColor: false,
 		ForegroundAware: true, IdleMinutes: DefaultIdleMinutes,
 		DonePolicy: DefaultDonePolicy, QuietCurrent: true,
-		QuietSubagents: true, SettingsTextSize: TextSizeStandard,
+		QuietSubagents: true, Animations: true, SettingsTextSize: TextSizeStandard,
 		SettingsKeyboard: false, SettingsTooltips: true,
 	}
 }

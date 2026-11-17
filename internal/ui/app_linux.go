@@ -1017,7 +1017,7 @@ func (a *App) alertOnTransitions() {
 func (a *App) syncAnimation() {
 	now := time.Now()
 	sliding := a.tuck != a.tuckTarget
-	pulsing := a.state == session.StateWaitingPermission || a.state == session.StateError
+	pulsing := a.options.Settings.Animations && (a.state == session.StateWaitingPermission || a.state == session.StateError)
 	toasting := a.toast.frame(now, a.sessions).visible()
 	shouldAnimate := !a.hidden && !a.drag.active && (sliding || pulsing || a.approvals.maxRemainingSeconds(now) >= 0 || toasting)
 	desiredInterval := uint32(pulseInterval)
@@ -1048,7 +1048,7 @@ func (a *App) present() error {
 	opacity := a.options.Opacity
 	reused := a.surface != nil && purePulseFrame(a.lastFrame, key, a.state, a.tuck, a.tuckTarget)
 	if reused {
-		opacity = pulseOpacity(a.options.Opacity, a.state, now)
+		opacity = pulseOpacity(a.options.Opacity, !a.options.Settings.Animations, a.state, now)
 	} else {
 		if a.surface != nil && (a.surface.width != width || a.surface.height != height) {
 			a.surface.close()
@@ -1078,6 +1078,7 @@ func (a *App) present() error {
 			SelectedRow: selectedRow,
 			Toast:       toast,
 			Tuck:        a.tuck,
+			Still:       !a.options.Settings.Animations,
 			Sliver:      a.sliverWidth(),
 			Dock:        a.dock,
 		})

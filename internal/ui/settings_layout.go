@@ -167,6 +167,7 @@ const (
 	settingsTheme
 	settingsPerSource
 	settingsHiddenAtLaunch
+	settingsAnimations
 
 	// How the settings window itself behaves. They live on the two tabs the
 	// window is about: text size on Look (it is a look), keyboard and tooltips
@@ -276,6 +277,7 @@ type settingsView struct {
 	Theme          string
 	PerSource      bool
 	HiddenAtLaunch bool
+	Animations     bool
 	TextSize       string
 	Keyboard       bool
 	Tooltips       bool
@@ -681,6 +683,9 @@ func appearanceRows(lang i18n.Lang) []settingsRow {
 		{control: settingsHiddenAtLaunch, kind: rowToggle,
 			title: i18n.T(lang, i18n.KeySettingsHiddenAtLaunch),
 			hint:  i18n.T(lang, i18n.KeySettingsHiddenAtLaunchHint)},
+		{control: settingsAnimations, kind: rowToggle,
+			title: i18n.T(lang, i18n.KeySettingsAnimations),
+			hint:  i18n.T(lang, i18n.KeySettingsAnimationsHint)},
 		{control: settingsNone, kind: rowNote,
 			title: i18n.T(lang, i18n.KeySettingsAppearanceNote)},
 	}
@@ -924,6 +929,8 @@ func settingsToggleState(row settingsRow, view settingsView) bool {
 		return view.PerSource
 	case settingsHiddenAtLaunch:
 		return view.HiddenAtLaunch
+	case settingsAnimations:
+		return view.Animations
 	case settingsForegroundAware:
 		return view.ForegroundAware
 	case settingsQuietCurrent:

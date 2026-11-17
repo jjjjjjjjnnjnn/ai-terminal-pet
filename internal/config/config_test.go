@@ -59,6 +59,26 @@ func TestDecodeConfigHonoursExplicitFalse(t *testing.T) {
 	}
 }
 
+// TestAnimationsDefaultOnAndCanBeTurnedOff pins the one new switch of 1.0.21.
+// On must be the default, including for a config file written before the key
+// existed; off must survive a round trip. DecodeConfig starts from Default and
+// unmarshals into it, which is what makes both halves true.
+func TestAnimationsDefaultOnAndCanBeTurnedOff(t *testing.T) {
+	if !Default().Animations {
+		t.Fatal("animations must default to on: the breath is how the strip says 'still blocked' without a sound")
+	}
+	if got := DecodeConfig([]byte(`{"opacity": 200}`)); !got.Animations {
+		t.Fatal("an older config file without the key must keep the default")
+	}
+	if got := DecodeConfig([]byte(`{"animations": false}`)); got.Animations {
+		t.Fatal("explicit false must stick")
+	}
+	// Normalize must not resurrect it: a value read back from disk is the truth.
+	if got := (Config{Animations: false}).Normalize(); got.Animations {
+		t.Fatal("Normalize turned animations back on")
+	}
+}
+
 func TestConfigNormalizeClampsOpacity(t *testing.T) {
 	for _, opacity := range []int{-1, 0, MinOpacity - 1, MaxOpacity + 1, 100000} {
 		if got := (Config{Opacity: opacity}).Normalize(); got.Opacity != Default().Opacity {

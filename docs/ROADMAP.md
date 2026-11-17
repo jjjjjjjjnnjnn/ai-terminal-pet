@@ -19,7 +19,7 @@
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,717,568 B**（4.50 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,705,344 B**（3.53 MiB）；三个 Windows 二进制合计 **12,101,632 B** = 11.54 MiB |
-| 代码量 | Go 非测试源码 **154 文件 / 28,309 行**、测试 **101 文件 / 14,842 行**（**499** 个 `func Test`）；JS/MJS 侧为 6 个 reporter + 工具链 `tools/*.mjs` + 两个包的测试与生成物（`packages/*/vendor/protocol.js` 与 `protocol.cjs` 是 `reporters/protocol.js` 的逐字节副本，不算第二份实现）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
+| 代码量 | Go 非测试源码 **154 文件 / 28,309 行**、测试 **101 文件 / 14,842 行**（**501** 个 `func Test`）；JS/MJS 侧为 6 个 reporter + 工具链 `tools/*.mjs` + 两个包的测试与生成物（`packages/*/vendor/protocol.js` 与 `protocol.cjs` 是 `reporters/protocol.js` 的逐字节副本，不算第二份实现）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
 | 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |
 | 面板几何 | 紧凑 `56x156`（固定）· 展开 `200x<内容高度>`，1–6 行自适应，超过 6 行加一条溢出行 |
@@ -30,7 +30,7 @@
 | 生命周期 | 按需拉起（reporter 发现端点不存在就拉起）；会话存在性由 OS 观测（进程表 + 窗口），连续不可观测 ≥ `DefaultAbsenceGrace` 2 分钟才移除；空闲自毁宽限 10 分钟；L1 statusline 30 秒管道短路；F2 键盘行导航；F5 按显示器工作区记忆坐标；**L5 快照扫描按身份/size/mtime 复用上次解析**（200 文件 22.7 ms → 0.51 ms）；**存在性判据：`title` 必须被窗口标题"包含"且不完全等于它**（§63 修掉的回归） |
 | 持久化 | `state.json`（位置/缩放/展开/`layouts`）· `config.json`（通知/音效/置顶/贴边/不透明度/语言/auto-approve）· `HKCU\...\Run` / `LaunchAgent` / XDG `.desktop`（开机自启）· `approvals/` |
 | 对外接口 | `--show/--toggle/--reset/--quit/--json[--pretty]/--autostart[=on\|off]/--settings`（有窗口开窗口，否则终端编辑器）`/--set k=v/--connect[=HOST]/--doctor/--version/--help` |
-| 单测与门禁 | **499 个 `func Test`** 分布在 15 个包（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 `tools/*.test.mjs`、两个包各自的测试，以及生成物一致性检查（`sync.mjs --check`） |
+| 单测与门禁 | **501 个 `func Test`** 分布在 15 个包（Windows + Linux + macOS 全量通过）；CI 的 `ubuntu-latest` 另跑 `go test -race`；工具链另有 `tools/*.test.mjs`、两个包各自的测试，以及生成物一致性检查（`sync.mjs --check`） |
 | 持续集成 | `.github/workflows/ci.yml`：四条并行 Job — `windows-latest`（全套单测/构建/打包/fresh-machine/版本链接检查）、`ubuntu-latest`（`cross-build.sh` / `go test` / Linux 二进制 / `install.sh` + tar 校验）、`macos-latest`（`go vet` / `go test` / Darwin 二进制 / `install.sh` + hook 冒烟）、`scan`（`govulncheck` + `gosec`） |
 | 自检 | `ai-terminal-pet --doctor` **13 项**（environment / install files / version / runtime / config / pipe / instance / node / reporters / autostart / alerts / audio / notifications），`[ok]/[warn]/[fail]` 逐行 + 末行汇总，任一 fail 退出码 1；`reporters` 读 OpenCode / Claude Code / Antigravity 三份宿主配置 |
 | 接入向导 | `ai-terminal-pet --connect[=opencode\|claude\|antigravity]` 按当前 OS 填写真实二进制/脚本路径并打印配置片段，**只打印不写盘**；OpenCode 现在优先给**包名**形态（`opencode plugin add …`），`file://` 检出形态只作为开发路径附在备注里 |
@@ -1014,7 +1014,7 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 
 ### 7.2 三条判断（后续所有取舍都从这里出发）
 
-1. **瓶颈是可见性，不是质量。** 75 轮工程、499 个测试、三平台可跑；14 天里只有 11 个唯一访客。
+1. **瓶颈是可见性，不是质量。** 75 轮工程、501 个测试、三平台可跑；14 天里只有 11 个唯一访客。
    在这个分母上做转化优化无法被测量，所以下一轮的第一件事是"让人看到"，不是"再做功能"。
 2. **两个漏点**：安装摩擦（未签名 exe + SmartScreen；winget 未合并；DSH 之外要"装应用 + 接上报端"两步）
    与叙事（首屏是长文档，竞品首屏是 GIF）。
@@ -1056,14 +1056,18 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 ### 7.6 C 的最小版：规格（下一个功能轮，先不写代码）
 
 - **目标**：状态带不失去信息密度，加一层"有人格"的最小表现。
-- **候选**：等待 / 出错 / 完成三种状态，在紧凑态各加 1–2 帧动画；复用现有呼吸定时器
-  （`syncAnimation`），**不新开常驻计时器**；`config.json` 增加 `animations` 开关，设置窗口与
-  `--set animations=on|off` 都能改。
+- **第一步已落地（2026-11-17，未发版）**：`animations` 开关——面板里唯一自己会动的东西（等待/出错的呼吸）
+  现在可以关：`config.json`、设置窗口外观页签、`--set animations=on|off`、Linux/macOS 的 `--settings` 表
+  四个入口一致；关掉时呼吸定时器不安装、窗口 alpha 停在 `opacity`、光晕画在静止相位。
+  两条测试钉住它：`TestTheBreathIsTheOnlyThingMotionControls`（开时 300 ms 两帧必须有像素差，关时必须逐像素相同）
+  与 `TestAnimationsDefaultOnAndCanBeTurnedOff`（旧配置文件缺字段仍是开）。
+- **下一步（帧）**：等待 / 出错 / 完成三种状态各加 1–2 帧；复用现有呼吸定时器（`syncAnimation`），
+  **不新开常驻计时器**；`frameKey` 要带上帧序号（本项目已经两次栽在"画了但没进 key"上）。
 - **不做**：可替换皮肤、素材市场、宠物形象包；不改 56 px 几何；不做声音之外的表现层。
-- **验收**：视觉不变量门禁加两条（两帧必须有像素差；关闭时与今天逐像素相同）；三平台 `go test` 绿；
-  紧凑帧绘制仍 < 1 ms（沿用 L4 的测量方法）。
+- **验收**：视觉不变量门禁再加一条（两帧必须有像素差）；关闭 `animations` 时与今天逐像素相同；
+  三平台 `go test` 绿；紧凑帧绘制仍 < 1 ms（沿用 L4 的测量方法）。
 - **先决问题**：产品内动画是否真的提高留存——首屏 GIF 已经有动画，而安装后的"人格"没有数据支撑。
-  所以这一项排在 P2 之后，并且**发版时才随一个 ≥2 天的观察窗口**。
+  所以帧仍排在 P2 之后，并且发版时要跟一个 ≥2 天的观察窗口。
 
 ### 7.7 硬指标（4 周后复核）
 

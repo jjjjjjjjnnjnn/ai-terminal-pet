@@ -59,13 +59,13 @@ func TestPurePulseFrameOnlyReusesClockOnlyChanges(t *testing.T) {
 
 func TestPulseOpacityStaysWithinReadableBand(t *testing.T) {
 	base := uint8(235)
-	if got := pulseOpacity(base, session.StateIdle, time.Now()); got != base {
+	if got := pulseOpacity(base, false, session.StateIdle, time.Now()); got != base {
 		t.Fatalf("idle opacity = %d, want the static %d", got, base)
 	}
 	seen := map[uint8]bool{}
 	start := time.Unix(5000, 0)
 	for step := 0; step < 40; step++ {
-		got := pulseOpacity(base, session.StateWaitingPermission, start.Add(time.Duration(step)*50*time.Millisecond))
+		got := pulseOpacity(base, false, session.StateWaitingPermission, start.Add(time.Duration(step)*50*time.Millisecond))
 		if got < base-26 || got > base {
 			t.Fatalf("opacity %d outside [%d,%d]", got, base-26, base)
 		}
@@ -76,8 +76,21 @@ func TestPulseOpacityStaysWithinReadableBand(t *testing.T) {
 	}
 
 	// A very transparent panel must not be made brighter than requested.
-	low := pulseOpacity(40, session.StateError, start.Add(37*time.Millisecond))
+	low := pulseOpacity(40, false, session.StateError, start.Add(37*time.Millisecond))
 	if low > 40 {
 		t.Fatalf("low opacity pulse = %d, want <= 40", low)
+	}
+
+	// "Reduce motion" is one value: every frame is the requested alpha, and a
+	// waiting session is no exception. This is the switch the settings window
+	// and config.animations both set.
+	for step := 0; step < 8; step++ {
+		at := start.Add(time.Duration(step) * 50 * time.Millisecond)
+		if got := pulseOpacity(base, true, session.StateWaitingPermission, at); got != base {
+			t.Fatalf("still opacity at step %d = %d, want the static %d", step, got, base)
+		}
+		if got := pulseOpacity(base, true, session.StateError, at); got != base {
+			t.Fatalf("still error opacity at step %d = %d, want the static %d", step, got, base)
+		}
 	}
 }

@@ -292,6 +292,7 @@ func applyUISettings(target *config.Config, value ui.Settings) {
 	target.Theme = config.ValidTheme(value.Theme)
 	target.PerSourceColor = value.PerSourceColor
 	target.HiddenAtLaunch = value.HiddenAtLaunch
+	target.Animations = value.Animations
 	target.SettingsTextSize = config.ValidTextSize(value.SettingsTextSize)
 	target.SettingsKeyboard = value.SettingsKeyboard
 	target.SettingsTooltips = value.SettingsTooltips

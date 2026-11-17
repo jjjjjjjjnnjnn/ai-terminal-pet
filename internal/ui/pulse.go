@@ -33,8 +33,8 @@ func purePulseFrame(previous, current renderedKey, state session.State, tuck, tu
 
 // pulseOpacity maps the breath onto a narrow band of constant alpha so the
 // panel is never too dim to read. alertPulse returns 0..1.
-func pulseOpacity(base uint8, state session.State, now time.Time) uint8 {
-	if state != session.StateWaitingPermission && state != session.StateError {
+func pulseOpacity(base uint8, still bool, state session.State, now time.Time) uint8 {
+	if still || (state != session.StateWaitingPermission && state != session.StateError) {
 		return base
 	}
 	const amplitude = 26

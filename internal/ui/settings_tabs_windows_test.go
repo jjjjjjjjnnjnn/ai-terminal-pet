@@ -163,6 +163,7 @@ func TestSettingsApplyPublishes(t *testing.T) {
 		{"theme", settingsTheme, 1, func(s Settings) bool { return s.Theme == "paper" }},
 		{"text size", settingsTextSize, 2, func(s Settings) bool { return s.SettingsTextSize == textSizeLarge }},
 		{"hidden at launch", settingsHiddenAtLaunch, -1, func(s Settings) bool { return s.HiddenAtLaunch }},
+		{"animations", settingsAnimations, -1, func(s Settings) bool { return !s.Animations }},
 		{"keyboard", settingsKeyboard, -1, func(s Settings) bool { return s.SettingsKeyboard }},
 		{"tooltips", settingsTooltips, -1, func(s Settings) bool { return !s.SettingsTooltips }},
 		{"per-source colour", settingsPerSource, -1, func(s Settings) bool { return s.PerSourceColor }},

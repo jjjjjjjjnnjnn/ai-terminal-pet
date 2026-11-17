@@ -93,6 +93,7 @@ func (a *App) settingsView() settingsView {
 		Theme:           normalizeTheme(settings.Theme),
 		PerSource:       settings.PerSourceColor,
 		HiddenAtLaunch:  settings.HiddenAtLaunch,
+		Animations:      settings.Animations,
 		TextSize:        normalizeTextSize(settings.SettingsTextSize),
 		Keyboard:        settings.SettingsKeyboard,
 		Tooltips:        settings.SettingsTooltips,
@@ -903,6 +904,15 @@ func (a *App) settingsApply(control settingsControl, index int) {
 		a.postRefresh()
 	case settingsHiddenAtLaunch:
 		settings.HiddenAtLaunch = !settings.HiddenAtLaunch
+	case settingsAnimations:
+		settings.Animations = !settings.Animations
+		// Turning it on or off has to reach the running panel now: the pulse
+		// timer is installed by syncAnimation, and the orb's halo is read from
+		// the same field. Without this the switch would only take effect after
+		// a restart, which is the shape of bug the settings window exists to
+		// avoid.
+		a.syncAnimation()
+		a.postRefresh()
 	case settingsReset:
 		a.applyDefaultSettings()
 		applyAppearance(a.options.Settings.Theme, a.options.Settings.PerSourceColor)

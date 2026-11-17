@@ -1348,7 +1348,7 @@ func (a *App) syncAnimation() {
 	// installed timer, installed and removed on real transitions. It asks the
 	// receipt's frame (not just its deadline) so a pill whose session left its
 	// row stops costing ticks immediately.
-	want := !a.hidden && (a.state == session.StateWaitingPermission || a.state == session.StateError || a.tuck != a.tuckTarget || a.toast.frame(time.Now(), a.sessions).visible())
+	want := !a.hidden && ((a.options.Settings.Animations && (a.state == session.StateWaitingPermission || a.state == session.StateError)) || a.tuck != a.tuckTarget || a.toast.frame(time.Now(), a.sessions).visible())
 	interval := uint32(pulseInterval)
 	if a.tuck != a.tuckTarget {
 		interval = slideInterval
@@ -1859,7 +1859,7 @@ func (a *App) present() error {
 	// permission prompt from burning a core on GDI work forever.
 	reused := a.surface != nil && purePulseFrame(a.lastFrame, key, a.state, a.tuck, a.tuckTarget)
 	if reused {
-		opacity = pulseOpacity(a.options.Opacity, a.state, now)
+		opacity = pulseOpacity(a.options.Opacity, !a.options.Settings.Animations, a.state, now)
 	} else {
 		if a.surface != nil && (a.surface.width != width || a.surface.height != height) {
 			a.surface.close()
@@ -1889,6 +1889,7 @@ func (a *App) present() error {
 			SelectedRow: selectedRow,
 			Toast:       toast,
 			Tuck:        a.tuck,
+			Still:       !a.options.Settings.Animations,
 			Sliver:      a.sliverWidth(),
 			Dock:        a.dock,
 		})

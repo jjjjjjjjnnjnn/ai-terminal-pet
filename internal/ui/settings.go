@@ -75,6 +75,10 @@ type Settings struct {
 	// overlay, and someone who wants it out of the way until a session needs
 	// attention should not have to hide it every logon.
 	HiddenAtLaunch bool
+	// Animations lets the status disc breathe while a session waits or fails.
+	// On by default; it is the one thing in the panel that moves on its own, so
+	// "reduce motion" is a single switch rather than a list.
+	Animations bool
 	// SettingsTextSize scales the settings window: "small", "standard" or
 	// "large". A name, like Theme, because the factor is a rendering decision
 	// (settingsTextScales) and config.json should record the choice.
@@ -109,6 +113,7 @@ func DefaultSettings() Settings {
 		Theme:                 themeSlate,
 		PerSourceColor:        false,
 		HiddenAtLaunch:        false,
+		Animations:            true,
 		ForegroundAware:       true,
 		IdleSeconds:           defaultIdleSeconds,
 		DonePolicy:            string(DonePolicyBackground),

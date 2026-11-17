@@ -205,6 +205,8 @@ const (
 	KeySettingsPerSourceHint      = "settings.perSource.hint"
 	KeySettingsHiddenAtLaunch     = "settings.hiddenAtLaunch"
 	KeySettingsHiddenAtLaunchHint = "settings.hiddenAtLaunch.hint"
+	KeySettingsAnimations         = "settings.animations"
+	KeySettingsAnimationsHint     = "settings.animations.hint"
 	KeySettingsAppearanceNote     = "settings.appearance.note"
 	KeySettingsTextSize           = "settings.textSize"
 	KeySettingsTextSizeHint       = "settings.textSize.hint"
@@ -395,6 +397,8 @@ var dictEn = map[string]string{
 	KeySettingsPerSourceHint:      "Tint each row's source name",
 	KeySettingsHiddenAtLaunch:     "Start hidden",
 	KeySettingsHiddenAtLaunchHint: "Begin in the tray; a reporter brings it back",
+	KeySettingsAnimations:         "Animate the status disc",
+	KeySettingsAnimationsHint:     "Breathe while a session waits or fails; turn off to keep it still",
 	KeySettingsAppearanceNote:     "The palette applies to the panel and to this window. Every screenshot in the repository uses Slate.",
 	KeySettingsTextSize:           "Text size",
 	KeySettingsTextSizeHint:       "Scales this window; it shrinks on its own when the screen is too short",
@@ -576,6 +580,8 @@ var dictZhCN = map[string]string{
 	KeySettingsPerSourceHint:      "给每行的来源名加上该终端的颜色",
 	KeySettingsHiddenAtLaunch:     "启动时隐藏",
 	KeySettingsHiddenAtLaunchHint: "启动后先进托盘，有会话上报再出现",
+	KeySettingsAnimations:         "状态盘动效",
+	KeySettingsAnimationsHint:     "等待或出错时呼吸；关掉就保持静止",
 	KeySettingsAppearanceNote:     "调色板同时作用于面板与这个设置窗口。仓库里所有截图用的都是「石板」。",
 	KeySettingsTextSize:           "字号",
 	KeySettingsTextSizeHint:       "放大或缩小这个窗口；屏幕放不下时会自动降一档",
