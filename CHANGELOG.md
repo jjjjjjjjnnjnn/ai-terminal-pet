@@ -58,6 +58,23 @@
 1.0.19 的 OpenCode 路径是"两行"：先 `opencode plugin add`，再自己装面板。实测里没人会做第二步——
 本仓库自己的安装说明都得读第三遍才看明白该先做哪一步。现在第二行不存在了。
 
+### 1.0.20 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.20` | `pet-setup.exe` | 14,563,840 | `6A6ED477…` |
+| | `ai-terminal-pet-1.0.20-win-x64.zip`（17 文件） | 5,148,673 | `D0A44998…` |
+| | `ai-terminal-pet-1.0.20-linux-amd64.tar.gz` | 5,446,117 | `A15E20CF…` |
+| | `ai-terminal-pet-1.0.20-linux-arm64.tar.gz` | 4,954,786 | `F12D5FDC…` |
+| | `ai-terminal-pet-1.0.20-darwin-arm64.tar.gz` | 5,151,945 | `9BAE537E…` |
+| | `ai-terminal-pet-1.0.20-darwin-amd64.tar.gz` | 5,541,825 | `A48CA0FD…` |
+| `dsh-plugin-v1.2.33` | `dsh-ai-terminal-pet-1.2.33.tgz`（20 文件） | 2,094,777 | `F963E5F3…` |
+| npm `opencode-ai-terminal-pet@1.0.20` | `opencode-ai-terminal-pet-1.0.20.tgz`（8 文件，含面板） | 2,040,662 | `1CB5CF11…` |
+
+本机装机：`-VerifyOnly` **12/12**、`--doctor` **12 ok / 1 warn / 0 fail**、`--version` = 1.0.20、
+注册表 `DisplayVersion=1.0.20`。CI 在本轮抓到两次真问题（`*.exe` 把 vendored 面板吞掉、测试按 cwd 找 `vendor/`），
+都在同一个提交序列里修掉——这两条正是"打包后自检"存在的理由。
+
 ## [1.0.19] / [1.2.32] — 2026-11-17（doctor 找错了 OpenCode 包的位置 —— 1.0.18 的修正版）
 
 1.0.18 把 OpenCode 上报端变成了 npm 包，而它的 `--doctor` 在包形状下去 `<配置目录>/node_modules` 找安装证据。
