@@ -8,7 +8,8 @@
 
 ## 1. 当前状态（2026-11-17；浮窗 **1.0.18**、插件包 **1.2.31** 已发版；**§75 第 75 轮（OpenCode 上报端成为 npm 包）；§74 第 74 轮（门禁、卸载项、像素、设置入口、推广功课）；§71（三平台视觉不变量门禁）；§70（安装器写卸载项 + winget 清单）**）
 
-> 接手请先读本节与 **§74「一轮五件事，下个会话从这里开始」**（机器状态、外部世界谁在等谁、
+> 接手请先读本节与 **§75「OpenCode 接入变成一行 npm 安装」**（为什么它是一个发行缺口、npm 包为什么是生成的、
+> 两个坑、以及本机为什么故意还没换配置），再读 **§74「一轮五件事，下个会话从这里开始」**（机器状态、外部世界谁在等谁、
 > 下一步顺序，以及三条只有本人能做的事），再读 **§72「Linux/macOS 终于有设置入口」**
 > （终端编辑器与 `--set`、为什么手改 JSON 不算入口、三个"看起来对其实错"的地方，
 > 以及顺手修掉的 `100%!z(MISSING)oom`），再读 **§71「面板的像素第一次被断言」**
@@ -5012,6 +5013,68 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 75. 交接：OpenCode 接入变成一行 npm 安装 —— 下个会话从这里开始（2026-11-17，**已发版** 浮窗 **1.0.18** / 插件 **1.2.31** / npm 新包 **1.0.18**）
+
+这一轮只做一件事，但它是 §74.4 排在第一的那件：**OpenCode 上报端变成一个真能 `opencode plugin add` 的 npm 包**。
+过程里发现它不只是体验问题——是发行缺口（zip 装出来的目录里根本没有那个上报端文件）。
+
+### 75.1 机器状态（全部当场跑出来）
+
+| 项 | 值 |
+|---|---|
+| 分支 / HEAD | `main`，本轮代码提交 `d709d78`（发版提交见 §75.6 的两步） |
+| 版本 | 浮窗 **1.0.18**、插件 **1.2.31**、`opencode-ai-terminal-pet` **1.0.18**（与浮窗同号） |
+| tag | `pet-v1.0.18`、`dsh-plugin-v1.2.31` |
+| CI | 四条 job 全绿（windows / ubuntu / macOS / scan） |
+| 测试 | **498 个 `func Test`** / 15 包；Node 侧 `sync.test.mjs` 4/4、`server.test.mjs` 1/1、`check_versions.test` 27/27 |
+| 本机安装 | **1.0.18**：`-VerifyOnly` **12/12**、`--doctor` **12 ok / 1 warn / 0 fail**、`DisplayVersion=1.0.18` |
+| 门禁 | `check_versions` **21** 条、`check_facts` 11 条、`check_docs_links` **14 份**、`check_assets` 15 行、`check-tarball` 两个包都与工作区逐文件一致 |
+
+### 75.2 交付了什么
+
+| 面 | 内容 |
+|---|---|
+| 新包 | `packages/opencode-ai-terminal-pet`（零依赖，5 文件约 48 KB）：`server.js` + `protocol.cjs` **生成**自 `reporters/`，`sync.mjs --check` 进 CI |
+| 包内测试 | 临时 home + 真实端点 + 真快照；三平台各跑一次（Windows 管道 / Linux socket / macOS socket） |
+| `--doctor` | `reporters` 认第三种入口：裸包名、`@version`、`{package}` 对象；证据是 `node_modules/<name>/package.json` 的版本 |
+| `--connect` | 包名优先；`file://` 检出形态只在真有检出现时进备注 |
+| 版本策略 | 这个包**与浮窗同号**，`check_versions` 断言相等——一次浮窗发版就是一次 npm 发布 |
+
+### 75.3 两个坑（值得记住）
+
+1. **`"type": "module"` 与 CJS 核心天生冲突。** 唯一诚实的答案是核心以 `.cjs` 进包、由生成器保证逐字节；
+   手写第二份实现正是 §52.3 的成因，而且那次是静默的。
+2. **测试里不能等 `socket.end` 之后再回 `OK`。** Windows 命名管道没有半关闭，客户端 `end()` 之后再写就是
+   EPIPE。真实 Go 服务端是「读到换行就回」（`pipeserver/server.go` 的 `ReadSlice('\n')`），测试必须照它写。
+
+### 75.4 外部世界（复核时间 2026-11-17）
+
+| 对象 | 状态 | 谁动 |
+|---|---|---|
+| winget `microsoft/winget-pkgs#481818` | `OPEN` / `BLOCKED` / `REVIEW_REQUIRED`（auto-merge 已开） | 等志愿维护者批准 |
+| DSH 上游条目 | 1.2.31 的 bump PR 见 §75.6 | 等维护者合并 |
+| 目录站 | 站点仍是 1.2.27，`catalog-status` 判 upstream stale（对方夜间构建失败） | 等对方重建；**不为此重发版** |
+| awesome-opencode | **门槛是 ≥25★ 且仓库满 30 天**（它的 contributing.md 原文）；我们 1★ → 现在投了就是被关 | 等 star，不是等包 |
+| 社交预览图 | 本会话的 browse 扩展在线但 **Chrome 解析不了任何域名**（`ERR_NAME_NOT_RESOLVED`），上传未完成 | 网络恢复后重试，或本人手传 |
+
+### 75.5 下个会话从这里开始
+
+1. **把本机 OpenCode 也换成包名形态**（§75.6 特意没换，见那一条）。换完跑 `--doctor`，`reporters` 行应是
+   `opencode: ok - plugins[0] -> opencode-ai-terminal-pet@1.0.18`。
+2. **社交预览图上传**（`docs/assets/social-preview.png`，1280×640）。
+3. **brew / scoop**：`opencode` 与 winget 都已覆盖，这两个是下一层；先读它们的 manifest 要求再动手。
+4. **HN / V2EX 正文与 awesome-claude-code 表单**：只有本人能做（规则见 [docs/PROMOTION.md](PROMOTION.md)）。
+
+### 75.6 发版记录与一个"故意没做"
+
+- 代码提交 `d709d78`（包 + doctor/connect + 门禁 + 版本 + vendor + 文档），tag 打在紧随其后的文档提交上；
+  索引 `source.commit` 由 B 提交钉上（git 无法在一个提交里引用自己）。
+- **本机 `opencode.json` 故意仍指向 `~/.config/opencode/plugins/terminal-pet`（仓库检出）。** 理由：这一轮要在
+  真实的 OpenCode 会话里验证的是**新包**，而换配置会让当前会话的插件重载一次；先确认包在 npm 上装得上、doctor
+  认得出（两件事都当场验过），再换。换法是删掉 `plugins` 里那条 `file://…`、换成 `"opencode-ai-terminal-pet"`，
+  或者直接 `opencode plugin add opencode-ai-terminal-pet`。
+- 上游条目：`bump-tarball-1.2.31` 的 PR 号与状态见本节下方（开出来之后补）；只换 `tarball` 一行。
 
 ## 74. 交接：一轮五件事（门禁、卸载项、像素、设置入口、推广功课）—— 下个会话从这里开始（2026-11-17，**已发版** 浮窗 **1.0.17** / 插件 **1.2.30**）
 

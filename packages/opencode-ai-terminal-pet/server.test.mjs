@@ -28,10 +28,20 @@ const OVERRIDES = ['USERPROFILE', 'HOME', 'LOCALAPPDATA', 'XDG_DATA_HOME', 'XDG_
 
 function redirectHome(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'atp-opencode-'))
+  // The endpoint is a unix socket on POSIX, and sun_path is 104 bytes (108 on
+  // Linux, 104 on macOS) including the terminator. os.tmpdir() on macOS is a
+  // per-user path under /var/folders/..., and three directory levels on top of
+  // it is enough to cross that line - CI found this the first time the test ran
+  // on a Mac (listen EINVAL). So the runtime directory gets a short root of its
+  // own, and the length is asserted below rather than trusted.
+  const shortRoot =
+    process.platform === 'win32'
+      ? root
+      : mkdtempSync(path.join(existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'atp-'))
   const directories = {
     home: path.join(root, 'home'),
     appData: path.join(root, 'appdata'),
-    runtime: path.join(root, 'run')
+    runtime: path.join(shortRoot, 'run')
   }
   for (const directory of Object.values(directories)) mkdirSync(directory, { recursive: true })
   const saved = {}
@@ -53,6 +63,7 @@ function redirectHome(t) {
       else process.env[name] = saved[name]
     }
     rmSync(root, { recursive: true, force: true })
+    if (shortRoot !== root) rmSync(shortRoot, { recursive: true, force: true })
   })
   return { root, ...directories }
 }
@@ -82,6 +93,9 @@ test('the packaged entry point reports real payloads over a real endpoint', asyn
       endpoint.startsWith(path.join(runtime, 'ai-terminal-pet-v1-')),
       `endpoint ${endpoint} escaped the temporary runtime directory`
     )
+    // sun_path is 104 bytes on macOS and 108 on Linux, terminator included; a
+    // longer path fails at listen() with EINVAL, which is how CI caught this.
+    assert.ok(endpoint.length < 104, `endpoint path is ${endpoint.length} bytes, too long for sun_path`)
   }
 
   const lines = []
