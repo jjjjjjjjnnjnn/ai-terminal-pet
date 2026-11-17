@@ -91,9 +91,9 @@
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
   三个二进制合计 **12,137,472 B** = 11.58 MiB。安装目录里多了第 12 件制品：`install.ps1` 的副本。
 - **分发（两条线 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.28**；`dsh-plugin-v1.2.28` 的 Release 资产 `dsh-ai-terminal-pet-1.2.28.tgz`
-    **2,086,438 B / sha256 `E3259B96…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.16`）；上游条目跟进 PR 见 §72.5。
+  - 插件线：npm `latest` = **1.2.29**；`dsh-plugin-v1.2.29` 的 Release 资产 `dsh-ai-terminal-pet-1.2.29.tgz`
+    **2,086,439 B / sha256 `059EF47A…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.16`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §72.5。
   - 浮窗线：`pet-v1.0.16` 的六个资产——`pet-setup.exe` **14,540,800 B / `5A4462CB…`**、
     `ai-terminal-pet-1.0.16-win-x64.zip` **5,137,799 B / `F1F2A578…`（17 文件）**，以及
     linux-{amd64,arm64} 与 darwin-{arm64,amd64} 四个 tar.gz。
@@ -5066,17 +5066,28 @@ Linux 与 macOS 只能手改 `config.json`，而 `--settings` 在那两个平台
 **macOS**：没有实机；编辑器与 Linux 共用同一份代码与测试，差异只在 `IsTerminal` 的 ioctl
 （`TIOCGETA`），并且它和其他 `func Test` 一起在 `macos-latest` 上编译与运行。
 
-### 72.5 发版记录（2026-11-17）
+### 72.5 发版记录（2026-11-17；插件线发了两次）
 
-- 两个 tag：`pet-v1.0.16`、`dsh-plugin-v1.2.28`。插件必须跟发的原因同 §70.5：版本常量编进浮窗二进制，
-  `1.0.15 → 1.0.16` 必改字节，`vendor/AI-Terminal-Pet.exe` 与源码摘要随之前移。
-- 资产：zip **5,137,799 B / `F1F2A578…`（17 文件）**、`pet-setup.exe` **14,540,800 B / `5A4462CB…`**、
-  `dsh-ai-terminal-pet-1.2.28.tgz` **2,086,438 B / `E3259B96…`（20 文件）**，另有四个 POSIX tar.gz。
-- 上游条目 PR：awesome-dsh-plugin [#16228](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16228)
-  （ump-tarball-1.2.28，单文件 +1 −1，MERGEABLE）；--check 报 in flight（健康状态）。
-- 按 §67.4 的教训：**四个 job 在同一个提交（8a62017）上全绿之后才打 tag**。
-- 资产复验：pet-setup.exe 200 / 14,540,800 B / 5A4462CB…、zip 200 / 5,137,799 B / F1F2A578…、
-  tgz 200 / 2,086,438 B / E3259B96…（三个都从公网 URL 下载回来核对过）。
+- 两个 tag：`pet-v1.0.16`（浮窗）、`dsh-plugin-v1.2.28` 与 `dsh-plugin-v1.2.29`（插件线）。
+  插件必须跟发的原因同 §70.5：版本常量编进浮窗二进制，`1.0.15 → 1.0.16` 必改字节，
+  `vendor/AI-Terminal-Pet.exe` 与源码摘要随之前移。
+- 浮窗资产：zip **5,137,799 B / `F1F2A578…`（17 文件）**、`pet-setup.exe` **14,540,800 B / `5A4462CB…`**，
+  另有四个 POSIX tar.gz；三个都从公网 URL 下载回来核对过。
+- **插件线为什么发两次**：1.2.28 的 **Release 资产**里的随包 README 仍写着 `dsh-plugin-v1.2.27` ——
+  `npm pack` 跑在"把版本号写进 `packages/…/README*.md`"**之前**，而 `npm publish` 在发布时重新打包，
+  所以 npm 上那份反而是对的（两者差 1 字节；解包后逐文件比对，只有两个 README 不同）。
+  资产不可变 → 按本仓库规矩再发 **1.2.29**（功能零差异，`lib/`、`vendor/`、`protocol.js` 与 1.2.28 相同）。
+  `dsh-plugin-v1.2.29` 的 tgz **2,086,439 B / `059EF47A…` / 20 文件**，从 npm 拉回来**逐字节相同**。
+- **顺序是这一轮的 bug，工作区自检看不见它**：改完版本号之后工作区是自洽的，只有看**产物**才能发现。
+  所以新增 `tools/check-tarball.mjs`（node 的 zlib + 40 行 tar 解析，零依赖）：解出 `.tgz` 逐文件与工作区比对，
+  并按 `files` 白名单判断"哪些文件本来就该被打包"。它第一次对真实包运行时报了 `scripts/` 与 `verify.mjs`
+  "缺失"——那正是比较器必须扛住的那类错。已写进 AGENTS 的发版步骤、[docs/UPSTREAM.md](UPSTREAM.md) §7 的清单
+  与 CI（它自己的规则测试）。
+- 上游条目 PR：awesome-dsh-plugin [#16235](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16235)
+  （`bump-tarball-1.2.29`，单文件 `+1 −1`）；1.2.28 的
+  [#16228](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16228) 已按"被取代"关闭，
+  保持同时只有一条 bump 在飞。
+- 按 §67.4 的教训：**四个 job 在同一个提交上全绿之后才打 tag**（浮窗在 `8a62017`，插件重发在 `4fcf8d3`）。
 
 ### 72.6 顺手修掉的一个老显示 bug
 
