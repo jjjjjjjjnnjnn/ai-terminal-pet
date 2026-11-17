@@ -1,0 +1,54 @@
+name: Something it should do
+description: A terminal it should support, a behaviour that is wrong for your workflow, a setting that is missing
+title: ""
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are the other half of this project: most of what is here came from
+        somebody saying "this is wrong for my workflow", not from a roadmap.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The workflow, not the solution. "I run four agents across two monitors" beats "add a slider".
+      placeholder: I keep two agents on the second monitor and the panel is on the first one, so I never see it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today instead
+      description: The workaround you are living with, if any. It tells us how much the gap costs.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which part
+      multiple: true
+      options:
+        - The panel (compact strip / expanded list)
+        - The settings window
+        - The CLI (--json, --doctor, --connect, --settings, --set)
+        - A reporter (Claude Code / OpenCode / Antigravity / DeepSeek Harness / generic)
+        - Install or packaging
+        - Something else
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Where you would use it
+      multiple: true
+      options:
+        - Windows
+        - Linux (X11)
+        - macOS
+    validations:
+      required: true

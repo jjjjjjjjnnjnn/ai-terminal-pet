@@ -1,0 +1,84 @@
+name: Something is broken
+description: The panel, a reporter, an install, or a terminal that does not show up
+title: ""
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Two things make the difference between "works for me" and a fix:
+        the version, and what `--doctor` prints on your machine.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, in your own words. A screenshot or GIF is worth a paragraph.
+      placeholder: The panel shows a session as waiting, but the terminal is already back at the prompt.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From `ai-terminal-pet --version`, or the top right of the settings window.
+      placeholder: ai-terminal-pet 1.0.17
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux (X11)
+        - Linux (Wayland / XWayland)
+        - macOS
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host
+    attributes:
+      label: Which terminal / agent
+      multiple: true
+      options:
+        - DeepSeek Harness (plugin)
+        - Claude Code (hook)
+        - OpenCode (plugin)
+        - Antigravity (statusline + hook)
+        - My own reporter / generic.js
+        - Not about a specific terminal
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `ai-terminal-pet --doctor`
+      description: Paste it as-is. It is plain text and contains no prompt or code content.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. open two Claude Code sessions in different tabs
+        2. let one hit a permission prompt
+        3. ...
+    validations:
+      required: false

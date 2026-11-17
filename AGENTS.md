@@ -190,7 +190,7 @@ Two conventions in those commands are load-bearing, not style:
 | I am working on GitHub email, commit identity, signing or account settings | [docs/HANDOVER.md](docs/HANDOVER.md) §34 — the measured identity table, and the one irreversible decision (rewriting history) |
 | I am writing my own reporter | [docs/PROTOCOL.md](docs/PROTOCOL.md) — the wire protocol contract |
 | **What works on which OS, and how was each claim measured?** | **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — the per-capability table (the reporting path is three platforms, the panel is one), what is unverified and why, and the two CI lists that pin it |
-| I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/LAUNCH.md](docs/LAUNCH.md) — the only place outward-facing copy lives, with the measured numbers it must not exceed |
+| I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/PROMOTION.md](docs/PROMOTION.md) has the paste-ready copy; [docs/LAUNCH.md](docs/LAUNCH.md) has the measured numbers it must not exceed and the posting history |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |
 | Frozen historical documents | [docs/archive/README.md](docs/archive/README.md) |
