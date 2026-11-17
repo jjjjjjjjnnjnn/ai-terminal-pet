@@ -8,7 +8,8 @@
 
 ## 1. 当前状态（2026-11-17；浮窗 **1.0.17**、插件包 **1.2.30** 已发版；**§71 第 71 轮（三平台视觉不变量门禁）；§70 第 70 轮（安装器写卸载项 + winget 清单）；§69（把文档里的数字变成门禁）；§68 公开文案重做**）
 
-> 接手请先读本节与 **§72「Linux/macOS 终于有设置入口」**
+> 接手请先读本节与 **§74「一轮五件事，下个会话从这里开始」**（机器状态、外部世界谁在等谁、
+> 下一步顺序，以及三条只有本人能做的事），再读 **§72「Linux/macOS 终于有设置入口」**
 > （终端编辑器与 `--set`、为什么手改 JSON 不算入口、三个"看起来对其实错"的地方，
 > 以及顺手修掉的 `100%!z(MISSING)oom`），再读 **§71「面板的像素第一次被断言」**
 > （三平台视觉不变量门禁：断言什么、为什么不比像素），再读 **§70「安装器写卸载项」**
@@ -5005,6 +5006,83 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 74. 交接：一轮五件事（门禁、卸载项、像素、设置入口、推广功课）—— 下个会话从这里开始（2026-11-17，**已发版** 浮窗 **1.0.17** / 插件 **1.2.30**）
+
+这一轮会话跨了五个主题，每一件都单独发过版或单独记过节（§69–§73），所以这里**只写"现在在哪、下一步做什么"**，
+不重复已经写清楚的 runbook。
+
+### 74.1 机器状态（全部当场跑出来）
+
+| 项 | 值 |
+|---|---|
+| 分支 / HEAD | `main` 与 `origin/main` 同步，HEAD `c5e9cb1` |
+| 版本 | 浮窗 **1.0.17**、插件 **1.2.30**；npm `latest` = **1.2.30** |
+| tag | `pet-v1.0.17`、`dsh-plugin-v1.2.30`（前一个插件 tag `v1.2.29` 是"随包 README 指向旧版本"的补救，见 §72.5） |
+| CI | 最近一次 Run 四条 job 全绿（windows / ubuntu / macOS / scan） |
+| 测试 | **495 个 `func Test`** / 15 包；`go test -count=1 ./...` 全过 |
+| 本机安装 | 就是 **1.0.17**：`-VerifyOnly` **12/12**、`--doctor` **12 ok / 1 warn / 0 fail** |
+| 门禁 | `check_versions` 20 条、`check_facts` 11 条、`check_docs_links` **13 份**、`check_assets` 15 行、`check-tarball` 与工作区逐文件一致 |
+
+### 74.2 这一轮交付了什么（各节详情）
+
+| 轮次 | 交付 | 节 |
+|---|---|---|
+| 69 | `tools/check_facts.mjs`：文档里的数字与代码不一致就红；`check_docs_links.py` 开始查 `<a href>` 与 HTML 锚点 | §69 |
+| 70 | 安装器写"设置 › 应用"那一行 + 把 `install.ps1` 复制进安装目录（删掉 zip 也能卸）；`pet-setup --uninstall --force`；`-VerifyOnly` 11→12 件 | §70 |
+| 71 | `internal/ui/render_invariants_test.go`：三平台**视觉不变量**门禁（不比像素）；L4 结案（实测最坏帧 ~4 ms，不做脏区重绘） | §71 |
+| 72 | Linux/macOS 的设置入口：`internal/settingscli` 终端编辑器 + `--set key=value`（拒绝而不是规范化）；顺手修掉 `100%!z(MISSING)oom` | §72 |
+| 72.5 | **插件线发了两次**：1.2.28 的随包 README 指向 1.2.27（打包早于改版本号）→ 发 1.2.29；并新增 `tools/check-tarball.mjs` | §72.5 |
+| 73 | 设置界面底部 **★ Star on GitHub / Report an issue** + 头部版本号；三平台终端版打印同样的链接 | §73 |
+| 73+ | 推广功课：**调研了 HN / V2EX / awesome 列表的实际规则**，写成 [docs/PROMOTION.md](PROMOTION.md)；仓库描述重写、topics 15→20、新增两个 issue 模板 | [PROMOTION.md](PROMOTION.md) |
+
+### 74.3 外部世界（谁在等谁）
+
+| 对象 | 状态（2026-11-17 复核） | 谁动 |
+|---|---|---|
+| **winget** [microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818) | CLA 已签；**`01`–`10` 号校验全过**（含真跑静默安装/卸载的 `08`）；标签 `New-Package` + `Validation-Completed` + `Azure-Pipeline-Passed`；机器人已开 **auto-merge（squash）**；`reviewDecision: REVIEW_REQUIRED` | **等社区志愿维护者批准**。批准后 auto-merge 自己合并 |
+| **DSH 上游条目** [#16249](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16249) | OPEN / `MERGEABLE` / 单文件 `+1 −1`；`--check` 报 in flight（健康）；#16228、#16235 已按"被取代"关闭 | 等维护者合并 |
+| **目录站点**（`node tools/catalog-status.mjs`） | 站点行仍是 `version 1.2.27`、`tarball 1.2.27`；`[upstream]`：对方夜间构建没跑成功；同一窗口下 **npm 侧下载量 3,455 → 4,586**（最后一天 1,131 此前没被算进去） | 等对方重建。**不要为此重发版** |
+
+**一个对推广有用的数字**：`catalog-status` 现在把同一窗口的 npm 下载量算成 **4,586**（此前记的 3,455 少了窗口最后一天，窗口是 `2026-10-18 → 11-16`）。引用时用 npm 的数并写窗口，不要用站点卡片上的 3,455。
+
+### 74.4 下个会话从这里开始（按价值排序）
+
+1. **把上报端做成一个真能 `opencode plugin add` 的 npm 包**（这一轮调研发现的唯一实质缺口）。
+   - 现状：OpenCode 接入是仓库里的 `reporters/opencode.js`，用户得手动放进 `~/.config/opencode/plugins/`。
+   - 目标：`opencode plugin add opencode-ai-terminal-pet` 一行装；包内就是同一份上报端 + `reporters/protocol.js`。
+   - 顺带解锁：**awesome-opencode（11k★）只按 npm 插件收录**。
+   - `opencode.ai/docs/plugins/` 的规则：插件可以是包名或 git spec；`opencode plugin add` 不接受 tarball 与 alias。
+2. **社交预览图上传**：`docs/assets/social-preview.png`（1280×640）已生成，但 Settings → Social preview **没有 API**。
+   本会话的浏览器扩展是 `paired-offline`，没代传。扩展一上线就传，或本人手传。
+3. **awesome-claude-code 收录**（58k★）：只能**人手网页表单**、一次一个、描述单行无 emoji。
+   那行字在 `docs/PROMOTION.md` §6（我们按"14 天且活跃"过线，不需要 100★）。
+4. **winget 合并后**：往根 README 安装段加 `winget install jjjjjjjjnnjnn.AI-Terminal-Pet`（根 README 不在 tarball 里，**不需要**发插件新版）。
+5. **HN / V2EX 发声**：正文必须本人写，`docs/PROMOTION.md` 只给结构、事实卡与会被问到的问题。
+
+### 74.5 只有本人能做的三件事
+
+1. **HN / V2EX 的正文**：HN 指南明写 "don't put generated text in HN posts"，dang 的 tips 更进一步——
+   "Don't use an LLM to generate any of it (not even a tiny bit, including to edit or spruce it up)"；
+   V2EX About 同样写着「请不要把 AI 生成的内容发送到这里」。所以那份文档里**没有**可粘贴的 HN/V2EX 成稿。
+2. **awesome-claude-code 的表单**（人手提交是硬要求）。
+3. **社交预览图上传**（或让浏览器的 browse 配置上线，我代传）。
+
+### 74.6 不要重做的事（每一条都有代价）
+
+- **不要给 HN / V2EX 用 AI 稿**，也不要让它润色——对方明文规定，被抓到是信誉问题。
+- **不要请人点赞/顶帖**；不要用项目名当 HN 用户名（dang 的 tips 原话：显得像品牌在推销）。
+- **不要重传或改写已发布的 Release 资产**（1.2.28 的教训：宁可发 1.2.29）。
+- **不要在 winget 合并前**在 README 写 `winget install`。
+- **不要写任何无法证明的使用量**（没有遥测；只有 GitHub stars / release 下载 / npm 下载三种公开计数）。
+- **不要为目录站的滞后重发版**：`catalog-status` 判的是 `[upstream]`。
+
+### 74.7 这一轮学到的两条（已各自进门禁）
+
+1. **打包顺序是产物问题，不是工作区问题**：1.2.28 的 tgz 早于"把版本号写进随包 README"，工作区自洽、产物过期。
+   只有看产物才能发现 → `tools/check-tarball.mjs`（zlib + 40 行 tar，零依赖；按 `files` 白名单判断该打包什么）。
+2. **`App` 是分平台类型**：页脚的点击测试用了 `*App`，Windows 上过、Linux/macOS 的 `go vet` 红。
+   共享的是布局，落到 Windows 的只是那一脚点击 → 那条测试进 `//go:build windows`，其余继续三平台跑。
 
 ## 73. 交接：设置界面里的出口 —— 两个链接与一个版本号（2026-11-17，第 73 轮；浮窗 **1.0.17** / 插件 **1.2.30**）
 
