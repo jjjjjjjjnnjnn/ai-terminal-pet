@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"ai-terminal-pet/internal/app"
 	"ai-terminal-pet/internal/config"
 	"ai-terminal-pet/internal/home"
 	"ai-terminal-pet/internal/i18n"
@@ -60,9 +61,9 @@ func controlSettingsTerminal(extra []string) error {
 	lang := settingsLanguage(value)
 	fmt.Fprintf(os.Stdout, "%s\n\n", path)
 	if !settingscli.IsTerminal(os.Stdin) {
-		return settingscli.Render(os.Stdout, value, lang)
+		return settingscli.Render(os.Stdout, value, lang, app.Version)
 	}
-	return settingscli.Run(os.Stdin, os.Stdout, value, lang, func(next config.Config) error {
+	return settingscli.Run(os.Stdin, os.Stdout, value, lang, app.Version, func(next config.Config) error {
 		return config.Save(path, next)
 	})
 }

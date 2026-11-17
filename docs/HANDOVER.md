@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-17；浮窗 **1.0.16**、插件包 **1.2.29** 已发版；**§71 第 71 轮（三平台视觉不变量门禁）；§70 第 70 轮（安装器写卸载项 + winget 清单）；§69（把文档里的数字变成门禁）；§68 公开文案重做**）
+## 1. 当前状态（2026-11-17；浮窗 **1.0.17**、插件包 **1.2.30** 已发版；**§71 第 71 轮（三平台视觉不变量门禁）；§70 第 70 轮（安装器写卸载项 + winget 清单）；§69（把文档里的数字变成门禁）；§68 公开文案重做**）
 
 > 接手请先读本节与 **§72「Linux/macOS 终于有设置入口」**
 > （终端编辑器与 `--set`、为什么手改 JSON 不算入口、三个"看起来对其实错"的地方，
@@ -65,37 +65,38 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.16`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.29`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.16` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.28`。
-  **工作区与本机安装目录已经与 `1.0.16` / `1.2.28` 同步**：`bin/`、
+- **版本**：浮窗 **`1.0.17`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.30`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.17` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.30`。
+  **工作区与本机安装目录已经与 `1.0.17` / `1.2.30` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
-  （`AI-Terminal-Pet.exe` **4,753,408 B**，sha256 `52FCA73C…`）。
+  （`AI-Terminal-Pet.exe` **4,759,040 B**，sha256 `396605B9…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**488 个** `func Test`，
-  本轮（第 72 轮）+18 来自终端设置入口：`internal/settingscli` 与 `cmd/ai-terminal-pet` 的 `--set` 规则）；CI 四条 job
-  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.16 的提交上全绿（见 §72.6）；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**495 个** `func Test`，
+  本轮（第 73 轮）+7 来自设置界面的支持链接与版本号）；CI 四条 job
+  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.17 的提交上全绿（见 §73.4）；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 与 1.0.16 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
-  （`node --test tools/check_versions.test.mjs` 26/26）、**`tools/check_facts.mjs` 11 条一致**
-  （§69 新增：`func Test` 数量、有测试的包数、Go 包总数、`--doctor` 项数写错就红）、
-  `tools/catalog-status.test.mjs` **12/12**、`tools/upstream-entry.test.mjs` 26/26；
-  `tests/fresh-machine.mjs --no-overlay` **183/183**（43.8 s）；
-  `tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.16 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  `vendor.mjs --check` 与 1.0.17 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
+  （`node --test tools/check_versions.test.mjs` 26/26）、**`tools/check_facts.mjs` 11 条一致**、
+  `tools/catalog-status.test.mjs` **12/12**、`tools/upstream-entry.test.mjs` 26/26、
+  `tools/check-tarball.test.mjs` 8/8；
+  `tests/fresh-machine.mjs --no-overlay` **183/183**；
+  `tools/check_docs_links.py` 12 份全解、`tools/check_assets.py` 15 行一致；
+  `govulncheck` + `gosec` 在 CI 的 scan job 跑。
+  1.0.17 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.16`，注册表那一行 `DisplayVersion=1.0.16`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.16 实测）：非测试 **151 文件 / 27,897 行**、
-  测试 **98 文件 / 14,416 行**、**488 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,753,408 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `52FCA73C…`）、
+  `--version` 报 `ai-terminal-pet 1.0.17`，注册表那一行 `DisplayVersion=1.0.17`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.17 实测）：非测试 **154 文件 / 28,156 行**、
+  测试 **99 文件 / 14,610 行**、**495 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,759,040 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `396605B9…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
-  三个二进制合计 **12,137,472 B** = 11.58 MiB。安装目录里多了第 12 件制品：`install.ps1` 的副本。
+  三个二进制合计 **12,143,104 B** = 11.58 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
 - **分发（两条线 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.29**；`dsh-plugin-v1.2.29` 的 Release 资产 `dsh-ai-terminal-pet-1.2.29.tgz`
-    **2,086,439 B / sha256 `059EF47A…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.16`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §72.5。
-  - 浮窗线：`pet-v1.0.16` 的六个资产——`pet-setup.exe` **14,540,800 B / `5A4462CB…`**、
-    `ai-terminal-pet-1.0.16-win-x64.zip` **5,137,799 B / `F1F2A578…`（17 文件）**，以及
+  - 插件线：npm `latest` = **1.2.30**；`dsh-plugin-v1.2.30` 的 Release 资产 `dsh-ai-terminal-pet-1.2.30.tgz`
+    **2,089,727 B / sha256 `EFDD7C10…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.17`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §73.4。
+  - 浮窗线：`pet-v1.0.17` 的六个资产——`pet-setup.exe` **14,546,432 B / `4202DB66…`**、
+    `ai-terminal-pet-1.0.17-win-x64.zip` **5,140,377 B / `A31E93FA…`（17 文件）**，以及
     linux-{amd64,arm64} 与 darwin-{arm64,amd64} 四个 tar.gz。
   - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
     `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
@@ -5004,6 +5005,60 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 73. 交接：设置界面里的出口 —— 两个链接与一个版本号（2026-11-17，第 73 轮；浮窗 **1.0.17** / 插件 **1.2.30**）
+
+这一版只加"从产品内部走到项目所在地"的路。一个装得上、跑得好、但没有任何出口的工具，用户想反馈要自己去搜仓库；
+页脚把这件事变成一次点击，而把它做在**设置界面**里（不是 README 里）意味着只有真的用过的人才会看到。
+
+### 73.1 三个面
+
+| 面 | 内容 |
+|---|---|
+| Windows 四页签窗口 | 分隔线下方一排：**★ Star on GitHub** 与 **Report an issue**；悬停变强调色 + 下划线；**Tab 也能走到**；点击用 `ShellExecuteW` 打开默认浏览器 |
+| 头部副标题 | 从"AI Terminal Pet"变成"AI Terminal Pet · v1.0.17"：报 bug 时版本号应该伸手可得 |
+| Linux/macOS 终端设置 | 同一组链接以**可复制文本**打印在表尾，并附版本号；终端里**不**主动拉起浏览器 |
+
+URL 只写一次（新包 `internal/project` 的 `RepoURL` / `IssuesURL`），三处引用同一份常量。
+
+### 73.2 三个"看起来对、其实错"的地方
+
+1. **版本号不能挤在页脚右边。** 第一版把页脚分成"两个链接 + 右对齐版本"，而页脚可用宽度只有
+   `500 − 20 − 176 = 304` 逻辑像素；`150 + 8 + 130 + 8 = 296` 之后只剩 **8 px** 给版本，
+   测试立刻报"版本那里 0 个亮像素"。正解是把版本放到**头部副标题**：宽度足够，而且"有没有画"
+   从一个像素断言变成**纯函数**断言（`settingsSubtitle(lang, version)`）。
+2. **打开浏览器的动作必须能注入。** 点链接的测试若调用真实实现，CI 上会弹浏览器（或在没有浏览器的机器上等待）。
+   所以 `ui.Options.OpenExternal` 由 app 层注入；**nil 表示"这个平台没有开浏览器的办法"，
+   此时什么都不做**——不是 panic，也不是假装成功。
+3. **终端里不自动开浏览器。** `--settings` 会被管道化（`| less`、CI、ssh 抓输出），
+   一个被要求打表的程序替用户开窗口是意外行为；终端版只打印 URL。
+
+### 73.3 本轮实测
+
+- Windows：`TestRenderSettingsPreview` 生成的 `settings-general-en.png` 可见页脚；六个单测覆盖
+  几何（在最后一排下方、不越界、两链接不重叠）/ 命中（各自命中、间隙不误命中）/ Tab 顺序（最后两站）/
+  `settingsApply` 打开**正确 URL**（注入 opener，不真开浏览器）/ 悬停多出像素 /
+  副标题带版本且空版本不写 `v`。
+- Linux（交叉编译的真二进制，WSL）：`--settings < /dev/null` 表尾三行是
+  `★ Star on GitHub  <repo>` / `Report an issue  <issues/new>` / `v1.0.17`。
+- 本机装机：`-VerifyOnly` **12/12**、`--doctor` **12 ok / 1 warn / 0 fail**、`--version` = `1.0.17`。
+- `go test ./...` 全过（本轮 +7 个 `func Test`）。
+
+### 73.4 发版记录（2026-11-17）
+
+- tag：`pet-v1.0.17`、`dsh-plugin-v1.2.30`（插件跟发的原因同 §70.5：版本常量编进浮窗二进制）。
+- 资产：zip **5,140,377 B / `A31E93FA…`（17 文件）**、`pet-setup.exe` **14,546,432 B / `4202DB66…`**、
+  `dsh-ai-terminal-pet-1.2.30.tgz` **2,089,727 B / `EFDD7C10…`（20 文件）**，另有四个 POSIX tar.gz。
+- **打包顺序**：`npm pack` 在"版本号与随包 README 都改完"之后执行，并用 `node tools/check-tarball.mjs`
+  确认 tgz 与工作区逐文件一致（这条规矩是 §72.5 换来的）。
+- 按 §67.4 的教训：**四个 job 在同一个提交上全绿之后才打 tag**。
+
+### 73.5 这一轮没有做的事
+
+- **没有任何"统计/回访"**：没有启动上报、没有首次运行计数器、没有"你从哪来"的参数。页脚只是两个链接，
+  URL 是常量，点击之外没有别的动作。这是项目"不出网"承诺的一部分，不是省略。
+- **macOS 的页脚没有实机验证**（无苹果硬件）；它与 Linux 共用同一份 `settingscli`。
+- **没有把链接做进托盘菜单/浮窗本体**：浮窗是"一眼可辨的状态条"，不是菜单；设置界面才是它该在的地方。
 
 ## 72. 交接：Linux/macOS 终于有设置入口（终端编辑器 + `--set`），以及顺手修掉的一个"100%"（2026-11-17，第 72 轮；浮窗 **1.0.16** / 插件 **1.2.28**）
 

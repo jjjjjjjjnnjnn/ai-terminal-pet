@@ -14,6 +14,13 @@ type Options struct {
 	// AutoApproveTimeoutSec is the countdown length for auto-approve.
 	// Out-of-range values fall back to 5 seconds.
 	AutoApproveTimeoutSec int
+	// Version is the build string the settings window prints in its footer. It is
+	// passed in rather than imported: internal/app owns the version, and the ui
+	// package must not depend on it to draw a window.
+	Version string
+	// OpenExternal opens a URL in the user's browser. Nil means this platform
+	// cannot do that, and the settings footer then does nothing.
+	OpenExternal func(string) error
 	// OpenSettings opens the settings window right after the first paint, so
 	// `--settings` works even when it had to start the overlay itself.
 	OpenSettings bool

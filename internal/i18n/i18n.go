@@ -270,6 +270,14 @@ const (
 	KeySettingsTestDoneHint    = "settings.test.done.hint"
 	KeySettingsTestPlay        = "settings.test.play"
 
+	// The footer of every settings surface. Two links and a version, because
+	// both are things a user cannot get to from inside the app otherwise: the
+	// repository is where the bug tracker is, and a version string is what a
+	// bug report has to start with.
+	KeySettingsStar    = "settings.support.star"
+	KeySettingsIssue   = "settings.support.issue"
+	KeySettingsStarTip = "settings.support.star.hint"
+
 	KeyBalloonDoneNamed  = "balloon.doneNamed"
 	KeyBalloonMutedTitle = "balloon.mutedTitle"
 	KeyBalloonMutedBody  = "balloon.mutedBody"
@@ -447,6 +455,10 @@ var dictEn = map[string]string{
 	KeySettingsTestDoneHint:    "The completion balloon with the timbre of the current Done setting",
 	KeySettingsTestPlay:        "Send",
 
+	KeySettingsStar:    "\u2605 Star on GitHub",
+	KeySettingsIssue:   "Report an issue",
+	KeySettingsStarTip: "No account, no telemetry: the links just open your browser",
+
 	KeyBalloonDoneNamed:  "Finished",
 	KeyBalloonMutedTitle: "Session muted",
 	KeyBalloonMutedBody:  "Its alerts are off until you unmute the row",
@@ -623,6 +635,10 @@ var dictZhCN = map[string]string{
 	KeySettingsTestDone:        "试发：回复完成",
 	KeySettingsTestDoneHint:    "用当前「回复完成」设置的音色发一条完成气泡",
 	KeySettingsTestPlay:        "发送",
+
+	KeySettingsStar:    "\u2605 给个 Star",
+	KeySettingsIssue:   "反馈问题",
+	KeySettingsStarTip: "不需要账号、没有遥测：点它只是打开浏览器",
 
 	KeyBalloonDoneNamed:  "已完成",
 	KeyBalloonMutedTitle: "该会话已静音",

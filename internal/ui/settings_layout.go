@@ -36,6 +36,16 @@ const (
 	settingsContentLeft  = 176
 	settingsRowsTop      = 70
 	settingsPanelRadius  = 14
+
+	// The footer: two links and the version, under a divider. It exists because
+	// both are things a user cannot reach from inside the app - the repository is
+	// where the issue tracker lives, and a version string is the first line of any
+	// useful bug report. Nothing here talks to the network; a click opens the
+	// user's browser and nothing else happens.
+	settingsFooterGap    = 10
+	settingsFooterHeight = 26
+	settingsLinkWidth    = 150
+	settingsIssueWidth   = 130
 )
 
 // settingsContentWidth is the width of the right-hand column.
@@ -181,6 +191,12 @@ const (
 	settingsMuteClear
 	settingsTestWaiting
 	settingsTestDone
+
+	// The footer links. They are controls rather than drawing because they have
+	// to be hoverable, focusable by Tab and clickable, and every one of those is
+	// what a settingsControl already means.
+	settingsStar
+	settingsIssue
 )
 
 // settingsTabControl maps a sidebar index onto its control id.
@@ -317,6 +333,13 @@ type settingsGeometry struct {
 	// contentHeight is where the last row ends, which is what "does this tab fit
 	// the screen" is measured against.
 	contentHeight int
+	// footer is the band under the last row, star and issue its two links. The
+	// build string is not here: the footer is one 304 px column and a third item
+	// would have squeezed the links to nothing. It goes in the header subtitle
+	// instead, where there is room and where it reads as "what am I looking at".
+	footer settingsRect
+	star   settingsRect
+	issue  settingsRect
 }
 
 // scale converts a logical dimension to device pixels at the current DPI and
@@ -393,10 +416,23 @@ func settingsGeometrySized(dpi uint32, textSize string, tab int, rows []settings
 		y += height
 	}
 	geometry.contentHeight = y
-	// The window is exactly as tall as its content. A fixed height left the
-	// shortest tab with half a screen of emptiness, which reads as a broken
-	// layout rather than a compact one.
-	geometry.height = maxInt(y+geometry.scale(settingsMargin), geometry.scale(settingsMinHeight))
+	footerTop := y + s(settingsFooterGap)
+	geometry.footer = settingsRect{Left: contentLeft, Top: footerTop, Width: contentWidth, Height: s(settingsFooterHeight)}
+	linkTop := footerTop
+	geometry.star = settingsRect{Left: contentLeft, Top: linkTop, Width: s(settingsLinkWidth), Height: s(settingsFooterHeight)}
+	linkLeft := contentLeft + s(settingsLinkWidth) + s(8)
+	geometry.issue = settingsRect{
+		Left:   linkLeft,
+		Top:    linkTop,
+		Width:  s(settingsIssueWidth),
+		Height: s(settingsFooterHeight),
+	}
+	// The window is exactly as tall as its content, and the footer is part of
+	// the content: it used to be cut off on the shortest tab (Sessions) when the
+	// height followed the rows alone.
+	geometry.height = maxInt(
+		geometry.footer.bottom()+geometry.scale(settingsMargin),
+		geometry.scale(settingsMinHeight))
 	return geometry
 }
 
@@ -464,6 +500,12 @@ func (g settingsGeometry) hit(x, y int) (settingsControl, int, settingsRect, boo
 			return settingsTabControl(index), -1, g.tabs[index], true
 		}
 	}
+	if g.star.contains(x, y) {
+		return settingsStar, -1, g.star, true
+	}
+	if g.issue.contains(x, y) {
+		return settingsIssue, -1, g.issue, true
+	}
 	for index := range g.rows {
 		if !g.frames[index].contains(x, y) {
 			continue
@@ -516,6 +558,9 @@ func settingsFocusOrder(geometry settingsGeometry) []settingsControl {
 		}
 		order = append(order, row.control)
 	}
+	// The footer links are reachable by Tab too: a keyboard user has the same
+	// reason to want the bug tracker as a mouse user does.
+	order = append(order, settingsStar, settingsIssue)
 	return order
 }
 
@@ -948,6 +993,9 @@ type settingsPaint struct {
 	focus    int
 	focusOn  bool
 	lang     i18n.Lang
+	// version is the footer's right-aligned build string. Empty in tests that do
+	// not care, which keeps the rasterised previews free of a moving value.
+	version string
 }
 
 func drawSettings(target *canvas, paint settingsPaint) {
@@ -966,10 +1014,10 @@ func drawSettings(target *canvas, paint settingsPaint) {
 	target.text(s(settingsMargin), s(12), width-s(settingsMargin)*2-s(40), s(30),
 		i18n.T(lang, i18n.KeySettingsTitle), f(fonts.header), 600, colors.Primary,
 		dtSingleLine|dtVCenter|dtNoPrefix)
-	subtitleWidth := s(160)
+	subtitleWidth := s(220)
 	target.text(width-s(settingsMargin)-s(30)-subtitleWidth, s(12), subtitleWidth, s(30),
-		i18n.T(lang, i18n.KeySettingsSubtitle), f(fonts.subtitle), 400, colors.Muted,
-		dtSingleLine|dtVCenter|dtRight|dtNoPrefix)
+		settingsSubtitle(lang, paint.version), f(fonts.subtitle), 400, colors.Muted,
+		dtSingleLine|dtVCenter|dtRight|dtNoPrefix|dtEndEllipsis)
 	target.fillRect(s(settingsMargin), s(settingsHeaderHeight), width-s(settingsMargin)*2, 1, colors.Divider)
 	drawSettingsClose(target, geometry, hover == settingsClose || pressed == settingsClose)
 	drawSettingsFocus(target, geometry, paint, settingsClose)
@@ -1055,7 +1103,60 @@ func drawSettings(target *canvas, paint settingsPaint) {
 		}
 		drawSettingsFocus(target, geometry, paint, row.control)
 	}
+	drawSettingsFooter(target, paint)
 	drawSettingsTooltip(target, paint)
+}
+
+// drawSettingsFooter draws the two links and the version.
+//
+// The links are drawn as text with an underline on hover rather than as buttons:
+// they leave the app, and a button shape would promise something the window
+// cannot do (nothing comes back). The version is on the same line because a bug
+// report that has to be chased for its build number is a bug report that does not
+// get filed.
+func drawSettingsFooter(target *canvas, paint settingsPaint) {
+	geometry, lang, fonts := paint.geometry, paint.lang, paint.geometry.fonts
+	s, f := geometry.scale, geometry.font
+	if geometry.footer.Width <= 0 {
+		return
+	}
+	target.fillRect(geometry.footer.Left, geometry.footer.Top-s(6), geometry.footer.Width, 1, colors.Divider)
+
+	links := []struct {
+		control settingsControl
+		rect    settingsRect
+		label   string
+	}{
+		{settingsStar, geometry.star, i18n.T(lang, i18n.KeySettingsStar)},
+		{settingsIssue, geometry.issue, i18n.T(lang, i18n.KeySettingsIssue)},
+	}
+	for _, link := range links {
+		colour := colors.Secondary
+		hot := paint.hover == link.control || paint.pressed == link.control
+		if hot {
+			colour = colors.Accent
+		}
+		target.text(link.rect.Left, link.rect.Top, link.rect.Width, link.rect.Height, link.label,
+			f(fonts.hint), 500, colour, dtSingleLine|dtVCenter|dtNoPrefix)
+		if hot {
+			width := target.measure(link.label, f(fonts.hint), 500)
+			target.fillRect(link.rect.Left, link.rect.Top+link.rect.Height-s(4), minInt(width, link.rect.Width), 1, colour)
+		}
+		drawSettingsFocus(target, geometry, paint, link.control)
+	}
+
+}
+
+// settingsSubtitle is the header's right-hand text: what this window belongs to,
+// and which build it is. A bug report that has to be chased for its version is a
+// bug report that does not get filed, and the header is where somebody copying
+// the window already looks.
+func settingsSubtitle(lang i18n.Lang, version string) string {
+	label := i18n.T(lang, i18n.KeySettingsSubtitle)
+	if version == "" {
+		return label
+	}
+	return label + " · " + version
 }
 
 // drawSettingsTooltip shows the full text of a label that had to be ellipsised.

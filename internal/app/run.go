@@ -146,6 +146,11 @@ func RunWith(openSettings bool) error {
 		AutoStart:             autostartEnabled,
 		AutoApproveTimeoutSec: settings.AutoApproveTimeoutSec,
 		OpenSettings:          openSettings,
+		// The settings footer prints the build and can open two links. Both are
+		// courtesy features: no network, no telemetry, and the only outbound
+		// action in the whole product happens when a user clicks one of them.
+		Version:      Version,
+		OpenExternal: openExternal,
 		// The attendance sampler reuses this exact cache: one process snapshot and
 		// one window pass serve both liveness and "is the user looking at that
 		// session", instead of enumerating twice.

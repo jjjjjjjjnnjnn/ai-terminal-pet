@@ -30,6 +30,7 @@ import (
 
 	"ai-terminal-pet/internal/config"
 	"ai-terminal-pet/internal/i18n"
+	"ai-terminal-pet/internal/project"
 )
 
 // Kind is how a field is read and written from one line of text.
@@ -274,7 +275,7 @@ func ClearMutes(value *config.Config) int {
 // Render prints the whole table: one line per key, its current value, and a
 // short localised label. It is the non-interactive form of --settings and the
 // thing the interactive editor redraws.
-func Render(w io.Writer, value config.Config, lang i18n.Lang) error {
+func Render(w io.Writer, value config.Config, lang i18n.Lang, version string) error {
 	fields := Fields()
 	width := 0
 	labels := make([]string, len(fields))
@@ -300,6 +301,19 @@ func Render(w io.Writer, value config.Config, lang i18n.Lang) error {
 			return err
 		}
 	}
+	// The same two links the Win32 window draws in its footer, printed rather
+	// than clickable: a terminal can be piped, and launching a browser from a
+	// program that was asked for a table would be a surprise.
+	if _, err := fmt.Fprintf(w, "\n%s  %s\n%s  %s\n",
+		i18n.T(lang, i18n.KeySettingsStar), project.RepoURL,
+		i18n.T(lang, i18n.KeySettingsIssue), project.IssuesURL); err != nil {
+		return err
+	}
+	if version != "" {
+		if _, err := fmt.Fprintf(w, "v%s\n", version); err != nil {
+			return err
+		}
+	}
 	_, err := fmt.Fprintf(w, "\n%s\n", helpLine(lang))
 	return err
 }
@@ -317,9 +331,9 @@ func helpLine(lang i18n.Lang) string {
 //
 // Saving is the caller's job: this package does not know where config.json is,
 // which is also why it can be tested without touching a disk.
-func Run(in io.Reader, out io.Writer, value config.Config, lang i18n.Lang, save func(config.Config) error) error {
+func Run(in io.Reader, out io.Writer, value config.Config, lang i18n.Lang, version string, save func(config.Config) error) error {
 	reader := bufio.NewReader(in)
-	if err := Render(out, value, lang); err != nil {
+	if err := Render(out, value, lang, version); err != nil {
 		return err
 	}
 	changed := false
@@ -356,7 +370,7 @@ func Run(in io.Reader, out io.Writer, value config.Config, lang i18n.Lang, save 
 			}
 			return nil
 		case answer == "?":
-			if err := Render(out, value, lang); err != nil {
+			if err := Render(out, value, lang, version); err != nil {
 				return err
 			}
 			continue

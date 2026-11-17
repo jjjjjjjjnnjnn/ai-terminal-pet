@@ -35,6 +35,7 @@ import (
 
 	"ai-terminal-pet/internal/config"
 	"ai-terminal-pet/internal/i18n"
+	"ai-terminal-pet/internal/project"
 	"ai-terminal-pet/internal/session"
 
 	win "github.com/lxn/win"
@@ -459,6 +460,7 @@ func (a *App) paintSettings() error {
 		focus:    a.settingsFocus,
 		focusOn:  a.settingsFocusVisible,
 		lang:     a.lang,
+		version:  a.settingsVersionLabel(),
 	})
 	a.settingsFrame = key
 
@@ -739,11 +741,41 @@ func (a *App) settingsApplySlider(control settingsControl, x int) {
 	_ = a.paintSettings()
 }
 
+// openLink hands a URL to the opener the app layer injected. A nil opener means
+// this build has no way to open a browser, which the settings window treats as
+// nothing happening - better than an unhandled nil call on a surface whose only
+// job is a courtesy link.
+func (a *App) openLink(url string) {
+	if a.options.OpenExternal == nil {
+		return
+	}
+	_ = a.options.OpenExternal(url)
+}
+
+// settingsVersionLabel is what the footer prints: the build string, prefixed so
+// it reads as a version rather than as a stray number. Empty means the wiring
+// did not supply one, and the footer then draws no version at all.
+func (a *App) settingsVersionLabel() string {
+	if a.options.Version == "" {
+		return ""
+	}
+	return "v" + a.options.Version
+}
+
 func (a *App) settingsApply(control settingsControl, index int) {
 	settings := &a.options.Settings
 	switch control {
 	case settingsClose:
 		a.hideSettings()
+		return
+	case settingsStar, settingsIssue:
+		// Opening a browser is the whole action. No telemetry, no ping, no state:
+		// the URL is a constant and the click is the user's.
+		url := project.RepoURL
+		if control == settingsIssue {
+			url = project.IssuesURL
+		}
+		a.openLink(url)
 		return
 	// Every tab in the sidebar must be listed here. settingsTabAppearance was
 	// missing from this case for two releases: the tab hit-tested, hovered and

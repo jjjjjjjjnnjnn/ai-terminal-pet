@@ -8,6 +8,7 @@ import (
 
 	"ai-terminal-pet/internal/config"
 	"ai-terminal-pet/internal/i18n"
+	"ai-terminal-pet/internal/project"
 )
 
 // TestEveryPersistedPreferenceIsEditable is the guard that matters most: a new
@@ -150,7 +151,7 @@ func TestRenderPrintsEveryKeyWithItsValue(t *testing.T) {
 	value := config.Default()
 	value.Theme = config.ThemePaper
 	var out strings.Builder
-	if err := Render(&out, value, i18n.LangEn); err != nil {
+	if err := Render(&out, value, i18n.LangEn, "1.2.3"); err != nil {
 		t.Fatal(err)
 	}
 	text := out.String()
@@ -169,7 +170,7 @@ func TestRenderPrintsEveryKeyWithItsValue(t *testing.T) {
 
 func TestRenderSpeaksTheRequestedLanguage(t *testing.T) {
 	var chinese strings.Builder
-	if err := Render(&chinese, config.Default(), i18n.LangZhCN); err != nil {
+	if err := Render(&chinese, config.Default(), i18n.LangZhCN, ""); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(chinese.String(), i18n.T(i18n.LangZhCN, i18n.KeySettingsNotify)) {
@@ -184,7 +185,7 @@ func scripted(t *testing.T, answers string) (config.Config, bool, string) {
 	var kept config.Config
 	var out strings.Builder
 	value := config.Default()
-	err := Run(strings.NewReader(answers), &out, value, i18n.LangEn, func(next config.Config) error {
+	err := Run(strings.NewReader(answers), &out, value, i18n.LangEn, "1.2.3", func(next config.Config) error {
 		saved = true
 		kept = next
 		return nil
@@ -259,5 +260,29 @@ func TestClearMutesReportsWhatItRemoved(t *testing.T) {
 	}
 	if len(value.MutedSessions) != 0 {
 		t.Fatalf("the list still has %d entries", len(value.MutedSessions))
+	}
+}
+
+// TestRenderPrintsTheSupportLinks is the terminal half of the settings footer:
+// the same two links the Win32 window draws, printed instead of clickable, plus
+// the build string a bug report needs.
+func TestRenderPrintsTheSupportLinks(t *testing.T) {
+	var out strings.Builder
+	if err := Render(&out, config.Default(), i18n.LangEn, "9.9.9"); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	for _, want := range []string{project.RepoURL, project.IssuesURL, "v9.9.9"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("%q is missing from the table:\n%s", want, text)
+		}
+	}
+	// No version supplied means no line, not a bare "v".
+	var bare strings.Builder
+	if err := Render(&bare, config.Default(), i18n.LangEn, ""); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(bare.String(), "\nv\n") {
+		t.Fatalf("an empty version printed a bare v:\n%s", bare.String())
 	}
 }
