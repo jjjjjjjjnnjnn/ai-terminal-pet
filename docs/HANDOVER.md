@@ -6,9 +6,11 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-16；浮窗 **1.0.15**、插件包 **1.2.27** 已发版；**§70 第 70 轮（安装器写卸载项 + winget 清单）；§69 第 69 轮（把文档里的数字变成门禁）；§68 公开文案重做；§67 DSH 插件三平台（Linux/macOS 首启按 pin 取浮窗）；§66 POSIX 平权：Linux 提示音与通知面、跳转失败不再静默、`--doctor` 13 项**）
+## 1. 当前状态（2026-11-17；浮窗 **1.0.15**、插件包 **1.2.27** 已发版；**§71 第 71 轮（三平台视觉不变量门禁）；§70 第 70 轮（安装器写卸载项 + winget 清单）；§69（把文档里的数字变成门禁）；§68 公开文案重做**）
 
-> 接手请先读本节与 **§70「安装器写卸载项」**
+> 接手请先读本节与 **§71「面板的像素第一次被断言」**
+> （三平台视觉不变量门禁：断言什么、为什么不比像素、三个"看起来对其实错"的地方），
+> 再读 **§70「安装器写卸载项」**
 > （为什么"装得上、卸不掉"是个真缺陷、注册表那一行的每个字段、沙箱键名为什么必须派生、
 > 以及 winget 清单的提交状态），再读 **§69「把文档里的数字变成门禁」**
 > （`tools/check_facts.mjs` 钉什么/不钉什么；它第一次运行抓到的 `#english` 假警报与被修正的 E5 清单），
@@ -69,8 +71,8 @@
   （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `E21CFDA7…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**465 个** `func Test`，
-  本轮 +2，来自 `cmd/pet-setup` 的两条新参数规则）；CI 四条 job
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**469 个** `func Test`，
+  1.0.15 那一轮 +2 来自 `cmd/pet-setup` 的两条参数规则；第 71 轮 +4 来自视觉不变量门禁）；CI 四条 job
   （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.15 的提交上全绿；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
   `vendor.mjs --check` 与 1.0.15 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
@@ -83,7 +85,7 @@
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
   `--version` 报 `ai-terminal-pet 1.0.15`。
 - **规模**（`node tools/check_facts.mjs --print`，1.0.15 实测）：非测试 **143 文件 / 27,236 行**、
-  测试 **94 文件 / 13,526 行**、**465 个 `func Test`**。
+  测试 **95 文件 / 13,956 行**、**469 个 `func Test`**。
   `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `E21CFDA7…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
   三个二进制合计 **12,101,632 B** = 11.54 MiB。安装目录里多了第 12 件制品：`install.ps1` 的副本。
@@ -5001,6 +5003,87 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 71. 交接：面板的像素第一次被断言 —— 三平台不变量门禁（2026-11-17，第 71 轮；**不发版**，浮窗仍 **1.0.15** / 插件仍 **1.2.27**）
+
+这一轮只加测试，不改产品代码、不发版。交付物是 `internal/ui/render_invariants_test.go`：
+它把 `docs/ROADMAP.md` §6 里那条诚实的自述（"UI 无自动化视觉回归"）换成四条**可执行**的断言。
+
+### 71.1 为什么这一项排在前面
+
+面板的**布局**早就有测试（矩形、行、命中区），但**像素**没有任何断言。Windows 的渲染器被看过几千次
+（谁跑 `TestRenderPreview` 都算一次），而 Linux X11 与 macOS AppKit 的浮窗走的是**另一条纯 Go 光栅化路径**，
+本项目没有任何人能在真实硬件上看它一眼（`docs/PLATFORMS.md` 写明了这一点）。
+于是"面板画出来是能认的"一直是个**假设**；这条门禁把它变成断言。
+
+关键的可行性来自一件事：`drawing_compact.go` 与 `canvas.go` 都**没有 build 标签**，
+所以同一份测试能在三个平台上跑——只是各自用自己那套文字光栅化（Windows GDI / Linux+macOS OpenType）。
+
+### 71.2 断言什么，不做什么
+
+| 断言 | 抓的缺陷 |
+|---|---|
+| 帧尺寸 = 布局算出的尺寸 | 几何悄悄变了而没人同时改两处 |
+| 四个角像素 alpha 为 0 | 圆角半径失效 → 桌面上出现一个硬矩形 |
+| 画上去的比例 ≥ 80%，且 **alpha ≥ 200 的比例 ≥ 70%** | 面板体没画（透明洞），或只剩一层半透明薄雾 |
+| **亮像素 ≥ 40**（文字与字形） | **字体栈缺失**：OpenType 找不到字体时一个字都不画，面板变成一块带颜色的板子 |
+| 每个状态的颜色真的在画布上（等待琥珀 / 出错红 / 进行中绿，各 ≥ 20 像素） | 状态色没上屏或调色板被换错 |
+| 不同状态、不同语言**必须长得不同**（像素差 ≥ 1%） | 渲染器忽略输入（会话列表、语言）也能通过每一条单帧断言 |
+| 两套配色真的不同：slate 中心亮度 ≤ 0.20、paper ≥ 0.60 | `applyAppearance` 没到光栅器，或浅色主题画成了深色 |
+
+**不做的**：逐像素回归。同机逐字节可复现这一点 `TestRenderPreview` 已经证明过；
+跨机只能比不变量，因为 GDI 与 OpenType 的抗锯齿、字体与 hinting 本来就不同。
+
+### 71.3 三个"看起来对、其实错"的地方
+
+1. **像素相等在跨平台上是错的目标，不是"暂时做不到"。** 同一帧"紧凑态等待"，Windows 量到
+   **659** 个亮像素，Linux 量到 **289** —— 差 2.3 倍，因为 GDI 的 ClearType 更厚。
+   任何"和基准图比"的设计都会在第二个平台上失败，而且失败信息毫无价值。
+2. **单点采样会把字体度量写进断言。** 第一版断言"面板中心像素 alpha ≥ 200"。在 Windows 的**紧凑空态**里，
+   中心恰好落在一块半透明提示框上（alpha 215）；同一个帧在 Linux 是 238。这不是缺陷，是"中心点在哪".
+   所以"面板被填"改成**比例**（实测 91.7%–98.6% 的像素 alpha ≥ 200），中心点只作为日志。
+3. **色相断言必须写成通道差，不能写成颜色相等。** 文字是按 `color×alpha/255` 预乘存进画布的
+   （`normalizeText`），一个 60% 覆盖率的琥珀字，通道值已经不是 `231,184,112`。
+   写成 `R-B ≥ 40 且 G-B ≥ 10` 这类差值谓词，既抓住了"状态色真的上屏"，也不在乎抗锯齿。
+
+### 71.4 本轮实测
+
+**Windows（GDI）**
+
+```
+compact waiting      8196/8736 painted (93.8%), 91.7% opaque, 659 light pixels
+expanded three rows 41792/42400 painted (98.6%), 97.4% opaque, 2512 light pixels
+compact empty        8128/8736 painted (93.0%), 92.1% opaque, 553 light pixels
+expanded one row    28192/28800 painted (97.9%), 96.8% opaque, 1479 light pixels
+hues: waiting 913, error 839, working 319
+diffs: waiting-vs-working 25.84%, waiting-vs-idle 17.33%, working-vs-idle 16.79%, zh-vs-en 7.73%
+themes: slate centre luminance 0.01, paper 1.00
+```
+
+**Linux（同一份测试交叉编译后在 WSL 里执行，走纯 Go OpenType）**
+
+```
+compact waiting      8196/8736 painted (93.8%), 93.8% opaque, 289 light pixels
+expanded three rows 41792/42400 painted (98.6%), 98.6% opaque, 817 light pixels
+compact empty        8128/8736 painted (93.0%), 93.0% opaque, 265 light pixels
+expanded one row    28192/28800 painted (97.9%), 97.9% opaque, 347 light pixels
+hues: waiting 746, error 703, working 249
+diffs: waiting-vs-working 24.14%, waiting-vs-idle 14.93%, working-vs-idle 14.73%, zh-vs-en 9.78%
+```
+
+**macOS**：本机没有苹果硬件；这条测试与其他 `func Test` 一样在 `macos-latest` 上跑（它走的是与 Linux
+同一份 `canvas_opentype.go`，所以预期数字接近 Linux，但**以 CI 的输出为准**）。
+
+顺带一个观察：新测试让 `func Test` 从 465 变 469，`tools/check_facts.mjs` 立刻变红并点名五处——
+第 69 轮那条门禁第一次被"真实的工作"撞到，而不是被造出来的样例。
+
+### 71.5 这一轮没有做的事
+
+- **没有做逐像素/基准图比对**，理由见 71.2 最后一段。
+- **设置窗口没有同类不变量**：它只有 Windows 实现，且 `TestRenderSettingsPreview` 已经覆盖"能画出来"。
+  三平台共有的东西才值得写跨机断言。
+- **没有把不变量接到 `--doctor`**：那是运行期环境自检，不该承担像素回归的职责。
+- **没有发版**：产品代码零改动。
 
 ## 70. 交接：安装器登记"设置 › 应用"那一行 —— 于是删掉 zip 也能卸，winget 才谈得上（2026-11-16，第 70 轮；浮窗 **1.0.15** / 插件 **1.2.27**）
 
