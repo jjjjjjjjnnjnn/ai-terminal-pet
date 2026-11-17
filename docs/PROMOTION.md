@@ -35,10 +35,10 @@ HN 创始人 dang 的原话（2020，2026-03 更新）值得记住：
 
 | 顺序 | 渠道 | 真实门槛（读来的） | 内容 | 谁写 |
 |---|---|---|---|---|
-| 1 | GitHub 仓库页 | 无 | 描述/topics/社交预览/README 首屏 —— 决定"点进来 30 秒懂不懂" | 我 |
-| 2 | **npm 上的 OpenCode 插件** | ✅ 已发布：`opencode-ai-terminal-pet`（与浮窗同号，1.0.18） | `opencode plugin add opencode-ai-terminal-pet` 一行装 —— 对目标人群最有用的一步 | 我 |
-| 3 | **awesome-opencode**（11k★） | **实际门槛（它的 contributing.md 原文）：≥25 stars，且仓库满 30 天；任一规则不过，PR 会被 close**。我们 1★ → **现在投了就是被关**。这一条等的是 star，不是等包 | 等过线再投，一条 `<details>` | 我起稿，你提 PR |
-| 4 | **awesome-claude-code**（58k★） | **人手网页表单**；一次只能荐一个；≥14 天且活跃（或 ≥100★）；描述单行、无 emoji、不推销 | 一行描述 + 表单 | 你提交，我给那行字 |
+| **1** | **awesome-claude-code**（58k★） | **人手网页表单**；一次只能荐一个；≥14 天且活跃（或 ≥100★）；描述单行、无 emoji、不推销。**我们已满 55 天、天天有提交 → 现在就够格** | 那一行描述在 §6，可直接粘 | **你提交**（表单），我给那行字 |
+| 2 | GitHub 仓库页 | 无 | 描述/topics/社交预览/README 首屏 —— 决定"点进来 30 秒懂不懂"；首屏的"一行装 + 它不是什么"2026-11-17 已改 | 我 |
+| 3 | **npm 上的 OpenCode 插件** | ✅ 已发布：`opencode-ai-terminal-pet`（与浮窗同号，1.0.19） | `opencode plugin add opencode-ai-terminal-pet` 一行装 —— 对目标人群最有用的一步 | 我 |
+| 4 | **awesome-opencode**（11k★） | **实际门槛（它的 contributing.md 原文）：≥25 stars，且仓库满 30 天；任一规则不过，PR 会被 close**。我们 1★ → **现在投了就是被关**。这一条等的是 star，不是等包 | 等过线再投，一条 `<details>` | 我起稿，你提 PR |
 | 5 | DSH 插件目录 / npm | 已有 | 生态内先看到 | 我 |
 | 6 | winget | 等合并 | `winget install` | 我 |
 | 7 | X / 即刻 | 你的号 | 5 秒动图 + 一句话 | 我起稿你改 |
@@ -46,8 +46,11 @@ HN 创始人 dang 的原话（2020，2026-03 更新）值得记住：
 | 9 | **Show HN** | 账号要有历史（新号发链接基本沉）；要能直接跑；不许求赞/删了重发 | 讲你怎么做的、哪里不一样 | **你** |
 | 10 | Reddit | **先读每个版侧栏**，多数对自我推广限次 | 只回帖，不主动开新帖 | 你 |
 
-> 顺序的道理：**先把"能一键装"和"能被搜到"做齐，再引人来**。反过来就是把半成品摊在门口。
+> 顺序的道理：**先让"能被搜到"和"点进来 30 秒懂"成立，再引人来**。反过来就是把半成品摊在门口。
 > 另：一周内不要在多个社区发同一段话，这些人互相都看得到。
+>
+> **2026-11-17 调整**：awesome-claude-code 从第 4 位提到第 1 —— 它现在是"只差一次人手提交"的状态，
+> 而 awesome-opencode 卡在 25★（不是我们能单方面推动的）。顺序按"这一步还缺谁"排，不按名气排。
 
 ---
 
@@ -124,6 +127,15 @@ Windows / Linux / macOS · MIT · 不联网、不要账号
 > Always-on-top strip showing which AI coding agent is waiting, and a one-click jump back to that terminal; no account, no network, no telemetry.
 
 提交方式：仓库 README 里的 **网页表单**（不是 PR、不是 `gh`），一次只荐这一个。
+表单地址在 `hesreallyhim/awesome-claude-code` 的 README / CONTRIBUTING 里（2026-11-17 读到的规则：
+资源推荐必须由人创建，且只有网页表单入口）。
+
+**2026-11-17 的资格复核**：门槛是「≥14 天且活跃」或「≥100★」。本仓库 2026-09-24 建立（**55 天**），
+当天仍有提交 → **第一档已满足，不需要 star**。填表时如实写：单人维护、无遥测、Windows/Linux/macOS、
+MIT；不要写下载量（见 §9）。
+
+**唯一需要你做的**：把上面那一行粘进表单的 description 字段，其余按表单问什么答什么。不要让它"更
+有感染力"——它就是要一行、无 emoji、不推销。
 
 ---
 

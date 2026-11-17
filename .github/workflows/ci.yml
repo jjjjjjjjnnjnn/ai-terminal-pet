@@ -395,6 +395,14 @@ jobs:
       - name: Catalogue status rules
         run: node --test tools/catalog-status.test.mjs
 
+      # The traffic report itself needs the network and `gh`, so CI does not run
+      # it. Its two judgement calls do not: "the latest share" is what separates
+      # a human distribution from a crawler fleet, and the asset baseline is
+      # what separates a user from our own release verification. Those rules are
+      # pinned here, because a metric that is wrong quietly is worse than none.
+      - name: Traffic metric rules
+        run: node --test tools/traffic-report.test.mjs
+
       # The portable zip and the self-extracting setup exe are what a Windows
       # user who does not use the DeepSeek Harness actually downloads, so a
       # packaging script that cannot produce them is a broken release, not a

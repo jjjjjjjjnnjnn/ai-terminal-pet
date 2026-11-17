@@ -205,6 +205,7 @@ Two conventions in those commands are load-bearing, not style:
 | **What works on which OS, and how was each claim measured?** | **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — the per-capability table (the reporting path is three platforms, the panel is one), what is unverified and why, and the two CI lists that pin it |
 | I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/PROMOTION.md](docs/PROMOTION.md) has the paste-ready copy; [docs/LAUNCH.md](docs/LAUNCH.md) has the measured numbers it must not exceed and the posting history |
 | **How many people actually use this, and is that download count real?** | **[docs/METRICS.md](docs/METRICS.md)** — the 2026-11-17 measurement (33 views, 0 external installs), the crawler-fleet proof, and the bot-resistant metric; re-measure with `node tools/traffic-report.mjs` |
+| **What is the growth plan, and why in that order?** | [docs/ROADMAP.md](docs/ROADMAP.md) §7 — the four decisions (positioning A+C, sequence, no untestable signing path, ≤2 releases a week), P1–P2 with owners, and the four-week targets |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does an OpenCode user install the reporter in one command? | [packages/opencode-ai-terminal-pet/README.md](packages/opencode-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |

@@ -39,6 +39,20 @@
 
 <a id="english"></a>
 
+## Install in one line
+
+```sh
+dsh plugin --profile <profile> add dsh-ai-terminal-pet   # DeepSeek Harness
+opencode plugin add opencode-ai-terminal-pet             # OpenCode
+```
+
+The panel itself is one file: `pet-setup.exe` on Windows, a `tar.gz` + `install.sh` on Linux and macOS
+([Install](#install) has every path, including the pinned-tag and offline forms). Claude Code and Antigravity
+are wired once with `ai-terminal-pet --connect`.
+
+**What it is not:** not an Electron app, not a web view, and no runtime to install for the panel itself — a single
+5&nbsp;MB Go binary that draws its own pixels and speaks to reporters over a local endpoint. No account, no telemetry, no network.
+
 ## The 15-minute problem
 
 You have four agents running in four tabs. One of them hits a permission prompt, waits for an answer, and gets none — because you are reading a diff in another window, or on another monitor, or you only have one monitor and that tab is behind this one.
@@ -330,6 +344,20 @@ Maintainer references: [docs/PLATFORMS.md](docs/PLATFORMS.md) (what works where,
 </p>
 
 <p>DeepSeek Harness · Claude Code · OpenCode · Antigravity</p>
+
+### 一行装
+
+```sh
+dsh plugin --profile <profile> add dsh-ai-terminal-pet   # DeepSeek Harness
+opencode plugin add opencode-ai-terminal-pet             # OpenCode
+```
+
+面板本体只有一个文件：Windows 上是 `pet-setup.exe`，Linux / macOS 是 `tar.gz` + `install.sh`
+（完整路径——含钉 tag 与离线安装——见英文的 [Install](#install) 一节）。Claude Code 与 Antigravity
+用 `ai-terminal-pet --connect` 各接一次。
+
+**它不是什么**：不是 Electron 应用，不是 WebView，**面板本身**没有运行时要装 —— 一个 5&nbsp;MB 的 Go 单文件，
+自己画像素，用本地端点跟上上报端说话。没有账号、没有遥测、不出网。
 
 ### 那个"十五分钟"的问题
 

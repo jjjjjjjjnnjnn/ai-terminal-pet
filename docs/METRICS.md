@@ -194,3 +194,18 @@ node --test tools/traffic-report.test.mjs   # latest share 与资产分组的规
 
 数据源：GitHub traffic API（14 天窗口）、`api.npmjs.org`、`awesome-dsh-plugin.com/plugins.json`、
 `gh run list`。所有窗口都写日期——这个仓库里没有"今天的数"这种说法。
+
+---
+
+## 9. 决策（2026-11-17 定）与计划在哪
+
+这份文件只负责**测量**；计划与取舍的正文在 **[docs/ROADMAP.md](ROADMAP.md) §7**。已定的四条：
+
+| 决策 | 选择 |
+|---|---|
+| 定位 | **A（状态带）为主干 + C（可选人格）为增量**，不跳到"做宠物" |
+| 顺序 | P1 转化 → P2 分发 → C 的最小版 → 等外部（winget / 上游 / 目录重建） |
+| 签名 | **不写代码，等账户**（Azure Trusted Signing ≈ $10/月）；没有证书就无法测试的路径不进打包脚本 |
+| 发版节奏 | **≤2 次/周**（安全与回归除外），已写进 AGENTS 第 10 条 |
+
+判断下一轮该做什么时，先跑 `node tools/traffic-report.mjs`，再看 §7.7 的五项硬指标。
