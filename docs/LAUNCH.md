@@ -89,13 +89,15 @@ imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 
 
 ## 2. 发布前必须就位的东西
 
-- [x] **六个跨平台资产已在本机构建**（`pet-v1.0.21`）：`pet-setup.exe` / `ai-terminal-pet-1.0.21-win-x64.zip` /
+- [x] **六个跨平台资产**（`pet-v1.0.21`）：`pet-setup.exe` / `ai-terminal-pet-1.0.21-win-x64.zip` /
       `linux-{amd64,arm64}.tar.gz` / `darwin-{arm64,amd64}.tar.gz`；字节与 sha256 见
-      [CHANGELOG](../CHANGELOG.md) 的「1.0.21 / 1.2.34 发布包实测清单」。**上传后从公开 URL 下载回来逐字节核对，结论补在 B 提交**
-- [x] 本机装机：`scripts\install.cmd -VerifyOnly` **12/12**，`--doctor` 12 ok / 1 warn / 0 fail，
-      `--version` = 1.0.21。独立 tag + Release 在推送 A 提交后创建
-- [ ] 插件包 `dsh-ai-terminal-pet` **1.2.34** 的 npm `latest` 与 `dsh-plugin-v1.2.34` Release（打包与 `check-tarball` 已通过）
-- [ ] OpenCode 上报端 `opencode-ai-terminal-pet` **1.0.21** 的 npm 发布（与浮窗同号）
+      [CHANGELOG](../CHANGELOG.md) 的「1.0.21 / 1.2.34 发布包实测清单」。
+      **已从公开 URL 下载回来逐字节核对，六个资产全部与本地相同**
+- [x] 独立 tag `pet-v1.0.21` + Release；`scripts\install.cmd -VerifyOnly` **12/12**，
+      `--doctor` 12 ok / 1 warn / 0 fail，`--version` = 1.0.21
+- [x] 插件包 `dsh-ai-terminal-pet` **1.2.34**（npm `latest`、`dsh-plugin-v1.2.34` Release、
+      上游 `+1 −1` 的跟进 PR **#16391**）；npm 上的 `.tgz` 与本地打包逐字节相同
+- [x] OpenCode 上报端 `opencode-ai-terminal-pet` **1.0.21**（npm `latest`，与浮窗同号；`.tgz` 同样逐字节核对）
 - [x] **GIF 动图**：`docs/assets/demo.gif`（25 帧 / 5.38 秒循环 / 359,471 B），三段真实动作
       —— 等待呼吸 → 悬停展开 → 点击等待行。循环时长 5.4 秒而不是 15 秒：GIF 是循环播放的，
       15 秒的循环第一遍没人看完，5 秒刚好一遍读完三句话。由 `docs/assets/make_launch_assets.py`

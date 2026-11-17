@@ -5111,12 +5111,16 @@ panic 文本没有落点；`error.log` 只由命令行入口写，窗口过程�
 
 ### 79.5 发布
 
-- A 提交：版本 + 两份清单 + `docs/market-index.json` 的 `versions[0].version` / `publishTimestamp`
+- A 提交 `16c533a`：版本 + 两份清单 + `docs/market-index.json` 的 `versions[0].version` / `publishTimestamp`
   + CHANGELOG + 本文件 + 目录文案。
 - tag `pet-v1.0.21` / `dsh-plugin-v1.2.34`；Release 六个浮窗资产 + 两个 tgz；npm 发布
   `dsh-ai-terminal-pet@1.2.34` 与 `opencode-ai-terminal-pet@1.0.21`。
-- B 提交把索引的 `source.commit` 与 `icon` 钉到 A 的 sha；上游 `bump-tarball-1.2.34` PR。
-  **具体 PR 号与 CI 结论在本提交之后补记，不写死**。
+- 公开 URL 复验：六个浮窗资产、DSH tgz、npm 上两个 `.tgz` **全部与本地逐字节相同**；
+  npm 的两个包用 `check-tarball.mjs` 再对工作区比了一遍，逐文件一致。
+- B 提交把索引的 `source.commit` 与 `icon` 钉到 `16c533a`；上游 PR **#16391**
+  （`awesome-dsh-plugin/awesome-dsh-plugin`，`+1 −1`，只换 tarball 行）。
+  上游条目里的 description 仍写着"另外三个需要自己的 reporter"——那是早先提交的文本，
+  `upstream-entry.mjs` 按设计只换 tarball 行；要改它得另开一条单独 PR（不与本次发版混在一起）。
 - 目录文案同步：市场索引、两份 `dsh.catalog.summary`、`docs/LAUNCH.md` §6 统一为
   "Harness 装上即接；OpenCode 一行；Claude Code / Antigravity 各接一次上报端"。
 
