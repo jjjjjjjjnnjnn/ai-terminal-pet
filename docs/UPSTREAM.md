@@ -316,6 +316,7 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 ```
 [ ] 代码/测试/素材/文档就绪，全门禁绿（AGENTS.md「标准验证命令」）
 [ ] Version + 两份清单 + market-index version/publishTimestamp → A 提交
+[ ] 版本号与随包 README **都改完**之后再 `npm pack`；`node tools/check-tarball.mjs` 必须与工作区逐文件一致
 [ ] npm run vendor；verify.mjs；npm pack 记字节与 sha256 → CHANGELOG
 [ ] 双 tag → 双 Release（资产齐全，URL 可下载）
 [ ] npm publish，等 2–4 分钟核对 dist-tags.latest

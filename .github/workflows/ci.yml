@@ -314,6 +314,14 @@ jobs:
       - name: Check documented asset sizes
         run: python tools/check_assets.py
 
+      # The tarball comparator's own rules: the tar reader, the four differences
+      # it must report (stale README, version mismatch, missing file, stray file),
+      # and the files-allowlist behaviour that its first real run got wrong. The
+      # artifact check itself cannot run here - a clean checkout has no .tgz - and
+      # lives in the release steps in docs/UPSTREAM.md.
+      - name: Tarball rule tests
+        run: node --test tools/check-tarball.test.mjs
+
       # Version strings in the documentation rot independently of the release
       # number: the README badge sat at 1.0.2 across three releases, and both
       # "the package is now" paragraphs said 1.2.8 while npm served 1.2.13. This

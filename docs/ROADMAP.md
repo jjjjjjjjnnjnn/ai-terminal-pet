@@ -13,7 +13,7 @@
 |---|---|
 | 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
-| 版本 | `1.0.16`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.28` |
+| 版本 | `1.0.16`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.29` |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,717,568 B**（4.50 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,705,344 B**（3.53 MiB）；三个 Windows 二进制合计 **12,101,632 B** = 11.54 MiB |

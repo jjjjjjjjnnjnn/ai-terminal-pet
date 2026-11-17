@@ -30,8 +30,46 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.16**（tag `pet-v1.0.16`）/ **1.2.28**（tag `dsh-plugin-v1.2.28`）。
+已发版到 **1.0.16**（tag `pet-v1.0.16`）/ **1.2.29**（tag `dsh-plugin-v1.2.29`）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
+
+## [1.2.29] — 2026-11-17（1.2.28 的随包 README 指向了 1.2.27：打包早于版本前移，所以只能再发一版）
+
+这一版**没有功能差异**：`lib/`、`vendor/`、`protocol.js`、清单字段与协议全部与 1.2.28 相同。
+它存在的唯一原因是 **1.2.28 的 Release 资产里，随包 README 的两条安装命令写着 `dsh-plugin-v1.2.27`**。
+
+### 是怎么发生的（顺序问题，不是内容问题）
+
+1.2.28 的流程里，`npm pack`（也就是 Release 资产）跑在"改 `packages/dsh-ai-terminal-pet/README*.md` 里的
+版本号"**之前**。于是那个 tgz 装的是**改版本号之前**的 README：
+
+- Release 资产 `dsh-ai-terminal-pet-1.2.28.tgz`：README 指向 `dsh-plugin-v1.2.27`（**旧**）
+- npm 上的 1.2.28：`npm publish` 会在发布时**重新打包**，所以 README 指向 1.2.28（**新**）
+
+两者因此差 1 字节、摘要不同，解包后逐文件比对只有这两个 README 不同。按本仓库的规矩
+（**资产不可变，改一句随包文案就要新版本号**，1.2.1 / 1.2.4 / 1.2.25 都是这么来的），
+1.2.28 的资产不能重传、也不能改写，所以有了 1.2.29。
+
+### 这一轮补的门禁：`tools/check-tarball.mjs`
+
+一个"打包早于改文档"的错误，工作区自检抓不到（改完之后工作区是自洽的），只有**看的是一份打包产物**才能发现。
+新工具把 `.tgz` 解出来（自带 gzip+tar 解析，零依赖），逐文件与工作区比对，并对 `package/package.json`
+单独断言版本一致：
+
+```
+node tools/check-tarball.mjs                     # 默认比 packages/dsh-ai-terminal-pet 下最新的 .tgz
+node tools/check-tarball.mjs path/to/file.tgz
+```
+
+版本号一样的文件、少一个文件、多一个文件、内容不同，四种都会报错并退出 1。
+
+### 1.2.29 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `dsh-plugin-v1.2.29` | `dsh-ai-terminal-pet-1.2.29.tgz`（20 文件） | 2,086,439 B | `059EF47A9A9750D24807C85F43A85E890CEFA122F7BEDE2934D2400B8C093D82` |
+
+浮窗本体不变：**1.0.16**，`vendor/AI-Terminal-Pet.exe` 与 `vendor/manifest.json` 均未改动。
 
 ## [1.0.16] / [1.2.28] — 2026-11-17（Linux/macOS 终于有设置入口：终端编辑器 + `--set`）
 
