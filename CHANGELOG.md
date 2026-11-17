@@ -30,8 +30,70 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.15**（tag `pet-v1.0.15`）/ **1.2.27**（tag `dsh-plugin-v1.2.27`）。
+已发版到 **1.0.16**（tag `pet-v1.0.16`）/ **1.2.28**（tag `dsh-plugin-v1.2.28`）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
+
+## [1.0.16] / [1.2.28] — 2026-11-17（Linux/macOS 终于有设置入口：终端编辑器 + `--set`）
+
+这一版补的是**两块平台上唯一"功能缺失"级别的空白**：Windows 有四页签设置窗口，
+Linux 与 macOS 只能手改 `config.json`，而 `--settings` 在那两个平台上只启动面板、不做别的。
+手改 JSON 并不只是不方便——`config.Normalize` 会把认不出的值**悄悄换成默认值**，
+所以一个拼写错误看起来就像"这个设置不生效"。
+
+### 改了什么
+
+- **`--settings` 在没有设置窗口的平台进入终端编辑器**：先打一张表（21 个键、当前值、本地化标签），
+  输入编号改一项（开关收 `on/off/true/false/yes/no/1/0`），`s` 保存、`q` 放弃、`?` 重画。
+  有管道或重定向时**只打表不入编辑器**（`--settings | less`、CI 都不会挂住）。
+- **新命令 `--set k=v [k=v …]`**（两平台都有）：非交互地改，脚本与 dotfiles 用。
+  未知键、越界值、拼错的选项**一律拒绝**（退出码 2）并把已知键列出来，而不是规范化成默认值。
+  多个键要么全部生效、要么一个都不写（先全部校验，再一次性落盘）。
+  唯一的列表型键用 `--set mutedSessions=clear`（与设置窗口里那个动作等价）。
+- **语言跟随配置**：编辑器用 `config.json` 里的 `language` 决定说中文还是英文，
+  而不是按进程 locale——否则"想把界面切成中文"的人会得到一张英文表。
+- **判定"有没有终端"用 termios / `GetConsoleMode`**，不是 `os.ModeCharDevice`：
+  `/dev/null` 与 `NUL` 也是字符设备，用后者判断会让 `--settings < /dev/null` 掉进一个立刻 EOF 的编辑器。
+- **顺手修掉一个存在多年的显示 bug**：`usageError` 把 usage 文本拼进了 `fmt` 格式串，
+  于是任何用法错误都会打出 `re-anchor … at 100%!z(MISSING)oom`。现在用法文本原样打印。
+
+### 为什么不需要重启面板
+
+`internal/app/run.go` 每 30 秒 stat 一次 `config.json` 并热加载（`configWatchInterval`），
+所以 `--set` 或编辑器保存之后，正在运行的面板最多 30 秒后生效。
+
+### 为什么插件包也发了一版（1.2.28）
+
+版本常量被编进浮窗二进制，`1.0.15 → 1.0.16` 必然改变 `bin/AI-Terminal-Pet.exe` 的字节，
+插件里的 `vendor/AI-Terminal-Pet.exe` 与 `vendor/manifest.json` 的源码摘要必须跟着前移。
+`lib/`、`protocol.js`、清单字段与协议**均未改动**。
+
+### 1.0.16 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.16` | `ai-terminal-pet-1.0.16-win-x64.zip`（17 文件） | 5,137,799 B | `F1F2A578FF70978A4DE3FB0239AA69B1CE1F94701550B744070645B57EFAAF87` |
+| `pet-v1.0.16` | `pet-setup.exe`（载荷 17 文件） | 14,540,800 B | `5A4462CB3002A10969D69F11939CC38223E0B439908331A8FDF5987FA171286D` |
+| `dsh-plugin-v1.2.28` | `dsh-ai-terminal-pet-1.2.28.tgz`（20 文件） | 2,086,438 B | `E3259B96DCB7D1173A1F4E0026E73557AF2890E4D682822CA0D5A4185C7160B1` |
+
+### 实测
+
+- 本机（Windows）：`--set theme=paper` / `--set sound=off opacity=200` 立即落盘并回显；
+  `--set theme=neon`、`--set nosuchkey=1` 都是退出码 2 且**文件字节不变**；
+  `--set mutedSessions=clear` 清空列表。
+- WSL（Linux，交叉编译的真二进制）：`--settings < /dev/null` 打表退出 0；
+  `--set` 单值与多值都生效；坏值退出 2 且文件摘要不变；
+  **交互路径用 `script` 分配 pty 真的跑过一次**：`1` → `off` → `s`，随后 `config.json` 里 `notifications: false`。
+- 单测：`internal/settingscli` 覆盖"每个持久化键都必须有设置项（或显式列进排除表）"、
+  各类值的接受与拒绝、脚本化编辑器（保存 / 放弃 / 坏值继续 / EOF）、清空静音列表；
+  `cmd/ai-terminal-pet` 覆盖 `--set` 的多键原子性、`mutedSessions` 只允许 clear、usage 文本原样打印。
+
+### 没有做的事
+
+- **不做 GUI**：`docs/ROADMAP.md` §5 的"不引入 UI 框架"没变；这是一个不需要 raw mode 的行式编辑器。
+- **`mutedSessions` 不能逐条手改**：它是 `source|sessionId` 的列表，逐条编辑只会制造无效键；
+  单条静音仍在面板里右键该行完成。
+- **macOS 的终端编辑器没有实机验证**（没有苹果硬件），但它与 Linux 共用同一份代码与测试，
+  差异只在 `IsTerminal` 的 ioctl（`TIOCGETA`）。
 
 ## [1.0.15] / [1.2.27] — 2026-11-16（安装器写卸载项：删掉 zip 之后，Windows 也能把它卸干净）
 

@@ -6,11 +6,12 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-17；浮窗 **1.0.15**、插件包 **1.2.27** 已发版；**§71 第 71 轮（三平台视觉不变量门禁）；§70 第 70 轮（安装器写卸载项 + winget 清单）；§69（把文档里的数字变成门禁）；§68 公开文案重做**）
+## 1. 当前状态（2026-11-17；浮窗 **1.0.16**、插件包 **1.2.28** 已发版；**§71 第 71 轮（三平台视觉不变量门禁）；§70 第 70 轮（安装器写卸载项 + winget 清单）；§69（把文档里的数字变成门禁）；§68 公开文案重做**）
 
-> 接手请先读本节与 **§71「面板的像素第一次被断言」**
-> （三平台视觉不变量门禁：断言什么、为什么不比像素、三个"看起来对其实错"的地方），
-> 再读 **§70「安装器写卸载项」**
+> 接手请先读本节与 **§72「Linux/macOS 终于有设置入口」**
+> （终端编辑器与 `--set`、为什么手改 JSON 不算入口、三个"看起来对其实错"的地方，
+> 以及顺手修掉的 `100%!z(MISSING)oom`），再读 **§71「面板的像素第一次被断言」**
+> （三平台视觉不变量门禁：断言什么、为什么不比像素），再读 **§70「安装器写卸载项」**
 > （为什么"装得上、卸不掉"是个真缺陷、注册表那一行的每个字段、沙箱键名为什么必须派生、
 > 以及 winget 清单的提交状态），再读 **§69「把文档里的数字变成门禁」**
 > （`tools/check_facts.mjs` 钉什么/不钉什么；它第一次运行抓到的 `#english` 假警报与被修正的 E5 清单），
@@ -64,37 +65,37 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.15`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.27`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.15` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.27`。
-  **工作区与本机安装目录已经与 `1.0.15` / `1.2.27` 同步**：`bin/`、
+- **版本**：浮窗 **`1.0.16`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.28`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.16` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.28`。
+  **工作区与本机安装目录已经与 `1.0.16` / `1.2.28` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
-  （`AI-Terminal-Pet.exe` **4,717,568 B**，sha256 `E21CFDA7…`）。
+  （`AI-Terminal-Pet.exe` **4,753,408 B**，sha256 `52FCA73C…`）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**470 个** `func Test`，
-  1.0.15 那一轮 +2 来自 `cmd/pet-setup` 的两条参数规则；第 71 轮 +5 来自视觉不变量门禁与面板绘制测量）；CI 四条 job
-  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.15 的提交上全绿；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**488 个** `func Test`，
+  本轮（第 72 轮）+18 来自终端设置入口：`internal/settingscli` 与 `cmd/ai-terminal-pet` 的 `--set` 规则）；CI 四条 job
+  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.16 的提交上全绿（见 §72.6）；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 与 1.0.15 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
+  `vendor.mjs --check` 与 1.0.16 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
   （`node --test tools/check_versions.test.mjs` 26/26）、**`tools/check_facts.mjs` 11 条一致**
   （§69 新增：`func Test` 数量、有测试的包数、Go 包总数、`--doctor` 项数写错就红）、
   `tools/catalog-status.test.mjs` **12/12**、`tools/upstream-entry.test.mjs` 26/26；
-  `tests/fresh-machine.mjs --no-overlay` **183/183**（44.6 s）；
+  `tests/fresh-machine.mjs --no-overlay` **183/183**（43.8 s）；
   `tools/check_docs_links.py` 12 份全解；`govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.15 的装机实测见 §70.4：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  1.0.16 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.15`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.15 实测）：非测试 **143 文件 / 27,236 行**、
-  测试 **96 文件 / 14,042 行**、**470 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,717,568 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `E21CFDA7…`）、
+  `--version` 报 `ai-terminal-pet 1.0.16`，注册表那一行 `DisplayVersion=1.0.16`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.16 实测）：非测试 **151 文件 / 27,897 行**、
+  测试 **98 文件 / 14,416 行**、**488 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,753,408 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `52FCA73C…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
-  三个二进制合计 **12,101,632 B** = 11.54 MiB。安装目录里多了第 12 件制品：`install.ps1` 的副本。
+  三个二进制合计 **12,137,472 B** = 11.58 MiB。安装目录里多了第 12 件制品：`install.ps1` 的副本。
 - **分发（两条线 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.27**；`dsh-plugin-v1.2.27` 的 Release 资产 `dsh-ai-terminal-pet-1.2.27.tgz`
-    **2,072,885 B / sha256 `FA50130D…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.15`）；上游条目跟进 PR 见 §70.5。
-  - 浮窗线：`pet-v1.0.15` 的六个资产——`pet-setup.exe` **14,504,960 B / `AF9E854F…`**、
-    `ai-terminal-pet-1.0.15-win-x64.zip` **5,129,002 B / `5292B2E7…`（17 文件）**，以及
+  - 插件线：npm `latest` = **1.2.28**；`dsh-plugin-v1.2.28` 的 Release 资产 `dsh-ai-terminal-pet-1.2.28.tgz`
+    **2,086,438 B / sha256 `E3259B96…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.16`）；上游条目跟进 PR 见 §72.5。
+  - 浮窗线：`pet-v1.0.16` 的六个资产——`pet-setup.exe` **14,540,800 B / `5A4462CB…`**、
+    `ai-terminal-pet-1.0.16-win-x64.zip` **5,137,799 B / `F1F2A578…`（17 文件）**，以及
     linux-{amd64,arm64} 与 darwin-{arm64,amd64} 四个 tar.gz。
   - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
     `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
@@ -5003,6 +5004,91 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 72. 交接：Linux/macOS 终于有设置入口（终端编辑器 + `--set`），以及顺手修掉的一个"100%"（2026-11-17，第 72 轮；浮窗 **1.0.16** / 插件 **1.2.28**）
+
+这一轮补的是两块平台上唯一"功能缺失"级别的空白。Windows 有四页签设置窗口；
+Linux 与 macOS 只能手改 `config.json`，而 `--settings` 在那两个平台上只启动面板、别的什么也不做。
+
+### 72.1 为什么"手改 JSON"不算入口
+
+`config.Normalize` 的职责是"读旧文件不炸"，所以它把认不出的值**换成默认值**而不报错。
+于是 `"theme": "papper"` 的结果不是一条错误，而是**主题悄悄回到 slate**——用户看到的现象是
+"这个设置不生效"，而不是"我拼错了"。这一轮把这件事变成两条明确的路：
+终端里的编辑器（人用）与 `--set`（脚本用），两者对非法值都是**拒绝**。
+
+### 72.2 改了什么
+
+| 面 | 内容 |
+|---|---|
+| `--settings` | 没有设置窗口的平台：先打表（21 个键 / 当前值 / 本地化标签），有终端时进入编辑：编号改一项，`s` 保存、`q` 放弃、`?` 重画。**有管道或重定向时只打表**，所以 `--settings \| less` 与 CI 都不会挂住 |
+| `--set k=v …` | 两平台都有。多键**要么全部生效要么一个都不写**（先全部校验，再一次性落盘）；未知键、越界值、坏拼写一律 exit 2 并列出已知键；`mutedSessions=clear` 是唯一列表型键的入口 |
+| 语言 | 跟随 `config.json` 的 `language`（而不是进程 locale），否则"想把界面切成中文"的人会拿到英文表 |
+| 代码 | 新包 `internal/settingscli`（纯逻辑 + 一行 I/O）；`internal/app.SettingsWindowAvailable()` 决定 `--settings` 走窗口还是走终端（`//go:build windows` 与 `!windows` 两个实现） |
+
+### 72.3 三个"看起来对、其实错"的地方
+
+1. **`os.ModeCharDevice` 不是"有没有终端"。** `/dev/null` 与 Windows 的 `NUL` 都是字符设备，
+   用这个判断会让 `--settings < /dev/null` 掉进一个立刻 EOF 的编辑器（表现出来就是"什么也没发生"）。
+   现在用 `unix.IoctlGetTermios`（Linux `TCGETS` / macOS `TIOCGETA`）与 `GetConsoleMode`，
+   也就是每个 `isatty()` 背后的那件事。
+2. **"改了就变脏"会把失败也算成成功。** 第一版编辑器在 `promptField` 之后**无条件**置
+   `changed = true`，于是"输入了一个非法值 → 按 s"会写盘一次、报告 saved，而实际上什么都没改。
+   现在 `promptField` 返回 `applied bool`；`TestRunKeepsGoingAfterABadValue` 就是钉这一条的
+   （它要求非法答案被拒绝、随后的合法答案仍然生效、并且只有后一次算改动）。
+3. **多键 `--set` 不能边校验边写。** `--set theme=paper opacity=999` 如果把第一对先落地，
+   用户会得到"一半生效"的配置，而错误信息只说第二对不合格。现在是**先全部校验、后一次写入**，
+   `TestControlSetLeavesTheFileAloneWhenAPairIsBad` 用文件里的最终值钉住它。
+
+### 72.4 本轮实测（两个平台都真的跑过）
+
+**Windows（本机）**
+
+```
+--set theme=paper                      -> theme = paper / saved to …\config.json   exit 0
+--set sound=off opacity=200            -> 两行回显 + saved                          exit 0
+--set theme=neon                       -> theme: "neon" is not one of slate, paper, contrast  exit 2
+--set nosuchkey=1                      -> unknown key … (known keys: …)             exit 2
+--set mutedSessions=clear              -> mutedSessions cleared (0 entries)        exit 0
+安装态：-VerifyOnly 12/12、--doctor 12 ok / 1 warn / 0 fail、--version 1.0.16、注册表行 DisplayVersion=1.0.16
+```
+
+**Linux（交叉编译的真二进制，在 WSL 里执行）**
+
+```
+--settings < /dev/null    -> 打印 21 行表 + 用法提示，exit 0（没有掉进编辑器）
+--set theme=paper         -> theme = paper，exit 0
+--set soundVolume=40 soundScheme=bell -> 两行回显，exit 0
+--set theme=neon          -> exit 2，且 config.json 的 md5 与之前相同（一个字节都没写）
+交互路径（script 分配真 pty）：1 -> off -> s  -> notifications = off / saved，随后 config.json 里 "notifications": false
+```
+
+**macOS**：没有实机；编辑器与 Linux 共用同一份代码与测试，差异只在 `IsTerminal` 的 ioctl
+（`TIOCGETA`），并且它和其他 `func Test` 一起在 `macos-latest` 上编译与运行。
+
+### 72.5 发版记录（2026-11-17）
+
+- 两个 tag：`pet-v1.0.16`、`dsh-plugin-v1.2.28`。插件必须跟发的原因同 §70.5：版本常量编进浮窗二进制，
+  `1.0.15 → 1.0.16` 必改字节，`vendor/AI-Terminal-Pet.exe` 与源码摘要随之前移。
+- 资产：zip **5,137,799 B / `F1F2A578…`（17 文件）**、`pet-setup.exe` **14,540,800 B / `5A4462CB…`**、
+  `dsh-ai-terminal-pet-1.2.28.tgz` **2,086,438 B / `E3259B96…`（20 文件）**，另有四个 POSIX tar.gz。
+- 按 §67.4 的教训：**四个 job 在同一个提交上全绿之后才打 tag**。
+
+### 72.6 顺手修掉的一个老显示 bug
+
+`usageError` 原来把 usage 文本拼进了 `fmt` 的**格式串**：
+`fmt.Fprintf(os.Stderr, "ai-terminal-pet: "+format+"\n\n"+usage, args...)`。
+usage 里有一句 "re-anchor … at 100% zoom"，于是**任何用法错误**都会打出
+`at 100%!z(MISSING)oom`。这一轮改成两次输出（消息走格式化、usage 原样打印），
+`TestUsageErrorPrintsTheUsageVerbatim` 钉住"既不能出现 MISSING，也不能丢百分号"。
+
+### 72.7 这一轮没有做的事
+
+- **不做 GUI**：`docs/ROADMAP.md` §5 的"不引入 UI 框架"没变；这是行式编辑器，不用 raw mode、不进备用屏。
+- **`mutedSessions` 不能逐条手改**：它是 `source|sessionId` 列表，逐条编辑只会制造无效键；
+  单条静音仍在面板里右键该行完成，终端这边只提供"清空"。
+- **`--settings` 不再顺带启动面板**：在没有窗口的平台上，"我要改设置"不等于"我要一块浮窗出现"。
+- **macOS 的终端编辑器没有实机验证**（理由同上）。
 
 ## 71. 交接：面板的像素第一次被断言 —— 三平台不变量门禁（2026-11-17，第 71 轮；**不发版**，浮窗仍 **1.0.15** / 插件仍 **1.2.27**）
 

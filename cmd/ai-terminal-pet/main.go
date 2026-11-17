@@ -35,7 +35,8 @@ usage:
   ai-terminal-pet --show          reveal the running overlay
   ai-terminal-pet --toggle        switch between compact and expanded
   ai-terminal-pet --reset         re-anchor to the screen edge at 100% zoom
-  ai-terminal-pet --settings      open the settings window
+  ai-terminal-pet --settings      open the settings (window, or the terminal editor)
+  ai-terminal-pet --set k=v ...   change settings and exit (theme=paper, sound=off, ...)
   ai-terminal-pet --quit          stop the running overlay
   ai-terminal-pet --json          print the current sessions as JSON
   ai-terminal-pet --autostart     report the run-at-logon state
@@ -57,6 +58,14 @@ reporters line reads the host configurations that are supposed to call us.
 
 --connect prints the block to paste into each terminal's own configuration.
 It writes nothing: paste it yourself, then run --doctor to confirm.
+
+--settings opens the four-tab window on Windows. On Linux and macOS there is no
+such window, so it prints every option with its current value and, when a
+terminal is attached, lets you edit them; a running panel re-reads config.json
+within 30 seconds. --set applies the same keys non-interactively and is the
+scriptable form: "--set theme=paper", "--set sound=off opacity=200",
+"--set mutedSessions=clear". Unknown keys and out-of-range values are refused
+rather than normalised, so a typo never becomes a silent default.
 
 The overlay also exits on its own once no terminal session is reporting.
 `
@@ -133,12 +142,19 @@ func run(args []string) error {
 		}
 		return app.Run()
 	case command == "--settings":
-		// Opening settings implies the panel should be visible: a settings
-		// window floating next to a hidden overlay is confusing.
+		// Windows: opening settings implies the panel should be visible, because
+		// the settings window lives next to it. Elsewhere there is no window, so
+		// --settings edits the same values in the terminal instead of starting a
+		// panel and doing nothing with the request.
+		if !app.SettingsWindowAvailable() {
+			return controlSettingsTerminal(args[1:])
+		}
 		if ui.Control(ui.ControlSettings) {
 			return nil
 		}
 		return app.RunWith(true)
+	case command == "--set" || strings.HasPrefix(command, "--set="):
+		return controlSet(command, args[1:])
 	case command == "--quit":
 		ui.Control(ui.ControlQuit)
 		return nil
@@ -258,7 +274,12 @@ func controlConnect(command string, extra []string) error {
 
 // usageError prints to stderr and returns the sentinel main maps to exit 2.
 func usageError(format string, args ...any) error {
-	fmt.Fprintf(os.Stderr, "ai-terminal-pet: "+format+"\n\n"+usage, args...)
+	// Two writes, not one: the usage text contains a literal "100%" ("re-anchor
+	// ... at 100% zoom"), and splicing it into a format string is how a usage
+	// error came out as "100%!z(MISSING)oom" for years. The message keeps its
+	// own formatting; the usage text is printed verbatim.
+	fmt.Fprintf(os.Stderr, "ai-terminal-pet: "+format+"\n\n", args...)
+	fmt.Fprint(os.Stderr, usage)
 	return errUsage
 }
 
