@@ -52,6 +52,8 @@ const OVERLAY_SOURCE = 'internal/app/version.go'
 const ROOT_MANIFEST = 'package.json'
 const PACKAGE_MANIFEST = 'packages/dsh-ai-terminal-pet/package.json'
 const PACKAGE_README = 'packages/dsh-ai-terminal-pet/README.md'
+const OPENCODE_MANIFEST = 'packages/opencode-ai-terminal-pet/package.json'
+const OPENCODE_README = 'packages/opencode-ai-terminal-pet/README.md'
 const MARKET_INDEX = 'docs/market-index.json'
 
 // Documents that may name a version at all. Used by the generic sweep, so a new
@@ -59,6 +61,7 @@ const MARKET_INDEX = 'docs/market-index.json'
 const DOCUMENTS = [
   'README.md',
   PACKAGE_README,
+  OPENCODE_README,
   'CHANGELOG.md',
   MARKET_INDEX,
   'docs/ROADMAP.md',
@@ -213,6 +216,17 @@ export const CLAIMS = [
     file: 'docs/LAUNCH.md',
     pattern: /\*\*(\d+\.\d+\.\d+)\*\*（`dist-tags\.latest`/g,
     expect: ['plugin'],
+    count: 1
+  },
+  {
+    // The reporter package is versioned with the overlay on purpose: there is
+    // one number for "the pair that was tested together", and the package's
+    // manifest version is asserted equal to the constant below. This row is the
+    // only prose that states the compatibility, so it is the one that rots.
+    id: 'opencode package requirement',
+    file: OPENCODE_README,
+    pattern: /AI Terminal Pet overlay \| \*\*(\d+\.\d+\.\d+) or newer\*\*/g,
+    expect: ['overlay'],
     count: 1
   }
 ]
@@ -396,6 +410,17 @@ export function check(documents, manifests, overlaySource, claims = CLAIMS) {
   if (manifests.index !== versions.plugin) {
     failures.push(`fail: ${MARKET_INDEX} lists ${manifests.index}, the packaged version is ${versions.plugin}`)
   }
+  // The OpenCode reporter is a third npm package, but it is deliberately not a
+  // third version line: it is generated from the same reporters/ sources that
+  // ship in the overlay, so "reporter 1.0.18 + overlay 1.0.18" is one product
+  // and two numbers that must agree. A bump that touches only one of them is
+  // the version drift this file exists to stop.
+  if (manifests.opencode !== versions.overlay) {
+    failures.push(
+      `fail: ${OPENCODE_MANIFEST} says ${manifests.opencode}, the overlay version is ${versions.overlay} ` +
+        '(this package is versioned with the overlay)'
+    )
+  }
   failures.push(...checkClaims(documents, versions, claims))
   failures.push(...sweepFutureVersions(documents, versions))
   failures.push(...checkChangelog(documents['CHANGELOG.md'] ?? '', versions))
@@ -425,6 +450,7 @@ function main() {
   const manifests = {
     root: readJson(ROOT_MANIFEST).version,
     package_: readJson(PACKAGE_MANIFEST).version,
+    opencode: readJson(OPENCODE_MANIFEST).version,
     index: readJson(MARKET_INDEX).plugins[0].versions[0].version
   }
 

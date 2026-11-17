@@ -97,11 +97,16 @@ func TestConnectTextNamesARealFileForEveryTerminal(t *testing.T) {
 		installRoot := filepath.Join(roots.LocalAppData, installDirectoryName)
 		switch terminal {
 		case connect.TerminalOpenCode:
-			if !strings.Contains(text, "file:///") {
-				t.Fatalf("opencode block is not a file URL:\n%s", text)
+			// The package is the form a normal user applies; the checkout URL
+			// is the development form and only appears when one is reachable.
+			if !strings.Contains(text, connect.OpenCodePackageName) {
+				t.Fatalf("opencode block does not name the package:\n%s", text)
 			}
-			if !strings.Contains(text, "reporters/opencode.js") {
-				t.Fatalf("opencode block does not name the reporter:\n%s", text)
+			if !strings.Contains(text, "opencode plugin add") {
+				t.Fatalf("opencode block does not name the install command:\n%s", text)
+			}
+			if !strings.Contains(text, "file:///") || !strings.Contains(text, "reporters/opencode.js") {
+				t.Fatalf("opencode block lost the checkout form the fixture provides:\n%s", text)
 			}
 		case connect.TerminalClaude:
 			if !strings.Contains(text, connect.HookBinaryName) {

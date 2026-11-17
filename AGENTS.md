@@ -74,7 +74,14 @@ reporters/*.js  ──[pipe / unix socket, JSON lines]──►  cmd/ai-terminal
   `--doctor`'s `reporters` line and `--connect`), and `internal/app/` (`run.go` is the lifecycle, `app.go`
   the neutral half, `doctor_windows.go` the `--doctor` implementation).
 - `reporters/`: host CLI hooks (`claude-hook.js`, `opencode.js`, `antigravity-hook.js`,
-  `antigravity-statusline.js`, `generic.js`, shared `protocol.js`).
+  `antigravity-statusline.js`, `generic.js`, shared `protocol.js`). **This is the only implementation**; every
+  packaged copy is generated from it.
+- `packages/opencode-ai-terminal-pet/`: the OpenCode reporter as a publishable npm plugin. `server.js` and
+  `protocol.cjs` are **generated** by `scripts/sync.mjs` from `reporters/opencode.js` and `reporters/protocol.js`
+  (the one difference is the `require()` specifier: an npm plugin must be `"type": "module"`, the shared core
+  is CommonJS). `--check` plus its tests are a CI gate: a fix that lands in `reporters/` and never reaches
+  this package is the drift handover §52.3 paid for. The package is **versioned with the overlay**
+  (`tools/check_versions.mjs` asserts the equality), so an overlay release publishes it in the same step.
 - `integrations/deepseek-harness/ai-terminal-pet-bridge/`: host-only Cordis bundle plus `verify.mjs`.
 
 ---
@@ -85,7 +92,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (495 func Test across 15 packages)
+# 1. Static analysis and all unit tests (498 func Test across 15 packages)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -104,6 +111,9 @@ node --check tests/fresh-machine.mjs
 node --test reporters/opencode-events.test.mjs   # the OpenCode event -> state table
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
+node packages/opencode-ai-terminal-pet/scripts/sync.mjs --check   # the npm reporter is generated from reporters/
+node --test packages/opencode-ai-terminal-pet/scripts/sync.test.mjs
+node --test packages/opencode-ai-terminal-pet/server.test.mjs      # loads the package the way npm install does
 node tools/upstream-entry.mjs --check   # catalogue entry points at this package version (SKIP is not a pass)
 node --test tools/upstream-entry.test.mjs
 node tools/check_versions.mjs           # every documented version equals the code's (badge, links, install commands)
@@ -115,10 +125,11 @@ python tools/check_assets.py       # every size/frame count in docs/assets/READM
 node --test tools/check-tarball.test.mjs   # the .tgz reader/writer rules (no tarball needed)
 
 # 2b. Doesn't run in CI (a clean checkout has no artifact) but must run before every
-#     plugin release, after `npm pack` in packages/dsh-ai-terminal-pet/: it unpacks the
+#     plugin release, after `npm pack` in the package directory: it unpacks the
 #     tarball and compares it file for file with the working tree. 1.2.28 shipped a
 #     packaged README that still said 1.2.27 because the pack ran before the bump.
-node tools/check-tarball.mjs
+node tools/check-tarball.mjs                                         # DSH plugin
+node tools/check-tarball.mjs --package packages/opencode-ai-terminal-pet   # OpenCode reporter
 
 # 3. Production build
 go build -trimpath -buildvcs=false -ldflags "-s -w" -o .\bin\AI-Terminal-Pet.exe ./cmd/ai-terminal-pet
@@ -192,6 +203,7 @@ Two conventions in those commands are load-bearing, not style:
 | **What works on which OS, and how was each claim measured?** | **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — the per-capability table (the reporting path is three platforms, the panel is one), what is unverified and why, and the two CI lists that pin it |
 | I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/PROMOTION.md](docs/PROMOTION.md) has the paste-ready copy; [docs/LAUNCH.md](docs/LAUNCH.md) has the measured numbers it must not exceed and the posting history |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
+| How does an OpenCode user install the reporter in one command? | [packages/opencode-ai-terminal-pet/README.md](packages/opencode-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |
 | Frozen historical documents | [docs/archive/README.md](docs/archive/README.md) |
 
@@ -247,6 +259,12 @@ Two conventions in those commands are load-bearing, not style:
    - Any text-only release still costs a version number. Release assets are immutable, so editing one
      sentence in the packaged README or in `dsh.catalog` means a new tag (that is why 1.2.1 and 1.2.4
      exist); never re-upload or rewrite a published `.tgz`.
+   - **The npm publish step now covers two packages**: `dsh-ai-terminal-pet` (its own 1.2.x line) and
+     `opencode-ai-terminal-pet` (**the overlay's own number** — `tools/check_versions.mjs` fails when the
+     two disagree). Publishing the reporter is not optional in an overlay release: the package is generated
+     from `reporters/`, so its bytes and the binary's bytes are the same code, and "reporter 1.0.18 +
+     overlay 1.0.17" is a pair that was never tested together. Pack *after* the bump, then
+     `node tools/check-tarball.mjs --package packages/opencode-ai-terminal-pet`.
 7. **Portability**:
    - Never commit machine-specific absolute paths into source, tests, scripts or docs. Use
      `internal/home.Directory()` (or `internal/home.Join(...)`) for this project's own paths,

@@ -18,9 +18,14 @@
  * Zero dependencies: gzip is node's zlib, and a tar is 512-byte headers, so the
  * release machine needs nothing that a clean checkout does not already have.
  *
- * Usage: node tools/check-tarball.mjs [path/to/file.tgz]
+ * Usage: node tools/check-tarball.mjs [path/to/file.tgz] [--package <dir>]
  * Exit codes: 0 every file matches, 1 a difference, 2 the tarball or the tree
  * cannot be read.
+ *
+ * `--package` exists because there are two npm packages in this repository
+ * (packages/dsh-ai-terminal-pet and packages/opencode-ai-terminal-pet) and the
+ * rule bought by the 1.2.28 incident is the same for both: compare the
+ * artifact, never the working tree.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import path from 'node:path'
@@ -129,35 +134,56 @@ export function check(tarball, directory = PACKAGE_DIR) {
   return failures
 }
 
-function newestTarball() {
-  const directory = path.join(repoDir, PACKAGE_DIR)
-  const candidates = existsSync(directory)
-    ? readdirSync(directory).filter((name) => name.endsWith('.tgz')).sort()
-    : []
+function newestTarball(directory) {
+  const root = at(directory)
+  const candidates = existsSync(root) ? readdirSync(root).filter((name) => name.endsWith('.tgz')).sort() : []
   if (candidates.length === 0) return null
-  return path.join(directory, candidates[candidates.length - 1])
+  return path.join(root, candidates[candidates.length - 1])
+}
+
+/**
+ * parseArgs accepts one optional tarball and an optional --package directory,
+ * because there are two npm packages in this repository now and the rule is the
+ * same for both: compare the artifact, not the working tree.
+ */
+function parseArgs(argv) {
+  let tarball
+  let directory = PACKAGE_DIR
+  for (let index = 0; index < argv.length; index++) {
+    const argument = argv[index]
+    if (argument === '--package') {
+      directory = argv[++index]
+    } else if (argument.startsWith('--package=')) {
+      directory = argument.slice('--package='.length)
+    } else {
+      tarball = argument
+    }
+  }
+  return { tarball, directory }
 }
 
 function main() {
-  const tarball = process.argv[2] ? path.resolve(process.argv[2]) : newestTarball()
+  const args = parseArgs(process.argv.slice(2))
+  const directory = args.directory
+  const tarball = args.tarball ? path.resolve(args.tarball) : newestTarball(directory)
   if (!tarball) {
-    console.log(`tarball: no .tgz in ${PACKAGE_DIR} - run "npm pack" there first`)
+    console.log(`tarball: no .tgz in ${directory} - run "npm pack" there first`)
     process.exit(2)
   }
   let failures
   try {
-    failures = check(tarball)
+    failures = check(tarball, directory)
   } catch (error) {
     console.log(`tarball: cannot read ${tarball}: ${error.message}`)
     process.exit(2)
   }
   if (failures.length > 0) {
-    console.log(`tarball: ${failures.length} difference(s) between ${path.basename(tarball)} and ${PACKAGE_DIR}`)
+    console.log(`tarball: ${failures.length} difference(s) between ${path.basename(tarball)} and ${directory}`)
     for (const failure of failures) console.log('  ' + failure)
     console.log('       Pack after the version bump, never before: the artifact is what ships.')
     process.exit(1)
   }
-  console.log(`tarball: ${path.basename(tarball)} matches ${PACKAGE_DIR} file for file`)
+  console.log(`tarball: ${path.basename(tarball)} matches ${directory} file for file`)
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

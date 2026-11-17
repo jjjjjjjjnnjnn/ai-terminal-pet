@@ -128,48 +128,34 @@ func repositoryRoot(roots Roots) string {
 	return ""
 }
 
-// openCodeSnippet wires OpenCode through the repository checkout.
+// openCodeSnippet wires OpenCode through the npm package.
 //
-// One hop, not two: the README's documented form is a direct file URL, and the
-// directory re-export on this machine exists only to keep the event table in one
-// place (handover §53.1). Printing the direct form means the snippet has one
-// target to go stale instead of two.
+// The package form comes first because it is the one a user who has never
+// cloned this repository can act on, and because it is the one that cannot go
+// stale: a file URL points at a checkout that moves, gets renamed, or is deleted
+// after the zip was unpacked - which is exactly the failure mode of handover
+// §52.3, and the reason the installer never shipped reporters/opencode.js.
+//
+// The checkout form is still printed, as a note, for the person developing the
+// reporter: they want their edits loaded, not a published copy.
 func openCodeSnippet(roots Roots) Snippet {
 	snippet := Snippet{Terminal: TerminalOpenCode}
 	snippet.Where = abbreviate(roots, filepath.Join(roots.Home, ".config", "opencode", "opencode.json"))
-	root := repositoryRoot(roots)
-	if root == "" {
-		// Running from the installed copy, where the repository is not
-		// reachable. If OpenCode is already wired, saying so is far more
-		// useful than "nothing to paste": the user's next question is "is it
-		// already done?", and this is the one command that can answer it.
-		if finding := InspectOpenCode(roots); finding.Status == StatusOK {
-			snippet.Text = "; already wired - " + finding.Detail
-			snippet.Note = "Nothing to paste: OpenCode already loads a reporter. " +
-				"Run `ai-terminal-pet --doctor` to see the reporters line, or paste this block " +
-				"yourself if you would rather point it at a repository checkout."
-			return snippet
-		}
-		snippet.Missing = []string{"reporters/opencode.js (a repository checkout that contains it)"}
-		snippet.Text = "; nothing to paste yet - run this from the repository, or install first"
-		snippet.Note = "OpenCode loads plugins from a file URL, so the snippet has to name a file that exists. " +
-			"From an installed copy the repository is not reachable: clone the repository, then run " +
-			"`ai-terminal-pet --connect=opencode` from its bin/ directory."
-		return snippet
-	}
-	url, err := PathToFileURL(filepath.Join(root, "reporters", "opencode.js"))
-	if err != nil {
-		snippet.Missing = []string{"reporters/opencode.js (could not be encoded as a URL: " + err.Error() + ")"}
-		snippet.Text = "; nothing to paste yet"
-		return snippet
-	}
+
 	var builder strings.Builder
 	builder.WriteString("\"plugins\": [\n")
-	fmt.Fprintf(&builder, "  \"%s\"\n", url)
+	fmt.Fprintf(&builder, "  %s\n", jsonQuote(OpenCodePackageName))
 	builder.WriteString("]")
 	snippet.Text = builder.String()
-	snippet.Note = "Add this entry to the existing plugins array (keep the entries already there). " +
-		"OpenCode resolves the entry to a directory's index.ts or to a .js file; this snippet is the direct file form."
+	snippet.Note = "`opencode plugin add " + OpenCodePackageName + "` writes this entry for you; " +
+		"the block is the same thing by hand. The package reports state only - the overlay is a separate " +
+		"install, and `ai-terminal-pet --doctor` says whether both halves are in place."
+
+	if root := repositoryRoot(roots); root != "" {
+		if url, err := PathToFileURL(filepath.Join(root, "reporters", "opencode.js")); err == nil {
+			snippet.Note += " Developing the reporter itself: point the entry at " + url + " instead."
+		}
+	}
 	return snippet
 }
 

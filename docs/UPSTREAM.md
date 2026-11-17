@@ -81,7 +81,10 @@
                    浮窗：ai-terminal-pet-X.Y.Z-win-x64.zip + pet-setup.exe（scripts/package.ps1 产出）
                    插件：dsh-ai-terminal-pet-X.Y.Z.tgz
 5. npm             cd packages/dsh-ai-terminal-pet && npm publish --access public
-                   等 2–4 分钟再 npm view dsh-ai-terminal-pet version（头几分钟 registry 只有占位 0.0.0-stage）
+                   cd packages/opencode-ai-terminal-pet && npm publish --access public   ← 与浮窗同号
+                   等 2–4 分钟再 npm view <name> version（头几分钟 registry 只有占位 0.0.0-stage）
+                   先 npm pack，再 node tools/check-tarball.mjs --package packages/opencode-ai-terminal-pet
+                   （包内 server.js / protocol.cjs 由 reporters/ 生成，所以要 bump 后重跑 sync.mjs --write）
 6. B 提交          把 docs/market-index.json 的 source.commit 与 icon 钉到 A 的 sha
                    （git 无法在一个提交里引用它自己的 sha，所以必须两步）
 7. 上游条目        node tools/upstream-entry.mjs --version X.Y.Z --write --branch bump-tarball-X.Y.Z --pr <号>
@@ -315,16 +318,19 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
 
 ```
 [ ] 代码/测试/素材/文档就绪，全门禁绿（AGENTS.md「标准验证命令」）
-[ ] Version + 两份清单 + market-index version/publishTimestamp → A 提交
+[ ] Version + 两份清单 + opencode 包清单（同号）+ market-index version/publishTimestamp → A 提交
 [ ] 版本号与随包 README **都改完**之后再 `npm pack`；`node tools/check-tarball.mjs` 必须与工作区逐文件一致
+[ ] `scripts/sync.mjs --write` 已在 reporters/ 改动之后跑过（CI 的 --check 会拦）
 [ ] npm run vendor；verify.mjs；npm pack 记字节与 sha256 → CHANGELOG
+[ ] npm pack（opencode 包）+ check-tarball --package …；三平台 server.test.mjs 绿
 [ ] 双 tag → 双 Release（资产齐全，URL 可下载）
-[ ] npm publish，等 2–4 分钟核对 dist-tags.latest
+[ ] npm publish 两个包，等 2–4 分钟核对 dist-tags.latest
 [ ] market-index 的 source.commit/icon 钉到 A 的 sha → B 提交
 [ ] node tools/upstream-entry.mjs --version <版本> --write --branch bump-tarball-<版本> --pr <号>
 [ ] gh pr view <号>：mergeable=MERGEABLE，check 跑起来（不是「没检查」）
 [ ] node tools/upstream-entry.mjs --check      → OK 或 OK（in flight）
 [ ] 从公网下载三个资产复验；沙箱 install → -VerifyOnly → --doctor → -Uninstall
+[ ] 真机装一次 opencode plugin add（临时 XDG_CONFIG_HOME 先试，再换本机），确认 --doctor 的 reporters 行变 ok
 [ ] packaging/winget 加新版本目录；winget validate 通过；向 microsoft/winget-pkgs 开 PR（只加这一个目录）
 [ ] HANDOVER 记本轮：发了什么、上游 PR 号与状态、判可见性读的是哪个文件
 [ ] node tools/check_versions.mjs 绿（徽章/发布链接/安装命令/基线行都与代码里的版本一致）

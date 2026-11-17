@@ -1,8 +1,9 @@
 package connect
 
-// The OpenCode check: two hops, and the second one is the one that broke.
+// The OpenCode check: three shapes, and the third one is what a user who has
+// never cloned this repository actually has.
 //
-// opencode.json on this machine names a *directory*:
+// opencode.json on the machine this was written on names a *directory*:
 //
 //	"plugins": ["file:///C:/Users/.../.config/opencode/plugins/terminal-pet"]
 //
@@ -15,13 +16,24 @@ package connect
 // A "plugins" entry may also be a plain .js file URL, which is one hop. Both
 // shapes are handled; anything else is reported as a shape we do not know
 // rather than guessed at.
+//
+// Since the reporter is published as an npm package, the primary shape is a
+// bare package name (or an object with a "package" field, which is the other
+// documented form). That shape has no local file to inspect: OpenCode resolves
+// it from its own package directory, so the evidence is the installed package's
+// manifest rather than a path in the config.
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+// OpenCodePackageName is the npm package this project publishes for OpenCode.
+// One constant, because the snippet, the doctor line and the tests all name it.
+const OpenCodePackageName = "opencode-ai-terminal-pet"
 
 // openCodeConfigDir is where OpenCode keeps opencode.json:
 // %USERPROFILE%\.config\opencode\opencode.json. This repository has that file
@@ -67,6 +79,11 @@ func InspectOpenCode(roots Roots) Finding {
 		if !refersToReporter(entry) {
 			continue
 		}
+		// Zero hops: a package name. There is no file in the config to follow,
+		// so the evidence is the package OpenCode installed for itself.
+		if name := npmPackageName(entry); name != "" {
+			return inspectOpenCodePackage(roots, finding, index, name)
+		}
 		// One hop: the entry is the reporter itself.
 		if target, err := FileURLToPath(expandUser(roots, entry)); err == nil && !isDirectory(target) {
 			if exists(target) {
@@ -79,6 +96,91 @@ func InspectOpenCode(roots Roots) Finding {
 	}
 	return finding.warn("not connected (plugins[] has %d entr%s, none of them ours; run `ai-terminal-pet --connect=opencode`)",
 		len(entries), plural(len(entries)))
+}
+
+// inspectOpenCodePackage reports the npm-package shape.
+//
+// "Not found here" is a warn, not a fail, and the difference is deliberate: an
+// installed package is visible in <config>/node_modules, but OpenCode also keeps
+// its own resolution and cache, and this tool is not going to call a working
+// installation broken because it could not see the file it looks for. The line
+// still names the one command that fixes the common case.
+func inspectOpenCodePackage(roots Roots, finding Finding, index int, name string) Finding {
+	manifest := filepath.Join(openCodeConfigDir(roots), "node_modules", filepath.FromSlash(name), "package.json")
+	raw, err := os.ReadFile(manifest)
+	if err != nil {
+		return finding.warn("plugins[%d] -> %s is listed but %s was not found (run `opencode plugin add %s`)",
+			index, name, abbreviate(roots, manifest), name)
+	}
+	version := ""
+	var parsed struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(raw, &parsed) == nil {
+		version = strings.TrimSpace(parsed.Version)
+	}
+	if version == "" {
+		return finding.ok("plugins[%d] -> %s (installed in %s)", index, name, abbreviate(roots, filepath.Dir(manifest)))
+	}
+	return finding.ok("plugins[%d] -> %s@%s", index, name, version)
+}
+
+// npmPackageName returns the package name an entry refers to, or "" when the
+// entry is a path or a git spec instead.
+//
+// The distinction has to be positive, not "does it look like a path": a nil
+// answer here falls through to the file/directory branches, and a wrong "yes"
+// would make --doctor check a manifest nobody named. So the shapes this project
+// itself writes are the only ones accepted - a bare name, a scoped name, either
+// with an optional @version - and everything with a scheme, a slash in a
+// non-scoped position (github:owner/repo), a drive letter or a leading dot is
+// left to the path branches.
+func npmPackageName(entry string) string {
+	spec := strings.TrimSpace(entry)
+	if spec == "" {
+		return ""
+	}
+	if strings.Contains(spec, "://") || strings.ContainsRune(spec, '\\') {
+		return "" // a URL, or a Windows path
+	}
+	if strings.HasPrefix(spec, ".") || strings.HasPrefix(spec, "/") || strings.HasPrefix(spec, "~") {
+		return "" // a relative or home-relative path
+	}
+	if len(spec) > 1 && spec[1] == ':' {
+		return "" // a Windows drive path: C:/...
+	}
+	name := spec
+	if at := strings.LastIndex(spec, "@"); at > 0 {
+		name = spec[:at] // drop @1.2.3 / @latest / @range
+	}
+	if strings.HasPrefix(name, "@") {
+		if strings.Count(name, "/") != 1 {
+			return ""
+		}
+	} else if strings.ContainsRune(name, '/') {
+		return ""
+	}
+	if !isPackageName(name) {
+		return ""
+	}
+	return name
+}
+
+// isPackageName accepts the characters npm allows in a name, plus the one slash
+// a scoped name needs. It is a filter against nonsense, not a validator.
+func isPackageName(name string) bool {
+	if name == "" || name == "@" || strings.HasSuffix(name, "/") {
+		return false
+	}
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '-', r == '_', r == '.', r == '/', r == '@':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // inspectOpenCodeEntrypoint follows the directory entry to its entrypoint and
@@ -200,11 +302,22 @@ func stringList(object map[string]any, keys ...string) ([]string, shape) {
 		case []any:
 			entries := make([]string, 0, len(typed))
 			for _, element := range typed {
-				text, ok := element.(string)
-				if !ok {
+				switch value := element.(type) {
+				case string:
+					entries = append(entries, value)
+				case map[string]any:
+					// OpenCode also documents an object form,
+					// {"package": "...", "options": {...}}. The package name is
+					// what decides "is this entry ours"; the options are another
+					// product's schema and are deliberately not read here.
+					name, isString := value["package"].(string)
+					if !isString || strings.TrimSpace(name) == "" {
+						return nil, shapeWrongType
+					}
+					entries = append(entries, name)
+				default:
 					return nil, shapeWrongType
 				}
-				entries = append(entries, text)
 			}
 			return entries, shapeStringList
 		default:

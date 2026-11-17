@@ -201,24 +201,33 @@ function docs(overrides = {}) {
 const claims = [claim]
 
 test('check() passes when the manifests, the index and the documents agree', () => {
-  const manifests = { root: '1.2.14', package_: '1.2.14', index: '1.2.14' }
+  const manifests = { root: '1.2.14', package_: '1.2.14', opencode: '1.0.7', index: '1.2.14' }
   assert.deepEqual(check(docs(), manifests, 'const Version = "1.0.7"', claims), [])
 })
 
 test('check() reports two manifests that disagree', () => {
-  const manifests = { root: '1.2.14', package_: '1.2.13', index: '1.2.14' }
+  const manifests = { root: '1.2.14', package_: '1.2.13', opencode: '1.0.7', index: '1.2.14' }
   const failures = check(docs(), manifests, 'const Version = "1.0.7"', claims)
   assert.match(failures.join('\n'), /two plugin manifests disagree/)
 })
 
 test('check() reports an index that is behind the package', () => {
-  const manifests = { root: '1.2.14', package_: '1.2.14', index: '1.2.13' }
+  const manifests = { root: '1.2.14', package_: '1.2.14', opencode: '1.0.7', index: '1.2.13' }
   const failures = check(docs(), manifests, 'const Version = "1.0.7"', claims)
   assert.match(failures.join('\n'), /lists 1\.2\.13, the packaged version is 1\.2\.14/)
 })
 
+test('check() reports a reporter package that did not follow the overlay', () => {
+  // The reporter package is versioned with the overlay, so a release that bumps
+  // one and not the other ships two things calling themselves different versions
+  // of the same tested pair.
+  const manifests = { root: '1.2.14', package_: '1.2.14', opencode: '1.0.6', index: '1.2.14' }
+  const failures = check(docs(), manifests, 'const Version = "1.0.7"', claims)
+  assert.match(failures.join('\n'), /packages\/opencode-ai-terminal-pet\/package\.json says 1\.0\.6/)
+})
+
 test('check() stops at a broken overlay source instead of guessing', () => {
-  const manifests = { root: '1.2.14', package_: '1.2.14', index: '1.2.14' }
+  const manifests = { root: '1.2.14', package_: '1.2.14', opencode: '1.0.7', index: '1.2.14' }
   const failures = check(docs(), manifests, 'var Version = 1', claims)
   assert.equal(failures.length, 1)
   // The source moved to version.go when the lifecycle split for the platform port;

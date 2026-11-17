@@ -18,10 +18,13 @@ bin/
 # the repository grow on every release.
 dist/
 
-# The packed plugin tarball (npm pack). It is a release asset, not source: it
-# carries a vendored copy of the overlay, so committing it would add ~2 MB of
-# binary per release. 73a9fad accidentally carried 1.2.11; do not repeat that.
+# The packed plugin tarballs (npm pack). They are release assets, not source: the
+# DSH package carries a vendored copy of the overlay, so committing it would add
+# ~2 MB of binary per release, and the OpenCode reporter has the same rule for the
+# simpler reason that its bytes are reproducible from reporters/ (73a9fad
+# accidentally carried 1.2.11; do not repeat that).
 packages/dsh-ai-terminal-pet/*.tgz
+packages/opencode-ai-terminal-pet/*.tgz
 
 # Runtime / logs (machine-local state)
 error.log

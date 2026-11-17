@@ -33,8 +33,8 @@ HN 创始人 dang 的原话（2020，2026-03 更新）值得记住：
 | 顺序 | 渠道 | 真实门槛（读来的） | 内容 | 谁写 |
 |---|---|---|---|---|
 | 1 | GitHub 仓库页 | 无 | 描述/topics/社交预览/README 首屏 —— 决定"点进来 30 秒懂不懂" | 我 |
-| 2 | **npm 上的 OpenCode 插件** | 需要一个真实可装的包 | `opencode plugin add` 一行装 —— 对目标人群最有用的一步 | 我 |
-| 3 | **awesome-opencode**（11k★） | 按 **插件** 收录，一行一个 `<details>` | 我们成了插件包之后才投 | 我起稿，你提 PR |
+| 2 | **npm 上的 OpenCode 插件** | ✅ 已发布：`opencode-ai-terminal-pet`（与浮窗同号，1.0.18） | `opencode plugin add opencode-ai-terminal-pet` 一行装 —— 对目标人群最有用的一步 | 我 |
+| 3 | **awesome-opencode**（11k★） | **实际门槛（它的 contributing.md 原文）：≥25 stars，且仓库满 30 天；任一规则不过，PR 会被 close**。我们 1★ → **现在投了就是被关**。这一条等的是 star，不是等包 | 等过线再投，一条 `<details>` | 我起稿，你提 PR |
 | 4 | **awesome-claude-code**（58k★） | **人手网页表单**；一次只能荐一个；≥14 天且活跃（或 ≥100★）；描述单行、无 emoji、不推销 | 一行描述 + 表单 | 你提交，我给那行字 |
 | 5 | DSH 插件目录 / npm | 已有 | 生态内先看到 | 我 |
 | 6 | winget | 等合并 | `winget install` | 我 |
@@ -51,7 +51,7 @@ HN 创始人 dang 的原话（2020，2026-03 更新）值得记住：
 ## 2. 事实卡（写帖时从这里取，别超过）
 
 - 是什么：一条 56px 置顶窄条，显示哪个 AI 终端卡住、在等什么、等了多久；点行尾箭头回到那个终端。
-- 支持：DeepSeek Harness（装上即接）、Claude Code、OpenCode、Antigravity。
+- 支持：DeepSeek Harness（装上即接）、OpenCode（`opencode plugin add opencode-ai-terminal-pet` 一行）、Claude Code、Antigravity（后两个是配置钩子，`--connect` 会打印片段）。
 - 平台：Windows / Linux（X11）/ macOS；单文件 Go 二进制，无运行时。
 - 不联网：无账号、无遥测、无云；审批仍在你的终端里点。
 - MIT；约 4.5 MiB；只在真事件上响（等待确认 / 出错 / 你不在看时完成）。
@@ -165,4 +165,4 @@ Windows / Linux / macOS · MIT · 不联网、不要账号
 - <https://news.ycombinator.com/item?id=22336638>（dang 的 present-your-work tips，含"别用 LLM 写/润色"）
 - <https://www.v2ex.com/about>（「请不要把 AI 生成的内容发送到这里」）
 - `awesome-claude-code` 的 CONTRIBUTING（人手网页表单、一次一个、14 天/100★、描述单行无 emoji）
-- `awesome-opencode` 的 README（按插件收录，一行一个 `<details>`）
+- `awesome-opencode` 的 `contributing.md`（YAML + PR，一条一个文件；**门槛：≥25 stars、仓库满 30 天、90 天内有提交**；规则明写"任一不过就关 PR"）

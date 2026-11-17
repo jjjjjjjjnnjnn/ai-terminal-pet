@@ -11,12 +11,12 @@
 ## 0. 发布顺序（**已全部就绪**）
 
 ```
-P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.17 / 1.2.30）──► ✅ 现在可以发声
+P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.18 / 1.2.31）──► ✅ 现在可以发声
 ```
 
-**前提条件全部满足，可以发了。** 浮窗 1.0.17（Windows / Linux X11 / macOS AppKit）、插件 1.2.30、npm `latest` = 1.2.30、`pet-v1.0.17` 的
+**前提条件全部满足，可以发了。** 浮窗 1.0.18（Windows / Linux X11 / macOS AppKit）、插件 1.2.31、npm `latest` = 1.2.31、`pet-v1.0.18` 的
 安装包与各平台压缩包都已构建并在发布时传回复验。
-发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.17` 这个链接。
+发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.18` 这个链接。
 
 **唯一还需要人做的一步**：`docs/assets/smartscreen-unsigned.png` 是**示意图**（图左下角写着 MOCKUP）。
 真机截图只有一台「从没构建过本项目」的机器才拍得到；如果能在发帖前补一张真的，更好；补不到就用示意图，
@@ -302,7 +302,7 @@ files alone does not wire it. The connect table in the README has one line per t
 | Release 下载数 | `gh api repos/.../releases` | `pet-v1.0.9` = 4／`v1.0.10` = 6／`v1.0.11` = 7／`v1.0.12` = 6／`dsh-plugin-v1.2.17` = 28／`v1.2.18` = 18／`v1.2.19` = 11／`v1.2.20` = 7／`v1.2.21` = 14（2026-11-16 复读；**1.2.17 仍是这批里最高的 28**，说明换代而不是发帖在带下载） |
 | 仓库浏览 | `gh api .../traffic/views` | 近 14 天 **28 views / 8 uniques**（2026-11-16） |
 | star / fork | `gh repo view` | **1 / 0** |
-| npm | `npm view dsh-ai-terminal-pet version` | **1.2.30**（`dist-tags.latest`，2026-11-16 发版同步） |
+| npm | `npm view dsh-ai-terminal-pet version` | **1.2.31**（`dist-tags.latest`，2026-11-17 发版同步）；OpenCode 上报端 `opencode-ai-terminal-pet` 同日 **1.0.18** |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后已数日未动） |
 | **npm 下载量（唯一可信的那个数）** | `npm i dsh-ai-terminal-pet` 的 npm 页面 Weekly Downloads，或 `api.npmjs.org/downloads/point/last-week` | **3,455**（2026-11-09 → 11-15）。`point/last-month`（2026-10-17 → 11-15）**也是 3,455**：首个版本 2026-11-11T12:10:46Z 才发布，之前 30 天每天都是 0，所以两个窗口真实值相同 |
 | **目录那行（只作参考，不当数据源）** | `node tools/catalog-status.mjs` | 站点写 `downloads: 1,179 (30d)`、`version: 1.2.16`、安装命令 `dsh-plugin-v1.2.16`。**这三个都落后于现实，且都不归我们修**：1,179 = 11-11 的 624 + 11-12 的 555，缺掉的 2,276 分两段（最后一天 1,197 见 issue #15864、窗口没前进 1,079 见 #15569/PR #15579）。分解表在 [docs/UPSTREAM.md](UPSTREAM.md) §4.1。**对外引用下载量一律用 npm 的 3,455，不要抄站点那个 1,179** |

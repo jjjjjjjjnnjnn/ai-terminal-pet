@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-17；浮窗 **1.0.17**、插件包 **1.2.30** 已发版；**§71 第 71 轮（三平台视觉不变量门禁）；§70 第 70 轮（安装器写卸载项 + winget 清单）；§69（把文档里的数字变成门禁）；§68 公开文案重做**）
+## 1. 当前状态（2026-11-17；浮窗 **1.0.18**、插件包 **1.2.31** 已发版；**§75 第 75 轮（OpenCode 上报端成为 npm 包）；§74 第 74 轮（门禁、卸载项、像素、设置入口、推广功课）；§71（三平台视觉不变量门禁）；§70（安装器写卸载项 + winget 清单）**）
 
 > 接手请先读本节与 **§74「一轮五件事，下个会话从这里开始」**（机器状态、外部世界谁在等谁、
 > 下一步顺序，以及三条只有本人能做的事），再读 **§72「Linux/macOS 终于有设置入口」**
@@ -66,39 +66,44 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.17`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.30`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.17` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.30`。
-  **工作区与本机安装目录已经与 `1.0.17` / `1.2.30` 同步**：`bin/`、
+- **版本**：浮窗 **`1.0.18`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.31`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.18` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.31`。
+  OpenCode 上报端包 `opencode-ai-terminal-pet` **没有自己的版本线**：它与浮窗同号（`check_versions` 断言相等）。
+  **工作区与本机安装目录已经与 `1.0.18` / `1.2.31` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
-  （`AI-Terminal-Pet.exe` **4,759,040 B**，sha256 `396605B9…`）。
+  （`AI-Terminal-Pet.exe` 的字节数与 sha256 见下方规模一行）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**495 个** `func Test`，
-  本轮（第 73 轮）+7 来自设置界面的支持链接与版本号）；CI 四条 job
-  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.17 的提交上全绿（见 §73.4）；
-  `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过；两个 `verify.mjs` 全 PASS；
-  `vendor.mjs --check` 与 1.0.17 的 `bin/` 一致；`tools/check_versions.mjs` 20 条一致
-  （`node --test tools/check_versions.test.mjs` 26/26）、**`tools/check_facts.mjs` 11 条一致**、
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**498 个** `func Test`，
+  本轮（第 75 轮）+3 来自 OpenCode 的 npm 包形状与包名解析）；CI 四条 job
+  （windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.18 的提交上全绿（见 §75）；
+  `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑：16 包 × linux/amd64 + darwin/arm64 全过）；两个 `verify.mjs` 全 PASS；
+  `vendor.mjs --check` 与 1.0.18 的 `bin/` 一致；`tools/check_versions.mjs` **21** 条一致
+  （`node --test tools/check_versions.test.mjs` 27/27）、**`tools/check_facts.mjs` 11 条一致**、
   `tools/catalog-status.test.mjs` **12/12**、`tools/upstream-entry.test.mjs` 26/26、
-  `tools/check-tarball.test.mjs` 8/8；
+  `tools/check-tarball.test.mjs` 8/8；**OpenCode 包**：`sync.mjs --check` 3/3、
+  `sync.test.mjs` 4/4、`server.test.mjs` 1/1（本机 Windows 走命名管道，Linux/macOS 在 CI 走 socket）；
   `tests/fresh-machine.mjs --no-overlay` **183/183**；
-  `tools/check_docs_links.py` 12 份全解、`tools/check_assets.py` 15 行一致；
+  `tools/check_docs_links.py` **14 份**全解、`tools/check_assets.py` 15 行一致；
   `govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.17 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  1.0.18 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.17`，注册表那一行 `DisplayVersion=1.0.17`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.17 实测）：非测试 **154 文件 / 28,156 行**、
-  测试 **99 文件 / 14,610 行**、**495 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,759,040 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `396605B9…`）、
+  `--version` 报 `ai-terminal-pet 1.0.18`，注册表那一行 `DisplayVersion=1.0.18`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.18 实测）：非测试 **154 文件 / 28,255 行**、
+  测试 **100 文件 / 14,735 行**、**498 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,764,160 B**（与 `vendor/AI-Terminal-Pet.exe` 逐字节相同，sha256 `B8DE4C94…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
-  三个二进制合计 **12,143,104 B** = 11.58 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
-- **分发（两条线 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.30**；`dsh-plugin-v1.2.30` 的 Release 资产 `dsh-ai-terminal-pet-1.2.30.tgz`
-    **2,089,727 B / sha256 `EFDD7C10…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.17`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §73.4。
-  - 浮窗线：`pet-v1.0.17` 的六个资产——`pet-setup.exe` **14,546,432 B / `4202DB66…`**、
-    `ai-terminal-pet-1.0.17-win-x64.zip` **5,140,377 B / `A31E93FA…`（17 文件）**，以及
-    linux-{amd64,arm64} 与 darwin-{arm64,amd64} 四个 tar.gz。
+  三个二进制合计 **12,148,224 B** = 11.585 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
+- **分发（两条版本线 + 两个 npm 包 + 一个包管理器）**：
+  - 插件线：npm `latest` = **1.2.31**；`dsh-plugin-v1.2.31` 的 Release 资产 `dsh-ai-terminal-pet-1.2.31.tgz`
+    **2,091,456 B / sha256 `8CEA5882…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.18`），**与 npm 上那一份逐字节相同**；上游条目 PR 见 §75。
+  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.18**（与浮窗同号），
+    资产 `opencode-ai-terminal-pet-1.0.18.tgz` **17,822 B / sha256 `C6588551…` / 5 文件**。
+  - 浮窗线：`pet-v1.0.18` 的六个资产——`pet-setup.exe` **14,551,552 B / `8A589006…`**、
+    `ai-terminal-pet-1.0.18-win-x64.zip` **5,142,108 B / `70AE18C0…`（17 文件）**，以及
+    linux-{amd64,arm64}（**5,439,674 B / `5F74890E…`**、**4,949,913 B / `17E29037…`**）与
+    darwin-{arm64,amd64}（**5,143,588 B / `9416A411…`**、**5,536,325 B / `39193DBF…`**）四个 tar.gz。
   - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
     `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
     版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
@@ -106,9 +111,10 @@
   - **winget**：清单在 `packaging/winget/`（`winget validate` 通过，`winget show` 解析正确），
     提交到 `microsoft/winget-pkgs` 的 PR 见 §70.6。能不能上取决于对方 pipeline 里那次静默安装/卸载；
     未签名带来的 SmartScreen 风险写在 [docs/UPSTREAM.md](UPSTREAM.md) §4.3。
-- **接入**：OpenCode（`reporters/opencode.js` 插件；本机 `opencode.json` 指向
+- **接入**：OpenCode（**npm 包 `opencode-ai-terminal-pet`，`opencode plugin add` 一行**；包内 `server.js`
+  由 `reporters/opencode.js` 生成，本机 `opencode.json` 目前仍指向
   `~/.config/opencode/plugins/terminal-pet` 这个目录，里面的 `index.ts` 只做一次静态 re-export，
-  见 §53）、Claude Code（`reporters/claude-hook.js` 7 事件）、
+  见 §53——§75.6 记了为什么本机特意先留着它）、Claude Code（`reporters/claude-hook.js` 7 事件）、
   Antigravity（`bin/pet-statusline.exe` + `reporters/antigravity-hook.js`）、DeepSeek Harness
   （两种：老的 host-only bridge bundle `integrations/deepseek-harness/ai-terminal-pet-bridge`，
   与新的独立插件包 `packages/dsh-ai-terminal-pet`，见 §27）、任意 CLI（`reporters/generic.js`）。

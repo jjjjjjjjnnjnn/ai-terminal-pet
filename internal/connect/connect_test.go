@@ -108,6 +108,80 @@ func TestInspectOpenCodeDirectFileEntry(t *testing.T) {
 	}
 }
 
+// The package shape is the one a user who never cloned this repository has.
+// There is no file in the config to follow, so the evidence is the manifest
+// OpenCode installed for itself - and "not found there" stays a warn, because
+// the tool cannot see every place the host may resolve from.
+func TestInspectOpenCodeAcceptsTheNpmPackage(t *testing.T) {
+	roots := home(t)
+	config := filepath.Join(roots.Home, ".config", "opencode", "opencode.json")
+	writeFile(t, config, `{"plugins": ["`+OpenCodePackageName+`"]}`)
+
+	finding := InspectOpenCode(roots)
+	if finding.Status != StatusWarn {
+		t.Fatalf("a listed but unseen package must warn, got %s: %s", finding.Status, finding.Detail)
+	}
+	if !strings.Contains(finding.Detail, "opencode plugin add") {
+		t.Fatalf("the warn has to carry the command that fixes it: %s", finding.Detail)
+	}
+	if strings.Contains(finding.Detail, "cannot be read") {
+		t.Fatalf("a package name is not an unreadable path: %s", finding.Detail)
+	}
+
+	writeFile(t, filepath.Join(roots.Home, ".config", "opencode", "node_modules", OpenCodePackageName, "package.json"),
+		`{"name": "`+OpenCodePackageName+`", "version": "1.0.0"}`)
+	finding = InspectOpenCode(roots)
+	if finding.Status != StatusOK || !strings.Contains(finding.Detail, "1.0.0") {
+		t.Fatalf("an installed package must be ok and carry its version, got %s: %s", finding.Status, finding.Detail)
+	}
+}
+
+func TestInspectOpenCodeAcceptsAPinnedNameAndTheObjectForm(t *testing.T) {
+	roots := home(t)
+	writeFile(t, filepath.Join(roots.Home, ".config", "opencode", "node_modules", OpenCodePackageName, "package.json"),
+		`{"name": "`+OpenCodePackageName+`", "version": "1.2.3"}`)
+	config := filepath.Join(roots.Home, ".config", "opencode", "opencode.json")
+
+	for _, plugins := range []string{
+		`["` + OpenCodePackageName + `@1.2.3"]`,
+		`[{"package": "` + OpenCodePackageName + `", "options": {"quiet": true}}]`,
+	} {
+		writeFile(t, config, `{"plugins": `+plugins+`}`)
+		finding := InspectOpenCode(roots)
+		if finding.Status != StatusOK || !strings.Contains(finding.Detail, "1.2.3") {
+			t.Fatalf("%s: got %s: %s", plugins, finding.Status, finding.Detail)
+		}
+	}
+}
+
+// The package/path distinction has to be positive: a wrong "yes" sends the
+// inspector looking for a manifest nobody named, and a wrong "no" falls through
+// to a file check that then reports a path that was never a path.
+func TestNpmPackageNameTellsAPackageFromAPath(t *testing.T) {
+	cases := []struct{ entry, want string }{
+		{OpenCodePackageName, OpenCodePackageName},
+		{OpenCodePackageName + "@1.2.3", OpenCodePackageName},
+		{OpenCodePackageName + "@latest", OpenCodePackageName},
+		{"@scope/plugin", "@scope/plugin"},
+		{"@scope/plugin@latest", "@scope/plugin"},
+		{"file:///C:/repo/reporters/opencode.js", ""},
+		{`C:\repo\reporters\opencode.js`, ""},
+		{"C:/repo/reporters/opencode.js", ""},
+		{"./plugins/local", ""},
+		{"../shared/plugin", ""},
+		{"~/plugins/pet", ""},
+		{"/absolute/path", ""},
+		{"github:owner/repo", ""},
+		{"git+ssh://git@github.com/owner/repo.git#main", ""},
+		{"", ""},
+	}
+	for _, testCase := range cases {
+		if got := npmPackageName(testCase.entry); got != testCase.want {
+			t.Fatalf("npmPackageName(%q) = %q, want %q", testCase.entry, got, testCase.want)
+		}
+	}
+}
+
 func TestInspectOpenCodeReportsWhatItCannotSee(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -120,6 +194,8 @@ func TestInspectOpenCodeReportsWhatItCannotSee(t *testing.T) {
 		{"empty list", `{"plugins": []}`, StatusWarn, "empty"},
 		{"foreign entry", `{"plugins": ["file:///C:/other/plugin.js"]}`, StatusWarn, "none of them ours"},
 		{"wrong type", `{"plugins": {"a": 1}}`, StatusWarn, "not a list of strings"},
+		{"number element", `{"plugins": [1]}`, StatusWarn, "not a list of strings"},
+		{"object without a package", `{"plugins": [{"options": {}}]}`, StatusWarn, "not a list of strings"},
 		{"comments", "{\n  // OpenCode allows a comment here\n  \"plugins\": []\n}", StatusWarn, "line 2"},
 	}
 	for _, testCase := range cases {
@@ -319,8 +395,13 @@ func TestSnippetsCarryResolvableTargets(t *testing.T) {
 	}
 
 	openCode := snippetNamed(t, snippets, TerminalOpenCode)
-	if !strings.Contains(openCode.Text, "file:///") || !strings.Contains(openCode.Text, "reporters/opencode.js") {
-		t.Fatalf("the opencode snippet has to be the direct file form: %s", openCode.Text)
+	// The package name is the primary form; the checkout URL, when one is
+	// reachable, belongs in the note because it is the development form.
+	if !strings.Contains(openCode.Text, OpenCodePackageName) {
+		t.Fatalf("the opencode snippet has to be the package form: %s", openCode.Text)
+	}
+	if !strings.Contains(openCode.Note, "reporters/opencode.js") {
+		t.Fatalf("the note has to name the checkout form when a repository is reachable: %s", openCode.Note)
 	}
 
 	claude := snippetNamed(t, snippets, TerminalClaude)
@@ -360,6 +441,19 @@ func TestSnippetsSayWhatIsMissingInsteadOfPrintingADeadCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, snippet := range Snippets(roots) {
+		if snippet.Terminal == TerminalOpenCode {
+			// The package form is the one snippet that installs nothing
+			// locally: npm supplies the reporter, so "missing reporter file" is
+			// not a state it can be in. What it must still do is name the
+			// package, because that is the command the user is about to run.
+			if len(snippet.Missing) != 0 {
+				t.Fatalf("the package form cannot be missing local files: %v", snippet.Missing)
+			}
+			if !strings.Contains(snippet.Text, OpenCodePackageName) {
+				t.Fatalf("the opencode snippet has to name the package: %s", snippet.Text)
+			}
+			continue
+		}
 		if len(snippet.Missing) == 0 {
 			t.Fatalf("%s reports nothing missing on a machine with no install", snippet.Terminal)
 		}
@@ -369,23 +463,31 @@ func TestSnippetsSayWhatIsMissingInsteadOfPrintingADeadCommand(t *testing.T) {
 	}
 }
 
-func TestOpenCodeSnippetRecognisesAnExistingWiring(t *testing.T) {
-	// From an installed copy the repository is unreachable, so the honest
-	// answer to --connect=opencode is "already wired" when the host config
-	// resolves - not "nothing to paste", which reads as "you have no option".
+func TestOpenCodeSnippetPrintsThePackageAndTheCheckoutForm(t *testing.T) {
+	// Two audiences, two forms. The package is what a user installs; the file
+	// URL is what a person editing reporters/opencode.js needs, and it is only
+	// printed when a checkout is actually reachable - a URL to a directory that
+	// does not exist is the stale-reference failure of handover §52.3.
 	root := t.TempDir()
 	roots := Roots{Home: filepath.Join(root, "profile"), LocalAppData: filepath.Join(root, "local")}
 	reporter := filepath.Join(root, "repo", "reporters", "opencode.js")
 	writeFile(t, reporter, "module.exports = {}\n")
-	writeFile(t, filepath.Join(roots.Home, ".config", "opencode", "opencode.json"),
-		`{"plugins": ["`+mustURL(t, reporter)+`"]}`)
+	roots.Executable = filepath.Join(root, "repo", "bin", "AI-Terminal-Pet.exe")
 
 	snippet := snippetFor(roots, TerminalOpenCode)
-	if len(snippet.Missing) != 0 {
-		t.Fatalf("an already-wired terminal must not report anything missing: %v", snippet.Missing)
+	if !strings.Contains(snippet.Text, OpenCodePackageName) || !strings.Contains(snippet.Note, mustURL(t, reporter)) {
+		t.Fatalf("both forms belong in the answer: text=%s note=%s", snippet.Text, snippet.Note)
 	}
-	if !strings.Contains(snippet.Text, "already wired") || !strings.Contains(snippet.Text, "opencode.js") {
-		t.Fatalf("the snippet has to say it is already wired and name the target: %s", snippet.Text)
+	if len(snippet.Missing) != 0 {
+		t.Fatalf("there is nothing to install locally: %v", snippet.Missing)
+	}
+
+	// Without a checkout only the package form remains, and the note must not
+	// name a file that is not there.
+	roots.Executable = ""
+	snippet = snippetFor(roots, TerminalOpenCode)
+	if strings.Contains(snippet.Note, "file:///") {
+		t.Fatalf("a URL was printed with no checkout behind it: %s", snippet.Note)
 	}
 }
 

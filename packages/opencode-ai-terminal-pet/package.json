@@ -1,0 +1,45 @@
+{
+  "name": "opencode-ai-terminal-pet",
+  "version": "1.0.18",
+  "description": "Report OpenCode session state to the AI Terminal Pet overlay: one always-on-top strip that shows which agent is waiting on you, and jumps back to it.",
+  "license": "MIT",
+  "type": "module",
+  "main": "server.js",
+  "exports": {
+    ".": "./server.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "server.js",
+    "protocol.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync": "node scripts/sync.mjs --write",
+    "sync:check": "node scripts/sync.mjs --check",
+    "test": "node --test server.test.mjs"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "ai-terminal-pet",
+    "overlay",
+    "session-state",
+    "notifications",
+    "no-network"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jjjjjjjjnnjnn/ai-terminal-pet.git",
+    "directory": "packages/opencode-ai-terminal-pet"
+  },
+  "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+  "bugs": {
+    "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/issues"
+  },
+  "author": "jjjjjjjjnnjnn"
+}

@@ -30,8 +30,45 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.17**（tag `pet-v1.0.17`）/ **1.2.30**（tag `dsh-plugin-v1.2.30`）。
-**注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）。
+已发版到 **1.0.18**（tag `pet-v1.0.18`）/ **1.2.31**（tag `dsh-plugin-v1.2.31`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.18**。
+**注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）；OpenCode 上报端包没有自己的版本线，它跟着浮窗走。
+
+## [1.0.18] / [1.2.31] — 2026-11-17（OpenCode 接入变成一行 npm 安装：`opencode plugin add opencode-ai-terminal-pet`）
+
+这一版把 OpenCode 的接入从「往配置里贴一条本机绝对路径」换成「装一个 npm 包」，顺手修掉一个**发行缺口**：zip / `pet-setup.exe` 装出来的目录里其实没有 `reporters/opencode.js`，而 zip 里的 `README.install.txt` 却让用户去贴那个文件。
+
+### 改了什么
+
+- **新包 `packages/opencode-ai-terminal-pet`**（npm 名同名，MIT，零依赖，5 个文件约 48 KB）：`opencode plugin add opencode-ai-terminal-pet` 一行接入，只支持 OpenCode V2。
+  包内 `server.js` 与 `protocol.cjs` 由 `scripts/sync.mjs` 从 `reporters/opencode.js` / `reporters/protocol.js` **生成**，唯一差异是一处 `require()` 说明符——npm 插件必须 `"type": "module"`，而共享核心是 CommonJS（5 个 hook `require()` 它，安装器也以 `protocol.js` 部署它）。
+- **生成器有门禁**：源里恰好一处说明符、副本逐字节相等、拒绝二次生成，各一条测试；`sync.mjs --check` 进 CI，和 `vendor/protocol.js` 那套纪律一致。
+- **包内端到端测试**：临时 home + 真实端点，验证「ESM 入口 + CJS 核心 + 真投递 + 快照落盘」，三平台各跑一次（Windows 命名管道 / Linux `$XDG_RUNTIME_DIR` / macOS `$TMPDIR`），并把「3 次投递之后不再重试」也断言掉。
+- **`--doctor` 的 `reporters` 认三种入口**：裸包名（含 `@1.2.3`）与对象 `{ "package": … }` 会去 `~/.config/opencode/node_modules/<name>/package.json` 读版本；找不到只给 `warn` 并附安装命令（这个工具看不到对方的全部解析路径，不把一种能跑的装法判成坏的）。
+- **`--connect=opencode` 包名优先**：打印 `"plugins": ["opencode-ai-terminal-pet"]` 与安装命令；`file://` 检出形态只在真有检出现时进备注，给改 reporter 的人。
+- **版本同号**：这个包与浮窗**同一个号**（`tools/check_versions.mjs` 断言相等），所以一次浮窗发版就是一次 npm 发布。
+
+### 为什么值得单独一版
+
+装上 zip 的用户此前**没有任何办法**接 OpenCode：配置文件能改，但它要指向的那个文件根本没被安装。这条路径只有真的从 zip 装一次才看得见——工作区里 `reporters/opencode.js` 一直在，自检也就一直说"从仓库跑没问题"。
+
+### 1.0.18 发布包实测清单
+
+| Release | 资产 | 字节数 | SHA-256 |
+|---|---|---|---|
+| `pet-v1.0.18` | `pet-setup.exe` | 14,551,552 | `8A589006…` |
+| | `ai-terminal-pet-1.0.18-win-x64.zip`（17 文件） | 5,142,108 | `70AE18C0…` |
+| | `ai-terminal-pet-1.0.18-linux-amd64.tar.gz` | 5,439,674 | `5F74890E…` |
+| | `ai-terminal-pet-1.0.18-linux-arm64.tar.gz` | 4,949,913 | `17E29037…` |
+| | `ai-terminal-pet-1.0.18-darwin-arm64.tar.gz` | 5,143,588 | `9416A411…` |
+| | `ai-terminal-pet-1.0.18-darwin-amd64.tar.gz` | 5,536,325 | `39193DBF…` |
+| `dsh-plugin-v1.2.31` | `dsh-ai-terminal-pet-1.2.31.tgz`（20 文件） | 2,091,456 | `8CEA5882…` |
+| npm `opencode-ai-terminal-pet@1.0.18` | `opencode-ai-terminal-pet-1.0.18.tgz`（5 文件） | 17,822 | `C6588551…` |
+
+本机装机实测：`-VerifyOnly` **12/12 一致、0 warning**；`--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是
+Antigravity 只接 statusline）；`--version` = `ai-terminal-pet 1.0.18`；注册表 `DisplayVersion=1.0.18`。
+`--connect=opencode` 打印的是包名形态；把包解开放进一个临时 home 的 `node_modules` 后，
+`reporters` 那一行变成 `opencode: ok - plugins[0] -> opencode-ai-terminal-pet@1.0.18`，删掉又回到
+带安装命令的 warn（两条分支都当场跑过）。
 
 ## [1.0.17] / [1.2.30] — 2026-11-17（设置界面底部两个链接：给个 Star / 反馈问题，以及当前版本号）
 

@@ -225,6 +225,30 @@ jobs:
       - name: Test the OpenCode event mapping
         run: node --test reporters/opencode-events.test.mjs
 
+      # The OpenCode reporter is also published as its own npm package, and the
+      # package's entry point is a *generated* copy of reporters/opencode.js:
+      # an npm plugin must be "type": "module" while the shared core is CommonJS
+      # (five hooks require() it, and the installer deploys it as protocol.js),
+      # so one require() specifier has to change and only that one.
+      #
+      # Two different failures are guarded here, and neither implies the other:
+      #   1. the generator check - the copies are byte-equal to the reference, so
+      #      a fix cannot land in the repository and never reach npm (the drift
+      #      handover §52.3 paid for);
+      #   2. the packaged test - the ESM entry still resolves the CJS core and
+      #      still puts a real payload on a real endpoint, which is the exact
+      #      shape an npm install has and the exact thing that breaks when
+      #      somebody "fixes" it by hand.
+      - name: Check the OpenCode package matches the reporter
+        shell: bash
+        run: |
+          node packages/opencode-ai-terminal-pet/scripts/sync.mjs --check
+          node --check packages/opencode-ai-terminal-pet/server.js
+          node --check packages/opencode-ai-terminal-pet/protocol.cjs
+          node --test packages/opencode-ai-terminal-pet/scripts/sync.test.mjs
+      - name: Test the packaged OpenCode reporter
+        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs
+
       # verify.mjs loads the Harness bundle the way the Harness loader does and
       # fails on an unloadable manifest, a missing locale or a broken patch.
       - name: Verify the DeepSeek Harness bundle
@@ -470,6 +494,13 @@ jobs:
       - name: Verify the DSH plugin package (Linux)
         run: node packages/dsh-ai-terminal-pet/verify.mjs
 
+      # The packaged OpenCode reporter is the same code on every platform, but
+      # the transport is not: on POSIX the endpoint is a unix socket under
+      # $XDG_RUNTIME_DIR, and this is the only job where that branch runs for a
+      # package loaded out of its npm shape.
+      - name: Test the packaged OpenCode reporter (Linux)
+        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs
+
       - name: Headless Linux CLI, install, and hook smoke test
         run: |
           export GOPATH="$(go env GOPATH)"
@@ -548,6 +579,11 @@ jobs:
       # the only macOS this project has: a CI runner.
       - name: Verify the DSH plugin package (macOS)
         run: node packages/dsh-ai-terminal-pet/verify.mjs
+
+      # Same package, the third transport: on macOS the endpoint lives under
+      # $TMPDIR, and this is the only runner where that derivation is exercised.
+      - name: Test the packaged OpenCode reporter (macOS)
+        run: node --test packages/opencode-ai-terminal-pet/server.test.mjs
 
       - name: Headless macOS CLI, install, and hook smoke test
         run: |
