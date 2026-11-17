@@ -5071,8 +5071,10 @@ hues: waiting 746, error 703, working 249
 diffs: waiting-vs-working 24.14%, waiting-vs-idle 14.93%, working-vs-idle 14.73%, zh-vs-en 9.78%
 ```
 
-**macOS**：本机没有苹果硬件；这条测试与其他 `func Test` 一样在 `macos-latest` 上跑（它走的是与 Linux
-同一份 `canvas_opentype.go`，所以预期数字接近 Linux，但**以 CI 的输出为准**）。
+**macOS**：本机没有苹果硬件；这条测试与其他 `func Test` 一样在 `macos-latest` 上跑
+（它走的是与 Linux 同一份 `canvas_opentype.go`）。**首次 CI 运行即通过**（提交 `f3a4b2d`，四条 job 全绿）。
+具体像素数没有记在这里：`go test ./...` 不带 `-v`，`t.Logf` 只在失败时进日志——
+要看数字就在本机跑 `go test ./internal/ui -run TestRenderedPanel -v`，或在那个 job 上临时加 `-v`。
 
 顺带一个观察：新测试让 `func Test` 从 465 变 469，`tools/check_facts.mjs` 立刻变红并点名五处——
 第 69 轮那条门禁第一次被"真实的工作"撞到，而不是被造出来的样例。
