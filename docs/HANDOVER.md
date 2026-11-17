@@ -5051,7 +5051,15 @@ URL 只写一次（新包 `internal/project` 的 `RepoURL` / `IssuesURL`），�
   `dsh-ai-terminal-pet-1.2.30.tgz` **2,089,727 B / `EFDD7C10…`（20 文件）**，另有四个 POSIX tar.gz。
 - **打包顺序**：`npm pack` 在"版本号与随包 README 都改完"之后执行，并用 `node tools/check-tarball.mjs`
   确认 tgz 与工作区逐文件一致（这条规矩是 §72.5 换来的）。
-- 按 §67.4 的教训：**四个 job 在同一个提交上全绿之后才打 tag**。
+- 上游条目 PR：awesome-dsh-plugin [#16249](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16249)
+  （`bump-tarball-1.2.30`，单文件 `+1 −1`）；1.2.29 的
+  [#16235](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16235) 已按"被取代"关闭。
+- 资产复验：`pet-setup.exe` 200 / 14,546,432 B / `4202DB66…`、zip 200 / 5,140,377 B / `A31E93FA…`、
+  tgz 200 / 2,089,727 B / `EFDD7C10…`（三个都从公网 URL 下载回来核对过）。
+- 按 §67.4 的教训：**四个 job 在同一个提交上全绿之后才打 tag**。第一轮 CI 在
+  `5ad4d3b` 上 Linux/macOS 的 `go vet` 红了：页脚的点击测试用了 `*App`，
+  而 `App` 是分平台的（`app_windows.go` 有设置窗口状态，Linux/macOS 的没有）。
+  修法是把那条测试移到 `//go:build windows`，几何/命中/绘制/副标题继续无标签跑三平台（`66ea190` 全绿）。
 
 ### 73.5 这一轮没有做的事
 
