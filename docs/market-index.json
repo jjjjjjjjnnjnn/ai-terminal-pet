@@ -37,7 +37,7 @@
         "en": "Which of your agents is waiting on you? One always-on-top panel (Windows, Linux X11, macOS) answers it: DeepSeek Harness, Claude Code, OpenCode and Antigravity sessions, each row saying working, waiting for approval, failed or finished, and a collapsed strip showing how long the blocked one has been blocked. The arrow at a row's end jumps to that terminal; the row itself copies its project path. It rings only for real events - not for an ordinary command, not for a session that vanished - and approvals still happen in DSH. Harness sessions appear on install; OpenCode is one command (`opencode plugin add opencode-ai-terminal-pet`, which brings this panel with it on Windows); Claude Code and Antigravity each need their reporter.",
         "zh": "哪个 agent 在等你？一块置顶面板（Windows / Linux X11 / macOS）就能回答：DeepSeek Harness、Claude Code、OpenCode 与 Antigravity 的会话都在这，每一行写着进行中、等待确认、出错还是完成，收起成一条时还会显示那个卡住的会话已经卡了多久。点行尾的箭头跳到对应终端，点行本身复制它的项目路径。它只在真事件上响——普通命令不响，会话消失也不算完成——授权仍然在 DSH 里完成。装上即接上 Harness 的会话；OpenCode 只需一行命令（`opencode plugin add opencode-ai-terminal-pet`，Windows 上它会连面板一起装好）；Claude Code 与 Antigravity 各需接一次上报端。"
       },
-      "icon": "https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/16c533a6cbad1588188b72771307a8aecf6ef662/packages/dsh-ai-terminal-pet/icon.png",
+      "icon": "https://raw.githubusercontent.com/jjjjjjjjnnjnn/ai-terminal-pet/f31100b8c0d5c89caa648834546dcf9d1fd13415/packages/dsh-ai-terminal-pet/icon.png",
       "author": "jjjjjjjjnnjnn",
       "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
       "repository": {
@@ -66,7 +66,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
-            "commit": "16c533a6cbad1588188b72771307a8aecf6ef662",
+            "commit": "f31100b8c0d5c89caa648834546dcf9d1fd13415",
             "path": "packages/dsh-ai-terminal-pet"
           },
           "engines": {
