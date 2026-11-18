@@ -82,12 +82,11 @@
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**511 个** `func Test`；§82 的两条与 §85 的五条是各自那轮的）；
   CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
-  1.0.22 走同一套 A/B：A `f31100b`（版本 + 修复 + 索引前移）、B `695c37b`（索引钉到 A）。
-  A 与 B 的 Run 都因下一次推送被 concurrency **取消**（不是失败）；
-  收尾 docs 提交 `8b598bf` 的 Run `44356438056` **四条 job 全绿**（windows / ubuntu（含 `-race`）/ macOS / scan）。
+  1.0.23 走同一套 A/B：A `dd639ae`（doctor 修复 + 版本 + 索引前移）、B `c942634`（索引钉到 A）。
+  B 的 Run `44378447585` **四条 job 全绿**（windows / ubuntu（含 `-race`）/ macOS / scan）；
   之后的新提交仍以 `gh run list --limit 1` 为准，**不要把排队写成绿**；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑）；
-  两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**两个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
+  两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**三个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
   `tools/check_versions.mjs` **22** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
   **`tools/check_facts.mjs` 11 条一致**、`tools/catalog-status.test.mjs` 12/12、
   `tools/upstream-entry.test.mjs` 26/26、`tools/check-tarball.test.mjs` 8/8、
@@ -5096,6 +5095,16 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 - **`--doctor` 的假 home 复验受 BOM 干扰**：`Set-Content -Encoding utf8` 写出 BOM，`loadConfig`
   会报 “not plain JSON”，看起来像代码坏了。用 Node/Python 写无 BOM 文件再验。
 
+### 85.6 发布记录
+
+- A `dd639ae`（doctor 修复 + 版本 + 索引前移）、B `c942634`（索引钉到 A）；
+  B 的 Run `44378447585` **四条 job 全绿**。
+- npm `dsh-ai-terminal-pet` **1.2.36**、`opencode-ai-terminal-pet` **1.0.23** 已发布；
+  Release 资产的 digest 与本地逐字节一致。
+- tag：`pet-v1.0.23`、`dsh-plugin-v1.2.36`、`claude-plugin-v1.0.23`。
+- 上游：[#16719](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16719) OPEN（1.2.36），
+  #16703 已评论并关闭。
+
 ## 84. 交接：回应核查、本机切到原生钩子、每日追踪（2026-11-18，第 84 轮；**不发版**）
 
 ### 84.1 回应核查（2026-11-18 19:40 UTC）
@@ -5109,7 +5118,7 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 | GitHub | star 1 / fork 0 / issue 0 / PR 0；14 天 **65 浏览 / 22 唯一**；clone 2,175（952 是 CI） | 比 11-17 的 33/11 有增长，仍是小样本 |
 | 资产下载 | `dsh-plugin-v1.2.35.tgz` **12 次**；1.0.22 六个资产各 1 次；1.0.21 各 2 次 | DSH 那 12 次高于“每次发版自检约 2 次”的基线，**值得继续看**，但还不能叫用户 |
 | npm | DSH 5,881/周，最新 1.2.34 占 **2.4%**；上报端 702/周，1.0.21 占 **17.4%**；对照 `dsh-pet` 72.8% | 仍是爬虫队形；引用只看 latest share |
-| 上游 | DSH 条目 #16703 OPEN；winget #481818 OPEN | 等对方 |
+| 上游 | DSH 条目 **#16719 OPEN**（1.2.36；上一版 #16703 已关闭）；winget #481818 OPEN | 等对方 |
 
 ### 84.2 本机 Claude Code 切到原生钩子
 
@@ -5267,7 +5276,7 @@ Claude Code 2.1.312 在 `PermissionRequest` 上不再接受旧的 `{"decision":"
   `runtime/` 里写入 `claude-hook-…json` 快照——**修复后的链路真的放行**。
 - **发版与装机**：`pet-v1.0.22` / `dsh-plugin-v1.2.35` 已发布（六个浮窗资产、DSH tarball、npm 两个包，数字见 §1）；
   本机 `-VerifyOnly` **12/12**、`--doctor` 12 ok / 1 warn / 0 fail、`--version` = `ai-terminal-pet 1.0.22`。
-  上游条目跟进 PR [#16703](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16703) 已开，等维护者合并。
+  上游条目跟进 PR [#16719](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16719) 已开（1.2.36；上一版 #16703 已关闭），等维护者合并。
 
 ### 82.5 没做的事与风险
 
