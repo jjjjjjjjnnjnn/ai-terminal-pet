@@ -14,9 +14,9 @@
 P0/I1-α 已交付 ──► I1-γ 自解压 exe 已交付 ──► I1-β 版本号已付清（当前 1.0.21 / 1.2.31）──► ✅ 现在可以发声
 ```
 
-**前提条件全部满足，可以发了。** 浮窗 1.0.22（Windows / Linux X11 / macOS AppKit）、插件 1.2.35、npm `latest` = 1.2.35、`pet-v1.0.22` 的
+**前提条件全部满足，可以发了。** 浮窗 1.0.23（Windows / Linux X11 / macOS AppKit）、插件 1.2.36、npm `latest` = 1.2.36、`pet-v1.0.23` 的
 安装包与各平台压缩包都已构建并在发布时传回复验。
-发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.22` 这个链接。
+发帖时用 `https://github.com/jjjjjjjjnnjnn/ai-terminal-pet/releases/tag/pet-v1.0.23` 这个链接。
 
 **唯一还需要人做的一步**：`docs/assets/smartscreen-unsigned.png` 是**示意图**（图左下角写着 MOCKUP）。
 真机截图只有一台「从没构建过本项目」的机器才拍得到；如果能在发帖前补一张真的，更好；补不到就用示意图，
@@ -322,7 +322,7 @@ files alone does not wire it. The connect table in the README has one line per t
 | 仓库浏览 | GitHub traffic（14 天窗口） | **33 views / 11 uniques**；referrer 只有 github.com 15、HN 3、目录站 1 |
 | clone | 同上 | 1,798 次里 **852** 直接由 213 次 CI run × 4 job 解释；**不要把 clone 当人气** |
 | star / fork | `gh repo view` | **1 / 0**（那 1 个是作者本人） |
-| npm | `npm view dsh-ai-terminal-pet version` | **1.2.35**（`dist-tags.latest`，2026-11-18 发版同步）；OpenCode 上报端 `opencode-ai-terminal-pet` 同日 **1.0.22** |
+| npm | `npm view dsh-ai-terminal-pet version` | **1.2.36**（`dist-tags.latest`，2026-11-18 发版同步）；OpenCode 上报端 `opencode-ai-terminal-pet` 同日 **1.0.23** |
 | DSH Discussions | 帖子 #13001 的 upvote 与回复数 | **1 / 0**（发帖后已数日未动） |
 | **npm 下载量（会被爬虫放大，不能当用户数）** | `node tools/traffic-report.mjs` | 2026-11-17 实测 **4,586/周**，但它分布在 **25 个版本、每个 137–227 次**，连不可安装的 `0.0.0-stage` 都有 166 次 → **latest share 6%**，是爬虫队形不是用户（对照 `dsh-pet` 的 58%）。证据链见 [docs/METRICS.md](METRICS.md) §2；**任何对外文本都不要引用这个总量** |
 | **目录那行（只作参考，不当数据源）** | `node tools/catalog-status.mjs` | 站点写 `downloads: 3,455 (30d)`、`version: 1.2.27`、安装命令解析到最新版。**这三个都落后于现实，且都不归我们修**：站点数字来自同一个被爬虫放大的 npm 探针；版本停在 1.2.27 是对方夜间构建未成功（见 [docs/UPSTREAM.md](UPSTREAM.md) §4.1）。**对外引用一律不引用下载量；要引用就引用 latest share 与窗口** |

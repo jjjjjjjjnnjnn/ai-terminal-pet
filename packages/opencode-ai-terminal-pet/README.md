@@ -17,7 +17,7 @@ autostart entry, and a tray item that a single binary drop cannot reproduce).
 |---|---|
 | OpenCode | **V2** (validated against 2.3.0; the reporter uses V2's `context.event.subscribe` and V2 event names) |
 | Node | 22 or newer (the one OpenCode already ships with) |
-| The AI Terminal Pet overlay | Windows: **installed automatically** by this package (vendored copy, no download). Linux/macOS: install the release tarball once — see [The panel on Linux and macOS](#the-panel-on-linux-and-macos). This package is versioned with the overlay: `1.0.22` of the reporter and `1.0.22` of the panel are the pair that was tested together |
+| The AI Terminal Pet overlay | Windows: **installed automatically** by this package (vendored copy, no download). Linux/macOS: install the release tarball once — see [The panel on Linux and macOS](#the-panel-on-linux-and-macos). This package is versioned with the overlay: `1.0.23` of the reporter and `1.0.23` of the panel are the pair that was tested together |
 | Platform | anything OpenCode runs on; the reporting path is Windows, Linux and macOS |
 
 ## Install

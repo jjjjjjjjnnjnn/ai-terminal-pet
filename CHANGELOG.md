@@ -30,8 +30,45 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.22**（tag `pet-v1.0.22`）/ **1.2.35**（tag `dsh-plugin-v1.2.35`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.22**。
+已发版到 **1.0.23**（tag `pet-v1.0.23`）/ **1.2.36**（tag `dsh-plugin-v1.2.36`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.23** 与 Claude Code 插件 `packages/claude-ai-terminal-pet` **1.0.23**（tag `claude-plugin-v1.0.23`）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）；OpenCode 上报端包没有自己的版本线，它跟着浮窗走。
+
+## [1.0.23] / [1.2.36] — 2026-11-18（插件版 Claude Code 也能被 `--doctor` 看见）
+
+这一版只修一处盲区：`--doctor` 的 `reporters` 项原先只读 `~/.claude/settings.json`，而 Claude Code
+插件的钩子登记在 `~/.claude/plugins/...`，于是刚装好插件的用户会看到 **“claude: not connected”**
+——一个关于他刚做完的事情的假警告，正是 `--doctor` 应该消灭的那类。
+
+### 修复
+
+- `internal/connect/claude_plugin.go`（新）：读 `installed_plugins.json` 的 `installPath`，
+  展开 `${CLAUDE_PLUGIN_ROOT}`，复用 settings 形状的同一套命令解析，校验 `<plugin>/vendor/pet-hook.exe`
+  是否存在、事件是否含 `SessionEnd`、以及 `enabledPlugins` 是否把它关掉。
+- settings 里没有任何上报端钩子时才走这条；装了但被禁用 → warn，二进制缺失 → fail，
+  都没有 → 仍然是原来的 “not connected”。
+- 5 条新测试：找到插件、缺二进制、被禁用、无插件仍报旧警告、enabled 的三种默认。
+
+### 版本
+
+- 浮窗 **1.0.23**、DSH 插件 **1.2.36**、OpenCode 上报端 **1.0.23**、Claude Code 插件 **1.0.23**
+  （三份 vendor 都换成 1.0.23 的面板）。
+- `AI-Terminal-Pet.exe` 4,783,616 → **4,794,368 B**（+10,752）；另外两个二进制未变。
+- 插件本身不改行为；这次 bump 只是让它的清单与随包面板保持同号。
+
+### 资产（2026-11-18 本机实测）
+
+| tag | 文件 | 字节 | sha256 |
+|---|---|---|---|
+| `pet-v1.0.23` | `pet-setup.exe` | 14,584,832 | `05E8A9E4…` |
+| | `ai-terminal-pet-1.0.23-win-x64.zip`（17 文件） | 5,158,672 | `346B629D…` |
+| | `ai-terminal-pet-1.0.23-linux-amd64.tar.gz` | 5,452,622 | `F45044E2…` |
+| | `ai-terminal-pet-1.0.23-linux-arm64.tar.gz` | 4,958,425 | `DB611A8A…` |
+| | `ai-terminal-pet-1.0.23-darwin-arm64.tar.gz` | 5,155,573 | `1F3E410A…` |
+| | `ai-terminal-pet-1.0.23-darwin-amd64.tar.gz` | 5,547,620 | `B115FCE1…` |
+| `dsh-plugin-v1.2.36` | `dsh-ai-terminal-pet-1.2.36.tgz`（20 文件） | 2,101,928 | `0CD1DF30…` |
+| npm `opencode-ai-terminal-pet@1.0.23` | `opencode-ai-terminal-pet-1.0.23.tgz`（9 文件，含面板） | 2,049,437 | `67FB7829…` |
+
+安装后 `--version` = `ai-terminal-pet 1.0.23`，`-VerifyOnly` 12/12、`--doctor` 12 ok / 1 warn / 0 fail。
 
 ## [1.0.22] / [1.2.35] — 2026-11-18（自动同意在 Claude Code 2.1.312 上一直是哑的）
 

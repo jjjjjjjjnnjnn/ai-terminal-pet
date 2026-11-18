@@ -49,6 +49,12 @@ func InspectClaude(roots Roots) Finding {
 
 	entries := claudeHookCommands(loaded.object)
 	if len(entries) == 0 {
+		// A plugin install registers its hooks with the host, not with
+		// settings.json. Check that second shape before calling the machine
+		// unconnected; see claude_plugin.go.
+		if plugin, found := inspectClaudePlugin(roots, loaded.object); found {
+			return plugin
+		}
 		return finding.warn("not connected (%s has no hook that reaches a reporter; run `ai-terminal-pet --connect=claude`)",
 			abbreviate(roots, configPath))
 	}

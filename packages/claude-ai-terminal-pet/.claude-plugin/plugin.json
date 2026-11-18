@@ -1,6 +1,6 @@
 {
   "name": "ai-terminal-pet",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Claude Code hooks for the AI Terminal Pet panel: each session reports what it is doing, which one is blocked on you, and permission gates can be answered from the panel. Windows only in this release.",
   "author": {
     "name": "jjjjjjjjnnjnn",

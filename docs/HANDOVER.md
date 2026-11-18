@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-18；浮窗 **1.0.22**、插件包 **1.2.35** 已发版；**§84 第 84 轮（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-18；浮窗 **1.0.23**、插件包 **1.2.36** 已发版；**§85 第 85 轮（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -72,15 +72,15 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.22`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.35`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.22` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.35`。
+- **版本**：浮窗 **`1.0.23`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.36`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.23` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.36`。
   OpenCode 上报端包 `opencode-ai-terminal-pet` **没有自己的版本线**：它与浮窗同号（`check_versions` 断言相等）。
   **工作区与本机安装目录已经与 `1.0.21` / `1.2.34` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` 的字节数与 sha256 见下方规模一行）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**506 个** `func Test`；§82 的两条是 auto-approve 方言）；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**511 个** `func Test`；§82 的两条与 §85 的五条是各自那轮的）；
   CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
   1.0.22 走同一套 A/B：A `f31100b`（版本 + 修复 + 索引前移）、B `695c37b`（索引钉到 A）。
   A 与 B 的 Run 都因下一次推送被 concurrency **取消**（不是失败）；
@@ -96,31 +96,31 @@
   `tests/fresh-machine.mjs --no-overlay` **183/183**；
   `tools/check_docs_links.py` **15 份**全解、`tools/check_assets.py` 15 行一致；
   `govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.22 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  1.0.23 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.22`，注册表那一行 `DisplayVersion=1.0.22`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.22 实测）：非测试 **157 文件 / 28,625 行**、
-  测试 **102 文件 / 15,005 行**、**506 个 `func Test`**。
-  `bin/AI-Terminal-Pet.exe` **4,783,616 B**（与 `packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`
-  和 `packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 三份逐字节相同，sha256 `DE4F04E8…`）、
+  `--version` 报 `ai-terminal-pet 1.0.23`，注册表那一行 `DisplayVersion=1.0.23`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.23 实测）：非测试 **158 文件 / 28,784 行**、
+  测试 **103 文件 / 15,153 行**、**511 个 `func Test`**。
+  `bin/AI-Terminal-Pet.exe` **4,794,368 B**（与 `packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`、
+  `packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 和
+  `packages/claude-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 四份逐字节相同，sha256 `FA9F003E…`）、
   `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,706,880 B**。
-  三个二进制合计 **12,169,216 B** = 11.61 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
-- **分发（两条版本线 + 两个 npm 包 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.35**；`dsh-plugin-v1.2.35` 的 Release 资产 `dsh-ai-terminal-pet-1.2.35.tgz`
-    **2,098,408 B / sha256 `5D23B06E…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.22`），与 npm 上那一份逐字节相同；上游跟进 PR
-    [#16703](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16703) 已开、等维护者合并。
-  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.22**（与浮窗同号），
-    资产 `opencode-ai-terminal-pet-1.0.22.tgz` **2,044,880 B / sha256 `1F05B5B5…` / 9 文件（含面板）**。
-  - Claude Code 插件线：`packages/claude-ai-terminal-pet` **1.0.22**（与浮窗同号，tag `claude-plugin-v1.0.22`），
+  三个二进制合计 **12,179,968 B** = 11.61 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
+- **分发（两条版本线 + 两个 npm 包 + 一个 Claude Code 插件 + 一个包管理器）**：
+  - 插件线：npm `latest` = **1.2.36**；`dsh-plugin-v1.2.36` 的 Release 资产 `dsh-ai-terminal-pet-1.2.36.tgz`
+    **2,101,928 B / sha256 `0CD1DF30…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.23`），与 npm 上那一份逐字节相同；上游跟进 PR 见本节末尾的发布记录。
+  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.23**（与浮窗同号），
+    资产 `opencode-ai-terminal-pet-1.0.23.tgz` **2,049,437 B / sha256 `67FB7829…` / 9 文件（含面板）**。
+  - Claude Code 插件线：`packages/claude-ai-terminal-pet` **1.0.23**（与浮窗同号，tag `claude-plugin-v1.0.23`），
     从仓库根的 `.claude-plugin/marketplace.json` 安装（`claude plugin marketplace add` + `install`）；
-    **不进 npm、不进浮窗的 Release 资产**，Windows-only，细节与验证见 §83。
-  - 浮窗线：`pet-v1.0.22` 的六个资产——`pet-setup.exe` **14,574,080 B / `C804705D…`**、
-    `ai-terminal-pet-1.0.22-win-x64.zip` **5,154,786 B / `109FFA90…`（17 文件）**，以及
-    linux-{amd64,arm64}（**5,447,902 B / `0030861C…`**、**4,956,185 B / `039CD1F5…`**）与
-    darwin-{arm64,amd64}（**5,153,798 B / `A8A3CD20…`**、**5,543,462 B / `5C42B458…`**）四个 tar.gz。
-  - **`pet-v1.0.21` / `dsh-plugin-v1.2.34` 也仍然有效且不可变**；更早的 `pet-v1.0.20` / `dsh-plugin-v1.2.33`
-    与 `pet-v1.0.18` / `dsh-plugin-v1.2.31` 同样保留（后者的 doctor 查错了 OpenCode 包路径，见 §75.7）。
+    **不进 npm、不进浮窗的 Release 资产**，Windows-only，细节见 §83。
+  - 浮窗线：`pet-v1.0.23` 的六个资产——`pet-setup.exe` **14,584,832 B / `05E8A9E4…`**、
+    `ai-terminal-pet-1.0.23-win-x64.zip` **5,158,672 B / `346B629D…`（17 文件）**，以及
+    linux-{amd64,arm64}（**5,452,622 B / `F45044E2…`**、**4,958,425 B / `DB611A8A…`**）与
+    darwin-{arm64,amd64}（**5,155,573 B / `1F3E410A…`**、**5,547,620 B / `B115FCE1…`**）四个 tar.gz。
+  - **`pet-v1.0.22` / `dsh-plugin-v1.2.35` 也仍然有效且不可变**；更早的 `pet-v1.0.21` / `dsh-plugin-v1.2.34`
+    与 `pet-v1.0.20` / `dsh-plugin-v1.2.33` 同样保留（后者的 doctor 查错了 OpenCode 包路径，见 §75.7）。
   - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
     `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
     版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
@@ -5053,6 +5053,48 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 85. 交接：插件版 Claude Code 也能被 `--doctor` 看见（2026-11-18，第 85 轮；**已发版** 1.0.23 / 1.2.36）
+
+### 85.1 为什么发这一版
+
+§83 发完插件后立刻暴露一个盲区：`--doctor` 的 `reporters` 项只读 `~/.claude/settings.json`，
+而插件的钩子登记在 `~/.claude/plugins/installed_plugins.json` 指向的缓存目录里。装了插件的用户
+会看到 **“claude: not connected”** —— 对刚做完的事给出假警告，正是自检应该消灭的那类失败。
+
+### 85.2 改了什么
+
+- `internal/connect/claude_plugin.go`（新）：读 `installed_plugins.json`（version 2）里的 `installPath`，
+  展开 `${CLAUDE_PLUGIN_ROOT}`，复用 settings 形状的同一套命令解析，校验
+  `<plugin>/vendor/pet-hook.exe` 存在、事件集合含 `SessionEnd`、以及 `enabledPlugins` 没有把它关掉。
+- `InspectClaude`：只有 settings 里**没有任何**上报端钩子时才走插件分支；装了被禁用 → warn，
+  二进制缺失 → fail，两者都没有 → 仍然报原来的 `not connected`。
+- 5 条新测试（`claude_plugin_test.go`）：找到插件、缺二进制、被禁用、无插件仍报旧警告、
+  enabled 的三种默认。`func Test` 506 → **511**。
+
+### 85.3 验证
+
+- `go test -count=1 ./...` 全过；`fresh-machine --no-overlay` **183/183**；三份 `vendor.mjs --check` 通过。
+- **真实安装的二进制 + 隔离 home**：把已安装的 1.0.23 指向一份带 `installed_plugins.json` 的假 profile，
+  `--doctor` 报 `claude: ok - 8 event(s) -> …/vendor/pet-hook.exe (plugin ai-terminal-pet@ai-terminal-pet-market 1.0.22, …)`。
+  第一次跑出 `Access is denied` 是文件里带了 BOM/写入竞争；去掉 BOM 后稳定复现出正确的 ok 行。
+- 本机仍用 settings 里的原生钩子（§84.2），所以本机 doctor 走的是第一条路径，不受这次改动影响。
+
+### 85.4 版本与资产
+
+- 浮窗 **1.0.23**、DSH **1.2.36**、OpenCode 上报端 **1.0.23**、Claude Code 插件 **1.0.23**
+  （三份 vendor 面板都是 `FA9F003E…` / 4,794,368 B）。
+- `AI-Terminal-Pet.exe` 4,783,616 → **4,794,368 B**；`pet-hook.exe` 与 `pet-statusline.exe` 未变；
+  三件合计 **12,179,968 B**。
+- 资产与 npm 的字节数见下方 §1；tag：`pet-v1.0.23`、`dsh-plugin-v1.2.36`、`claude-plugin-v1.0.23`。
+
+### 85.5 过程教训
+
+- **不要用 PowerShell 的 `Get-Content -Raw` + `Set-Content` 改带中文的仓库文件**：5.1 会把无 BOM 的
+  UTF-8 当 ANSI 读，中文变 mojibake，写回去就是坏 JSON（§30.6 早就记过同一条）。这次版本号替换踩中，
+  从 HEAD 恢复两个 `package.json` 后用 edit 工具重做。版本号一类的小改用编辑工具，别走 PowerShell。
+- **`--doctor` 的假 home 复验受 BOM 干扰**：`Set-Content -Encoding utf8` 写出 BOM，`loadConfig`
+  会报 “not plain JSON”，看起来像代码坏了。用 Node/Python 写无 BOM 文件再验。
 
 ## 84. 交接：回应核查、本机切到原生钩子、每日追踪（2026-11-18，第 84 轮；**不发版**）
 
