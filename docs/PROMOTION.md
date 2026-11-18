@@ -44,7 +44,7 @@ HN 创始人 dang 的原话（2020，2026-03 更新）值得记住：
 | 7 | X / 即刻 | 你的号 | 5 秒动图 + 一句话 | 我起稿你改 |
 | 8 | **V2EX 分享创造** | 需账号；禁 AI 文本 | 讲你自己那次白等 | **你** |
 | 9 | **Show HN** | 账号要有历史（新号发链接基本沉）；要能直接跑；不许求赞/删了重发 | 讲你怎么做的、哪里不一样 | **你** |
-| 10 | Reddit | **先读每个版侧栏**，多数对自我推广限次 | 只回帖，不主动开新帖 | 你 |
+| 10 | Reddit | **先读每个版侧栏**；r/SideProject 的站级 spam filter 会移除低 karma 账号的推广帖（2026-11-18 实测 `removed_by_category: reddit`），r/coolgithubprojects 允许直接发 GitHub 链接 | r/coolgithubprojects 已发一条；r/SideProject 转 modmail 等放行。**不要同一天连发第三个版** | 我（账号 `Visible_Swim471`），评论由你回 |
 
 > 顺序的道理：**先让"能被搜到"和"点进来 30 秒懂"成立，再引人来**。反过来就是把半成品摊在门口。
 > 另：一周内不要在多个社区发同一段话，这些人互相都看得到。
@@ -161,6 +161,19 @@ MIT；不要写下载量（见 §9）。
 - 当天把 bug 变成 issue；下个版本 release notes 点名感谢。
 - 不催、不转自己的帖、不在别的社区二次刷同一链接。
 - 一周后回看：哪个渠道来的 issue 最多，下一轮就往那里加力气。
+
+## 8.1 2026-11-18 的 Reddit 实测
+
+- **r/coolgithubprojects 已发布并可见**（`/new/` 里能找到，无 removed 标记）：
+  https://www.reddit.com/r/coolgithubprojects/comments/1xzj9zc/ai_terminal_pet_a_56px_alwaysontop_strip_that/
+  标题：`AI Terminal Pet - a 56px always-on-top strip that shows which coding agent is waiting`
+  链接直指 GitHub 仓库；版规只要求 GitHub 托管、标题带描述，语言 flair 自动分配。
+- **r/SideProject 同文被 Reddit 站级 spam filter 移除**（帖子 JSON 的
+  `removed_by_category: "reddit"`，`approved_at_utc: null`），不出现在 `/new/`；已给版主发 modmail
+  请求从 mod queue 放行（发送后表单清空），等待回复。帖子本身仍可在作者 profile 看到：
+  https://www.reddit.com/r/SideProject/comments/1xzj589/ai_terminal_pet_a_56px_alwaysontop_strip_that/
+- 账号 `Visible_Swim471` 发布时只有 **6 karma**。同一天不要再去第三个版；先回评论、在相关帖子里
+  正常参与，等这波过滤/放行结果出来再决定下一条。
 
 ## 9. 不要做的事
 
