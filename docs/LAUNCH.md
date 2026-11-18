@@ -117,7 +117,9 @@ imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 
       不是真机截图，图左下角写着 MOCKUP。真机截图需要一台"从没构建过本项目"的机器，
       而且会带上别人的桌面与机器名；这两张卡片把"你会看到什么、点哪里"说清楚就够了
 - [ ] **awesome-claude-code 的表单**：仓库已满 55 天、当天仍有提交 → 它「≥14 天且活跃」这一档已满足。
-      那一行描述在 [docs/PROMOTION.md](PROMOTION.md) §6，**提交只能由人做**（网页表单）
+      但 2026-11-18 实测该仓库**把 issue 创建限制为 collaborators only**（表单页 `Action restricted`），
+      普通账号连表单都打不开；那一行描述仍留在 [docs/PROMOTION.md](PROMOTION.md) §6，等入口开放再用。
+      不要用 PR / `gh` 绕过——contribution 规则同样禁止
 - [x] 基线数字记下来（[docs/METRICS.md](METRICS.md) §1，2026-11-17 实测）：14 天 33 浏览 / 11 唯一、
       star 1、issue 0、release 资产 ≈2 件/版本（= 自己的复验）、npm **latest share 6%**（爬虫队形）。
       **这一版之后对外只说 latest share，不再说下载总量**
