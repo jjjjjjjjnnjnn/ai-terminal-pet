@@ -81,7 +81,8 @@
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**504 个** `func Test`）；
   CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
-  1.0.21 的本地门禁已全绿（§79.4），CI 结论在推送该提交后按实际运行补记；
+  1.0.21 的 CI 在 B 提交 `00646db` 上四条 job 全绿（Run `44185483273`；A 提交那次的
+  `Upstream catalogue entry` 红是"PR 还没开"的预期顺序，PR #16391 开好后 B 提交转绿）；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑）；
   两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**两个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
   `tools/check_versions.mjs` **21** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
@@ -5121,6 +5122,9 @@ panic 文本没有落点；`error.log` 只由命令行入口写，窗口过程�
   （`awesome-dsh-plugin/awesome-dsh-plugin`，`+1 −1`，只换 tarball 行）。
   上游条目里的 description 仍写着"另外三个需要自己的 reporter"——那是早先提交的文本，
   `upstream-entry.mjs` 按设计只换 tarball 行；要改它得另开一条单独 PR（不与本次发版混在一起）。
+- CI：B 提交 `00646db` 的四条 job 全绿（Run `44185483273`）。A 提交 `16c533a` 那次只有
+  `Upstream catalogue entry` 一步红——当时 PR 还不存在；PR #16391 开好后，同一条检查在 B 上
+  报 `OK（in flight）` 并转绿，这正是 `docs/UPSTREAM.md` §2 描述的预期顺序。
 - 目录文案同步：市场索引、两份 `dsh.catalog.summary`、`docs/LAUNCH.md` §6 统一为
   "Harness 装上即接；OpenCode 一行；Claude Code / Antigravity 各接一次上报端"。
 
