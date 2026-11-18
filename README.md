@@ -243,7 +243,7 @@ The rule that decides whether to interrupt you is a pure function over the sessi
 
 ## Platform matrix
 
-Every platform compiles all 16 Go packages cleanly with `CGO_ENABLED=0`. The overlay binary is **4.50 MiB** (4,717,568 bytes) on Win64. Details and measurement methods: [docs/PLATFORMS.md](docs/PLATFORMS.md).
+Every platform compiles all 16 Go packages cleanly with `CGO_ENABLED=0`. The overlay binary is **4.56 MiB** (4,783,616 bytes) on Win64. Details and measurement methods: [docs/PLATFORMS.md](docs/PLATFORMS.md).
 
 | Platform | Window &amp; text engine | Local endpoint | System integration | Settings &amp; audio |
 |---|---|---|---|---|
@@ -486,7 +486,7 @@ ai-terminal-pet --doctor
 
 ### 全平台矩阵
 
-三个系统全部以 `CGO_ENABLED=0` 通过 16 个 Go 包的构建；Win64 上的浮窗本体是 **4.50 MiB**（4,717,568 B）。逐项实测方法与边界见 [docs/PLATFORMS.md](docs/PLATFORMS.md)，矩阵表与英文版一致。
+三个系统全部以 `CGO_ENABLED=0` 通过 16 个 Go 包的构建；Win64 上的浮窗本体是 **4.56 MiB**（4,783,616 B）。逐项实测方法与边界见 [docs/PLATFORMS.md](docs/PLATFORMS.md)，矩阵表与英文版一致。
 
 ### 验证到什么程度 —— 以及哪些没有
 

@@ -206,24 +206,24 @@ but it is inside the thing you are not looking at. So I put it where you cannot 
 long it has been asking.
 ```
 
-**发布时仍然必须守住的三条**：数字只引用末尾那套实测（461→**463** 个 Go 测试、**172** 项 fresh-machine、
-**4.50 MiB** 浮窗、`--doctor` **13** 项）；不写"已收录"只写"已提交/已被渲染"（§1.1 的分界线）；
+**发布时仍然必须守住的三条**：数字只引用末尾那套实测（**504** 个 Go 测试、**183** 项 fresh-machine、
+**4.56 MiB** 浮窗、`--doctor` **13** 项）；不写"已收录"只写"已提交/已被渲染"（§1.1 的分界线）；
 不写任何我们没验证过的东西——macOS 面板与通知、Linux 的真实出声/弹窗，一律按 README 的
 "How this is verified — and what is not" 原样说。
 
 ## 4. X 线程（英文，5 条，每条 ≤270 字符）```text
 1/5 Running Claude Code, OpenCode and Antigravity in three terminals means one of them eventually sits blocked on a permission prompt while you are focused in another window. I built a 56px strip that shows which project is waiting, and for how long.
 
-2/5 State arrives as one JSON line per event over a per-user Windows named pipe. Lifecycle is not heartbeat-based: the overlay checks the OS process table and window titles, so a reporter that goes quiet never ends a session. Click a row to jump back to that terminal.
+2/5 State arrives as one JSON line per event over a per-user local pipe (named pipe / unix socket). Lifecycle is not heartbeat-based: the overlay checks the OS process table and window titles, so a reporter that goes quiet never ends a session. Click a row to jump back.
 
 3/5 Auto-approve is off by default and opt-in per terminal. Before the 5-second countdown starts a denylist is checked: rm -rf, rd /s, format, git push --force. Those always go to manual review; silence only approves an ordinary tool prompt you chose to delegate.
 
-4/5 Three native exes, no runtime at install: the 4.50 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line in their config, from a README table.
+4/5 Three native exes, no runtime at install: the 4.56 MiB overlay, an Antigravity statusline shim, a Claude Code hook. DeepSeek Harness connects with one command; the other three each get one line or one command in their config.
 
-5/5 Windows / Linux (X11) / macOS (AppKit), one CGO-free Go codebase. MIT, no account, no network, no telemetry. 463 Go tests plus a 172-check fresh-machine suite. Not code-signed yet, so first run shows SmartScreen. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 Windows / Linux X11 / macOS AppKit, one CGO-free Go codebase. macOS builds in CI; not run on Apple hardware. MIT, no account/network/telemetry. 504 Go tests, 183 fresh-machine checks. Unsigned: SmartScreen first run. https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
-字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 268 / 263 / 235 / 265。
+字数实测（含链接、含空格、含 `n/5` 前缀）：250 / 270 / 263 / 229 / 269。
 **第 1 条挂 `docs/assets/demo.gif`**，第 2 条挂 `docs/assets/overlay-expanded.png`，
 第 4 条挂 `docs/assets/smartscreen-unsigned.png`（未签名这件事先说在前面，
 而不是等人来问），第 5 条挂 `docs/assets/desktop-scene.png`。GIF 在 X 上要 ≤5 MB / ≤15 MB（移动端另算），
@@ -241,9 +241,9 @@ long it has been asking.
 
 3/5 自动同意默认关闭、按终端单独开启。倒计时开始前先过黑名单：rm -rf、rd /s、format、git push --force 一律走人工确认；沉默只放行你主动委托的普通工具调用。
 
-4/5 三个原生 exe，装完不需要任何运行时：4.50 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置，README 里有表。
+4/5 三个原生 exe，装完不需要任何运行时：4.56 MiB 浮窗、Antigravity 状态栏 shim、Claude Code hook。Harness 一条命令接入，另外三个各加一行配置（OpenCode 是一行命令），README 里有表。
 
-5/5 支持 Windows / Linux (X11) / macOS (AppKit)，同一份零 cgo 的 Go 代码。MIT，无账号、不联网、无遥测。465 个 Go 单测 + 183 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
+5/5 支持 Windows / Linux (X11) / macOS (AppKit)，同一份零 cgo 的 Go 代码；macOS 在 CI 里构建，没有在苹果硬件上开过窗。MIT，无账号、不联网、无遥测。504 个 Go 单测 + 183 项全新机器端到端。还没代码签名，首次运行会看到 SmartScreen。https://github.com/jjjjjjjjnnjnn/ai-terminal-pet
 ```
 
 字数实测（Unicode 字符）：98 / 89 / 96 / 111 / 181。
