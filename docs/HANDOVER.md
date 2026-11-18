@@ -6,9 +6,10 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-17；浮窗 **1.0.21**、插件包 **1.2.34** 已发版；**§79 第 79 轮（窗口过程不再静默死掉，动效开关随批发版）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）；§75（OpenCode 上报端成为 npm 包）**）
+## 1. 当前状态（2026-11-18；浮窗 **1.0.21**、插件包 **1.2.34** 已发版；**§80 第 80 轮（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
-> 接手请先读本节与 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
+> 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
+> 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
 > `hang.log` 没有转储、回调 panic 的收容/记录/深度上限），再读 **§78「状态盘的动效有了开关」**（`animations` 四个入口、为什么反着命名 `Still`、
 > 以及为什么它随 §79 一批发版），再读 **§77「OpenCode 的一行真的只是一行」**（包里带面板、首次加载装机、为什么
 > Linux/macOS 故意不这么做），再读 **§76「先量清楚有几个人在看」**（那一轮只做测量：33 浏览 / 11 唯一、外部安装 ≈ 0、
@@ -121,6 +122,21 @@
   - **winget**：清单在 `packaging/winget/`（`winget validate` 通过，`winget show` 解析正确），
     提交到 `microsoft/winget-pkgs` 的 PR 见 §70.6。能不能上取决于对方 pipeline 里那次静默安装/卸载；
     未签名带来的 SmartScreen 风险写在 [docs/UPSTREAM.md](UPSTREAM.md) §4.3。
+- **宣传（2026-11-18，流程见 [docs/PROMOTION-PLAYBOOK.md](PROMOTION-PLAYBOOK.md)）**：
+  GitHub 社交预览已上传（仓库引用 `repository-images.githubusercontent.com/1385828605/3179c90c-…`，
+  1280×640）；X 线程已发（@JJjj1955714，根帖
+  https://x.com/JJjj1955714/status/2122943194904322144；未登录访客会看到登录门槛，**不要重发**）；
+  Reddit `r/coolgithubprojects` 已发布并出现在 `/new/`
+  （https://www.reddit.com/r/coolgithubprojects/comments/1xzj9zc/ai_terminal_pet_a_56px_alwaysontop_strip_that/）；
+  `r/SideProject` 同文被 Reddit **站级 spam filter** 移除（`removed_by_category: "reddit"`），
+  已发 modmail 等版主从队列放行；awesome-claude-code 入口只对 collaborator 开放（`Action restricted`）；
+  HN / V2EX 仍只能本人写。账号 `Visible_Swim471` 只有 6 karma，**同一天不要再发第三个版**。
+- **本机浏览器**：Chrome 的 `Local State` 曾把 Secure DNS 固定到不可达的 `dns.google`，导致所有站点
+  `ERR_NAME_NOT_RESOLVED`；原文件备份为 `Local State.bak-20261118-doh`，模式已改为 `off`。
+  校内网仍会按域名阻断 Reddit，需要全局 VPN / 代理。
+- **工作区**：根目录 6 个 `go build` 产物、旧的 `dist/`（**335.6 MB → 38.9 MB**，只留 1.0.21 的六个资产）、
+  `bin/pet-setup.exe`、两个包里的 8 个旧 `.tgz`、`tools/__pycache__/` 已清理；
+  `.local/`（发布笔记、PR body）与 `.workbuddy-ai/`（记忆）是历史资料，保留。
 - **公共计数（2026-11-17 实测，[docs/METRICS.md](METRICS.md)）**：14 天 **33 浏览 / 11 唯一**；
   release 资产 **≈2 件/版本**（等于本项目自己的发版复验）；npm 4,586/周但 **latest share 仅 6%**（爬虫队形，
   对照 `dsh-pet` 58%）；star 1（本人）/ fork 0 / issue 0 / PR 0 —— **外部用户数为 0**。
@@ -5027,6 +5043,83 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 80. 交接：宣传流程化、工作区清理与会话切换（2026-11-18）
+
+这一轮没有改产品代码：1.0.21 已经在 §79 发完。它做的是**把宣传变成可复用流程**、把这次实际发到哪
+写清楚、把工作区里可再生的杂物清掉，并给下一个会话/下一个项目留下可直接照做的入口。
+
+### 80.1 交付物
+
+| 文件 | 内容 |
+|---|---|
+| `docs/PROMOTION-PLAYBOOK.md` | **项目无关**的宣传流程：渠道矩阵与硬规则、去 AI 化写作规则、GitHub/X/Reddit/awesome/HN 的分步操作与验证命令、换项目时的替换清单、这次踩到的坑 |
+| `docs/PROMOTION.md` | 顶部链到 playbook；Reddit 行的判断已按 2026-11-18 实测更新；新增 §8.1 发布记录 |
+| `docs/LAUNCH.md` | 社交预览上传记录；X 线程实际发布的 URL 与“只有首条带 GIF”的说明 |
+| `AGENTS.md` | 文档索引新增 playbook 一行 |
+| 本节 | 跨会话交接：现状、阻塞、下个项目怎么复用 |
+
+### 80.2 宣传现状（截至 2026-11-18）
+
+| 渠道 | 状态 | 证据 / 链接 | 下一步 |
+|---|---|---|---|
+| GitHub 社交预览 | **已上线** | 仓库引用 `repository-images.githubusercontent.com/1385828605/3179c90c-…`；取回 1280×640 / 78,962 B | 无需动作 |
+| X 线程 | **已发**，登录可见 | 根帖 https://x.com/JJjj1955714/status/2122943194904322144；5 条回复；首条带 `demo.gif` | 24–48 小时内不重发；未登录看到“不可用”是登录门槛 |
+| r/coolgithubprojects | **已发布，在 `/new/`** | https://www.reddit.com/r/coolgithubprojects/comments/1xzj9zc/ai_terminal_pet_a_56px_alwaysontop_strip_that/ | 回评论；观察 24 小时 |
+| r/SideProject | **被 Reddit 站级过滤** | 帖子 JSON `removed_by_category: "reddit"`、`approved_at_utc: null`；作者 profile 仍可见；已 modmail | 等版主放行；**不要重发** |
+| awesome-claude-code | **入口关闭** | 表单页 `Action restricted`：只允许 collaborator 开 issue；资格满足也无入口 | 等上游开放；不要用 PR/API 绕过 |
+| HN / V2EX | **未发** | 平台明禁 AI 文本；事实卡与结构在 `PROMOTION.md` §2–§4 | 本人写、本人发 |
+| npm / 上游目录 | 1.0.21 / 1.2.34 已发布；PR #16391 在飞 | 资产与 npm 逐字节复验过 | 等维护者合并 |
+
+**账号状态**：Reddit `Visible_Swim471` 发布时 **6 karma**。低 karma 是 r/SideProject 被站级过滤的
+最可能原因；同一天不要再发第三个版，先在相关帖子里正常参与、回评论。
+
+### 80.3 机器与仓库
+
+- 最新已推送提交：`ea622c5`（宣传记录）；本节的提交紧随其后，**不写死它自己的 sha**。
+- 版本：浮窗 **1.0.21**、DSH 插件 **1.2.34**、OpenCode 上报端 **1.0.21**；`func Test` **504**。
+- CI：1.0.21 的 B 提交 `00646db` 四条 job 全绿（Run `44185483273`）；之后的提交都是文档改动，
+  按实际 Run 记录，不在文档里假设。
+- 本机安装：`%LOCALAPPDATA%\AI-Terminal-Pet\AI-Terminal-Pet.exe` = 1.0.21 / 4,783,616 B /
+  sha256 `2AAE6F22…`；`-VerifyOnly` 12/12；`--doctor` 12 ok / 1 warn / 0 fail。
+- 工作区：`bin/` 只剩三个正式二进制；`dist/` 只留 1.0.21 的六个资产（335.6 MB → 38.9 MB）；
+  根目录不再有 `go build` 产物；两个包不再留旧 `.tgz`；`.local/`、`.workbuddy-ai/` 保留。
+- 浏览器：Chrome Secure DNS 已从不可达的 `dns.google` 改为 `off`，备份 `Local State.bak-20261118-doh`。
+  校内网仍按域名阻断 Reddit；发 Reddit 前必须确认全局代理/VPN 生效。
+
+### 80.4 下一个项目怎么复用
+
+1. 复制 `docs/PROMOTION-PLAYBOOK.md` 到新项目，**只替换事实卡与链接**。
+2. 事实卡现取：版本、体积、测试数、平台限制、未签名/未上真机等边界。
+3. 素材重新生成：1280×640 社交预览、≤5 MB 的 GIF、2–3 张截图；不要沿用本项目的图。
+4. 每个渠道先读当期规则；确认入口对普通账号开放（awesome 可能 `Action restricted`）。
+5. 顺序：GitHub 社交预览 → 一个最匹配的社区 → 24 小时观察 → 再决定第二个。
+6. 发完必须验证：社交预览 DOM、X oEmbed、Reddit `removed_by_category` / `/new/`。
+7. 把 URL、过滤结果、modmail、评论结论写进新项目的 `PROMOTION.md`。
+8. **不要复制**：1.0.21 / 1.2.34、4.56 MiB、504、183、任何“已验证”的措辞。
+
+### 80.5 未完成与风险
+
+- r/SideProject 的 modmail 可能没有回复；没有放行前不要重发，也不要换标题再发。
+- Reddit 低 karma 账号的外链帖仍可能进站级过滤器；先评论、后发帖。
+- awesome-claude-code 没有普通账号入口；这是上游策略，不是我们可以绕过的。
+- HN / V2EX 的正文必须本人写；只提供事实卡，不代写。
+- X 账号较新（1 关注者），短时间连发 5 条已是上限；观察 24–48 小时，不重发。
+- 校园网对 Reddit 的阻断仍在；VPN 会员过期过，下次发 Reddit 前先验证 `/r/...` 能打开。
+
+### 80.6 出问题先看哪里
+
+1. `%LOCALAPPDATA%\AI-Terminal-Pet\error.log`：`panic:` / `dispatch-overflow`（§79 的收容层）。
+2. `hang.log` 与 `--doctor`：浮窗是否还在、安装是否一致。
+3. Reddit：帖子 JSON 的 `removed_by_category`，不是页面看起来怎样。
+4. X：登录页 + `publish.twitter.com/oembed`；未登录的“不可用”不等于被删。
+5. 浏览器全站解析失败：先查 `Local State` 的 `dns_over_https`，再怀疑网络。
+
+### 80.7 本轮提交（文档）
+
+`16c533a`（1.0.21 发版）、`00646db`（索引钉 commit）、`09570be` / `ff7c313`（CI 与文案收口）、
+`1caa26f`（社交预览 + Chrome DNS）、`32a9b36`（awesome 入口关闭）、`fd773df`（X 稿数字对齐）、
+`8b418ae`（X 发布记录）、`ea622c5`（Reddit 记录）。之后的 playbook/清理/本节是同一批文档提交。
 
 ## 79. 交接：一个卡死的进程，和它藏起来的 panic（2026-11-17；**已发版** 浮窗 1.0.21 / 插件 1.2.34 / 上报端 1.0.21）
 

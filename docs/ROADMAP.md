@@ -1050,7 +1050,8 @@ IPC 分支，但要在 `--json` 永远不阻塞 GUI 进程这个约束下做。
 |---|---|---|---|
 | **awesome-claude-code（58k★）** | 2026-11-18 实测：**只允许 collaborators 开 issue**（表单页 `Action restricted`）；资格（≥14 天且活跃）满足也无入口 | —（等上游开放） | **被上游关闭**，从"现在就能做"移到"等外部" |
 | awesome-opencode（11k★） | ≥25★ 且仓库 ≥30 天，任一不过即关 | 我起稿，你提 PR | 卡在 star，等 |
-| HN / V2EX / Reddit | 正文必须人写 | 你 | 文本齐了就能发 |
+| HN / V2EX | 正文必须人写（明文禁 AI 稿） | 你 | 文本齐了就能发 |
+| Reddit | 2026-11-18：`r/coolgithubprojects` 已发布并可见；`r/SideProject` 被站级 spam filter 移除；账号 6 karma | 我发帖，你回评论 | 先回评论，24 小时后再评估第二个版 |
 | 已合并的 5 家 DSH 目录 | 已收录 | — | 等对方重建 |
 
 ### 7.6 C 的最小版：规格（下一个功能轮，先不写代码）

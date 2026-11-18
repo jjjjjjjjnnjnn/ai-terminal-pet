@@ -134,15 +134,18 @@ latest share = 最新两个版本 的下载 / 全部版本 的下载
    - winget：PR 仍 `BLOCKED / REVIEW_REQUIRED`，合并后立刻在 README 写 `winget install`；
    - **签名**：这是 Windows 转化的唯一硬门槛（SmartScreen）。Azure Trusted Signing 约 $10/月，
      需要你开户；决定后我把 `sign` 步骤接进 `scripts/package.ps1` 与 CI。
-3. **社交预览图**：`docs/assets/social-preview.png` 已生成，只差上传（本机浏览器 DNS 故障时传不了）。
+3. **社交预览图**：`docs/assets/social-preview.png` 已于 2026-11-18 上传；仓库引用
+   `repository-images.githubusercontent.com/1385828605/3179c90c-…`，取回 1280×640 / 78,962 B。
+   上传前修掉了 Chrome 的 Secure DNS 故障（`Local State` 指向不可达的 `dns.google`）。
 
 ### P2 — 分发（你 + 我）
 
 | 渠道 | 门槛（读自其规则） | 谁做 | 现在能不能做 |
 |---|---|---|---|
-| awesome-claude-code（58k★） | 人手网页表单；≥14 天且活跃；一行描述、无 emoji | 你提交，我给那行字 | **可以**（仓库 55 天） |
+| awesome-claude-code（58k★） | 2026-11-18 实测：**只允许 collaborators 开 issue**（`Action restricted`）；资格满足也无入口 | —（等上游开放） | **被上游关闭** |
 | awesome-opencode（11k★） | **≥25★ 且仓库 ≥30 天**，任一不过即关 | 我起稿，你提 PR | 不能，等 star |
-| HN / V2EX / Reddit | 正文必须人写（明文禁 AI 稿） | 你 | 文本齐了就能发 |
+| HN / V2EX | 正文必须人写（明文禁 AI 稿） | 你 | 文本齐了就能发 |
+| Reddit | 2026-11-18：`r/coolgithubprojects` 已发并可见；`r/SideProject` 被站级 spam filter 移除；账号 6 karma | 我发帖，你回评论 | 先回评论，24 小时后再评估第二个版 |
 | 已合并的 5 家 DSH 目录 | 已收录 | — | 已完成，只等对方重建 |
 
 ### P3 — 发版节奏（我做）
