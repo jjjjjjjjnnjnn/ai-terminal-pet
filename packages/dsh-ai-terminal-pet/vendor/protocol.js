@@ -553,6 +553,25 @@ function waitForApprovalDecision(info, options = {}) {
   })()
 }
 
+// claudeApprovalAnswer mirrors reporter.ClaudeApprovalAnswer (Go). Claude Code
+// 2.1.312 ignores the legacy {"decision":"allow"} shape on PermissionRequest:
+// measured 2026-11-18 against a local Messages API stub, the same hook printed
+// it and the tool was still denied as if no hook had answered. Mixing both
+// shapes in one object is rejected as well, so this emits only the accepted
+// one. Never route this through the Antigravity dialect - that host does use
+// {"decision":"allow"} and it is the only decider there.
+function claudeApprovalAnswer(behavior, eventName) {
+  const decision = behavior === "deny"
+    ? { behavior: "deny", message: "Denied from the AI Terminal Pet panel." }
+    : { behavior: "allow" }
+  return JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: eventName || "PermissionRequest",
+      decision
+    }
+  })
+}
+
 async function sendStatus(payload, options = {}) {
   options = options && typeof options === "object" ? options : {}
   let item
@@ -590,6 +609,7 @@ module.exports = {
   SCHEMA_VERSION,
   STATES,
   approvalPlan,
+  claudeApprovalAnswer,
   // Exported for a packaged bootstrap that has to put the overlay where
   // launchApplication() looks for it: one answer to "where does this project
   // keep its files" instead of a fourth spelling of the path.

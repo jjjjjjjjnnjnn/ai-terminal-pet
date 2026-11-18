@@ -225,6 +225,13 @@ jobs:
       - name: Test the OpenCode event mapping
         run: node --test reporters/opencode-events.test.mjs
 
+      # The Claude Code permission answer is a wire format between this repo and
+      # a host we do not control. Claude Code 2.1.312 started ignoring the legacy
+      # {"decision":"allow"} shape on PermissionRequest, which made auto-approve
+      # look enabled and do nothing; this test pins the shape that works.
+      - name: Test the Claude Code approval answer
+        run: node --test reporters/claude-approval.test.mjs
+
       # The OpenCode reporter is also published as its own npm package, and the
       # package's entry point is a *generated* copy of reporters/opencode.js:
       # an npm plugin must be "type": "module" while the shared core is CommonJS

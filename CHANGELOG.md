@@ -30,8 +30,65 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.21**（tag `pet-v1.0.21`）/ **1.2.34**（tag `dsh-plugin-v1.2.34`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.21**。
+已发版到 **1.0.22**（tag `pet-v1.0.22`）/ **1.2.35**（tag `dsh-plugin-v1.2.35`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.22**。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）；OpenCode 上报端包没有自己的版本线，它跟着浮窗走。
+
+## [1.0.22] / [1.2.35] — 2026-11-18（自动同意在 Claude Code 2.1.312 上一直是哑的）
+
+这一版没有新功能：它修的是一个**看起来开着、实际什么都没做**的开关。
+
+### 根因
+
+`pet-hook` 与 `reporters/claude-hook.js` 在权限门控上返回的是旧的
+`{"decision":"allow"}` / `{"decision":"deny"}`。Claude Code **2.1.312** 不再接受这个形状：
+钩子照常执行、输出照常被读走，但决定不生效——`claude -p` 里直接按「没有钩子」处理并拒绝，
+交互式终端里落到宿主自己的提示。于是「5 秒未响应时自动允许」这个开关长期是哑的。
+
+证据来自一个本地 Messages API stub（`-p` 模式下让宿主真的执行一次 `mkdir`），同一场景换输出：
+
+| 钩子输出 | 结果 |
+|---|---|
+| 无钩子 | 拒绝，`needs approval` |
+| 旧 `{"decision":"allow"}` | **仍拒绝**，与无钩子一模一样 |
+| `hookSpecificOutput.decision.behavior:"allow"` | 执行，目录出现 |
+| 同形状 `deny` + message | 拒绝并显示 message |
+| 两种形状混发 | 拒绝 |
+
+`PreToolUse` 的旧方言是 `{"decision":"block","reason":…}`（实测有效），本项目在该事件上只发 `{}`，
+所以只有权限门控这一条路径受影响。
+
+### 修复
+
+- 新增 `internal/reporter/claude_decision.go`：`ClaudeApprovalAnswer(event, behavior)` 只发
+  `hookSpecificOutput.decision.behavior`；deny 带一句终端里看得见的原因。
+- `cmd/pet-hook/main.go` 的 Claude 分支改用它，**Antigravity 分支保持原方言**（那个宿主就是靠它决策的）。
+- `reporters/protocol.js` 与 `reporters/claude-hook.js` 同步（JS 回退实现）。
+- 测试：Go 2 条（形状 + 拒绝旧方言）、`reporters/claude-approval.test.mjs` 4 条、`fresh-machine` 两处期望；
+  CI 与 `AGENTS.md` 都加了那条 JS 测试。
+- 真实二进制 + 真实宿主复测：`bin/pet-hook.exe` 挂到 `PermissionRequest`、沙箱 `autoApprove=true`，
+  同一个 stub 下 `mkdir` 执行、目录出现、快照写入。
+
+### 版本
+
+- 浮窗 **1.0.22**、DSH 插件 **1.2.35**、OpenCode 上报端 **1.0.22**（与浮窗同号）。
+- `bin/pet-hook.exe` 3,705,344 → **3,706,880 B**；浮窗与状态行二进制未变。
+- 完整 runbook 与"更老版本未测"的边界：HANDOVER §82。
+
+### 资产（2026-11-18 本机实测）
+
+| tag | 文件 | 字节 | sha256 |
+|---|---|---|---|
+| `pet-v1.0.22` | `pet-setup.exe` | 14,574,080 | `C804705D…` |
+| | `ai-terminal-pet-1.0.22-win-x64.zip`（17 文件） | 5,154,786 | `109FFA90…` |
+| | `ai-terminal-pet-1.0.22-linux-amd64.tar.gz` | 5,447,902 | `0030861C…` |
+| | `ai-terminal-pet-1.0.22-linux-arm64.tar.gz` | 4,956,185 | `039CD1F5…` |
+| | `ai-terminal-pet-1.0.22-darwin-arm64.tar.gz` | 5,153,798 | `A8A3CD20…` |
+| | `ai-terminal-pet-1.0.22-darwin-amd64.tar.gz` | 5,543,462 | `5C42B458…` |
+| `dsh-plugin-v1.2.35` | `dsh-ai-terminal-pet-1.2.35.tgz`（20 文件） | 2,098,408 | `5D23B06E…` |
+| npm `opencode-ai-terminal-pet@1.0.22` | `opencode-ai-terminal-pet-1.0.22.tgz`（9 文件，含面板） | 2,044,880 | `1F05B5B5…` |
+
+安装后 `--version` = `ai-terminal-pet 1.0.22`，注册表行 `DisplayVersion=1.0.22`，
+`install.cmd -VerifyOnly` 12/12、`--doctor` 12 ok / 1 warn / 0 fail。
 
 ## [1.0.21] / [1.2.34] — 2026-11-17（一个卡死的窗口：窗口过程里的 panic 不再静默；状态盘动效可以关掉）
 

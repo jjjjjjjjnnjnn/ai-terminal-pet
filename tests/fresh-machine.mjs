@@ -1213,7 +1213,7 @@ async function scenarioSettingsAndConfig(sandbox, overlayExe, hookExe) {
 
   writeFileSync(configPath, JSON.stringify({ autoApprove: true, autoApproveTimeoutSec: 1 }), 'utf8')
   const approved = spawnSync(hookExe, ['--mode=claude'], { input: gate, encoding: 'utf8', timeout: 30000, env: sandbox.env })
-  equal('auto-approve with no veto allows', String(approved.stdout || '').trim(), '{"decision":"allow"}')
+  equal('auto-approve with no veto allows', String(approved.stdout || '').trim(), '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}')
 
   const dangerous = spawnSync(hookExe, ['--mode=claude'], {
     input: JSON.stringify({
@@ -1259,7 +1259,7 @@ async function scenarioSettingsAndConfig(sandbox, overlayExe, hookExe) {
   }
   await new Promise((resolve) => vetoChild.on('close', resolve))
   check('the overlay veto file is observed', vetoed)
-  equal('a veto turns the decision into deny', vetoStdout.trim(), '{"decision":"deny"}')
+  equal('a veto turns the decision into deny', vetoStdout.trim(), '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from the AI Terminal Pet panel."}}}')
 
   equal('--settings exits 0 while an instance is running', runExe(overlayExe, ['--settings'], sandbox.env, 20000).status, 0)
   // --settings starts an instance when none is listening; close whatever it left

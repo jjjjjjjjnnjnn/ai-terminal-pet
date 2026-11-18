@@ -1,6 +1,6 @@
 "use strict"
 
-const { approvalPlan, readStdin, sendStatus, stableProcessId, waitForApprovalDecision } = require("./protocol.js")
+const { approvalPlan, claudeApprovalAnswer, readStdin, sendStatus, stableProcessId, waitForApprovalDecision } = require("./protocol.js")
 
 function modelName(value) {
   if (typeof value === "string") return value
@@ -79,7 +79,8 @@ async function main() {
         { source: "claude-hook", sessionId: String(sessionId), pid, tool: input.tool_name || null },
         { timeoutMs: plan.timeoutMs }
       )
-      process.stdout.write(decision === "deny" ? '{"decision":"deny"}' : '{"decision":"allow"}')
+      const eventName = input.hook_event_name || input.hookEventName || "PermissionRequest"
+      process.stdout.write(claudeApprovalAnswer(decision === "deny" ? "deny" : "allow", eventName))
       return
     }
     if (plan.mode === "manual") {

@@ -96,7 +96,7 @@ Any AI modifying this repository must run the following steps. They are exactly 
 in [.github/workflows/ci.yml](.github/workflows/ci.yml), so a green local run means a green CI run.
 
 ```powershell
-# 1. Static analysis and all unit tests (504 func Test across 15 packages)
+# 1. Static analysis and all unit tests (506 func Test across 15 packages)
 gofmt -l .          # must print nothing
 go vet ./...
 go test -count=1 ./...
@@ -113,6 +113,7 @@ go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -severity high -confidence
 for f in reporters/*.js; do node --check "$f"; done   # per file: node --check only guards its first argument
 node --check tests/fresh-machine.mjs
 node --test reporters/opencode-events.test.mjs   # the OpenCode event -> state table
+node --test reporters/claude-approval.test.mjs   # the Claude Code permission answer shape
 node integrations/deepseek-harness/verify.mjs
 node packages/dsh-ai-terminal-pet/verify.mjs
 node packages/opencode-ai-terminal-pet/scripts/sync.mjs --check   # the npm reporter is generated from reporters/

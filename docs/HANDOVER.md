@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-18；浮窗 **1.0.21**、插件包 **1.2.34** 已发版；**§80 第 80 轮（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-18；浮窗 **1.0.22**、插件包 **1.2.35** 已发版；**§82 第 82 轮（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -72,15 +72,15 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.21`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.34`**。
-  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.21` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.34`。
+- **版本**：浮窗 **`1.0.22`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.35`**。
+  两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.22` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.35`。
   OpenCode 上报端包 `opencode-ai-terminal-pet` **没有自己的版本线**：它与浮窗同号（`check_versions` 断言相等）。
   **工作区与本机安装目录已经与 `1.0.21` / `1.2.34` 同步**：`bin/`、
   `packages/dsh-ai-terminal-pet/vendor/` 与 Release 逐字节相同
   （`AI-Terminal-Pet.exe` 的字节数与 sha256 见下方规模一行）。
   更早的每一个 tag 与资产仍然有效且不可变。查当前 CI 用
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
-- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**504 个** `func Test`）；
+- **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**506 个** `func Test`；§82 的两条是 auto-approve 方言）；
   CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
   1.0.21 的 CI 在 B 提交 `00646db` 上四条 job 全绿（Run `44185483273`；A 提交那次的
   `Upstream catalogue entry` 红是"PR 还没开"的预期顺序，PR #16391 开好后 B 提交转绿）；
@@ -5043,6 +5043,149 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 82. 缺陷：auto-approve 在 Claude Code 2.1.312 上一直没生效（2026-11-18，第 82 轮；代码已改、测试已加，**未发版**）
+
+### 82.1 一句话
+
+Claude Code 2.1.312 在 `PermissionRequest` 上不再接受旧的 `{"decision":"allow"}` / `{"decision":"deny"}` 形状，
+而 `pet-hook` 与 `reporters/claude-hook.js` 一直只发这个形状。于是「5 秒自动同意」看起来是开着的，
+**实际决定不了任何事**：`claude -p` 里直接拒绝（实测），交互式终端里落到宿主自己的提示
+（没有单独在 TTY 里复测，但两处用的是同一个 hook 输出解析器）。
+
+### 82.2 怎么发现的（可复现）
+
+§81 的插件契约验证需要一个能真的执行工具的宿主。API 余额不足（402），于是用
+`C:\Users\rongj\AppData\Local\Temp\opencode\pet-plugin-probe\` 里的一个本地 Messages API stub
+（`mock-api.js`）让宿主跑一次 `mkdir pet_probe_dir`，同一场景换钩子输出：
+
+| 钩子输出 | 结果 |
+|---|---|
+| 没有钩子 | 拒绝，`needs approval` |
+| `{"decision":"allow"}`（旧，当前项目发的） | **仍然拒绝**，文本与没有钩子完全相同 |
+| `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}` | **执行**，目录出现 |
+| 同上但 `behavior:"deny","message":"probe deny"` | 拒绝，终端显示 `probe deny` |
+| 两种形状混在一个对象里 | 拒绝（不会被当成任一有效形状） |
+
+同一轮还测了 `PreToolUse`：旧的 `{"decision":"deny"}` 同样被忽略；该事件可用的旧方言是
+`{"decision":"block","reason":"…"}`（实测显示 `PreToolUse:Bash hook error: probe block`）。
+本项目在 `PreToolUse` 上只发 `{}`，所以只有权限门控这一条路径受影响。
+
+**证据在哪**：临时目录里的 `run-scenario.ps1`、`mock-api.js`、`requests-*.jsonl`、`probe-*.jsonl`。
+不提交这些文件（它们依赖本机安装的宿主版本），但方法可照抄：本地 stub 返回一个 `tool_use`，
+第二次请求里看 `tool_result` 是执行成功还是 `needs approval`。
+
+### 82.3 改了什么
+
+| 文件 | 改动 |
+|---|---|
+| `internal/reporter/claude_decision.go`（新） | `ClaudeApprovalAnswer(event, behavior)` 只发 `hookSpecificOutput.decision.behavior`；deny 带 `ClaudeDeniedMessage`，让终端里能看到原因；空事件名默认 `PermissionRequest` |
+| `cmd/pet-hook/main.go` | Claude 分支改用上面的函数（事件名取 `hook_event_name`）；**Antigravity 分支保持 `{"decision":"allow"\|"deny"}`**，那个宿主就是靠它决策的 |
+| `reporters/protocol.js` | `claudeApprovalAnswer()` 镜像；导出 |
+| `reporters/claude-hook.js` | 权限路径改用它；事件名取 `input.hook_event_name` |
+| 生成物 | `packages/opencode-ai-terminal-pet/protocol.cjs`、`packages/dsh-ai-terminal-pet/vendor/protocol.js` 与 `vendor/manifest.json` 已按新源重生成 |
+| 测试 | Go 2 条（形状 + 拒绝旧方言）、`reporters/claude-approval.test.mjs` 4 条、`tests/fresh-machine.mjs` 两处期望 |
+| 门禁 | `.github/workflows/ci.yml` 与 `AGENTS.md` 增加那条 JS 测试 |
+
+**别改回去的三件事**：Antigravity 的方言必须保持原样；两种形状**不能混发**（实测被拒）；
+危险命令仍然返回 `{}`（交回宿主原生提示），自动同意只覆盖非危险命令的权限门控。
+
+### 82.4 验收
+
+- `gofmt -l .` 无输出、`go vet ./...` 0、`go test -count=1 ./...` 全过，**506** 个 `func Test`（新增 2 条）。
+- `node --test reporters/claude-approval.test.mjs` **4/4**；`sync.mjs --check` 3 个生成物一致；
+  两个包的 `vendor.mjs --check` 通过。
+- `node tests/fresh-machine.mjs --no-overlay` **183/183**（含改过的两处 auto-approve 期望）。
+- **真实二进制 + 真实宿主**：把 `bin/pet-hook.exe` 挂到 `PermissionRequest`、沙箱 `LOCALAPPDATA`
+  里 `autoApprove=true`、超时 1 s，用同一个 stub 跑：`mkdir` 执行、目录出现、
+  `runtime/` 里写入 `claude-hook-…json` 快照——**修复后的链路真的放行**。
+- 当前 `bin/pet-hook.exe` **3,706,880 B**（原 3,705,344 B）。安装目录仍是 1.0.21，
+  所以现在跑 `-VerifyOnly` 会报 `pet-hook.exe` 不一致：这是「源码已改、版本未发」的正常状态，发版后消失。
+
+### 82.5 没做的事与风险
+
+- **未发版**：版本仍是 1.0.21 / 1.2.34 / 上报端 1.0.21。自动同意是用户可见行为，
+  应当随下一次发版（1.0.22）出去；按 AGENTS 第 6 条走 A/B 两提交 + 索引前移。
+- **更老的 Claude Code 未测**：本次只测了 2.1.312 的 `-p` 模式，交互式 TTY 没有单独复测。
+  如果某个旧版本只认 `{"decision":"allow"}`，切换后那些版本的自动同意会失效——但它们本来就在当前版本上失效，
+  而且没有任何版本能同时接受两种形状。要支持更老版本只能按版本分支，这不是现在该做的事。
+- **本机安装的 `~/.claude/hooks/terminal-pet-hook.js` 是独立副本**（不是 re-export），
+  它不会随仓库更新；要么重跑 `--connect=claude` 改用 `pet-hook.exe`，要么替换那份副本。
+  这不影响仓库与发布物。
+- **卸载缓存残留**（§81 第 6 项）：装插件会留 `plugins/cache/…`；若最终做插件包，
+  要么接受并写进卸载说明，要么只带 `pet-hook.exe` 以把残留压到 3.7 MB。
+
+## 81. 接手体检：门禁全绿，Claude Code 插件进入契约验证（2026-11-18，第 81 轮；**不改代码、不发版**）
+
+这一轮是接手后的第一轮：先按 `AGENTS.md` 把门禁原样跑一遍并记录实测值，再决定要不要动产品代码。
+结论是**工程侧没有欠账**，唯一还在我们手上的转化缺口是 Claude Code 仍要手改 `settings.json`，
+于是下一步先做一小时的插件契约验证（不通过就退回 C 最小人格帧）。
+
+### 81.1 这一刻的机器状态（全部当场测出来）
+
+| 项 | 实测（2026-11-18） |
+|---|---|
+| 分支 / HEAD | `main` 与 `origin/main` 同步；HEAD `b17fbc8`（本节提交紧随其后，**不写自己的 sha**） |
+| 版本 | 浮窗 **1.0.21**、DSH 插件 **1.2.34**、OpenCode 上报端 **1.0.21**；npm `latest` 三者一致 |
+| 单测 | `gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（接手时 **504** 个 `func Test` / 15 个包；§82 加了 2 条，现为 **506**） |
+| 二进制 | `AI-Terminal-Pet.exe` 4,783,616 B、`pet-statusline.exe` 3,678,720 B、`pet-hook.exe` 3,705,344 B（合计 12,167,680 B） |
+| 新机套件 | `node tests/fresh-machine.mjs --no-overlay` **183/183**，37.9 s |
+| 安装校验 | `scripts\install.cmd -VerifyOnly` **12/12**，0 warning |
+| 自检 | `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline） |
+| 文档门禁 | `check_versions` 21 条、`check_facts` 11 条（504→506 / 15 / 16 / 13）、`upstream-entry --check` OK（指向 1.2.34）、`check_docs_links.py` 15 份、`check_assets.py` 15 行 |
+| 工具链测试 | bootstrap / server / sync / upstream-entry / check_versions / check_facts / check-tarball / traffic-report / catalog-status 各自 `node --test` **exit 0** |
+| 跨平台 | `scripts/cross-build.sh`（Git Bash）两条清单都成立：16 个包 linux/amd64 + darwin/arm64，Windows-only 清单没有漂移 |
+| CI | 最后一条**已完成**的 Run 是 `ea622c5`，success；HEAD `b17fbc8` 的 Run 在测量时**仍在排队**——不写成绿 |
+
+### 81.2 外部世界在等什么（复读，不重推）
+
+| 对象 | 状态 | 下一步 |
+|---|---|---|
+| `awesome-dsh-plugin` 条目 | PR #16391（1.2.34）**已合并**，`upstream-entry` 已指向 1.2.34 | 等站点重建；不催 |
+| winget `#481818` | **OPEN**，清单仍是 **1.0.15**；`08` 真跑过静默安装/卸载，auto-merge 已开 | 只等志愿维护者，**不改 PR** |
+| Reddit | `r/coolgithubprojects` 在 `/new/`；`r/SideProject` 被站级过滤；账号 6 karma | 先回评论，24 小时内不发第三个版 |
+| HN / V2EX | 未发 | 正文必须本人写、本人发 |
+| awesome-claude-code | 入口只对 collaborator 开放 | 等上游 |
+| awesome-opencode | 门槛 ≥25★ | 等 star |
+
+### 81.3 Claude Code 插件：先验证六件事（本轮施工）
+
+动机：OpenCode 与 DSH 都已是「一条命令」，Claude Code 仍要按 `--connect=claude` 贴 7 个事件的 JSON。
+本机 Claude Code **2.1.312** 有完整 `plugin` / `marketplace` CLI（`marketplace add` 接受 URL、路径或
+GitHub 仓库，`validate --profile` 会跑目录级检查），`C:\Users\rongj\ecc` 就是一个带 `hooks/hooks.json`
+的插件并在用 `${CLAUDE_PLUGIN_ROOT}`——**形状存在，但契约细节必须实测**：
+
+| # | 验证项 | 失败意味着 |
+|---|---|---|
+| 1 | 只有 `hooks/hooks.json` 的插件能否被 `claude plugin validate --profile` 接受 | 插件形态不成立，改用 `--connect --apply` 或退回 C |
+| 2 | 临时目录**故意带空格**时 `${CLAUDE_PLUGIN_ROOT}` 如何展开、命令里的 exe 是否要自己加引号 | Windows 路径不可靠，插件方案放弃 |
+| 3 | 插件 hook 与 `~/.claude/settings.json` hook 的负载是否同字段（`hook_event_name` / `session_id` / `cwd` / `tool_name`） | 上报会静默丢字段，停止 |
+| 4 | `PermissionRequest` 的退出码/JSON 语义是否与 settings hook 一致 | **auto-approve 会静默失效**，停止 |
+| 5 | `vendor/pet-hook.exe` + `vendor/AI-Terminal-Pet.exe` 装进插件后 sha256 与可执行性是否保持 | 包带面板的做法不可行，改为只带 hook |
+| 6 | `marketplace add <本地路径>` → `install` 的真实落点，以及 `uninstall` 是否干净、是否碰 `settings.json` | 卸载残留不可接受，重新设计 |
+
+**产出一份逐项 pass/fail 的记录，贴在 §81.4；任何一项失败即停手**，按 ROADMAP §7.6 退回 C 最小人格帧。
+只有六项全过才建 `packages/claude-ai-terminal-pet/`（照 §77 的 OpenCode 模式：digest 校验 →
+临时文件 → rename → 从不覆盖；版本与浮窗同号）。
+
+### 81.4 验证记录（2026-11-18，全部实测）
+
+| # | 项 | 结果 | 证据 |
+|---|---|---|---|
+| 1 | 只有 `hooks/hooks.json` 的插件能否被接受 | **通过** | `claude plugin validate` exit 0；`--profile directory` 只缺 README / LICENSE / icon（可补，不影响运行） |
+| 2 | 空格路径与 `${CLAUDE_PLUGIN_ROOT}` | **通过** | 临时目录故意命名 `market place root\plugin dir`，钩子命令 `node "${CLAUDE_PLUGIN_ROOT}/probe.js"` 正常执行；记录到的 `plugin_root` 是正斜杠绝对路径 |
+| 3 | 插件 hook 与 `settings.json` hook 的负载 | **通过** | 同一条 `PermissionRequest`：键集合逐项相同（`session_id` / `transcript_path` / `cwd` / `prompt_id` / `permission_mode` / `effort` / `hook_event_name` / `tool_name` / `tool_input` / `permission_suggestions`），值与类型一致 |
+| 4 | 决策语义 | **通过（插件），并发现产品缺陷** | 插件与 settings 走同一执行器；`hookSpecificOutput.decision.behavior` 的 allow/deny 两边都生效；旧 `{"decision":"allow"}` 在 2.1.312 上完全失效 → 见 §82 |
+| 5 | 二进制完整性 | **通过** | 安装后 `pet-hook.exe` sha256 `83595E5E…`、`AI-Terminal-Pet.exe` `2AAE6F22…` 与安装前逐字节相同；缓存里的 `pet-hook.exe --help` 可执行 |
+| 6 | 安装 / 卸载 | **部分** | 含空格的本地路径 `marketplace add` + `install` 成功，落点 `plugins/cache/<market>/<plugin>/<version>`；`uninstall` + `marketplace remove` 清空 `settings.json` 与 `installed_plugins.json`，**但缓存目录不删**（带面板约 8.5 MB），`plugin prune` 也不清；安装是 **两条命令**（marketplace + install），不是一条 |
+
+**结论**：插件形态可行，六项没有阻塞项；唯一需要设计的是卸载残留的缓存目录。第 4 项的副作用比插件本身更重要——见 §82。
+
+### 81.5 本轮不做什么
+
+- **不发版、不占版本号**：产品代码零改动；上面 12/12、183/183 都是对 1.0.21 的复验。
+- 不实现 `--connect=claude --apply`：它推翻 README 明写的 read-only 承诺，且改的是别人工具的配置。
+- 不催 winget、不重发 Reddit、不代写 HN/V2EX。
 
 ## 80. 交接：宣传流程化、工作区清理与会话切换（2026-11-18）
 

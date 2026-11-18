@@ -1,6 +1,6 @@
 {
   "name": "opencode-ai-terminal-pet",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "description": "Report OpenCode session state to the AI Terminal Pet overlay: one always-on-top strip that shows which agent is waiting on you, and jumps back to it.",
   "license": "MIT",
   "type": "module",

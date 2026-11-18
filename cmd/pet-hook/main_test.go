@@ -138,8 +138,8 @@ func TestAutoApproveApprovesWhenNothingVetoes(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d", code)
 	}
-	if strings.TrimSpace(out) != `{"decision":"allow"}` {
-		t.Fatalf("silence must approve, got %q", out)
+	if strings.TrimSpace(out) != `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}` {
+		t.Fatalf("silence must approve in the shape Claude Code 2.1.312 accepts, got %q", out)
 	}
 	if elapsed < 900*time.Millisecond {
 		t.Fatalf("the veto window was skipped (waited %v, expected about 1s)", elapsed)
@@ -186,8 +186,8 @@ func TestAutoApproveHonoursAVetoFromTheOverlay(t *testing.T) {
 	out, _ := runHook(t, []string{"--mode=claude"},
 		`{"hook_event_name":"PermissionRequest","session_id":"veto-1","tool_name":"Read"}`)
 	<-done
-	if strings.TrimSpace(out) != `{"decision":"deny"}` {
-		t.Fatalf("a veto must turn into deny, got %q", out)
+	if strings.TrimSpace(out) != `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from the AI Terminal Pet panel."}}}` {
+		t.Fatalf("a veto must turn into a deny Claude Code understands, got %q", out)
 	}
 	if len(*sent) == 0 {
 		t.Fatal("the pending session should have been reported")

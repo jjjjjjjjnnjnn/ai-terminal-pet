@@ -74,7 +74,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) int {
 		state, reason := reporter.ClaudeStatus(input)
 		payload := claudePayload(input, state, reason, now)
 		if state == string(session.StateWaitingPermission) {
-			if answer, done := decide(payload, reporter.ClaudeToolText(input), mode); done {
+			event := reporter.StringField(input, "hook_event_name", "hookEventName")
+			if answer, done := decide(payload, event, reporter.ClaudeToolText(input), mode); done {
 				fmt.Fprintln(stdout, answer)
 				return 0
 			}
@@ -86,7 +87,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) int {
 		if reporter.AntigravityIsPermissionGate(input) {
 			payload.State = session.StateWaitingPermission
 			payload.Reason = "permission"
-			if answer, done := decide(payload, reporter.AntigravityToolText(input), mode); done {
+			if answer, done := decide(payload, "", reporter.AntigravityToolText(input), mode); done {
 				fmt.Fprintln(stdout, answer)
 				return 0
 			}
@@ -105,7 +106,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) int {
 // The two dialects differ in what a dangerous command means, and that
 // difference is load-bearing: Claude Code re-asks natively, while Antigravity
 // treats this hook as the decider, so "manual" there has to deny.
-func decide(payload reporter.Payload, toolText, mode string) (string, bool) {
+func decide(payload reporter.Payload, eventName, toolText, mode string) (string, bool) {
 	plan, timeout := reporter.ApprovalPlan(toolText)
 	source := "claude-hook"
 	fallback := "{}"
@@ -125,7 +126,13 @@ func decide(payload reporter.Payload, toolText, mode string) (string, bool) {
 		// screen to start its countdown while this hook waits out the window.
 		_ = sender(payload)
 		if reporter.WaitForApprovalDecision(request, timeout) == "deny" {
+			if mode == modeClaude {
+				return reporter.ClaudeApprovalAnswer(eventName, "deny"), true
+			}
 			return `{"decision":"deny"}`, true
+		}
+		if mode == modeClaude {
+			return reporter.ClaudeApprovalAnswer(eventName, "allow"), true
 		}
 		return `{"decision":"allow"}`, true
 	case reporter.ApprovalManual:
