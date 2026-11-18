@@ -177,6 +177,9 @@ MIT；不要写下载量（见 §9）。
   https://www.reddit.com/r/SideProject/comments/1xzj589/ai_terminal_pet_a_56px_alwaysontop_strip_that/
 - 账号 `Visible_Swim471` 发布时只有 **6 karma**。同一天不要再去第三个版；先回评论、在相关帖子里
   正常参与，等这波过滤/放行结果出来再决定下一条。
+- **每日追踪（2026-11-18 起）**：自动部分 `node tools/daily-reach.mjs` → `docs/reach/`
+  （Windows 任务 `AITerminalPet-DailyReach` 每天 09:00）；X 与 Reddit 的回复必须用浏览器人工核对，
+  规则见 `AGENTS.md` 第 11 条。`docs/reach/latest.md` 是每天的第一份阅读材料。
 
 ## 9. 不要做的事
 

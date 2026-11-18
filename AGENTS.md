@@ -141,6 +141,7 @@ python tools/check_docs_links.py   # every relative path and #anchor in the docs
 python tools/check_assets.py       # every size/frame count in docs/assets/README.md matches the file
 node --test tools/check-tarball.test.mjs   # the .tgz reader/writer rules (no tarball needed)
 node tools/traffic-report.mjs       # reach / installs / npm, with the machine traffic separated (docs/METRICS.md)
+node tools/daily-reach.mjs          # daily reach record (docs/reach/); also scheduled as AITerminalPet-DailyReach at 09:00
 node --test tools/traffic-report.test.mjs  # latest share and the asset baseline rules
 
 # 2b. Doesn't run in CI (a clean checkout has no artifact) but must run before every
@@ -223,6 +224,7 @@ Two conventions in those commands are load-bearing, not style:
 | I am announcing this somewhere (X, Hacker News, a marketplace) | [docs/PROMOTION.md](docs/PROMOTION.md) has the paste-ready copy; [docs/LAUNCH.md](docs/LAUNCH.md) has the measured numbers it must not exceed and the posting history |
 | **I need the repeatable promotion process, or another project wants to reuse it** | **[docs/PROMOTION-PLAYBOOK.md](docs/PROMOTION-PLAYBOOK.md)** — channel rules, de-AI writing rules, per-channel verification, Reddit's site filter vs sub rules, and the copy-for-another-project checklist |
 | **How many people actually use this, and is that download count real?** | **[docs/METRICS.md](docs/METRICS.md)** — the 2026-11-17 measurement (33 views, 0 external installs), the crawler-fleet proof, and the bot-resistant metric; re-measure with `node tools/traffic-report.mjs` |
+| **What happened to the posts we published, and what needs answering today?** | **[docs/reach/README.md](docs/reach/README.md)** — the daily record, the `AITerminalPet-DailyReach` task, and the manual X/Reddit half (AGENTS rule 11) |
 | **What is the growth plan, and why in that order?** | [docs/ROADMAP.md](docs/ROADMAP.md) §7 — the four decisions (positioning A+C, sequence, no untestable signing path, ≤2 releases a week), P1–P2 with owners, and the four-week targets |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does an OpenCode user install the reporter in one command? | [packages/opencode-ai-terminal-pet/README.md](packages/opencode-ai-terminal-pet/README.md) |
@@ -334,3 +336,11 @@ Two conventions in those commands are load-bearing, not style:
    - **Release cadence is a metric input**: every release adds an npm version, which the fleet fetches, which
      raises the total and lowers the latest share. Batch changes into one release (aim for ≤ 2 a week;
      security and regression fixes excepted) instead of shipping on every commit.
+11. **The daily reach check is part of the work** (owner instruction, 2026-11-18):
+   - `docs/reach/latest.md` is the last run; `node tools/daily-reach.mjs` refreshes it. The Windows task
+     `AITerminalPet-DailyReach` runs the same command at 09:00, and at the next logon if the machine was off.
+   - The first session of each day reads it, then checks **X notifications/thread** and **Reddit as the
+     author** in the browser, and appends what changed (author + substance) to `docs/reach/<today>.md`.
+     The script cannot see those two and says so; the manual half is not optional.
+   - A quiet day is recorded as `no change`. Never invent activity, never repost a filtered post, never ask
+     for votes, and never quote npm totals as users.

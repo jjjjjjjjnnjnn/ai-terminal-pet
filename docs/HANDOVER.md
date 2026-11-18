@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-18；浮窗 **1.0.22**、插件包 **1.2.35** 已发版；**§83 第 83 轮（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-18；浮窗 **1.0.22**、插件包 **1.2.35** 已发版；**§84 第 84 轮（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -143,16 +143,19 @@
 - **工作区**：根目录 6 个 `go build` 产物、旧的 `dist/`（**335.6 MB → 38.9 MB**，只留 1.0.21 的六个资产）、
   `bin/pet-setup.exe`、两个包里的 8 个旧 `.tgz`、`tools/__pycache__/` 已清理；
   `.local/`（发布笔记、PR body）与 `.workbuddy-ai/`（记忆）是历史资料，保留。
-- **公共计数（2026-11-17 实测，[docs/METRICS.md](METRICS.md)）**：14 天 **33 浏览 / 11 唯一**；
-  release 资产 **≈2 件/版本**（等于本项目自己的发版复验）；npm 4,586/周但 **latest share 仅 6%**（爬虫队形，
-  对照 `dsh-pet` 58%）；star 1（本人）/ fork 0 / issue 0 / PR 0 —— **外部用户数为 0**。
-  这一轮据此把优先级重排为"先可见性、再转化"（[docs/ROADMAP.md](ROADMAP.md) §7），
-  并且新增了 `node tools/traffic-report.mjs` 让这件事每次都能复算。
+- **公共计数（2026-11-18，`docs/reach/latest.md`）**：14 天 **65 浏览 / 22 唯一**；
+  DSH tarball 累计 **496**（13.1/版本），1.2.35 单版本 **12 次**；npm DSH 5,881/周但最新 1.2.34 只占
+  **2.4%**，上报端 702/周、1.0.21 占 **17.4%**（对照 `dsh-pet` 72.8%）——仍是爬虫队形。
+  star 1 / fork 0 / issue 0 / PR 0。**外部用户数仍无法证明 >0**。这组数字每天由
+  `node tools/daily-reach.mjs` 复算（Windows 任务 `AITerminalPet-DailyReach`，09:00）。
+- **每日追踪（2026-11-18 起，owner 指令）**：每天第一次会话读 `docs/reach/latest.md`，
+  再用浏览器核对 **X 通知/线程**与 **Reddit 作者视角的评论**，把变化写进 `docs/reach/<日期>.md`；
+  脚本看不到这两项，人工那半不能省（`AGENTS.md` 第 11 条）。
 - **接入**：OpenCode（**npm 包 `opencode-ai-terminal-pet`，`opencode plugin add` 一行**；包内 `server.js`
   由 `reporters/opencode.js` 生成，本机 `opencode.json` 目前仍指向
   `~/.config/opencode/plugins/terminal-pet` 这个目录，里面的 `index.ts` 只做一次静态 re-export，
-  见 §53——§75.6 记了为什么本机特意先留着它）、Claude Code（Windows 上可装插件
-  `packages/claude-ai-terminal-pet`，见 §83；否则用 `reporters/claude-hook.js` 的 8 个事件）、
+  见 §53——§75.6 记了为什么本机特意先留着它）、Claude Code（**本机已于 2026-11-18 切到原生
+  `pet-hook.exe` 的 8 个事件**；Windows 新用户可装插件 `packages/claude-ai-terminal-pet`，见 §83）、
   Antigravity（`bin/pet-statusline.exe` + `reporters/antigravity-hook.js`）、DeepSeek Harness
   （两种：老的 host-only bridge bundle `integrations/deepseek-harness/ai-terminal-pet-bridge`，
   与新的独立插件包 `packages/dsh-ai-terminal-pet`，见 §27）、任意 CLI（`reporters/generic.js`）。
@@ -5050,6 +5053,52 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 84. 交接：回应核查、本机切到原生钩子、每日追踪（2026-11-18，第 84 轮；**不发版**）
+
+### 84.1 回应核查（2026-11-18 19:40 UTC）
+
+| 渠道 | 实测 | 结论 |
+|---|---|---|
+| X 线程 | 无外部回复；Notifications → Mentions 为空。1 个赞（sharenow，11-11）、1 个关注（luna，11-10）；根帖 18 浏览 | 没有要回的内容 |
+| `r/coolgithubprojects` | 可见，score 0，**0 评论** | 继续观察 |
+| `r/SideProject` | 仍 `removed_by_category: reddit`，无 modmail 回复 | **不要重发** |
+| `r/DeepSeekHarness`（更早的帖子） | u/louisremi 回复 **“Nice !”**（2026-11-03） | 第一条外部正面回复；无需回应 |
+| GitHub | star 1 / fork 0 / issue 0 / PR 0；14 天 **65 浏览 / 22 唯一**；clone 2,175（952 是 CI） | 比 11-17 的 33/11 有增长，仍是小样本 |
+| 资产下载 | `dsh-plugin-v1.2.35.tgz` **12 次**；1.0.22 六个资产各 1 次；1.0.21 各 2 次 | DSH 那 12 次高于“每次发版自检约 2 次”的基线，**值得继续看**，但还不能叫用户 |
+| npm | DSH 5,881/周，最新 1.2.34 占 **2.4%**；上报端 702/周，1.0.21 占 **17.4%**；对照 `dsh-pet` 72.8% | 仍是爬虫队形；引用只看 latest share |
+| 上游 | DSH 条目 #16703 OPEN；winget #481818 OPEN | 等对方 |
+
+### 84.2 本机 Claude Code 切到原生钩子
+
+- 旧配置：`~/.claude/settings.json` 里 8 条 `terminal-pet-hook.js`（§53 的独立副本，不带 §82 的方言修复）。
+- 动作：移除这 8 条，写入 `--connect=claude` 生成的 8 条原生命令（`%LOCALAPPDATA%\AI-Terminal-Pet\pet-hook.exe --mode=claude`），
+  其余钩子（PreToolUse/Stop 上的通知器）原样保留。
+- 备份：`~/.claude/settings.json.bak-2026-11-18T1834-pet-native`；回滚就是把它复制回去。
+- 验证：`--doctor` 报 `claude: ok - 8 event(s) -> %LOCALAPPDATA%/AI-Terminal-Pet/pet-hook.exe`。
+- 没有装插件到真实配置：插件会让 `--doctor` 的 `reporters` 项看不到（`inspect` 只读 `settings.json`），
+  这个缺口已记在 §84.4，等修好再切插件。
+
+### 84.3 每日追踪（机制，不是这一次的检查）
+
+- `tools/daily-reach.mjs`：一条命令收集 GitHub 流量 / 各 Release 下载 / npm latest share / Reddit 帖子 JSON /
+  上游 PR 状态，写 `docs/reach/<日期>.md`（追加）与 `latest.md`（覆盖）；`--stdout` 只打印。
+  某个源不可达时**不失败**，报告写 `unreachable`——校园网访问不到 Reddit 是已知的。
+- Windows 计划任务 **`AITerminalPet-DailyReach`**：每天 **09:00** 跑同一命令，`StartWhenAvailable`
+  让关机后的下一次登录补跑；已实跑一次（LastTaskResult 0，下次 2026-11-19 09:00）。
+- `docs/reach/README.md` 写明自动/人工各一半；**X 与 Reddit 的回复必须人工用浏览器看**，
+  脚本不伪造这两项。
+- `AGENTS.md` 第 11 条把「每天第一次会话读 `docs/reach/latest.md`、核对 X/Reddit、把回复写进当天文件」
+  写成长期职责。
+
+### 84.4 已知缺口与下一步
+
+- **插件版的 `--doctor` 盲区**：`internal/connect/claude.go` 只读 `~/.claude/settings.json`，装了
+  Claude Code 插件（钩子在插件缓存里）会报 `not connected`。修法是读
+  `~/.claude/plugins/installed_plugins.json` 的 `installPath`，校验 `<plugin>/hooks/hooks.json`
+  与 `<plugin>/vendor/pet-hook.exe`，并区分「已安装但被禁用」。**未发版**，留到下一次发版。
+- Reddit 的自动抓取在本机网络下不可用（浏览器可以）；每日报告已把它标成人工项。
+- X 的回复/浏览只能登录后看；每日人工核对是唯一可靠路径。
 
 ## 83. 交接：Claude Code 插件（2026-11-18，第 83 轮；**Windows-only**，随 `claude-plugin-v1.0.22`）
 
