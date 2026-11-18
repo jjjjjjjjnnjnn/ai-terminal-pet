@@ -5095,9 +5095,12 @@ claude plugin install ai-terminal-pet@ai-terminal-pet-market
 - `claude plugin validate .`（marketplace）：**Validation passed**。
 - `node --test packages/claude-ai-terminal-pet/{bootstrap,plugin}.test.mjs`：**15/15**。
 - `scripts/vendor.mjs --check`：两个二进制与源码摘要一致。
-- **端到端**：在隔离的 `CLAUDE_CONFIG_DIR` 里从本地 marketplace 安装 → 用本地 Messages API stub 跑一次真实
-  `claude -p` 会话 → `SessionStart` 把 4,783,616 B 的面板（sha256 `DE4F04E8…`）装进沙箱
-  `LOCALAPPDATA` → pet-hook 写入 `claude-hook-….json` 快照 → 全程没有钩子报错。
+- **端到端（本地 marketplace）**：在隔离的 `CLAUDE_CONFIG_DIR` 里从本地 marketplace 安装 → 用本地
+  Messages API stub 跑一次真实 `claude -p` 会话 → `SessionStart` 把 4,783,616 B 的面板
+  （sha256 `DE4F04E8…`）装进沙箱 `LOCALAPPDATA` → pet-hook 写入 `claude-hook-….json` 快照 → 全程没有钩子报错。
+- **端到端（GitHub）**：`claude plugin marketplace add jjjjjjjjnnjnn/ai-terminal-pet` 走 HTTPS clone、
+  校验 marketplace、安装 `ai-terminal-pet@ai-terminal-pet-market` 成功；同样的真实会话复跑一遍，
+  面板与快照都到位、零钩子报错。**这是用户实际会走的那条路**，不只是本地路径。
 - **一个本地路径的坑**：把 marketplace 指到含中文的仓库路径（本机就是这样）时，Claude Code 经 Git Bash
   展开 `${CLAUDE_PLUGIN_ROOT}` 会把中文路径打断，钩子报 `No such file or directory`。真实安装把包复制到
   ASCII 的 `~/.claude/plugins/cache/…`，因此不受影响；本机复验时把 marketplace 指向一份 ASCII 副本即通过。
@@ -5105,6 +5108,9 @@ claude plugin install ai-terminal-pet@ai-terminal-pet-market
 - **CI 第一次红在跨工具链字节相等**：插件测试拿 `bin/`（CI 的 go1.23）与 `vendor/`（本机 go1.27）比 sha256，
   而 `go.mod` 的 `go 1.23.0` 是下限不是钉死——这正是 `vendor.mjs` 早就按 `goVersion` 跳过比较的原因。
   测试改成只校验 `vendor/manifest.json` 描述自己那份二进制，跨工具链判断留给 `vendor.mjs --check`。
+  修正提交 `fb62b59` 的 Run `44364790239` **四条 job 全绿**。
+- **tag 移动过一次（发布前）**：`claude-plugin-v1.0.22` 最初指在 CI 红的 `12d2212` 上，没有对应的 Release
+  资产，已在转绿前移到 `fb62b59`；与 DSH 1.0.0 那次同例，先说明再移。
 
 ### 83.5 没做的事
 
