@@ -67,8 +67,8 @@
 
 市场索引与 DSH 摘要统一成同一件事：装上即接 Harness；**OpenCode 只需一行命令**
 （`opencode plugin add opencode-ai-terminal-pet`，Windows 上连面板一起装）；Claude Code 与 Antigravity
-各需接一次上报端。三处（`docs/market-index.json`、两份 `package.json` 的 `dsh.catalog.summary`）逐字一致，
-粘贴稿在 `docs/LAUNCH.md` §6。
+各需接一次上报端。`docs/market-index.json` 的条目描述（长）与两份 `package.json` 的
+`dsh.catalog.summary`（短）说的是同一件事，两份摘要彼此逐字一致；粘贴稿在 `docs/LAUNCH.md` §6。
 
 ### 为什么这一批值得发（批次规则）
 

@@ -246,10 +246,10 @@ long it has been asking.
 
 ## 6. DSH 市场条目描述
 
-市场列表只显示摘要，所以它必须是**事实**而不是卖点，而且**它已经存在，不能直接换**：
-`docs/market-index.json` 的 `plugins[0].description`、`packages/dsh-ai-terminal-pet/package.json`
-的 `dsh.catalog.summary`、以及仓库根 `package.json` 的同一块，三处是**逐字相同的一段文字**
-（`verify.mjs` 有断言钉住它们），并且它属于已发布的 1.2.30 tarball 的字节。
+市场列表只显示摘要，所以它必须是**事实**而不是卖点。它出现在两个地方，**长度不同、意思必须一致**：
+`docs/market-index.json` 的 `plugins[0].description`（长，条目页用）与两份 `package.json` 的
+`dsh.catalog.summary`（短，目录用；这两份彼此逐字一致）。`verify.mjs` 断言的是索引版本/commit/icon，
+**不**断言这段文字与摘要逐字相同；摘要属于已发布 tarball 的字节，所以改它也意味着一个新版本号。
 
 **1.2.34 起用的（中英文各一段）**
 
