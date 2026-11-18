@@ -104,9 +104,12 @@ imsai（目录文件，无版本滞后）、YELEBAI 与 brade（两家都是按 
       从同一份光栅器输出合成，`README.md` 中英两段都已引用
 - [x] **「两个终端 + 浮窗同框」实景图**：`docs/assets/desktop-scene.png`（1500x860，59,029 B）。
       面板那一半是真实光栅器输出，两个终端是画出来的，图注里写明了这一点
-- [ ] **GitHub 社交预览图上传**：`docs/assets/social-preview.png`（1280x640）已生成，
-      但仓库 Settings → Social preview **没有 API**，重生成文件不等于换上去。
-      2026-11-17 尝试代传时本机浏览器解析不了 DNS（`ERR_NAME_NOT_RESOLVED`），等网络恢复或本人手传
+- [x] **GitHub 社交预览图上传**：`docs/assets/social-preview.png`（1280x640 / 78,962 B）已于 2026-11-18
+      通过 Settings → Social preview 上传；仓库现在引用
+      `https://repository-images.githubusercontent.com/1385828605/3179c90c-05e6-4c67-b94c-dad723d3282f`
+      （取回仍是 1280x640 / 78,962 B）。上传前修掉了本机 Chrome 的 DNS 故障：`Local State` 的
+      `dns_over_https.mode` 是 `secure` 且指向本网络不可达的 `https://dns.google/dns-query`；
+      原文件备份为 `Local State.bak-20261118-doh`，改成 `off` 后浏览器恢复解析
 - [x] `--doctor` 全绿（12 ok, 1 warn, 0 fail），截图 `docs/assets/doctor-green.png`
       （1798x358 / 63,335 B）已生成：那是程序自己的 stdout，只加了着色与窗口边框，
       并把捕获机器上的用户名换成 `<you>`
