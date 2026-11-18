@@ -350,6 +350,8 @@ node tools/catalog-status.mjs --file f.json   # 离线：只判我们自己能�
   PR 已开：[microsoft/winget-pkgs#481818](https://github.com/microsoft/winget-pkgs/pull/481818)（见 §4.3）。
   **`01`–`10` 号校验全过（含真跑静默安装/卸载的 `08`），auto-merge 已由机器人开启**；
   现在只等一位社区志愿维护者批准。在他的批准之前，"能被 winget 安装"仍不成立。
+- **1.0.22 的上游条目**：[#16703](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16703)
+  已开（只改 `tarball` 到 1.2.35），等维护者合并；合并后还要等对方站点重建才在目录页可见。
 - 上游 PR **合并仍要人工**：我们只能保证「随时可合」（无冲突、检查跑过、只改一行）。
 - 站点渲染有延迟：合并后要等对方重建，`plugins.json` 才换新版本。**我们会读到旧值，这是正常的。**
 - 其他目录（dshbase / dsh.so / dsh-plugin.org / AllDSH）都是人工复核，已投过，等对方。

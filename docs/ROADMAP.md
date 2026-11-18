@@ -18,7 +18,7 @@
 | OpenCode 上报端包 | `opencode-ai-terminal-pet` **1.0.21**，**与浮窗同号**（`tools/check_versions.mjs` 断言相等），没有自己的版本线 |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,783,616 B**（4.56 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
-| 原生 hook | `bin/pet-hook.exe` **3,705,344 B**（3.53 MiB）；三个 Windows 二进制合计 **12,167,680 B** = 11.60 MiB |
+| 原生 hook | `bin/pet-hook.exe` **3,706,880 B**（3.54 MiB）；三个 Windows 二进制合计 **12,169,216 B** = 11.61 MiB |
 | 代码量 | Go 非测试源码 **156 文件 / 28,561 行**、测试 **101 文件 / 14,946 行**（**506** 个 `func Test`）；JS/MJS 侧为 6 个 reporter + 工具链 `tools/*.mjs` + 两个包的测试与生成物（`packages/*/vendor/protocol.js` 与 `protocol.cjs` 是 `reporters/protocol.js` 的逐字节副本，不算第二份实现）。文件/行数与二进制体积**由 `node tools/check_facts.mjs --print` 现测**（它们每天变，本表不把它们当作断言；`func Test` 数量是断言，见本文件 §0 的门禁说明） |
 | 第三方依赖 | 6 个直接依赖 + 1 个间接依赖，无 cgo：go-winio v0.6.2(MIT) / lxn/win(BSD) / ebitengine/purego v0.9.1(Apache-2.0) / jezek/xgb v1.3.1(BSD) / x/image v0.25.0(BSD) / x/sys v0.10.0(BSD)（+ x/text v0.23.0 indirect） |
 | 运行期占用 | 有活跃会话时工作集约 22–38 MB（含共享页），线程 8–16（Windows 实测，待跨平台长期基线复测） |

@@ -82,8 +82,9 @@
   `gh run list --limit 1`，查提交用 `git log --oneline -10`——**不写死**，因为 git 无法在一个提交里引用它自己或它的后继。
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**506 个** `func Test`；§82 的两条是 auto-approve 方言）；
   CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
-  1.0.21 的 CI 在 B 提交 `00646db` 上四条 job 全绿（Run `44185483273`；A 提交那次的
-  `Upstream catalogue entry` 红是"PR 还没开"的预期顺序，PR #16391 开好后 B 提交转绿）；
+  1.0.22 走同一套 A/B：A `f31100b`（版本 + 修复 + 索引前移）、B `695c37b`（索引钉到 A）。
+  A 那次的 Run 因 B 紧随推送被 concurrency **取消**（不是失败），
+  以最新一次 Run 为准（`gh run list --limit 1`；**不要把排队写成绿**）；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑）；
   两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**两个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
   `tools/check_versions.mjs` **21** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
@@ -94,27 +95,28 @@
   `tests/fresh-machine.mjs --no-overlay` **183/183**；
   `tools/check_docs_links.py` **15 份**全解、`tools/check_assets.py` 15 行一致；
   `govulncheck` + `gosec` 在 CI 的 scan job 跑。
-  1.0.21 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
+  1.0.22 的装机实测：`scripts\install.cmd` → `-VerifyOnly` **12/12 一致、0 warning**、
   `--doctor` **12 ok / 1 warn / 0 fail**（唯一 warn 仍是 Antigravity 只接 statusline）、
-  `--version` 报 `ai-terminal-pet 1.0.21`，注册表那一行 `DisplayVersion=1.0.21`。
-- **规模**（`node tools/check_facts.mjs --print`，1.0.21 实测）：非测试 **156 文件 / 28,561 行**、
-  测试 **101 文件 / 14,946 行**、**504 个 `func Test`**。
+  `--version` 报 `ai-terminal-pet 1.0.22`，注册表那一行 `DisplayVersion=1.0.22`。
+- **规模**（`node tools/check_facts.mjs --print`，1.0.22 实测）：非测试 **157 文件 / 28,625 行**、
+  测试 **102 文件 / 15,005 行**、**506 个 `func Test`**。
   `bin/AI-Terminal-Pet.exe` **4,783,616 B**（与 `packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe`
-  和 `packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 三份逐字节相同，sha256 `2AAE6F22…`）、
-  `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,705,344 B**。
-  三个二进制合计 **12,167,680 B** = 11.60 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
+  和 `packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe` 三份逐字节相同，sha256 `DE4F04E8…`）、
+  `bin/pet-statusline.exe` **3,678,720 B**、`bin/pet-hook.exe` **3,706,880 B**。
+  三个二进制合计 **12,169,216 B** = 11.61 MiB。安装目录里多了一件制品：`install.ps1` 的副本。
 - **分发（两条版本线 + 两个 npm 包 + 一个包管理器）**：
-  - 插件线：npm `latest` = **1.2.34**；`dsh-plugin-v1.2.34` 的 Release 资产 `dsh-ai-terminal-pet-1.2.34.tgz`
-    **2,098,103 B / sha256 `455AC1B6…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
-    = `ai-terminal-pet 1.0.21`），**与 npm 上那一份逐字节相同**；上游条目 PR 的提交与结果见 §79.5。
-  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.21**（与浮窗同号），
-    资产 `opencode-ai-terminal-pet-1.0.21.tgz` **2,044,125 B / sha256 `EF6A47EE…` / 9 文件（含面板）**。
-  - 浮窗线：`pet-v1.0.21` 的六个资产——`pet-setup.exe` **14,571,520 B / `907C8C29…`**、
-    `ai-terminal-pet-1.0.21-win-x64.zip` **5,153,440 B / `9FB0DC21…`（17 文件）**，以及
-    linux-{amd64,arm64}（**5,446,915 B / `19283924…`**、**4,955,276 B / `5CF6F46D…`**）与
-    darwin-{arm64,amd64}（**5,152,832 B / `D1B027F2…`**、**5,542,276 B / `8E25821E…`**）四个 tar.gz。
-  - **`pet-v1.0.20` / `dsh-plugin-v1.2.33` 也仍然有效且不可变**；`pet-v1.0.18` / `dsh-plugin-v1.2.31`
-    同样保留（它们的 doctor 查错了 OpenCode 包路径，见 §75.7）。
+  - 插件线：npm `latest` = **1.2.35**；`dsh-plugin-v1.2.35` 的 Release 资产 `dsh-ai-terminal-pet-1.2.35.tgz`
+    **2,098,408 B / sha256 `5D23B06E…` / 20 文件**（解包后跑包内 `vendor/AI-Terminal-Pet.exe --version`
+    = `ai-terminal-pet 1.0.22`），与 npm 上那一份逐字节相同；上游跟进 PR
+    [#16703](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16703) 已开、等维护者合并。
+  - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.22**（与浮窗同号），
+    资产 `opencode-ai-terminal-pet-1.0.22.tgz` **2,044,880 B / sha256 `1F05B5B5…` / 9 文件（含面板）**。
+  - 浮窗线：`pet-v1.0.22` 的六个资产——`pet-setup.exe` **14,574,080 B / `C804705D…`**、
+    `ai-terminal-pet-1.0.22-win-x64.zip` **5,154,786 B / `109FFA90…`（17 文件）**，以及
+    linux-{amd64,arm64}（**5,447,902 B / `0030861C…`**、**4,956,185 B / `039CD1F5…`**）与
+    darwin-{arm64,amd64}（**5,153,798 B / `A8A3CD20…`**、**5,543,462 B / `5C42B458…`**）四个 tar.gz。
+  - **`pet-v1.0.21` / `dsh-plugin-v1.2.34` 也仍然有效且不可变**；更早的 `pet-v1.0.20` / `dsh-plugin-v1.2.33`
+    与 `pet-v1.0.18` / `dsh-plugin-v1.2.31` 同样保留（后者的 doctor 查错了 OpenCode 包路径，见 §75.7）。
   - 钉 tag 的 git 源；仓库根的清单 shim；自建 format-1 索引（`source.commit` 与 `icon` 均钉到 Commit A）。
     `b4474a6` 那次 CI 红就是反面教材：索引只被下一个提交 `fabb591` 前移，而 `verify.mjs` 要求「索引里的最新
     版本 == 包版本」，于是 tag 指向的提交本身是红的（规矩：发版提交必须同时前移索引，见 AGENTS.md 第 6 条）。
@@ -5099,13 +5101,15 @@ Claude Code 2.1.312 在 `PermissionRequest` 上不再接受旧的 `{"decision":"
 - **真实二进制 + 真实宿主**：把 `bin/pet-hook.exe` 挂到 `PermissionRequest`、沙箱 `LOCALAPPDATA`
   里 `autoApprove=true`、超时 1 s，用同一个 stub 跑：`mkdir` 执行、目录出现、
   `runtime/` 里写入 `claude-hook-…json` 快照——**修复后的链路真的放行**。
-- 当前 `bin/pet-hook.exe` **3,706,880 B**（原 3,705,344 B）。安装目录仍是 1.0.21，
-  所以现在跑 `-VerifyOnly` 会报 `pet-hook.exe` 不一致：这是「源码已改、版本未发」的正常状态，发版后消失。
+- **发版与装机**：`pet-v1.0.22` / `dsh-plugin-v1.2.35` 已发布（六个浮窗资产、DSH tarball、npm 两个包，数字见 §1）；
+  本机 `-VerifyOnly` **12/12**、`--doctor` 12 ok / 1 warn / 0 fail、`--version` = `ai-terminal-pet 1.0.22`。
+  上游条目跟进 PR [#16703](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16703) 已开，等维护者合并。
 
 ### 82.5 没做的事与风险
 
-- **未发版**：版本仍是 1.0.21 / 1.2.34 / 上报端 1.0.21。自动同意是用户可见行为，
-  应当随下一次发版（1.0.22）出去；按 AGENTS 第 6 条走 A/B 两提交 + 索引前移。
+- **已发版**：1.0.22 / 1.2.35 / 上报端 1.0.22（2026-11-18）。A 提交 `f31100b`、B 提交 `695c37b`
+  （索引的 `source.commit` 与 `icon` 钉到 A）。npm 的 DSH 版本在发布后几分钟内可能仍显示旧值，
+  以 `npm view dsh-ai-terminal-pet version` 为准。
 - **更老的 Claude Code 未测**：本次只测了 2.1.312 的 `-p` 模式，交互式 TTY 没有单独复测。
   如果某个旧版本只认 `{"decision":"allow"}`，切换后那些版本的自动同意会失效——但它们本来就在当前版本上失效，
   而且没有任何版本能同时接受两种形状。要支持更老版本只能按版本分支，这不是现在该做的事。
