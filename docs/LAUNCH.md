@@ -229,6 +229,11 @@ long it has been asking.
 而不是等人来问），第 5 条挂 `docs/assets/desktop-scene.png`。GIF 在 X 上要 ≤5 MB / ≤15 MB（移动端另算），
 342 KB 远在限内；HN 不支持 GIF，Show HN 帖里改贴 `desktop-scene.png` 的直链。
 
+**2026-11-18 已发布**（@JJjj1955714）：
+https://x.com/JJjj1955714/status/2122943194904322144 —— 5 条按顺序回复，第 1 条带 `demo.gif`。
+**实际只有第 1 条带图**：X 的多帖编辑器把后续上传的附件都挂到首条（GIF + 图片不被允许），
+所以 2/5、4/5、5/5 改为纯文本回复；这四张图仍在 README 与 Release 页可点。
+
 **Show HN 的正文不发图**，HN 的帖子是纯文本，图只能放在链接的仓库里——所以 README 里的
 这四张图是 HN 那条帖子的实际配图位置。
 
