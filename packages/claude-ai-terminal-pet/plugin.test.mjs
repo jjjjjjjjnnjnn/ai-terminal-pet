@@ -64,23 +64,22 @@ test("SessionStart installs the bundled panel before reporting", () => {
   assert.match(commands[1], /vendor\/pet-hook\.exe/);
 });
 
-test("the vendored panel matches its manifest and bin/", () => {
+test("the vendored panel matches its manifest", () => {
   const manifest = readJson(path.join("vendor", "manifest.json"));
   const vendored = path.join(packageDir, "vendor", "AI-Terminal-Pet.exe");
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.overlay.bytes, readFileSync(vendored).length);
   assert.equal(manifest.overlay.sha256, sha256(vendored));
-  const built = path.join(repoDir, "bin", "AI-Terminal-Pet.exe");
-  if (existsSync(built)) assert.equal(sha256(built), sha256(vendored), "vendor/ must be copied from bin/");
+  // Byte equality with bin/ is vendor.mjs --check's job, and only when the
+  // local Go release equals the one that cut the binary: CI's go1.23 and a
+  // developer's go1.27 compile the same sources to different bytes.
 });
 
-test("the vendored hook matches its manifest and bin/", () => {
+test("the vendored hook matches its manifest", () => {
   const manifest = readJson(path.join("vendor", "manifest.json"));
   const vendored = path.join(packageDir, "vendor", "pet-hook.exe");
   assert.equal(manifest.hook.bytes, readFileSync(vendored).length);
   assert.equal(manifest.hook.sha256, sha256(vendored));
-  const built = path.join(repoDir, "bin", "pet-hook.exe");
-  if (existsSync(built)) assert.equal(sha256(built), sha256(vendored), "vendor/ must be copied from bin/");
 });
 
 test("no machine-specific path leaked into the package", () => {

@@ -5102,6 +5102,9 @@ claude plugin install ai-terminal-pet@ai-terminal-pet-market
   展开 `${CLAUDE_PLUGIN_ROOT}` 会把中文路径打断，钩子报 `No such file or directory`。真实安装把包复制到
   ASCII 的 `~/.claude/plugins/cache/…`，因此不受影响；本机复验时把 marketplace 指向一份 ASCII 副本即通过。
   这条写在这里，免得下次把「本地开发路径」误判成插件坏了。
+- **CI 第一次红在跨工具链字节相等**：插件测试拿 `bin/`（CI 的 go1.23）与 `vendor/`（本机 go1.27）比 sha256，
+  而 `go.mod` 的 `go 1.23.0` 是下限不是钉死——这正是 `vendor.mjs` 早就按 `goVersion` 跳过比较的原因。
+  测试改成只校验 `vendor/manifest.json` 描述自己那份二进制，跨工具链判断留给 `vendor.mjs --check`。
 
 ### 83.5 没做的事
 
