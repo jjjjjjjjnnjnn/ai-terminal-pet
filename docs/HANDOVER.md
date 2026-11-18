@@ -83,8 +83,9 @@
 - **健康**：`gofmt -l .` 无输出；`go vet ./...` exit 0；`go test -count=1 ./...` 全过（**506 个** `func Test`；§82 的两条是 auto-approve 方言）；
   CI 四条 job（windows / ubuntu（含 `go test -race`）/ macOS / scan）在 1.0.20 的提交上全绿（见 §77）；
   1.0.22 走同一套 A/B：A `f31100b`（版本 + 修复 + 索引前移）、B `695c37b`（索引钉到 A）。
-  A 那次的 Run 因 B 紧随推送被 concurrency **取消**（不是失败），
-  以最新一次 Run 为准（`gh run list --limit 1`；**不要把排队写成绿**）；
+  A 与 B 的 Run 都因下一次推送被 concurrency **取消**（不是失败）；
+  收尾 docs 提交 `8b598bf` 的 Run `44356438056` **四条 job 全绿**（windows / ubuntu（含 `-race`）/ macOS / scan）。
+  之后的新提交仍以 `gh run list --limit 1` 为准，**不要把排队写成绿**；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑）；
   两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**两个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
   `tools/check_versions.mjs` **21** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
