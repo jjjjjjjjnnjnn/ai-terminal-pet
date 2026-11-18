@@ -62,6 +62,7 @@ const DOCUMENTS = [
   'README.md',
   PACKAGE_README,
   OPENCODE_README,
+  'packages/claude-ai-terminal-pet/.claude-plugin/plugin.json',
   'CHANGELOG.md',
   MARKET_INDEX,
   'docs/ROADMAP.md',
@@ -226,6 +227,17 @@ export const CLAIMS = [
     id: 'opencode package requirement',
     file: OPENCODE_README,
     pattern: /versioned with the overlay: `(\d+\.\d+\.\d+)` of the reporter/g,
+    expect: ['overlay'],
+    count: 1
+  },
+  {
+    // The Claude Code plugin ships both binaries, so its number names the pair
+    // the same way the reporter package's number does. A plugin manifest that
+    // says a different version than the panel it vendors is a combination
+    // nobody tested.
+    id: 'claude code plugin manifest version',
+    file: 'packages/claude-ai-terminal-pet/.claude-plugin/plugin.json',
+    pattern: /"version":\s*"(\d+\.\d+\.\d+)"/g,
     expect: ['overlay'],
     count: 1
   }

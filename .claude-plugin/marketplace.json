@@ -1,0 +1,19 @@
+{
+  "name": "ai-terminal-pet-market",
+  "owner": {
+    "name": "jjjjjjjjnnjnn",
+    "url": "https://github.com/jjjjjjjjnnjnn"
+  },
+  "metadata": {
+    "description": "The AI Terminal Pet panel as a Claude Code plugin: Windows overlay plus the native hook reporter, bundled so one install carries both."
+  },
+  "plugins": [
+    {
+      "name": "ai-terminal-pet",
+      "source": "./packages/claude-ai-terminal-pet",
+      "description": "Shows every Claude Code session in the AI Terminal Pet panel and answers permission gates from it. Windows only in this release.",
+      "version": "1.0.22",
+      "strict": false
+    }
+  ]
+}

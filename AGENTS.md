@@ -86,6 +86,13 @@ reporters/*.js  ──[pipe / unix socket, JSON lines]──►  cmd/ai-terminal
   handover §52.3 paid for, and an unverified file copy inside a host's plugin loader is the failure AGENTS
   rule 1 forbids. The package is **versioned with the overlay** (`tools/check_versions.mjs` asserts the
   equality), so an overlay release publishes it in the same step.
+- `packages/claude-ai-terminal-pet/`: the Claude Code plugin. Eight hooks call the native
+  `vendor/pet-hook.exe`; `SessionStart` also runs `bootstrap.cjs`, which copies the vendored panel into
+  `%LOCALAPPDATA%\AI-Terminal-Pet\` once (temp file, digest check, rename, **never overwrite**). The repo
+  root `.claude-plugin/marketplace.json` points at this package, so `claude plugin marketplace add` plus
+  `claude plugin install` is the whole wiring. **Windows-only in this release**: the native hook cannot run
+  on macOS/Linux, where `ai-terminal-pet --connect=claude` remains the path. Versioned with the overlay by
+  the same `check_versions` claim as the reporter package; `vendor/` holds both binaries and its manifest.
 - `integrations/deepseek-harness/ai-terminal-pet-bridge/`: host-only Cordis bundle plus `verify.mjs`.
 
 ---
@@ -121,6 +128,9 @@ node packages/opencode-ai-terminal-pet/scripts/vendor.mjs --check  # the panel i
 node --test packages/opencode-ai-terminal-pet/scripts/sync.test.mjs
 node --test packages/opencode-ai-terminal-pet/bootstrap.test.mjs   # install-once rules: never overwrite, verify digest
 node --test packages/opencode-ai-terminal-pet/server.test.mjs      # loads the package the way npm install does
+node packages/claude-ai-terminal-pet/scripts/vendor.mjs --check     # both vendored binaries are current
+node --test packages/claude-ai-terminal-pet/bootstrap.test.mjs      # the same install-once rules for the plugin
+node --test packages/claude-ai-terminal-pet/plugin.test.mjs         # hooks, marketplace and version pairing
 node tools/upstream-entry.mjs --check   # catalogue entry points at this package version (SKIP is not a pass)
 node --test tools/upstream-entry.test.mjs
 node tools/check_versions.mjs           # every documented version equals the code's (badge, links, install commands)
@@ -216,6 +226,7 @@ Two conventions in those commands are load-bearing, not style:
 | **What is the growth plan, and why in that order?** | [docs/ROADMAP.md](docs/ROADMAP.md) §7 — the four decisions (positioning A+C, sequence, no untestable signing path, ≤2 releases a week), P1–P2 with owners, and the four-week targets |
 | What does the DSH plugin package ship, and how is it versioned? | [packages/dsh-ai-terminal-pet/README.md](packages/dsh-ai-terminal-pet/README.md) |
 | How does an OpenCode user install the reporter in one command? | [packages/opencode-ai-terminal-pet/README.md](packages/opencode-ai-terminal-pet/README.md) |
+| How does a Claude Code user install the panel without editing JSON? | [packages/claude-ai-terminal-pet/README.md](packages/claude-ai-terminal-pet/README.md) |
 | How does Discover find this plugin without npm? | [docs/market-index.json](docs/market-index.json) (format 1, pinned to the release commit) |
 | Frozen historical documents | [docs/archive/README.md](docs/archive/README.md) |
 

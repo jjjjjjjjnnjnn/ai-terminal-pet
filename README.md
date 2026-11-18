@@ -49,7 +49,8 @@ opencode plugin add opencode-ai-terminal-pet             # OpenCode
 The panel itself is one file: `pet-setup.exe` on Windows, a `tar.gz` + `install.sh` on Linux and macOS
 ([Install](#install) has every path, including the pinned-tag and offline forms). On Windows the OpenCode
 package carries that panel and drops it in place on first load, so its one line really is one line.
-Claude Code and Antigravity are wired once with `ai-terminal-pet --connect`.
+Claude Code and Antigravity are wired once with `ai-terminal-pet --connect`; on Windows Claude Code can
+also be installed as a plugin, panel included (see [Connect](#connect-the-terminals-you-already-use)).
 
 **What it is not:** not an Electron app, not a web view, and no runtime to install for the panel itself — a single
 5&nbsp;MB Go binary that draws its own pixels and speaks to reporters over a local endpoint. No account, no telemetry, no network.
@@ -207,7 +208,7 @@ It reads your local host configs **read-only** (it never edits them for you) and
 | Host CLI | Mechanism | What runs on each event |
 |---|---|---|
 | **DeepSeek Harness** | Cordis plugin `dsh-ai-terminal-pet` (or the host-only bridge in `integrations/deepseek-harness/`) | subscribes to `session/event` and `approval/request` inside DSH |
-| **Claude Code** | hooks in `~/.claude/settings.json` (`--connect=claude`) | native `pet-hook --mode=claude`, falling back to `reporters/claude-hook.js` |
+| **Claude Code** | on Windows the plugin `ai-terminal-pet` (`claude plugin marketplace add jjjjjjjjnnjnn/ai-terminal-pet`, then `claude plugin install ai-terminal-pet@ai-terminal-pet-market`); elsewhere hooks in `~/.claude/settings.json` (`--connect=claude`) | native `pet-hook --mode=claude`; the plugin also installs the panel once, from the copy it carries |
 | **OpenCode** | `opencode plugin add opencode-ai-terminal-pet` (or the entry in `~/.config/opencode/opencode.json`, which `--connect=opencode` prints) | the npm package `opencode-ai-terminal-pet` — the same `reporters/opencode.js` with OpenCode 2.x event names. On Windows it also installs the panel, once, from the copy the package carries |
 | **Antigravity CLI** | statusline + hooks in its settings (`--connect=antigravity`) | native `pet-statusline` (with the short-circuit) + `pet-hook --mode=antigravity` |
 | **Anything else** | a shell wrapper around `reporters/generic.js`, or JSON lines over the endpoint | one JSON line per state transition — see [docs/PROTOCOL.md](docs/PROTOCOL.md) |
@@ -355,7 +356,7 @@ opencode plugin add opencode-ai-terminal-pet             # OpenCode
 
 面板本体只有一个文件：Windows 上是 `pet-setup.exe`，Linux / macOS 是 `tar.gz` + `install.sh`
 （完整路径——含钉 tag 与离线安装——见英文的 [Install](#install) 一节）。Claude Code 与 Antigravity
-用 `ai-terminal-pet --connect` 各接一次。
+用 `ai-terminal-pet --connect` 各接一次；Windows 上 Claude Code 还可以装成插件，连面板一起（见英文表格）。
 
 **它不是什么**：不是 Electron 应用，不是 WebView，**面板本身**没有运行时要装 —— 一个 5&nbsp;MB 的 Go 单文件，
 自己画像素，用本地端点跟上上报端说话。没有账号、没有遥测、不出网。

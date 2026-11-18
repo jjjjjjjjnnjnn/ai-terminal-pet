@@ -259,6 +259,18 @@ jobs:
       - name: Test the packaged OpenCode reporter
         run: node --test packages/opencode-ai-terminal-pet/server.test.mjs packages/opencode-ai-terminal-pet/bootstrap.test.mjs
 
+      # The Claude Code plugin ships both binaries, so its vendor/ carries the
+      # same "verify, never overwrite" contract as the other two packages, and
+      # its manifest number equals the overlay's. `claude plugin validate` needs
+      # the host installed, so CI runs the offline half; the runbook records the
+      # validator result from a machine that has it.
+      - name: Check the Claude Code plugin package
+        shell: bash
+        run: |
+          node packages/claude-ai-terminal-pet/scripts/vendor.mjs --check
+          node --check packages/claude-ai-terminal-pet/bootstrap.cjs
+          node --test packages/claude-ai-terminal-pet/bootstrap.test.mjs packages/claude-ai-terminal-pet/plugin.test.mjs
+
       # verify.mjs loads the Harness bundle the way the Harness loader does and
       # fails on an unloadable manifest, a missing locale or a broken patch.
       - name: Verify the DeepSeek Harness bundle

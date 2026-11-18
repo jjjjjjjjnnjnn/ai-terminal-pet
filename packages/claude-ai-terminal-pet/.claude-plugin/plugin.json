@@ -1,0 +1,20 @@
+{
+  "name": "ai-terminal-pet",
+  "version": "1.0.22",
+  "description": "Claude Code hooks for the AI Terminal Pet panel: each session reports what it is doing, which one is blocked on you, and permission gates can be answered from the panel. Windows only in this release.",
+  "author": {
+    "name": "jjjjjjjjnnjnn",
+    "url": "https://github.com/jjjjjjjjnnjnn"
+  },
+  "homepage": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+  "repository": "https://github.com/jjjjjjjjnnjnn/ai-terminal-pet",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "hooks",
+    "status",
+    "notification",
+    "terminal",
+    "windows"
+  ]
+}

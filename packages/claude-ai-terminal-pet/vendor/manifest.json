@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/vendor.mjs",
+  "goVersion": "go1.27.0",
+  "source": {
+    "files": 138,
+    "sha256": "45fc4dca1a018b99bb0c4a75d3e9d822b55faabcfe2ed113e11c76915e061978"
+  },
+  "overlay": {
+    "file": "vendor/AI-Terminal-Pet.exe",
+    "bytes": 4783616,
+    "sha256": "de4f04e8c18b67e41cf8aefb72fd2113d37c2fa551dee3118e20dee5a7ec89db"
+  },
+  "hook": {
+    "file": "vendor/pet-hook.exe",
+    "bytes": 3706880,
+    "sha256": "c738fd45ca54263649a69e79a0a5fb49c2fc5061ace100a5e212711f0fc9d7b3"
+  }
+}

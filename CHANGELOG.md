@@ -90,6 +90,13 @@
 安装后 `--version` = `ai-terminal-pet 1.0.22`，注册表行 `DisplayVersion=1.0.22`，
 `install.cmd -VerifyOnly` 12/12、`--doctor` 12 ok / 1 warn / 0 fail。
 
+### 追加（同日）：Claude Code 插件
+
+`packages/claude-ai-terminal-pet` **1.0.22**（与浮窗同号，tag `claude-plugin-v1.0.22`）：八个原生钩子 +
+`SessionStart` 的一次性面板装载，从仓库根的 `.claude-plugin/marketplace.json` 安装，Windows-only。
+它**不进 npm，也不进浮窗的 Release 资产**；`claude plugin validate` 两个清单都通过，15 条包内测试与一次
+真实 marketplace 安装 + 真实会话均已实测。细节与本地路径的坑见 HANDOVER §83。
+
 ## [1.0.21] / [1.2.34] — 2026-11-17（一个卡死的窗口：窗口过程里的 panic 不再静默；状态盘动效可以关掉）
 
 这一版来自一次真实现场，而不是一个功能清单：机器上有一个 `AI-Terminal-Pet.exe` 进程活着、窗口不响应，

@@ -72,3 +72,5 @@ __pycache__/
 # working tree and shipped fine while `git clone` shipped an empty package.
 !packages/dsh-ai-terminal-pet/vendor/AI-Terminal-Pet.exe
 !packages/opencode-ai-terminal-pet/vendor/AI-Terminal-Pet.exe
+!packages/claude-ai-terminal-pet/vendor/AI-Terminal-Pet.exe
+!packages/claude-ai-terminal-pet/vendor/pet-hook.exe

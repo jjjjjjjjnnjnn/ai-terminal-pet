@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-18；浮窗 **1.0.22**、插件包 **1.2.35** 已发版；**§82 第 82 轮（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-18；浮窗 **1.0.22**、插件包 **1.2.35** 已发版；**§83 第 83 轮（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -88,7 +88,7 @@
   之后的新提交仍以 `gh run list --limit 1` 为准，**不要把排队写成绿**；
   `scripts/cross-build.sh` 全 16 包三端 `CGO_ENABLED=0` 通过（本机无 gcc，用 PowerShell 复跑同一逻辑）；
   两个 `verify.mjs` 全 PASS；`vendor.mjs --check`（**两个包各一次**，共享同一个源码摘要）与 `bin/` 一致；
-  `tools/check_versions.mjs` **21** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
+  `tools/check_versions.mjs` **22** 条一致（`node --test tools/check_versions.test.mjs` 27/27）、
   **`tools/check_facts.mjs` 11 条一致**、`tools/catalog-status.test.mjs` 12/12、
   `tools/upstream-entry.test.mjs` 26/26、`tools/check-tarball.test.mjs` 8/8、
   `tools/traffic-report.test.mjs` 4/4；**OpenCode 包**：`sync.mjs --check` 3/3、`sync.test.mjs` 4/4、
@@ -112,6 +112,9 @@
     [#16703](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16703) 已开、等维护者合并。
   - OpenCode 上报端线：npm `opencode-ai-terminal-pet` **1.0.22**（与浮窗同号），
     资产 `opencode-ai-terminal-pet-1.0.22.tgz` **2,044,880 B / sha256 `1F05B5B5…` / 9 文件（含面板）**。
+  - Claude Code 插件线：`packages/claude-ai-terminal-pet` **1.0.22**（与浮窗同号，tag `claude-plugin-v1.0.22`），
+    从仓库根的 `.claude-plugin/marketplace.json` 安装（`claude plugin marketplace add` + `install`）；
+    **不进 npm、不进浮窗的 Release 资产**，Windows-only，细节与验证见 §83。
   - 浮窗线：`pet-v1.0.22` 的六个资产——`pet-setup.exe` **14,574,080 B / `C804705D…`**、
     `ai-terminal-pet-1.0.22-win-x64.zip` **5,154,786 B / `109FFA90…`（17 文件）**，以及
     linux-{amd64,arm64}（**5,447,902 B / `0030861C…`**、**4,956,185 B / `039CD1F5…`**）与
@@ -148,7 +151,8 @@
 - **接入**：OpenCode（**npm 包 `opencode-ai-terminal-pet`，`opencode plugin add` 一行**；包内 `server.js`
   由 `reporters/opencode.js` 生成，本机 `opencode.json` 目前仍指向
   `~/.config/opencode/plugins/terminal-pet` 这个目录，里面的 `index.ts` 只做一次静态 re-export，
-  见 §53——§75.6 记了为什么本机特意先留着它）、Claude Code（`reporters/claude-hook.js` 7 事件）、
+  见 §53——§75.6 记了为什么本机特意先留着它）、Claude Code（Windows 上可装插件
+  `packages/claude-ai-terminal-pet`，见 §83；否则用 `reporters/claude-hook.js` 的 8 个事件）、
   Antigravity（`bin/pet-statusline.exe` + `reporters/antigravity-hook.js`）、DeepSeek Harness
   （两种：老的 host-only bridge bundle `integrations/deepseek-harness/ai-terminal-pet-bridge`，
   与新的独立插件包 `packages/dsh-ai-terminal-pet`，见 §27）、任意 CLI（`reporters/generic.js`）。
@@ -5047,7 +5051,66 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
 
-## 82. 缺陷：auto-approve 在 Claude Code 2.1.312 上一直没生效（2026-11-18，第 82 轮；代码已改、测试已加，**未发版**）
+## 83. 交接：Claude Code 插件（2026-11-18，第 83 轮；**Windows-only**，随 `claude-plugin-v1.0.22`）
+
+### 83.1 一句话
+
+Claude Code 现在也有「装一次就完」的入口：两个命令装好插件，八个钩子走原生 `pet-hook.exe`，
+`SessionStart` 把随包的面板按摘要校验装进 `%LOCALAPPDATA%\AI-Terminal-Pet\`（从不覆盖）。
+它不占浮窗版本号、不进 npm、也不改 1.0.22 的 Release 资产。
+
+### 83.2 交付物
+
+| 路径 | 内容 |
+|---|---|
+| `packages/claude-ai-terminal-pet/.claude-plugin/plugin.json` | 插件清单，版本与浮窗同号（1.0.22） |
+| `packages/claude-ai-terminal-pet/hooks/hooks.json` | 8 个事件（与 `internal/connect` 的 `claudeHookEvents()` 一致），全部原生 |
+| `packages/claude-ai-terminal-pet/bootstrap.cjs` | SessionStart 的一次性装载：摘要校验 → 临时文件 → rename → **从不覆盖** |
+| `packages/claude-ai-terminal-pet/vendor/` | `pet-hook.exe` + `AI-Terminal-Pet.exe` + `manifest.json`（两个二进制的字节/摘要 + Go 源码摘要） |
+| `packages/claude-ai-terminal-pet/scripts/vendor.mjs` | vendor 的生成与 `--check`；与另外两个包共用 `tools/overlay-vendor.mjs` 的源码摘要 |
+| `packages/claude-ai-terminal-pet/bootstrap.test.mjs` | 8 条：装一次、不覆盖、摘要不符、清单损坏、平台跳过、路径契约、环境开关、坏清单 |
+| `packages/claude-ai-terminal-pet/plugin.test.mjs` | 7 条：版本配对、marketplace 指向、八个事件、SessionStart 顺序、两个二进制的摘要、无本机路径 |
+| 仓库根 `.claude-plugin/marketplace.json` | marketplace，`source` 指向 `./packages/claude-ai-terminal-pet` |
+| `.gitignore` | 两条反向例外：`*.exe` 会吞掉新 vendor 的两个二进制（与 §1j 同一个坑，这次是 `git check-ignore` 先抓到的） |
+
+### 83.3 安装与边界
+
+```sh
+claude plugin marketplace add jjjjjjjjnnjnn/ai-terminal-pet
+claude plugin install ai-terminal-pet@ai-terminal-pet-market
+```
+
+- **两条命令，不是一条**：Claude Code 的 `plugin install` 只从已添加的 marketplace 解析，没有 npm 那种裸包名。
+- **Windows-only**：钩子是 Windows PE；macOS/Linux 仍用 `ai-terminal-pet --connect=claude`（JS 上报端）。
+  `docs/PLATFORMS.md` 的表格已按平台写明。
+- **Node 只在 SessionStart 用一次**（`bootstrap.cjs`）；每个事件走原生，不额外起 Node。
+- **卸载不删缓存也不删面板**：`claude plugin uninstall` 只移除钩子；`~/.claude/plugins/cache/…`（约 8.5 MB，
+  带面板）与 `%LOCALAPPDATA%\AI-Terminal-Pet\` 都保留。README 写明要手工删。
+- **版本**：与浮窗同号（`check_versions` 新增第 22 条断言），所以下一次浮窗发版也要同时 bump 这个清单。
+
+### 83.4 验证（2026-11-18 实测）
+
+- `claude plugin validate packages/claude-ai-terminal-pet`：**Validation passed**（目录级检查也无告警：
+  README / LICENSE / icon / author 齐全）。
+- `claude plugin validate .`（marketplace）：**Validation passed**。
+- `node --test packages/claude-ai-terminal-pet/{bootstrap,plugin}.test.mjs`：**15/15**。
+- `scripts/vendor.mjs --check`：两个二进制与源码摘要一致。
+- **端到端**：在隔离的 `CLAUDE_CONFIG_DIR` 里从本地 marketplace 安装 → 用本地 Messages API stub 跑一次真实
+  `claude -p` 会话 → `SessionStart` 把 4,783,616 B 的面板（sha256 `DE4F04E8…`）装进沙箱
+  `LOCALAPPDATA` → pet-hook 写入 `claude-hook-….json` 快照 → 全程没有钩子报错。
+- **一个本地路径的坑**：把 marketplace 指到含中文的仓库路径（本机就是这样）时，Claude Code 经 Git Bash
+  展开 `${CLAUDE_PLUGIN_ROOT}` 会把中文路径打断，钩子报 `No such file or directory`。真实安装把包复制到
+  ASCII 的 `~/.claude/plugins/cache/…`，因此不受影响；本机复验时把 marketplace 指向一份 ASCII 副本即通过。
+  这条写在这里，免得下次把「本地开发路径」误判成插件坏了。
+
+### 83.5 没做的事
+
+- 没有提交到任何 Claude Code 插件目录（Claude Code 的 marketplace 就是一个 git 仓库；用户添加本仓库即发现）。
+- 没有 macOS/Linux 版本（需要按平台分发/选择 `pet-hook`，而那会引入一个 Node 启动器或第二份 hooks 清单）。
+- 本机现有 `~/.claude/hooks/terminal-pet-hook.js` 仍是旧的独立副本；要切到插件，需先移除
+  `~/.claude/settings.json` 里那 8 条 hooks，再装插件，否则同一会话会被上报两次。
+
+## 82. 缺陷：auto-approve 在 Claude Code 2.1.312 上一直没生效（2026-11-18，第 82 轮；**已发版** 1.0.22 / 1.2.35）
 
 ### 82.1 一句话
 
