@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-19；浮窗 **1.0.24**、插件包 **1.2.37** 已发版；**§88（三报同源已改代码，待重建二进制/发版/重载插件）；§87（现场三报：假报/颜色/跳转，只取证）；§86（DSH 0.2.2-rc.5 实测）；§85（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-19；浮窗 **1.0.24**、插件包 **1.2.37** 已发版；**§89（交接：发版 + 宣传总线接入 + 会话切换）；§88（三报同源已修并已发版，本机插件未重载/现场未复验）；§87（现场三报：假报/颜色/跳转，只取证）；§86（DSH 0.2.2-rc.5 实测）；§85（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -5053,7 +5053,59 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
 
-## 88. 收束：三报同源（幽灵会话）+ 跳转回执（2026-11-19，第 88 轮；**代码已改，尚未发版、尚未加载新插件**）
+## 89. 交接：发版完成 + 宣传总线接入（2026-11-19，第 89 轮；**切会话请从本节开始**）
+
+### 89.1 机器与仓库状态（收尾实测）
+
+- 版本 **1.0.24** / 插件 **1.2.37** / OpenCode 上报端 **1.0.24** / Claude 插件 **1.0.24**，已发版。
+- 提交顺序：`b9be45e`（A，代码+版本+索引+文档）→ `f259b09`（B，索引钉 A）→ `6207b2c`
+  （记录发版与上游 PR）→ `f72dbf0`（宣传总线接入）→ `9dee3f5`（AGENTS 第 12 条：社交发帖归知识库
+  `agent-promotion`）。全部已 push。
+- tag `pet-v1.0.24` / `dsh-plugin-v1.2.37` / `claude-plugin-v1.0.24` 均指向 A；两个 Release 带齐
+  Windows zip + `pet-setup.exe` + 四个 POSIX tarball + DSH tgz；npm 两个包已 publish。
+- 上游目录 bump PR [awesome-dsh-plugin#16914](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16914)
+  开着，`upstream-entry.mjs --check` 报 in flight；维护者合并前商店仍指向旧版，属预期。
+- 独立子会话在发版前复核：13 PASS / 1 预期 SKIP / 0 FAIL。发版后本仓新增
+  `tools/promotion-snapshot.test.mjs`（3 条）全过，44 个 node 测试绿。
+
+### 89.2 本轮新增：宣传管线交给知识库总线
+
+- **硬边界（AGENTS 第 12 条）**：本仓 agent 只产出 `promotion-snapshot/v1`、事实卡与只读 reach 记录；
+  **不发帖、不回帖、不写总线台账**。要发帖时看 `kb promo plan` / 知识库 `Promotion/` 的 queue，
+  不要把可直接发送的成稿贴进 X / Reddit。
+- 本仓侧：`tools/daily-reach.mjs --json` 出快照（已发布版本取 `pet-vX.Y.Z`，不取工作区值；
+  插件版本进 `facts`；读不到的源进 `unreachable`）；`tools/promo-version.mjs` 只读 release tag；
+  `PROMOTION.md` / `PROMOTION-PLAYBOOK.md` / `docs/reach/README.md` 顶部声明总线是唯一状态机。
+- 总线侧：`ai-terminal-pet` 已 active，事实卡 verified；今天已登记 r/devtools 帖、上游 PR #16914、
+  dev.to 回复（npm / GitHub Release 早前已登记）。当前 plan：npm / releases / devto / reddit = done，
+  github-repo / 社交预览 = check，awesome / winget = wait，两个 awesome 入口 = blocked，X = 日上限。
+- dsh-remedy 是样板（R77/R78）：项目只给事实与只读快照，总线管排期、门禁、台账、抓取回流。
+
+### 89.3 本轮对外动作（只读证据，勿重复发）
+
+- dev.to：新回复 `3ljec`（回 tamina 的 10-thread 点击检验法），API 已确认。
+- Reddit：仅 r/devtools 文本帖 `1y04jgf` 发出且 `removed_by_category: null`；r/LLMDevs 两次提交
+  没生成帖子，已停止；账号 6 link karma，当天已达两个版的日上限。
+- 这些渠道状态已写进知识库台账，**本仓不再维护第二份**。
+
+### 89.4 下个会话从这里开始
+
+1. **现场复验（最高优先）**：你方便时重载 OpenCode 插件（`~/.config/opencode/plugins/terminal-pet/index.ts`
+   静态 re-export 仓库文件），等 2–3 分钟看面板是否从 16 行降到约 7 行、跳转回执是否出现。
+   我没有替你重启宿主进程。若行数没降，嫌疑是插件 API 未暴露 `time.viewed`（失败安全会保留行，
+   不会误删）；届时加 `session.list` 或只读 DB 兜底。
+2. **上游**：等 #16914 合并；合并后再跑 `node tools/upstream-entry.mjs --check` 应从 in flight 转 OK。
+3. **颜色**：幽灵清掉后用 `PET_PREVIEW_DIR` 重渲染 compact/expanded 两帧再看；按用户回答，
+   颜色抱怨其实是行数问题，大概率不需要动调色板。
+4. **发版节奏**：11-18 已有 1.0.22 / 1.0.23，11-19 又发 1.0.24（回归修复按例外）。
+   下一轮先攒改动，别再单独发版。
+5. **总线小尾巴**：知识库 `projects/pet.yaml` 备注仍写"OpenCode 插件 1.0.23"，实际 1.0.24；
+   总线没有现成条目更新命令，按知识库流程由 owner 改，不要手改 YAML。
+6. **产物整理**：交接前已删 `dist/` 里 1.0.23 / 1.2.36 的旧资产（7 个文件，全部可由脚本再生成），
+   只留 1.0.24 / 1.2.37 的当前资产与 `pet-setup.exe`。两个包目录里的当前 `.tgz` 留着，方便直接重跑
+   `tools/check-tarball.mjs`；它们是 gitignore 的可再生产物。
+
+## 88. 收束：三报同源（幽灵会话）+ 跳转回执（2026-11-19，第 88 轮；**已发版 1.0.24 / 1.2.37；本机插件未重载，现场未复验**）
 
 ### 88.1 用户补充的三条回答
 
@@ -5089,7 +5141,7 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 
 - `gofmt -l .` 空；`go vet ./...` 0；`go test -count=1 ./...` 全过（**516** `func Test`，本轮 +5）。
 - reporter reconcile 8/8，其中一条回放 16 → 9 行清理 → 7 行；`opencode-events.test.mjs` 仍全过；`sync.mjs --check` 4 个生成文件一致。
-- 本地已重建三个 exe（版本号**未动**，仍是 1.0.23）：`AI-Terminal-Pet.exe` **4,805,120 B** / sha256 `917E9990…`，三个合计 **12,190,720 B** = 11.62 MiB；三个包的 vendor 均已用 `vendor.mjs` 刷新，`vendor.mjs --check` 应全绿。§1 的 4,794,368 B / `FA9F003E…` 是**已发布的那一份**，不要混用。
+- 本地已重建三个 exe，随 A/B 提交发版为 **1.0.24**：`AI-Terminal-Pet.exe` **4,805,120 B** / sha256 `917E9990…`，三个合计 **12,190,720 B** = 11.62 MiB；三个包的 vendor 均已用 `vendor.mjs` 刷新，`vendor.mjs --check` 全绿。§1 里 1.0.23 的 4,794,368 B / `FA9F003E…` 是**上一版的历史记录**，不要混用。
 - 其余门禁：`check_facts` 11 条一致、`check_versions` 22 条一致、文档链接/assets 全过；两个 `verify.mjs` PASS。
 
 ### 88.5 交接状态（2026-11-19 收尾）

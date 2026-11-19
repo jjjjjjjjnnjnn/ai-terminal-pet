@@ -1,21 +1,21 @@
 # ROADMAP — ai-terminal-pet
 
-> 快照时间 **2026-11-17（浮窗 1.0.21 / 插件 1.2.34 已发版）**。本文分六块：现状基线、
+> 快照时间 **2026-11-19（浮窗 1.0.24 / 插件 1.2.37 已发版）**。本文分六块：现状基线、
 > 已交付批次、扩展计划、轻量化计划、实用功能候选与非目标、已知残留、**增长计划（§7，2026-11-17 按
 > [docs/METRICS.md](METRICS.md) 的实测重定）**。每项都标注了**动机**和
 > **为什么现在不做/怎么做**，便于下一位维护者直接挑一项开工。
 >
 > 交付历史的逐条细节在 [docs/HANDOVER.md](HANDOVER.md) §13–§27 与 §35–§76（§75 是 OpenCode npm 包那一轮，
-> §76 是本轮）；按版本发布的变更摘要在 [CHANGELOG.md](../CHANGELOG.md)。
+> §88–§89 是最近两轮：幽灵会话修复与发版、宣传总线接入）；按版本发布的变更摘要在 [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 0. 现状基线
 
-| 维度 | 数值（2026-11-17，浮窗 1.0.21 / 插件 1.2.34 已发布） |
+| 维度 | 数值（2026-11-19，浮窗 1.0.24 / 插件 1.2.37 已发布） |
 |---|---|
 | 平台 | Windows（Win32 分层窗口 + 命名管道）· Linux（纯 Go `jezek/xgb` X11 ARGB + Unix socket）· macOS（纯 Go `purego` AppKit + Unix socket），三端均 `CGO_ENABLED=0` |
 | 工具链 | Go 1.23+（实测 go1.27.0 windows/amd64），reporters 仅用 Node 标准库（无 npm 依赖） |
 | 版本 | `1.0.24`（`internal/app/version.go` 的 `const Version`）；插件包 `1.2.37` |
-| OpenCode 上报端包 | `opencode-ai-terminal-pet` **1.0.21**，**与浮窗同号**（`tools/check_versions.mjs` 断言相等），没有自己的版本线 |
+| OpenCode 上报端包 | `opencode-ai-terminal-pet` **1.0.24**，**与浮窗同号**（`tools/check_versions.mjs` 断言相等），没有自己的版本线 |
 | 主程序 | `bin/AI-Terminal-Pet.exe` **4,805,120 B**（4.58 MiB，`-trimpath -buildvcs=false -ldflags "-s -w"`） |
 | 状态行 shim | `bin/pet-statusline.exe` **3,678,720 B**（3.51 MiB） |
 | 原生 hook | `bin/pet-hook.exe` **3,706,880 B**（3.54 MiB）；三个 Windows 二进制合计 **12,190,720 B** = 11.62 MiB |
