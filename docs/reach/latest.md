@@ -91,3 +91,22 @@ Reference `dsh-pet`: newest share **72.8%** (humans concentrate; see docs/METRIC
 - **DSH tarball**: 510 all-time (+14 since yesterday), and the 1.2.36 asset already shows 13 downloads.
   The per-release self-check baseline is ~2, so this is still small but no longer at baseline.
 - **HN / V2EX**: not posted.
+
+## dev.to reply status (2026-11-19)
+
+Two comments on the launch retrospective (u/tamina, u/Sage). Replies were drafted; posting is blocked
+because the browser session is **logged out of dev.to** (the Reply button opens "Log in to continue").
+Nothing was posted.
+
+Drafts, in the article's voice, for the owner to send (or to approve after logging in):
+
+- **tamina**: "Thanks. The 242-thread idea is the only channel left that doesn't depend on an algorithm,
+  which is also why I'm suspicious of it: it might just produce polite thank-yous. The pre-registered
+  thresholds were what kept me honest; without them I'd still be calling 19 visitors early traction.
+  If answering old threads converts at all, I'll write that up with the same numbers, failures included.
+  What would you test first?"
+- **Sage**: "The [flagged] detail is the one I hadn't measured. A linkless reply from a new account dying
+  at the source means HN is an account problem before it's a content problem, and rewriting doesn't fix
+  that. It changes where the week goes: fewer one-off replies, more time where the account already has
+  standing. Does the flag follow the account or the domain for you? The linkless ones dying is what makes
+  me think it's the account."
