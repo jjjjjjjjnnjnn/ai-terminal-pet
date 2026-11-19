@@ -180,6 +180,11 @@ MIT；不要写下载量（见 §9）。
 - **每日追踪（2026-11-18 起）**：自动部分 `node tools/daily-reach.mjs` → `docs/reach/`
   （Windows 任务 `AITerminalPet-DailyReach` 每天 09:00）；X 与 Reddit 的回复必须用浏览器人工核对，
   规则见 `AGENTS.md` 第 11 条。`docs/reach/latest.md` 是每天的第一份阅读材料。
+- **dev.to（2026-11-19 纳入）**：用户于 2026-11-17 发布
+  《19 visitors, 1 star, 1,416 clones: what a launch actually looked like》，
+  2026-11-19 有 **2 reactions / 2 comments**（tamina、Sage）。公开 API
+  `https://dev.to/api/articles?username=jjjjjjjjnnjnn` 与 `/api/comments?a_id=…`
+  已进 `tools/daily-reach.mjs`，评论正文自动落进每日记录。
 
 ## 9. 不要做的事
 

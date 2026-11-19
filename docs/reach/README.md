@@ -26,6 +26,8 @@ It collects, and labels the window for each:
 - Reddit post JSON (score, comments, `removed_by_category`) when this machine can
   reach reddit.com. On campus Wi-Fi it cannot; the report says `unreachable` and
   the browser check below covers it.
+- dev.to articles by the account (`https://dev.to/api/articles?username=…`):
+  reactions and comment counts, public and unauthenticated.
 - Upstream PR state: `awesome-dsh-plugin` tarball bump and the winget package.
 
 A Windows Scheduled Task, `AITerminalPet-DailyReach`, runs it daily at 09:00 and
@@ -44,9 +46,12 @@ checklist:
    replies. The thread view's "1 reply" is our own second post.
 2. **Reddit** — read the comments as the author; a removed post can still show
    on the profile. `r/SideProject` stays filtered until a moderator replies.
-3. **HN / V2EX** — not posted; the body must be written and submitted by the
+3. **dev.to** — open the articles and read the comments; the API gives counts,
+   not the text. The launch retrospective is at
+   <https://dev.to/jjjjjjjjnnjnn/19-visitors-1-star-1416-clones-what-a-launch-actually-looked-like-43pi>.
+4. **HN / V2EX** — not posted; the body must be written and submitted by the
    owner, not generated.
-4. **Replies** — write them into that day's file under the relevant post, with
+5. **Replies** — write them into that day's file under the relevant post, with
    the author and the substance. A reply that is not recorded will be forgotten
    by the next session.
 

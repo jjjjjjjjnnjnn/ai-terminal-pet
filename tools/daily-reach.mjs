@@ -33,6 +33,7 @@ const repoDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const stdoutOnly = process.argv.includes("--stdout");
 
 const REPO = "jjjjjjjjnnjnn/ai-terminal-pet";
+const DEVTO_USER = "jjjjjjjjnnjnn";
 const X_THREAD = "https://x.com/JJjj1955714/status/2122943194904322144";
 const REDDIT_POSTS = [
   {
@@ -105,8 +106,52 @@ function upstream() {
   });
 }
 
-async function redditPost(post) {
-  const url = post.url.replace(/\/$/, "") + "/.json?limit=50";
+async function devto() {
+  try {
+    const response = await fetch(
+      `https://dev.to/api/articles?username=${DEVTO_USER}&per_page=10`,
+      { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10000) }
+    );
+    if (!response.ok) return { error: `HTTP ${response.status}` };
+    const items = await response.json();
+    const articles = items.map((article) => ({
+      id: article.id,
+      title: article.title,
+      url: article.url,
+      published: article.published_at,
+      reactions: article.public_reactions_count,
+      comments: article.comments_count,
+      commentsList: []
+    }));
+    for (const article of articles.slice(0, 3)) {
+      if (!article.comments) continue;
+      try {
+        const listResponse = await fetch(`https://dev.to/api/comments?a_id=${article.id}`, {
+          headers: { accept: "application/json" },
+          signal: AbortSignal.timeout(10000)
+        });
+        if (!listResponse.ok) continue;
+        const list = await listResponse.json();
+        article.commentsList = list.slice(0, 3).map((comment) => ({
+          author: (comment.user && comment.user.name) || "unknown",
+          body: String(comment.body_html || "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 240),
+          created: comment.created_at
+        }));
+      } catch {
+        // A comment fetch is best effort; the count still stands.
+      }
+    }
+    return articles;
+  } catch (error) {
+    return { error: error.name === "TimeoutError" ? "timeout" : String(error.message || error) };
+  }
+}
+
+async function redditPost(post) {  const url = post.url.replace(/\/$/, "") + "/.json?limit=50";
   try {
     const response = await fetch(url, {
       headers: {
@@ -227,8 +272,31 @@ function markdown(report) {
     lines.push("");
   }
 
-  lines.push("## Reddit", "");
-  lines.push("| post | status | score | comments |");
+  lines.push("## dev.to", "");
+  if (report.devto.error) {
+    lines.push(`unavailable: ${report.devto.error}`, "");
+  } else if (report.devto.length === 0) {
+    lines.push("no articles under this username", "");
+  } else {
+    lines.push("| article | published | reactions | comments |");
+    lines.push("|---|---|---|---|");
+    for (const article of report.devto) {
+      lines.push(
+        `| [${article.title}](${article.url}) | ${String(article.published).slice(0, 10)} | ${article.reactions} | ${article.comments} |`
+      );
+    }
+    lines.push("");
+    for (const article of report.devto) {
+      if (!article.commentsList || article.commentsList.length === 0) continue;
+      lines.push(`**Comments on “${article.title}”**`, "");
+      for (const comment of article.commentsList) {
+        lines.push(`- ${comment.author} (${String(comment.created).slice(0, 10)}): ${comment.body}`);
+      }
+      lines.push("");
+    }
+  }
+
+  lines.push("## Reddit", "");  lines.push("| post | status | score | comments |");
   lines.push("|---|---|---|---|");
   for (const post of report.reddit) {
     lines.push(`| ${post.label} | ${post.status} | ${post.score ?? "?"} | ${post.comments ?? "?"} |`);
@@ -265,6 +333,7 @@ const report = {
   traffic: traffic(),
   releases: releases(),
   upstream: upstream(),
+  devto: await devto(),
   reddit: []
 };
 for (const post of REDDIT_POSTS) report.reddit.push(await redditPost(post));
@@ -280,5 +349,12 @@ if (!stdoutOnly) {
   const previous = existsSync(daily) ? readFileSync(daily, "utf8") : "";
   const separator = previous ? "\n\n---\n\n" : "";
   writeFileSync(daily, previous + separator + text, "utf8");
-  writeFileSync(path.join(dir, "latest.md"), text, "utf8");
+
+  // The scheduled run must not erase the manual half (X/Reddit/dev.to notes)
+  // that yesterday's browser check appended to latest.md.
+  const latestPath = path.join(dir, "latest.md");
+  const previousLatest = existsSync(latestPath) ? readFileSync(latestPath, "utf8") : "";
+  const manualAt = previousLatest.indexOf("\n## Manual check");
+  const manual = manualAt >= 0 ? previousLatest.slice(manualAt) : "";
+  writeFileSync(latestPath, text + manual, "utf8");
 }
