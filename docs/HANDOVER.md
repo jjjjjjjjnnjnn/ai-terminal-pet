@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-19；浮窗 **1.0.23**、插件包 **1.2.36** 已发版；**§86（DSH 0.2.2-rc.5 实测）；§85（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-19；浮窗 **1.0.23**、插件包 **1.2.36** 已发版；**§87（现场三报：假报/颜色/跳转，待下个会话改代码）；§86（DSH 0.2.2-rc.5 实测）；§85（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -5052,6 +5052,64 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 87. 交接：现场三报（假报 / 颜色缺失 / 跳转缺失）与下个会话的起点（2026-11-19，第 87 轮；**只取证，不改代码**）
+
+### 87.1 用户报告（2026-11-19，原文意思）
+
+1. **假报**：电脑上的 pet 会出现假报（提醒/状态与实际不符）。
+2. **颜色显示**：颜色经常缺少。
+3. **跳转**：跳转也经常缺少。
+
+下个会话要做的是**代码调整**。先复现，再改；不要凭这三句话直接动 `attention.go` 或 `focus_windows.go`。
+
+### 87.2 当场证据（2026-11-19 06:47 UTC，1.0.23）
+
+`AI-Terminal-Pet.exe --json`（原始快照存在 `.local/handover-2026-11-19/sessions.json`，不入库）：
+
+| 项 | 值 |
+|---|---|
+| 会话数 | **16**，全部 `source: opencode`，**全部 `pid: 102272`**（OpenCode 宿主），`parentPid: 73116` |
+| 状态 | **11 idle** · 3 working · 2 thinking |
+| 年龄 | 4 个 > 1 小时、**4 个 > 6 小时**（最老 2026-11-18T15:22Z），0 个 > 24 小时 |
+| 标题 | 都是对话标题（如「项目交接与下一步规划」），不是终端窗口标题 |
+| 配置 | `theme: contrast` · `perSourceColor: true` · `donePolicy: always` · `notifyOnFinish: true` · `quietCurrent: true` · `quietSubagents: true` · `hiddenAtLaunch: true` · `edgeRetract: true` |
+| alerts.json | 最近一次扫描只记了 1 个会话：`working / not-asking`，`presence: present`，`attendingSessions: 2` |
+| error.log | 空 |
+| 截图 | `.local/handover-2026-11-19/panel-compact.png`（9+ 会话、working、绿色）与 `panel-expanded.png`（16 会话、等待确认、橙色，根帖 `byebye_control`） |
+
+**最关键的一条**：16 个会话共享同一个宿主 `pid`。存在性按进程/窗口观测时，只要 OpenCode 还开着，这些历史对话就都“活着”。这是“假报”和“跳转”两个症状的共同土壤。
+
+### 87.3 三条线索（按可验证性排序）
+
+1. **假报 = 旧 idle 会话 + `donePolicy: always`**（最可能）
+   - 证据：11 个 idle，其中 4 个超过 6 小时；`notifyOnFinish` 与 `donePolicy: always` 都在开。
+   - 可能路径：旧会话下一次 `working → idle`（OpenCode 重连、事件重放、宿主恢复）会触发“完成”提醒；`Decide` 的 `Existed && Previous == State && !ChangedKind` 只挡同状态重复，不挡“旧会话重新动一下”。
+   - 要查：`internal/ui/attention.go` 的 `decideCompletion` / `sinceFinish`；`internal/ui/alert_windows.go` 的会话账本；`reporters/opencode.js` 的 idle/完成事件；`store.Reconcile` 的 TTL 与 `snapshotAwareAlive`。
+   - 验收：用 16 会话快照回放一遍 `PlanAlerts`，列出“谁会响、为什么”；旧会话（例如 >30 分钟没有真实活动）不应产生完成提醒，除非用户明确要看。
+2. **跳转缺 = 一个 pid 对多个会话**
+   - 证据：所有会话 `pid=102272`、`parentPid=73116`；`title` 是对话标题而不是窗口标题；紧凑态的跳转箭头存在（截图可见），但点击后能否到“对的那个 OpenCode 会话”没有证据。
+   - 要查：`internal/platform/focus_windows.go` 的打分（祖先距离 / 窗口标题包含 `title` / 项目基名 / 终端关键词）；`jumpPriority` / `mostUrgentJump`；OpenCode 终端窗口标题实际是什么（`GetWindowText`）。
+   - 可能的诚实修法：OpenCode 的单个宿主进程本来就无法区分多个对话时，**不要画一个会失败的箭头**，或点击后给出“只能到窗口/标签”的回执，而不是静默失败。
+3. **颜色缺 = 单 source + 展开态才有的 provenance 色**
+   - 证据：16 个会话全部 `opencode`，`perSourceColor` 只给**展开态行的 source 名**上色；`theme=contrast` 是纯黑高对比，状态色是绿/橙/灰。紧凑态截图里绿色（working）与橙色（waiting）都在。
+   - 要查：用户说“颜色经常缺少”时具体是哪一块（状态球 / 行首 / source 名 / 边框）；`frameKey` 已包含 theme 与 perSource（`drawing_compact.go:155`），所以“切主题不重绘”不是默认怀疑对象，但要复现。
+   - 需要一张**展开态**截图：16 行里前 6 行 + 溢出行，看哪些颜色没出现。下一次让用户截一张，或用 `PET_PREVIEW_DIR` 渲染同样的状态组合。
+
+### 87.4 下个会话的顺序（建议）
+
+1. **先复现，不改代码**：读 `.local/handover-2026-11-19/sessions.json`，用 `PetPreview` / 现有测试夹具渲染 16 会话；把 `--json`、`alerts.json`、`error.log` 各留一份带时间戳的副本。
+2. **假报**：写一个纯函数测试，喂“16 会话、含 4 个 6 小时前 idle”的输入，断言哪些会响；再决定是改 `decideCompletion`（陈旧会话不报完成）还是改 `reporters/opencode.js`（旧会话不再活跃）或改展示（旧会话折叠）。
+3. **跳转**：在真实的 OpenCode 窗口上记录 `GetWindowText` 与 `ResolveTarget` 的返回（`PET_FOCUS_PROBE` 已有探针）；决定“箭头只在可解析时出现”还是“失败要回执”。
+4. **颜色**：拿到展开态截图后，对照 `drawing.go` 的 `contrastPalette`、`sourceColor`、`perSourceColors`；只改一处并在 `TestStatesAndLanguagesLookDifferent` / 主题测试里加断言。
+5. 发版：按 AGENTS 第 6 条 A/B 两提交；`docs/ROADMAP.md` §7 的“≤2 次/周”仍然有效。
+
+### 87.5 不要做的事
+
+- 不要因为“假报”就直接把 `donePolicy` 默认改掉：用户的配置是显式 `always`，先修“旧会话不该算完成”，再谈默认值。
+- 不要把 16 个会话都当成 bug 删掉：它们可能是用户真的开着的对话；先区分“活跃/陈旧”，再决定隐藏策略。
+- 不要在未复现的情况下动 `focus_windows.go` 的祖先链打分（§22 的教训：抢前台是更糟的失败）。
+- 不要把本节的 `.local/` 截图或会话 JSON 提交进仓库（含用户路径与对话标题）。
 
 ## 86. 交接：DSH 0.2.2-rc.5 实测（2026-11-19，第 86 轮；**不改代码、不发版**）
 
