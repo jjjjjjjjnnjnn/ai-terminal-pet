@@ -30,8 +30,26 @@
    期间的排查与实现，而这些提交实际是在 2026-11-09 集中落库的（`6f18394` 之后的 14 个提交）。
    本文件按**交付日期**分组，并标注对应提交。
 
-已发版到 **1.0.23**（tag `pet-v1.0.23`）/ **1.2.36**（tag `dsh-plugin-v1.2.36`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.23** 与 Claude Code 插件 `packages/claude-ai-terminal-pet` **1.0.23**（tag `claude-plugin-v1.0.23`）。
+已发版到 **1.0.24**（tag `pet-v1.0.24`）/ **1.2.37**（tag `dsh-plugin-v1.2.37`），另有同号的 OpenCode 上报端包 `opencode-ai-terminal-pet` **1.0.24** 与 Claude Code 插件 `packages/claude-ai-terminal-pet` **1.0.24**（tag `claude-plugin-v1.0.24`）。
 **注意浮窗本体与 DSH 插件包是两条版本线**：它们各自有 tag 线（`pet-v*` 与 `dsh-plugin-v*`）；OpenCode 上报端包没有自己的版本线，它跟着浮窗走。
+
+## [1.0.24] / [1.2.37] — 2026-11-19（面板不再显示终端里没有的会话；跳转给诚实回执）
+
+现场三报（[HANDOVER](docs/HANDOVER.md) §87–§88）来自同一个根因：OpenCode 的 `serve --service`
+让一个进程承载所有会话，旧的 idle 对话和子会话一直占着面板行。宿主数据库实测 16 个 id
+全部存在且未归档，其中 5 个子会话没有 `time_viewed`、4 个 idle 停在 11-18，真正对应终端的只有 7 个。
+
+- **幽灵会话**：`reporters/opencode-reconcile.js` 做宿主背书的 2 分钟对账（archived / 已结束的子会话 /
+  `time_viewed` 超过 2 小时的 idle），并以 `backfillFromDisk()` 把插件刚加载时不在内存表里的旧快照
+  回填后再核对；只发 `closed`，宿主回答未知就不动，不按文件年龄猜。面板侧 `panelRows` 不再给
+  已结束的子会话画行（urgent 的保留）。
+- **跳转**：`FocusMatchIsExact` 区分"到了这个对话"和"只到了窗口"；后者激活终端后给
+  `jump.partial` 回执（Windows 气泡 / POSIX 药丸），不再假装跳到了那个对话，也不抢前台。
+- **假报取证**：新增有界 `alerts-log.jsonl`（500 行），只记真正响过的扫描；`alerts.json` 形状不变。
+  `--json` 与面板统一 `snapshotAwareAlive`，并检查 `scanner.Err()`，不再"读不到就说 0"。
+- **验证**：516 个 `func Test`（本轮 +5）；reporter reconcile 8/8，含 16→7 现场回放；
+  `gofmt` / `go vet` / 全平台构建 / fresh-machine 183/183 / 版本与事实门禁全绿。
+  本机 OpenCode 未重载，所以上述是本地与数据层验证，不是现场复验。
 
 ## [1.0.23] / [1.2.36] — 2026-11-18（插件版 Claude Code 也能被 `--doctor` 看见）
 

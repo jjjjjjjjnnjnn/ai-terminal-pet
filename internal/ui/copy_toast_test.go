@@ -80,6 +80,9 @@ func TestOnlyFailedKindsUseTheErrorColour(t *testing.T) {
 	if toastColour(panelToast{kind: toastCopied}) != colors.Primary {
 		t.Fatal("a successful copy is not an error")
 	}
+	if toastColour(panelToast{kind: toastJumpPartial}) != colors.Primary {
+		t.Fatal("a partial jump did work: it must not be drawn as a failure")
+	}
 	for _, kind := range []toastKind{toastCopyFailed, toastJumpFailed} {
 		if toastColour(panelToast{kind: kind}) != colors.Error {
 			t.Fatalf("kind %d must be drawn in the error colour", kind)

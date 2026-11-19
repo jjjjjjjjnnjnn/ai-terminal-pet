@@ -42,12 +42,16 @@ const (
 	toastCopied
 	toastCopyFailed
 	toastJumpFailed
+	// toastJumpPartial is a successful activation of a window that does not
+	// name this conversation. It is a receipt, not a failure: the ink stays
+	// neutral so the pill does not claim the click did nothing.
+	toastJumpPartial
 )
 
 // duration is how long this pill stays up. A zero kind has no lifetime, which
 // is why show() clears the receipt rather than arming it with nothing to say.
 func (k toastKind) duration() time.Duration {
-	if k == toastJumpFailed {
+	if k == toastJumpFailed || k == toastJumpPartial {
 		return jumpToastDuration
 	}
 	return copyToastDuration
@@ -180,6 +184,8 @@ func copyToastLabel(p panelToast, lang i18n.Lang) string {
 		return i18n.T(lang, i18n.KeyCopyFailed)
 	case toastJumpFailed:
 		return i18n.T(lang, i18n.KeyJumpFailed)
+	case toastJumpPartial:
+		return i18n.T(lang, i18n.KeyJumpPartial)
 	default:
 		return i18n.T(lang, i18n.KeyCopyDone)
 	}

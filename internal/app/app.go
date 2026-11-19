@@ -362,13 +362,22 @@ func Snapshot() (Report, error) {
 		Alive:     presence.ProcessAlive,
 		KeepAlive: presence.SessionAlive,
 	}
+	if err := scanner.Err(); err != nil {
+		return Report{}, err
+	}
 	values := store.New()
 	now := time.Now()
-	for _, value := range scanner.Scan() {
+	items, present := scanner.ScanWithKeys()
+	for _, value := range items {
 		values.UpsertSnapshot(value, now)
 	}
-	values.Reconcile(now, presence.SessionAlive, store.DefaultAbsenceGrace)
-	items := values.List()
+	// The same existence rule the overlay uses: a snapshot on disk IS the
+	// conversation, however quiet it has been. Using only presence.SessionAlive
+	// here made --json drop rows the panel kept, which turned "state does not
+	// match reality" bug reports into two contradictory data points.
+	alive := snapshotAwareAlive(present, present, presence.SessionAlive)
+	values.Reconcile(now, alive, store.DefaultAbsenceGrace)
+	items = values.List()
 	if items == nil {
 		items = []session.Session{}
 	}

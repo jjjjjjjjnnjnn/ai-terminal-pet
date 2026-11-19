@@ -109,6 +109,9 @@ const (
 	// not there. It is deliberately not KeyCopyFailed - the sentence has to be
 	// about the gesture the user actually made.
 	KeyJumpFailed = "jump.failed"
+	// KeyJumpPartial is the honest receipt for a jump that found the terminal
+	// window but not the conversation inside it.
+	KeyJumpPartial = "jump.partial"
 
 	KeySummaryEmpty    = "summary.empty"
 	KeySummarySessions = "summary.sessions"
@@ -151,6 +154,9 @@ const (
 	KeyBalloonDoneBody  = "balloon.doneBody"
 	KeyBalloonJumpTitle = "balloon.jumpTitle"
 	KeyBalloonJumpBody  = "balloon.jumpBody"
+	// The "we found the window, but not this conversation" receipt.
+	KeyBalloonJumpPartialTitle = "balloon.jumpPartialTitle"
+	KeyBalloonJumpPartialBody  = "balloon.jumpPartialBody"
 
 	KeyApproveCountdown = "approve.countdown"
 	KeyApproveDenied    = "approve.denied"
@@ -306,6 +312,7 @@ var dictEn = map[string]string{
 	KeyCopyDone:      "Copied",
 	KeyCopyFailed:    "Copy failed",
 	KeyJumpFailed:    "Could not switch",
+	KeyJumpPartial:   "Terminal focused · switch tab",
 
 	KeySummaryEmpty:    "No sessions",
 	KeySummarySessions: "%d sessions",
@@ -346,6 +353,9 @@ var dictEn = map[string]string{
 
 	KeyBalloonJumpTitle: "Could not switch terminal",
 	KeyBalloonJumpBody:  "No matching terminal window is open for this session",
+
+	KeyBalloonJumpPartialTitle: "Terminal focused",
+	KeyBalloonJumpPartialBody:  "This conversation is not the active tab; switch to it in the CLI.",
 
 	KeyApproveCountdown: "Allow (%ds)",
 	KeyApproveDenied:    "Denied",
@@ -489,6 +499,7 @@ var dictZhCN = map[string]string{
 	KeyCopyDone:      "已复制",
 	KeyCopyFailed:    "复制失败",
 	KeyJumpFailed:    "未能切换",
+	KeyJumpPartial:   "已到终端 · 请切换对话",
 
 	KeySummaryEmpty:    "暂无会话",
 	KeySummarySessions: "%d 个会话",
@@ -529,6 +540,9 @@ var dictZhCN = map[string]string{
 
 	KeyBalloonJumpTitle: "无法跳转到终端",
 	KeyBalloonJumpBody:  "没有找到这个会话对应的终端窗口",
+
+	KeyBalloonJumpPartialTitle: "已切到终端",
+	KeyBalloonJumpPartialBody:  "该对话不是当前标签，请在终端里切换过去。",
 
 	KeyApproveCountdown: "允许（%d 秒）",
 	KeyApproveDenied:    "已拒绝",

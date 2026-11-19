@@ -42,6 +42,9 @@ const (
 	// thread to activate it. The UI thread owns the foreground right after
 	// the click, so no AttachThreadInput / z-order tricks are needed.
 	wmFocusActivate = wmApp + 7
+	// focusPartialFlag is the lParam of wmFocusActivate: the window came
+	// forward but its title did not name this conversation.
+	focusPartialFlag = 1
 	// wmSettings opens the settings window (tray, --settings, hotkey).
 	wmSettings       = wmApp + 8
 	wmDPIChanged     = 0x02E0

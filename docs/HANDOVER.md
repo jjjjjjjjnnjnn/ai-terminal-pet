@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-19；浮窗 **1.0.23**、插件包 **1.2.36** 已发版；**§87（现场三报：假报/颜色/跳转，待下个会话改代码）；§86（DSH 0.2.2-rc.5 实测）；§85（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-19；浮窗 **1.0.24**、插件包 **1.2.37** 已发版；**§88（三报同源已改代码，待重建二进制/发版/重载插件）；§87（现场三报：假报/颜色/跳转，只取证）；§86（DSH 0.2.2-rc.5 实测）；§85（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -72,7 +72,7 @@
   ② **设置窗口跟着进程消失**——空闲自毁（会话表空 10 分钟）会连同一个 UI 线程上的设置窗口一起带走；
   现在**可见的设置窗口算"仍在使用"**（`internal/ui/lifetime.go` 的 `idleDecision` 纯函数），
   关闭设置后重新计 10 分钟。
-- **版本**：浮窗 **`1.0.23`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.36`**。
+- **版本**：浮窗 **`1.0.24`**（`internal/app/version.go` 的 `const Version`），插件包 **`1.2.37`**。
   两条版本线各有 tag：`pet-v1.0.0`…`pet-v1.0.23` 与 `dsh-plugin-v1.2.6`…`dsh-plugin-v1.2.36`。
   OpenCode 上报端包 `opencode-ai-terminal-pet` **没有自己的版本线**：它与浮窗同号（`check_versions` 断言相等）。
   **工作区与本机安装目录已经与 `1.0.21` / `1.2.34` 同步**：`bin/`、
@@ -5052,6 +5052,53 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 88. 收束：三报同源（幽灵会话）+ 跳转回执（2026-11-19，第 88 轮；**代码已改，尚未发版、尚未加载新插件**）
+
+### 88.1 用户补充的三条回答
+
+- **假报**＝"面板状态与实际不符"，不是完成气泡误响。
+- **颜色**＝"终端现实里没有那么多会话（没有 10 个以上）"——所以颜色问题其实是**行数问题**。
+- 三条报告收敛为一个根因：面板在显示用户眼前并不存在的会话。
+
+### 88.2 决定性证据（本机实测，2026-11-19）
+
+`%LOCALAPPDATA%\opencode\opencode.db` 实为 `C:\Users\rongj\.local\share\opencode\opencode.db`，`session_v2` 表 **3019** 行。§87 快照里的 **16 个 id 全部存在，`time_archived` 全为空**——所以"问宿主会话是否还存在"清不掉任何一行。按 `time_viewed` / `parent_id` 拆开：
+
+| 类别 | 行数 | 宿主记录 | 用户是否能看到 |
+|---|---|---|---|
+| working / thinking | 5 | 11-19 06:42–07:09 有活动 | 是 |
+| idle，今天有查看 | 2 | `time_viewed` 11-19 06:45 左右 | 是 |
+| idle 子会话 | 5 | 有 `parent_id`，`time_viewed` 为空 | **否**（从不是独立标签） |
+| idle 旧会话 | 4 | `time_viewed` 停在 11-18 15:22–21:31 | **否** |
+
+即 **16 → 9 行不该出现在面板**，剩 7 行才是现实。
+
+跳转的死因（实测进程树）：16 个会话全来自 `opencode.exe serve --service` (102272)，它的 `parentPid` 73116 **已不存在**；真正的 TUI 是 31452 ← powershell 38140 ← WindowsTerminal 20992，窗口标题 `OC | 项目交接后的下一步计划`。终端窗口在 `selectFocusWindow` 里永远吃 −40（不在祖先链），只有标题包含会话标题的 +100 能过 40 分线——**16 个里只有当前显示的那个能跳**，其余都走 `focusFailure()`。
+
+### 88.3 改了什么
+
+1. **`reporters/opencode-reconcile.js`（新，纯函数）**：宿主背书的清理——archived、已结束的子会话、`time_viewed` 超过 2 小时的 idle。不按文件年龄猜、宿主回答未知就不动。
+2. **`reporters/opencode.js`**：`hydrate` 读 `time.viewed`；`session.viewed` 事件刷新标记但不报状态；2 分钟一次 sweep，只发 `closed`（reason 为 `session_archived` / `subagent_settled` / `stale_idle`）。**每轮先 `backfillFromDisk()`**：插件刚加载时内存表是空的，必须把本 pid 写在 `runtime/` 的旧快照回填成 meta 再 hydrate，否则 4 个安静的旧会话根本进不了 sweep。所有分支 try/catch，失败静默。
+3. **`internal/ui/sessions_visible.go`（新）**：`panelRows` 从面板行里去掉已结束的子会话；urgent 的子会话保留。`--json` 仍保留全部上报行（诊断视图，与 `sessions_dedupe.go` 同一原则）。
+4. **跳转回执**：`FocusMatchIsExact`（纯函数）判断解析出的窗口标题是否真的点了这个会话；不是就激活窗口后给 `jump.partial` 回执（Windows 气泡、POSIX 面板药丸），不再假装跳到了那个对话。i18n 两套文案齐全。
+5. **`alerts-log.jsonl`（新）**：有界 500 行，只记真正响过的扫描；`alerts.json` 形状不变，`--json` 契约不变。
+6. **`app.Snapshot()`**：检查 `scanner.Err()`，并与面板共用 `snapshotAwareAlive`，不再出现"面板保留、`--json` 丢掉"的同一文件两种答案。
+
+### 88.4 验收状态
+
+- `gofmt -l .` 空；`go vet ./...` 0；`go test -count=1 ./...` 全过（**516** `func Test`，本轮 +5）。
+- reporter reconcile 8/8，其中一条回放 16 → 9 行清理 → 7 行；`opencode-events.test.mjs` 仍全过；`sync.mjs --check` 4 个生成文件一致。
+- 本地已重建三个 exe（版本号**未动**，仍是 1.0.23）：`AI-Terminal-Pet.exe` **4,805,120 B** / sha256 `917E9990…`，三个合计 **12,190,720 B** = 11.62 MiB；三个包的 vendor 均已用 `vendor.mjs` 刷新，`vendor.mjs --check` 应全绿。§1 的 4,794,368 B / `FA9F003E…` 是**已发布的那一份**，不要混用。
+- 其余门禁：`check_facts` 11 条一致、`check_versions` 22 条一致、文档链接/assets 全过；两个 `verify.mjs` PASS。
+
+### 88.5 交接状态（2026-11-19 收尾）
+
+- **已重建**：三个 exe 按 §3 重建，版本 **1.0.24**；三个包的 vendor 全部刷新，`vendor.mjs --check` 全绿。
+- **已做 A/B 双提交**（AGENTS §6）：A 提交版本号、两份清单、市场索引的 `version`/`publishTimestamp` 与文档；B 提交把索引的 `source.commit` 与 `icon` 钉到 A 的 sha。
+- **尚未对外发布**：tag、GitHub Release、npm publish、上游 bump PR 都没做。`node tools/upstream-entry.mjs --check` 因此报"版本未 tag 不能上架"，这是顺序决定的，不是回归。
+- **未重载插件**：本机 OpenCode 仍加载旧 reporter（`~/.config/opencode/plugins/terminal-pet/index.ts` 静态 re-export 仓库文件），按用户决定不重启宿主进程。所以 16→7 的现场效果尚未复验；最大嫌疑是插件 API 没暴露 `time.viewed`（读不到时是失败安全：保留行，不误删）。
+- **颜色**：没有改调色板。用户补充"终端现实里没有 10 个以上会话"，说明颜色抱怨其实是行数问题；等现场复验后再决定是否需要调色。
 
 ## 87. 交接：现场三报（假报 / 颜色缺失 / 跳转缺失）与下个会话的起点（2026-11-19，第 87 轮；**只取证，不改代码**）
 

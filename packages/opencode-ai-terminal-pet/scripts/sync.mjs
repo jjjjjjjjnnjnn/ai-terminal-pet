@@ -59,6 +59,9 @@ export const BANNER = [
 /** Generated files that are pure copies, with the extension as the only change. */
 export const COPIES = [
   { source: 'reporters/protocol.js', target: 'protocol.cjs' },
+  // The stale-row sweep is imported by reporter.js with the same specifier in
+  // both trees, so it is a pure copy (no require() specifier to rewrite).
+  { source: 'reporters/opencode-reconcile.js', target: 'opencode-reconcile.js' },
   // The licence ships inside the package; copying it keeps one text of it.
   { source: 'LICENSE', target: 'LICENSE' }
 ]

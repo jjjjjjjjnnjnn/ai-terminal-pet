@@ -30,6 +30,9 @@ type focusRequest struct {
 	row      int
 	identity string
 	at       time.Time
+	// partial is true when the window came forward but its title did not name
+	// this conversation. The user needs a receipt even though the click worked.
+	partial bool
 }
 
 // focusFailed says the jump did not happen.
@@ -39,6 +42,18 @@ func (a *App) focusFailed(request focusRequest, now time.Time) {
 	}
 	a.toast.show(request.row, request.identity, toastJumpFailed, now)
 	beep(beepExclamation)
+	a.syncAnimation()
+	_ = a.present()
+}
+
+// focusPartial says the window was activated but the conversation inside it is
+// not the one the row named. No error tone: the gesture did what OpenCode can
+// do, and the pill is the only honest answer it has.
+func (a *App) focusPartial(request focusRequest, now time.Time) {
+	if now.Sub(request.at) > jumpStaleAfter {
+		return
+	}
+	a.toast.show(request.row, request.identity, toastJumpPartial, now)
 	a.syncAnimation()
 	_ = a.present()
 }

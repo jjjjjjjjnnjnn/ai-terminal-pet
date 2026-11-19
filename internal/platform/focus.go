@@ -196,6 +196,26 @@ func terminalKeyword(source, terminal string) string {
 	return ""
 }
 
+// FocusMatchIsExact reports whether a resolved window title actually names
+// this conversation. A jump that only found the terminal window must not claim
+// it reached the conversation: OpenCode hosts many conversations in one tab,
+// and the tab title names only the one currently on screen.
+//
+// The "windowTitle != sessionTitle" half is the same rule presence.go uses: a
+// title verbatim equal to the window title names the window, not a conversation
+// inside it.
+func FocusMatchIsExact(windowTitle, sessionTitle string) bool {
+	title := strings.ToLower(strings.TrimSpace(sessionTitle))
+	if len([]rune(title)) < 3 {
+		return false
+	}
+	window := strings.ToLower(strings.TrimSpace(windowTitle))
+	if window == "" || window == title {
+		return false
+	}
+	return strings.Contains(window, title)
+}
+
 func projectBase(project string) string {
 	trimmed := strings.TrimSpace(project)
 	if trimmed == "" {

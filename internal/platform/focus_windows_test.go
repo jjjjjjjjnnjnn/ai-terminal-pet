@@ -140,6 +140,24 @@ func TestSelectFocusWindowPrefersMatchingTab(t *testing.T) {
 	}
 }
 
+func TestFocusMatchIsExact(t *testing.T) {
+	cases := []struct {
+		window, session string
+		want            bool
+	}{
+		{"OC | 项目交接与下一步计划", "项目交接与下一步计划", true},
+		{"OC | 项目交接与下一步计划", "别的一个对话", false},
+		{"OC | 项目交接与下一步计划", "OC | 项目交接与下一步计划", false},
+		{"项目交接与下一步计划", "交接", false}, // too short to identify a conversation
+		{"", "项目交接与下一步计划", false},
+	}
+	for _, tc := range cases {
+		if got := FocusMatchIsExact(tc.window, tc.session); got != tc.want {
+			t.Errorf("FocusMatchIsExact(%q, %q) = %v, want %v", tc.window, tc.session, got, tc.want)
+		}
+	}
+}
+
 func TestSelectFocusWindowRejectsWeakOrSelfMatches(t *testing.T) {
 	self := []focusWindow{
 		{handle: 14, pid: 40788, class: "AITerminalPetWindow", title: "AI Terminal Pet", exe: "AI-Terminal-Pet.exe"},

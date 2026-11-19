@@ -708,6 +708,9 @@ func (a *App) handleMessage(hwnd win.HWND, message uint32, wParam, lParam uintpt
 			a.focusFailure()
 			return 0
 		}
+		if lParam == focusPartialFlag {
+			a.notify(composeJumpPartial(a.lang))
+		}
 		// Keep the panel out for a moment: without this, losing hover as the
 		// pointer leaves for the terminal can slide it into the screen edge,
 		// which reads as "the overlay closed itself".
@@ -1185,7 +1188,7 @@ func (a *App) jumpTo(row int) bool {
 		// Only the lookup runs off-thread (EnumWindows touches other
 		// processes). The resolved HWND is posted back so activation happens
 		// on the UI thread, which holds the foreground after the click.
-		resolved, _, ok := platform.ResolveTarget(request)
+		resolved, windowTitle, ok := platform.ResolveTarget(request)
 		if handle == 0 {
 			return
 		}
@@ -1193,7 +1196,14 @@ func (a *App) jumpTo(row int) bool {
 			win.PostMessage(win.HWND(handle), wmFocusResult, 0, 0)
 			return
 		}
-		win.PostMessage(win.HWND(handle), wmFocusActivate, resolved, 0)
+		// A window can be on the session's host without showing this
+		// conversation - OpenCode keeps many conversations in one terminal.
+		// Say so in the receipt instead of pretending the jump was exact.
+		var partial uintptr
+		if !platform.FocusMatchIsExact(windowTitle, target.Title) {
+			partial = focusPartialFlag
+		}
+		win.PostMessage(win.HWND(handle), wmFocusActivate, resolved, partial)
 	}()
 	return true
 }
@@ -1769,6 +1779,12 @@ func (a *App) rememberAlerts(inputs []AlertInput, plan AlertPlan, now time.Time)
 // persistReceipt stores the decision record and keeps the in-memory copy that
 // --json and --doctor read without touching the disk.
 func (a *App) persistReceipt(record alertRecord) {
+	// Log first, even when this scan is indistinguishable from the last one:
+	// two identical rings are still two rings, and the log is the only record
+	// of either.
+	if record.Balloon != "" {
+		appendAlertLog(record)
+	}
 	if a.sameAlertRecord(record) {
 		return
 	}
@@ -1946,7 +1962,7 @@ func (a *App) load() {
 	// because the pipe and the tombstone ledger are per reporter process; the
 	// panel shows conversations, so two pids reporting the same sessionId must
 	// not become two rows. See sessions_dedupe.go.
-	a.sessions = dedupeSessions(a.values.List())
+	a.sessions = panelRows(dedupeSessions(a.values.List()))
 	a.state = session.Aggregate(a.sessions)
 	a.digest = sessionDigest(a.sessions)
 	// Reconcile the auto-approve countdowns with what is actually waiting.

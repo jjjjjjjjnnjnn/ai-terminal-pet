@@ -177,6 +177,11 @@ MIT；不要写下载量（见 §9）。
   https://www.reddit.com/r/SideProject/comments/1xzj589/ai_terminal_pet_a_56px_alwaysontop_strip_that/
 - 账号 `Visible_Swim471` 发布时只有 **6 karma**。同一天不要再去第三个版；先回评论、在相关帖子里
   正常参与，等这波过滤/放行结果出来再决定下一条。
+- **2026-11-19 追加**：r/devtools 发了文本帖（说明怎么做的、为什么有用），
+  https://www.reddit.com/r/devtools/comments/1y04jgf/i_built_a_56px_alwaysontop_strip_that_shows_which/ ，
+  帖子 JSON `removed_by_category: null`，未被过滤。r/LLMDevs 的同主题不同文案点了两次提交都没发出
+  （账号 submitted 列表确认没有新帖），停止重试，避免重复发帖。当天该账号另有其他项目的
+  r/DeepSeekHarness 帖，所以 11-19 已达到两个版的日上限。详情与规则判读见 `docs/reach/2026-11-19.md`。
 - **每日追踪（2026-11-18 起）**：自动部分 `node tools/daily-reach.mjs` → `docs/reach/`
   （Windows 任务 `AITerminalPet-DailyReach` 每天 09:00）；X 与 Reddit 的回复必须用浏览器人工核对，
   规则见 `AGENTS.md` 第 11 条。`docs/reach/latest.md` 是每天的第一份阅读材料。

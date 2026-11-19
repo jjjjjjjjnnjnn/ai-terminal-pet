@@ -91,6 +91,21 @@ func TestComposeJumpFailureIsTheSharedCopy(t *testing.T) {
 	}
 }
 
+func TestComposeJumpPartialIsNotAFailure(t *testing.T) {
+	for _, lang := range []i18n.Lang{i18n.LangEn, i18n.LangZhCN} {
+		got := composeJumpPartial(lang)
+		if want := i18n.T(lang, i18n.KeyBalloonJumpPartialTitle); got.Title != want {
+			t.Fatalf("%s title = %q, want %q", lang, got.Title, want)
+		}
+		if want := i18n.T(lang, i18n.KeyBalloonJumpPartialBody); got.Body != want {
+			t.Fatalf("%s body = %q, want %q", lang, got.Body, want)
+		}
+		if got.Level != notifyInfo {
+			t.Fatalf("%s level = %v, want info (the click did work)", lang, got.Level)
+		}
+	}
+}
+
 func TestAppleScriptLiteralSurvivesAProjectName(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{`plain`, `"plain"`},

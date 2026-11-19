@@ -366,6 +366,9 @@ func (a *App) Run() error {
 
 		case request := <-a.focusCh:
 			if request.handle != 0 && platform.ActivateTarget(request.handle) {
+				if request.partial {
+					a.focusPartial(request, time.Now())
+				}
 				a.holdTuck(2 * time.Second)
 				a.syncTuck()
 				resetAnimTimer()
@@ -962,7 +965,7 @@ func (a *App) load() {
 		return
 	}
 	a.revision = revision
-	a.sessions = dedupeSessions(a.values.List())
+	a.sessions = panelRows(dedupeSessions(a.values.List()))
 	a.state = session.Aggregate(a.sessions)
 	a.digest = sessionDigest(a.sessions)
 	a.approvals.update(a.sessions, time.Now(), a.options.Settings.AutoApprove, a.approveTimeout)
@@ -1390,12 +1393,13 @@ func (a *App) jumpTo(row int) bool {
 	requested := time.Now()
 	identity := session.Identity(target)
 	go func() {
-		resolved, _, ok := platform.ResolveTarget(request)
+		resolved, windowTitle, ok := platform.ResolveTarget(request)
+		partial := ok && !platform.FocusMatchIsExact(windowTitle, target.Title)
 		if !ok {
 			resolved = 0
 		}
 		select {
-		case a.focusCh <- focusRequest{handle: resolved, row: row, identity: identity, at: requested}:
+		case a.focusCh <- focusRequest{handle: resolved, row: row, identity: identity, at: requested, partial: partial}:
 		default:
 		}
 	}()

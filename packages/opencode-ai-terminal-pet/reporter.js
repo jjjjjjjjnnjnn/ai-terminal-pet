@@ -36,10 +36,17 @@
 // Every handler is wrapped, every promise is fire-and-forget, and a failure to
 // report is silent.
 
+import fs from "node:fs"
 import { createRequire } from "node:module"
+import path from "node:path"
+import {
+  SWEEP_INTERVAL_MS,
+  applyViewedAt,
+  collectStale
+} from "./opencode-reconcile.js"
 
 const require = createRequire(import.meta.url)
-const { sendStatus } = require("./protocol.cjs")
+const { dataDirectory, sendStatus } = require("./protocol.cjs")
 
 const SOURCE = "opencode"
 const TERMINAL = "opencode"
@@ -284,7 +291,11 @@ function createMeta(sessionId) {
     state: "",
     reason: "",
     tool: null,
-    hydrated: false
+    hydrated: false,
+    // Last time the HOST says this conversation was viewed in a terminal.
+    // Seeded from info.time.viewed on hydrate and refreshed by session.viewed
+    // events. Zero means "unknown", which the sweep treats as "keep the row".
+    viewedAt: 0
   }
 }
 
@@ -343,10 +354,12 @@ function createTracker(context) {
         // happened to have reported: an archived conversation emits no state
         // events, so any state we did report is older than the archive.
         if (archivedAt(info.time?.archived)) {
+          meta.archived = true
           report(meta, "closed", "session_archived", null, true)
           sessions.delete(meta.sessionId)
           return
         }
+        applyViewedAt(meta, info)
         const changed = applyMetadata(meta, {
           title: info.title,
           parentID: info.parentID,
@@ -383,6 +396,14 @@ function createTracker(context) {
       const data = eventData(event)
       const sessionId = sessionIdOf(data)
       if (!sessionId) return
+      // "viewed" is a real OpenCode event but not a state change, so mapEvent
+      // correctly ignores it. It is nevertheless the freshest evidence that a
+      // conversation is on somebody's screen; record it without reporting.
+      if (type === "session.viewed") {
+        const existing = sessions.get(sessionId)
+        if (existing) applyViewedAt(existing, { time: { viewed: Date.now() } })
+        return
+      }
       const { meta, known } = track(sessionId)
       const metadataChanged = applyMetadata(meta, data)
       const mapped = mapEvent(type, data)
@@ -407,7 +428,62 @@ function createTracker(context) {
     }
   }
 
-  return { handle }
+  // A plugin that just loaded has an empty tracker, but the overlay still
+  // shows yesterday's rows from the snapshots on disk. Backfill one meta per
+  // snapshot this pid wrote and let hydrate ask the host about it; without
+  // this the sweep could never see a quiet old conversation at all.
+  function backfillFromDisk() {
+    const directory = dataDirectory()
+    if (!directory) return
+    for (const name of fs.readdirSync(path.join(directory, "runtime"))) {
+      const match = /^opencode-(\d+)-(.+)\.json$/.exec(name)
+      if (!match || Number(match[1]) !== process.pid) continue
+      const sessionId = match[2]
+      if (sessions.has(sessionId)) continue
+      let payload
+      try {
+        payload = JSON.parse(fs.readFileSync(path.join(directory, "runtime", name), "utf8"))
+      } catch {
+        continue
+      }
+      if (!payload || payload.state === "closed") continue
+      const meta = createMeta(sessionId)
+      meta.state = payload.state || ""
+      meta.reason = payload.reason || ""
+      meta.project = payload.project || null
+      meta.title = payload.title || null
+      meta.parentSessionId = payload.parentSessionId || null
+      meta.startedAt = payload.startedAt || null
+      sessions.set(sessionId, meta)
+      hydrate(meta)
+    }
+  }
+
+  // sweep closes rows the HOST says are no longer on a terminal: archived
+  // conversations, settled subagents (never a tab of their own), and idle
+  // conversations nobody has viewed for two hours. It never guesses from a
+  // snapshot file's age, and it never acts on an unknown answer.
+  function sweep() {
+    try {
+      backfillFromDisk()
+      for (const [sessionId, reason] of collectStale(sessions, Date.now())) {
+        const meta = sessions.get(sessionId)
+        if (!meta) continue
+        sessions.delete(sessionId)
+        report(meta, "closed", reason, null, true)
+      }
+    } catch {
+      // A failed sweep costs one tick. It must never reach the host.
+    }
+  }
+
+  function startSweep() {
+    const timer = setInterval(sweep, SWEEP_INTERVAL_MS)
+    if (typeof timer.unref === "function") timer.unref()
+    return () => clearInterval(timer)
+  }
+
+  return { handle, sweep, startSweep }
 }
 
 // close is the process-exit path and nothing else. A plugin reload is not the
@@ -446,6 +522,7 @@ export const plugin = {
       process.once("exit", closeAll)
     }
     const tracker = createTracker(context)
+    const stopSweep = tracker.startSweep()
     const controller = new AbortController()
     void (async () => {
       try {
@@ -458,9 +535,10 @@ export const plugin = {
       }
     })()
     return () => {
-      // Abort only. Marking everything closed here would empty the panel every
-      // time this file is edited, because a reload is not the end of the
-      // conversations OpenCode is still running.
+      // Abort and stop the sweep only. Marking everything closed here would
+      // empty the panel every time this file is edited, because a reload is
+      // not the end of the conversations OpenCode is still running.
+      stopSweep()
       controller.abort()
     }
   }

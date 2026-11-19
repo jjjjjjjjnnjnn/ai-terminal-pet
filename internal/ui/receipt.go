@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"time"
@@ -29,7 +30,14 @@ type alertRecordSession struct {
 	Unread   bool   `json:"unread,omitempty"`
 }
 
-const alertReceiptName = "alerts.json"
+const (
+	alertReceiptName = "alerts.json"
+	// alertLogName is the append-only history of scans that actually spoke.
+	// alerts.json stays a one-scan snapshot because --json reads it; the two
+	// answer different questions and must not share a shape.
+	alertLogName = "alerts-log.jsonl"
+	alertLogMax  = 500
+)
 
 // Why a scan said nothing. The receipt is diagnostics, so an absent balloon has
 // to be explained rather than merely missing: "no-sessions" is the empty tick,
@@ -54,6 +62,41 @@ func writeAlertRecord(record alertRecord) {
 		return
 	}
 	_ = config.WriteFileAtomic(path, append(data, '\n'))
+}
+
+// appendAlertLog keeps the last alertLogMax scans that actually spoke. A
+// one-snapshot receipt cannot answer "why did it ring five minutes ago"; this
+// can, without changing alerts.json's shape for --json.
+func appendAlertLog(record alertRecord) {
+	path := home.Join(alertLogName)
+	if path == "" {
+		return
+	}
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		return
+	}
+	line := append(encoded, '\n')
+	existing, err := os.ReadFile(path)
+	if err == nil && len(existing) > 0 {
+		kept := make([][]byte, 0, alertLogMax)
+		for _, old := range bytes.Split(existing, []byte{'\n'}) {
+			if len(bytes.TrimSpace(old)) > 0 {
+				kept = append(kept, old)
+			}
+		}
+		if len(kept) >= alertLogMax {
+			kept = kept[len(kept)-alertLogMax+1:]
+		}
+		var buffer bytes.Buffer
+		for _, old := range kept {
+			buffer.Write(old)
+			buffer.WriteByte('\n')
+		}
+		buffer.Write(line)
+		line = buffer.Bytes()
+	}
+	_ = config.WriteFileAtomic(path, line)
 }
 
 func readAlertRecord() *alertRecord {

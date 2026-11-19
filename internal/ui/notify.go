@@ -78,6 +78,17 @@ func composeJumpFailure(lang i18n.Lang) notification {
 	}
 }
 
+// composeJumpPartial is the "window came forward, conversation did not" copy.
+// It is deliberately not a failure tone: the click did something useful, and
+// the user only needs to know which half of the jump OpenCode can perform.
+func composeJumpPartial(lang i18n.Lang) notification {
+	return notification{
+		Title: i18n.T(lang, i18n.KeyBalloonJumpPartialTitle),
+		Body:  i18n.T(lang, i18n.KeyBalloonJumpPartialBody),
+		Level: notifyInfo,
+	}
+}
+
 // alertSurfaceAvailable reports whether this machine can show a notification at
 // all. It is a variable rather than a direct call so the receipt's tests can pin
 // both answers on a machine where the tool happens to be installed.
