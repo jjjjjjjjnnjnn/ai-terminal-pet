@@ -6,7 +6,7 @@
 > 变成机制的记录。上架的规则与清单另有专文：[docs/UPSTREAM.md](UPSTREAM.md)。
 > 2026-09-24 停用态时期的章节已归档到 [docs/archive/HANDOVER-2026-09-DISABLE.md](archive/HANDOVER-2026-09-DISABLE.md)。
 
-## 1. 当前状态（2026-11-18；浮窗 **1.0.23**、插件包 **1.2.36** 已发版；**§85 第 85 轮（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
+## 1. 当前状态（2026-11-19；浮窗 **1.0.23**、插件包 **1.2.36** 已发版；**§86（DSH 0.2.2-rc.5 实测）；§85（插件版也能被 --doctor 看见）；§84（回应核查、本机切原生钩子、每日追踪）；§83（Claude Code 插件）；§82（auto-approve 方言修复）；§81（接手体检：门禁全绿、Claude Code 插件契约验证通过）；§80（宣传流程化、工作区清理、会话切换）；§79（卡死修复）；§78（状态盘动效开关）；§77（OpenCode 一行装到底）；§76（先量清楚有几个人在看）**）
 
 > 接手请先读本节与 **§80「宣传流程化、工作区清理与会话切换」**（这次宣传实际发到哪、哪条被过滤、
 > 下个项目怎么复用 playbook、清理了什么），再读 **§79「一个卡死的进程，和它藏起来的 panic」**（UI 线程栈取证、为什么
@@ -5052,6 +5052,44 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
    画法，可以复用）。
 3. §67.6 的三项仍然有效：上游条目只等我们的 PR；插件与 `install.sh` 两条安装路径的"先装的赢"值得写清；
    视觉不变量门禁（preview 已证明同机逐字节可复现，跨机只能比不变量）。
+
+## 86. 交接：DSH 0.2.2-rc.5 实测（2026-11-19，第 86 轮；**不改代码、不发版**）
+
+### 86.1 宿主版本
+
+- 桌面 app **44.7.0**（Electron），核心 `desktopVersion` **0.2.2-rc.5**（`resources/runtime/primary-runtime/runtime.json`）；
+  CLI `dsh.cmd --version` 同样报 **0.2.2-rc.5**。
+- 插件声明 `engines.dsh: ">=0.2.0-0 <0.3.0-0"` 已覆盖该版本，**无需改兼容范围**。
+
+### 86.2 怎么测的
+
+- 从 headless 模板建一个临时 profile `pet-live`（不碰 desktop/headless），
+  `dsh plugin --profile pet-live add dist/dsh-ai-terminal-pet-1.2.36.tgz`，`--dump-config` 里出现
+  `- id: dsh-ai-terminal-pet`。
+- 真实 headless 会话：`dsh --profile pet-live --json "Reply with exactly: ok"`。模型调用因
+  **`MISSING_CREDENTIAL`**（CLI profile 没有 API key）失败，但会话事件是真实产生的。
+- 在**临时 profile 的副本**里加了几个一次性探针（`apply`、`session/event`、`sendStatus`、快照写入），确认：
+  - `apply` 执行，五个处理器都注册；
+  - `session/event` 收到 `turn/start`、`user/message`、`turn/end`，header 是 `{version,id,createdAt,cwd,isSeeded}`；
+  - 插件把状态映射为 `working` → `error` → `idle` → `closed`，快照路径
+    `%LOCALAPPDATA%\AI-Terminal-Pet\runtime\deepseek-harness-<pid>-<session>.json`，管道
+    `\\.\pipe\ai-terminal-pet-v1-42ce7d78`。
+- **短会话的 closed 清理**：会话结束后 `closed` 快照在约 3 秒内被浮窗清掉，所以过几秒再 `--json` 看不到它。
+  这不是丢报，是 tombstone 的正常行为。
+- 类型表核对（0.2.2-rc.5 的 `SessionEventMap`）：插件覆盖的 `turn/*`、`step/*`、`tool/call`、`tool/result`、
+  `approval/asked|decided`、`command/done`、`session/title` 全在；`approval/asked` 的
+  `toolName` / `callId` / `reason` 未变；`working-directory/change` 现在**真的存在**（插件早就留了分支）。
+- `node packages/dsh-ai-terminal-pet/verify.mjs` **PASS**。
+
+### 86.3 结论、边界与清理
+
+- **兼容**：0.2.2-rc.5 上插件可加载、收事件、写快照、发到正确的管道。
+- **没做**：没有把插件装进正在使用的 `desktop` profile（会改用户正在跑的配置）；没有带 API key 的完整 turn
+  （CLI profile 缺凭据）。desktop 的事件总线与 headless 是同一套，代码路径也同一份。
+- **没有发版**：包内 README 的“实测过 0.2.0-rc.1 / 0.2.2-rc.3”仍然为真；把 rc.5 写进包内文案要耗一个版本号，
+  留给下一次发版。本节就是 rc.5 的测试记录。
+- **清理**：临时 profile 已删除；安装目录的 `protocol.js` 在探测前备份、测后还原，
+  sha256 `F2DE8FDD…` 与仓库一致，`-VerifyOnly` 12/12。临时探针只存在于已删除的 profile 副本里。
 
 ## 85. 交接：插件版 Claude Code 也能被 `--doctor` 看见（2026-11-18，第 85 轮；**已发版** 1.0.23 / 1.2.36）
 
