@@ -4,6 +4,9 @@
 > （`C:\Users\rongj\Desktop\本地知识库\知识库内容\Promotion\`）。从这里开始用
 > `kb promo status` 看今天该做什么，用 `kb promo record` 登记真实发布。
 > 本文件只保留事实卡与历史记录；排期、七道门禁、台账和渠道冷却状态都在总线里，这里不再新增渠道状态。
+>
+> **本仓库 Agent 不直接发帖**：X / Reddit / dev.to / HN / V2EX 的发帖、回帖与 `promotion_post` 登记
+> 只由知识库 `agent-promotion` 执行；这里只提供事实卡与 `promotion-snapshot/v1`。
 
 > 目标一句话：**你的 agent 在等你，而你在另一个标签页里。**
 >
@@ -45,7 +48,7 @@ HN 创始人 dang 的原话（2020，2026-03 更新）值得记住：
 |---|---|---|---|---|
 | **1** | **awesome-claude-code**（58k★） | **入口已关闭**：2026-11-18 实测，该仓库把 issue 创建限制为 **collaborators only**，表单页返回 `Action restricted`。资格（≥14 天且活跃）满足也没用——普通账号连表单都打不开。规则另写明推荐必须由人创建 | 那一行描述在 §6，**等对方开放入口**再用；不要用 PR / `gh` 绕过 | 等外部（原先的"你提交"已无入口） |
 | 2 | GitHub 仓库页 | 无 | 描述/topics/社交预览/README 首屏 —— 决定"点进来 30 秒懂不懂"；首屏的"一行装 + 它不是什么"2026-11-17 已改 | 我 |
-| 3 | **npm 上的 OpenCode 插件** | ✅ 已发布：`opencode-ai-terminal-pet`（与浮窗同号，1.0.19） | `opencode plugin add opencode-ai-terminal-pet` 一行装 —— 对目标人群最有用的一步 | 我 |
+| 3 | **npm 上的 OpenCode 插件** | ✅ 已发布：`opencode-ai-terminal-pet`（与浮窗同号，1.0.24） | `opencode plugin add opencode-ai-terminal-pet` 一行装 —— 对目标人群最有用的一步 | 我 |
 | 4 | **awesome-opencode**（11k★） | **实际门槛（它的 contributing.md 原文）：≥25 stars，且仓库满 30 天；任一规则不过，PR 会被 close**。我们 1★ → **现在投了就是被关**。这一条等的是 star，不是等包 | 等过线再投，一条 `<details>` | 我起稿，你提 PR |
 | 5 | DSH 插件目录 / npm | 已有 | 生态内先看到 | 我 |
 | 6 | winget | 等合并 | `winget install` | 我 |

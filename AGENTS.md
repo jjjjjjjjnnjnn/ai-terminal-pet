@@ -345,3 +345,8 @@ Two conventions in those commands are load-bearing, not style:
      The script cannot see those two and says so; the manual half is not optional.
    - A quiet day is recorded as `no change`. Never invent activity, never repost a filtered post, never ask
      for votes, and never quote npm totals as users.
+12. **Social posting belongs to the knowledge-base `agent-promotion`** (owner instruction, 2026-11-19):
+   - This repo's agent only emits `promotion-snapshot/v1` (`tools/daily-reach.mjs --json`), the fact card,
+     and read-only reach notes. It does not post, reply, or write the bus ledger.
+   - When the owner asks for a post, point at `kb promo plan` / the KB `Promotion/` queue; do not paste a
+     ready-to-send post into X/Reddit yourself.

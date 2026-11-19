@@ -25,6 +25,7 @@ test('the repo defers channel status to the knowledge-base bus', () => {
   assert.ok(playbook.includes('宣传总线'), 'the playbook must keep the bus boundary')
   assert.ok(reach.includes('not the channel state machine'), 'the local reach ledger must not claim to be status')
   assert.ok(reach.includes('kb promo record'), 'real posts must be registered in the bus')
+  assert.ok(promotion.includes('agent-promotion'), 'posting must be delegated to the KB agent-promotion')
 })
 
 test('promo-version reads the published tag, not the working-tree version', () => {
