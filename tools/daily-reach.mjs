@@ -338,6 +338,74 @@ const report = {
 };
 for (const post of REDDIT_POSTS) report.reddit.push(await redditPost(post));
 
+if (process.argv.includes("--json")) {
+  const t = report.traffic || {};
+  const repo = t.repo || {};
+  const unreachable = [];
+  if (t.error) unreachable.push("traffic");
+  if (report.releases?.error) unreachable.push("releases");
+  if (report.devto?.error) unreachable.push("devto");
+  for (const post of report.reddit || []) {
+    if (String(post.status || "").startsWith("unreachable")) unreachable.push(`reddit:${post.label}`);
+  }
+  for (const item of report.upstream || []) {
+    if (item.state === "unreachable") unreachable.push(`upstream:${item.label}`);
+  }
+  const snapshot = {
+    schema: "promotion-snapshot/v1",
+    project_id: "ai-terminal-pet",
+    generated_at: new Date().toISOString(),
+    release: (() => {
+      const latestTag = Array.isArray(report.releases)
+        ? report.releases.map((r) => r.tag).find((tag) => /^pet-v\d+\.\d+\.\d+$/.test(tag))
+        : null;
+      return {
+        version: latestTag ? latestTag.replace(/^pet-v/, "") : report.localVersion,
+        local_version: report.localVersion,
+        tag: latestTag || null,
+        version_source: latestTag ? "release_tag" : "local_version"
+      };
+    })(),
+    github: t.error ? {} : {
+      stars: repo.stars,
+      forks: repo.forks,
+      watchers: repo.subscribers,
+      open_issues: repo.issues,
+      views: { count: repo.views?.count, uniques: repo.views?.uniques, window_days: 14 },
+      clones: { count: repo.clones?.count, uniques: repo.clones?.uniques, ci: repo.clones?.ciClones, window_days: 14 },
+      referrers: repo.referrers || []
+    },
+    npm: Object.entries(t.npm || {}).map(([name, n]) => {
+      const share = latestShare(n);
+      return {
+        package: name,
+        published: publishedVersion(name),
+        week: n.week?.total ?? null,
+        newest: share?.version ?? null,
+        share: share ? Number(share.share.toFixed(4)) : null,
+        window: "last-week"
+      };
+    }),
+    catalogue: t.catalog
+      ? [{ name: t.catalog.name, downloads: t.catalog.downloads, rank: `${t.catalog.rank}/${t.catalog.entries}`, median: t.catalog.median }]
+      : [],
+    releases: Array.isArray(report.releases) ? report.releases : [],
+    social: {
+      devto: Array.isArray(report.devto) ? report.devto : [],
+      reddit: report.reddit || []
+    },
+    upstream: report.upstream || [],
+    facts: {
+      dsh_plugin_version: publishedVersion("dsh-ai-terminal-pet"),
+      opencode_plugin_version: publishedVersion("opencode-ai-terminal-pet")
+    },
+    unreachable,
+    source: { command: "node tools/daily-reach.mjs --json" }
+  };
+  process.stdout.write(JSON.stringify(snapshot, null, 2));
+  process.exit(0);
+}
+
 const text = markdown(report);
 process.stdout.write(text);
 

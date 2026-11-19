@@ -137,6 +137,7 @@ node tools/check_versions.mjs           # every documented version equals the co
 node --test tools/check_versions.test.mjs
 node tools/check_facts.mjs              # every documented count equals the tree's (func Test, packages, --doctor)
 node --test tools/check_facts.test.mjs
+node --test tools/promotion-snapshot.test.mjs   # repo -> knowledge-base promotion bus (promotion-snapshot/v1)
 python tools/check_docs_links.py   # every relative path and #anchor in the docs we maintain
 python tools/check_assets.py       # every size/frame count in docs/assets/README.md matches the file
 node --test tools/check-tarball.test.mjs   # the .tgz reader/writer rules (no tarball needed)

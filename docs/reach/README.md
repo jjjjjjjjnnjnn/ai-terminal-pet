@@ -3,6 +3,14 @@
 The owner's standing instruction (2026-11-18): **check what we published every
 day**. This directory is where that check lands.
 
+**This is a local ledger, not the channel state machine.** The single state machine
+is the local knowledge base's `Promotion/` bus
+(`C:\Users\rongj\Desktop\本地知识库\知识库内容\Promotion\`). Start with
+`kb promo status` for what is due, in cooldown or awaiting a human; register real
+posts with `kb promo record`. The snapshot contract the bus reads is
+`promotion-snapshot/v1` (defined in the bus's `Promotion/SIGNALS.md`), emitted by
+`node tools/daily-reach.mjs --json`.
+
 - `latest.md` — the most recent run, overwritten each time.
 - `YYYY-MM-DD.md` — that day's runs, appended, so a morning and an evening check
   both survive.
