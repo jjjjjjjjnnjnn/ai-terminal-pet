@@ -5096,7 +5096,8 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 
 - **已重建**：三个 exe 按 §3 重建，版本 **1.0.24**；三个包的 vendor 全部刷新，`vendor.mjs --check` 全绿。
 - **已做 A/B 双提交**（AGENTS §6）：A 提交版本号、两份清单、市场索引的 `version`/`publishTimestamp` 与文档；B 提交把索引的 `source.commit` 与 `icon` 钉到 A 的 sha。
-- **尚未对外发布**：tag、GitHub Release、npm publish、上游 bump PR 都没做。`node tools/upstream-entry.mjs --check` 因此报"版本未 tag 不能上架"，这是顺序决定的，不是回归。
+- **已对外发布（2026-11-19 09:02–09:1x UTC）**：`pet-v1.0.24` / `dsh-plugin-v1.2.37` / `claude-plugin-v1.0.24` 三个 tag 指向 A（`b9be45e`）；两个 Release 已建并带全部资产（`pet-setup.exe` 14,595,584 B / `AF8B45B0…` zip，四个 POSIX tarball，DSH tgz）；两个 npm 包已 publish，`npm view` 现为 1.2.37 / 1.0.24；上游目录 bump PR [awesome-dsh-plugin#16914](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/16914) 开着，`upstream-entry.mjs --check` 报 in flight（健康状态，等维护者合并）。
+- 独立子会话复核 A/B 状态：13 PASS / 1 预期 SKIP / 0 FAIL（发布前的全量门禁）。
 - **未重载插件**：本机 OpenCode 仍加载旧 reporter（`~/.config/opencode/plugins/terminal-pet/index.ts` 静态 re-export 仓库文件），按用户决定不重启宿主进程。所以 16→7 的现场效果尚未复验；最大嫌疑是插件 API 没暴露 `time.viewed`（读不到时是失败安全：保留行，不误删）。
 - **颜色**：没有改调色板。用户补充"终端现实里没有 10 个以上会话"，说明颜色抱怨其实是行数问题；等现场复验后再决定是否需要调色。
 
