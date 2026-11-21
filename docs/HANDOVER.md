@@ -5079,13 +5079,13 @@ macOS 面板从未在苹果硬件上开过窗、macOS 通知走 `osascript` 从�
 
 - 账本按 **UTC 日记日**：北京时间已是 11-22 00:xx（+08:00），但脚本仍写进 `docs/reach/2026-11-21.md`，不要另建 `2026-11-22.md` 造成两套口径。
 - **dev.to**（公开 API，无需登录）：自 11-19 回复以来无新增外部互动——launch retrospective 仍是两条顶层评论（amintacccp、sagereads）加我们的两条回复，seam 文章 0 评论。文章计数器写 7，而 comments 端点只返回 4（2 顶层 + 2 回复），不要把计数器当人数。
-- **X 未查**：浏览器停在 X 登录页，handoff 等 3 分钟超时；点赞 / 关注 / 回复未知，**不能写成"无变化"**。
-- **Reddit 未查**：浏览器在 r/coolgithubprojects 遇到 "Prove your humanity" reCAPTCHA，`.json` 端点仍不可达；作者视角评论与 r/SideProject modmail 都需要人来做。
+- **X 已补查**（16:2x 那次卡在登录页、两次 handoff 超时；owner 登录后 16:4x 完成）：**新增 2 个关注** @ZiadLoom（瘆人菌子，约 11-20 22:00 UTC）与 @txnyblossom63（luna 🖌，约 11-20 18:00 UTC），这是 11-19 那次记录之后真正的外部变化。旧的 sharenow 点赞（11-11）与 @peachyhearx90 关注（11-10）不变。Mentions 空；根帖仍是 22 浏览 / 0 赞 / 0 转推 / 0 收藏，只有我们自己的 4 条续帖，没有外部回复。
+- **Reddit 已补查**（首次遇到 "Prove your humanity" reCAPTCHA、`.json` 仍 403，但 owner 登录后公开页可读）：r/coolgithubprojects **score 0 / 0 评论**，与上次一致；r/SideProject **仍被站级 spam filter 移除**，score 1 / 0 评论，帖面上没有版主回信。作者主页隐藏评论、`/message/messages/` 要登录，所以 **modmail 本身仍未读**，需要登录态的 Reddit 账号再查；不要重发被过滤的帖。
 - **11-20（UTC）没有人工记录** → 记为"未查"，不是"安静的一天"。以上都已写进 `docs/reach/2026-11-21.md`；不要发帖或回帖（AGENTS 第 12 条，归知识库 `agent-promotion`）。
 
 ### 90.5 从这里开始
 
-1. **你方便时**：在浏览器登录 X / 过 Reddit 人机验证，补上 11-21（UTC）的人工半；脚本与 tools 都不该代替你发帖。
+1. **你方便时**：用登录态的 Reddit 账号读一次 modmail（`/message/messages/`），确认 r/SideProject 的 filtered 帖有没有版主回信；脚本与 tools 都不该代替你发帖。X 与两个 Reddit 帖面的人工半已在 16:4x UTC 补完（见 §90.4）。
 2. **现场点一个非当前会话**看 `jump.partial` 回执；等出现子会话时再看它们是否不再占面板行。
 3. **本批不发版**（§89.4 第 4 项）：reach 工具修复 + 文档攒到下一批。真要发时按 AGENTS 第 6 条 A/B 两提交、三个 tag、两个 npm 包、市场索引一起动。
 4. **颜色**：看装了 1.0.24 的展开态再说；目前没有证据需要动调色板（§88.5 的结论仍是"颜色抱怨其实是行数问题"）。
