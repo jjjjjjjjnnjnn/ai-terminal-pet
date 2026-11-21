@@ -28,6 +28,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { manualTail } from "./reach-manual.mjs";
 
 const repoDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stdoutOnly = process.argv.includes("--stdout");
@@ -46,7 +47,7 @@ const REDDIT_POSTS = [
   }
 ];
 const UPSTREAM = [
-  { label: "awesome-dsh-plugin #16703 (tarball 1.2.35)", repo: "awesome-dsh-plugin/awesome-dsh-plugin", number: 16703 },
+  { label: "awesome-dsh-plugin #16914 (tarball 1.2.37)", repo: "awesome-dsh-plugin/awesome-dsh-plugin", number: 16914 },
   { label: "winget-pkgs #481818 (1.0.15)", repo: "microsoft/winget-pkgs", number: 481818 }
 ];
 
@@ -418,11 +419,9 @@ if (!stdoutOnly) {
   const separator = previous ? "\n\n---\n\n" : "";
   writeFileSync(daily, previous + separator + text, "utf8");
 
-  // The scheduled run must not erase the manual half (X/Reddit/dev.to notes)
-  // that yesterday's browser check appended to latest.md.
+  // Keep a person's dated notes, but never the generated checklist: matching
+  // "## Manual check" used to re-append our own boilerplate on every run.
   const latestPath = path.join(dir, "latest.md");
   const previousLatest = existsSync(latestPath) ? readFileSync(latestPath, "utf8") : "";
-  const manualAt = previousLatest.indexOf("\n## Manual check");
-  const manual = manualAt >= 0 ? previousLatest.slice(manualAt) : "";
-  writeFileSync(latestPath, text + manual, "utf8");
+  writeFileSync(latestPath, text + manualTail(previousLatest), "utf8");
 }
